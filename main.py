@@ -26,13 +26,6 @@ def run_biduleur(filename):
     """
     html_body_bidul = 'error'
     html_body_agenda = 'error'
-    # try:
-    #     with open(filename, "r", errors="ignore", encoding="utf8") as csvfile:
-    #         reader = csv.DictReader(csvfile)
-    #         html_body_bidul, html_body_agenda, number_of_lines = parse_bidul(reader)
-    #         print(f"number of lines: {number_of_lines}")
-    # except Exception as e:
-    #     logging.warning(f"Could not open bidul csv file {filename}. See exception message: {e}")
 
     with open(filename, "r", errors="ignore", encoding="utf8") as csvfile:
         reader = csv.DictReader(csvfile)

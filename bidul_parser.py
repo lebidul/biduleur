@@ -1,5 +1,3 @@
-from datetime import datetime
-import dateparser
 import warnings
 from constants import *
 
@@ -19,9 +17,10 @@ def parse_bidul(csv_reader):
     body_content_agenda = ''
 
     # sort csv_reader dictionary by date and type of event (musique first theatre then)
-    # for d in csv_reader:
-    #     print(dateparser.parse(d[DATE]))
-    sorted_csv_reader = sorted(csv_reader, key=lambda d: (d[DATE].split()[1].zfill(2), d[GENRE_EVT], d[HORAIRE]))
+    try:
+        sorted_csv_reader = sorted(csv_reader, key=lambda d: (d[DATE].split()[1].zfill(2), d[GENRE_EVT], d[HORAIRE]))
+    except:
+        print("Oops!  Il y a un probleme pour classer le fichier. Reesssayez en s'assurant bien que chaque ligne a une date definie")
 
     # Initialize date
     current_date = None
@@ -45,11 +44,7 @@ def parse_bidul_event(event: dict, current_date: str):
     line_bidul = ""
     line_agenda = ""
 
-    # Eventually add date line_bidul if new date
     if not current_date or current_date != event[DATE]:
-        # date soulignees
-        # line_bidul = f"""{P_MD_OPEN}<u>{event[DATE]}</u>{P_MD_CLOSE}"""
-        # date non soulignees
         line_bidul = f"""{P_MD_OPEN_DATE}{event[DATE]}{P_MD_CLOSE_DATE}"""
         line_agenda = f"""{P_MD_OPEN_DATE_AGENDA}{event[DATE]}{P_MD_CLOSE}"""
 
