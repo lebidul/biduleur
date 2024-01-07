@@ -1,20 +1,12 @@
-import logging
 import csv
 import os
 
 from bidul_parser import parse_bidul
 from utils import output_html_file
 
-# Press Shift+F10 to execute it or replace it with your code.
-# Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
-
-# TODO: add css
 # TODO: edge cases: entree libre, info complementaire
-# TODO: longueur de lignes (couper les mots)
 # TODO: executable
-# TODO: open source
 # TODO: doc francais
-# TODO: handle cas de ligne sans date
 
 
 def run_biduleur(filename):
@@ -36,9 +28,6 @@ def run_biduleur(filename):
     output_html_file(html_body_agenda, original_file_name=filename, output_filename=os.path.basename(filename) + ".agenda.html")
 
 
-# Press the green button in the gutter to run the script.
 if __name__ == '__main__':
-    # filename = '../sample_bidul.csv'
-    filename = '../tapages/202401_tapage_biduleur_janvier_2024.csv'
-    # filename = '../tapages/202307_tapage_biduleur_juillet_2023.csv'
+    filename = './tapages/202401_tapage_biduleur_janvier_2024.csv'
     run_biduleur(filename)

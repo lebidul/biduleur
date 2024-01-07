@@ -1,7 +1,9 @@
 import os.path
+from constants import *
 
 
-def output_html_file(html_body: str, original_file_name: str = None, output_filename: str = None, output_folder_name: str = "../outputs/"):
+def output_html_file(html_body: str, original_file_name: str = None, output_filename: str = None,
+                     output_folder_name: str = OUTPUT_FOLDER_NAME):
     pre, ext = os.path.splitext(os.path.basename(original_file_name))
     if not output_filename:
         output_filename = os.path.join(output_folder_name, pre + ".html")
