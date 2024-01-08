@@ -22,12 +22,12 @@ def run_biduleur(filename):
     with open(filename, "r", errors="ignore", encoding="utf8") as csvfile:
         reader = csv.DictReader(csvfile)
         html_body_bidul, html_body_agenda, number_of_lines = parse_bidul(reader)
-        print(f"number of lines: {number_of_lines}")
+        print(f"Nombre d'événements créés : {number_of_lines}")
 
     output_html_file(html_body_bidul, original_file_name=filename, output_filename=os.path.basename(filename) + ".html")
     output_html_file(html_body_agenda, original_file_name=filename, output_filename=os.path.basename(filename) + ".agenda.html")
 
 
 if __name__ == '__main__':
-    filename = './tapages/202401_tapage_biduleur_janvier_2024.csv'
+    filename = './tapages/202401_tapage_biduleur_janvier_2024_test.csv'
     run_biduleur(filename)
