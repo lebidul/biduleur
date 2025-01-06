@@ -15,23 +15,26 @@ def parse_bidul(csv_reader):
     """
     body_content = ''
     body_content_agenda = ''
+    body_post = 'date|event\n\n'
 
     # sort csv_reader dictionary by date and type of event (musique first theatre then)
-    try:
-        sorted_csv_reader = sorted(csv_reader, key=lambda d: (d[DATE].split()[1].zfill(2), d[GENRE_EVT], d[HORAIRE]))
-    except:
-        print("Oops!  Il y a un probleme pour classer le fichier. Reesssayez en s'assurant bien que chaque ligne a une date definie")
+    # sorted_csv_reader = {}
+    # try:
+    sorted_csv_reader = sorted(csv_reader, key=lambda d: (d[DATE].split()[1].zfill(2), d[GENRE_EVT], d[HORAIRE]))
+    # except:
+    #     print("Oops!  Il y a un probleme pour classer le fichier. Reesssayez en s'assurant bien que chaque ligne a une date definie")
 
     # Initialize date
     current_date = None
     number_of_lines = 0
     # Handle csv content per row
     for row in sorted_csv_reader:
-        formatted_line_bidul, formatted_line_agenda, current_date = parse_bidul_event(row, current_date)
+        formatted_line_bidul, formatted_line_agenda, formatted_line_post, current_date = parse_bidul_event(row, current_date)
         body_content += formatted_line_bidul + "\n\n"
         body_content_agenda += formatted_line_agenda + "\n\n"
+        body_post += formatted_line_post + "\n\n"
         number_of_lines += 1
-    return body_content, body_content_agenda, number_of_lines
+    return body_content, body_content_agenda, body_post, number_of_lines
 
 
 def parse_bidul_event(event: dict, current_date: str):
@@ -43,6 +46,7 @@ def parse_bidul_event(event: dict, current_date: str):
     """
     line_bidul = ""
     line_agenda = ""
+    line_post = ""
 
     if not current_date or current_date != event[DATE]:
         line_bidul = f"""{P_MD_OPEN_DATE}{event[DATE]}{P_MD_CLOSE_DATE}"""
@@ -53,8 +57,8 @@ def parse_bidul_event(event: dict, current_date: str):
     # Take in account particular formatting
     # manuel_formatting = format_manuel_formatting(event['manuel'])
     evenement = format_evenement(event[FESTIVAL], event[STYLE_FESTIVAL])
-    ville = format_ville(event[VILLE])
-    prix = event[PRIX].replace(' a ', ' à ')
+    ville = fmt_ville(event[VILLE])
+    prix = fmt_prix(event[PRIX])
     heure = fmt_heure(event[HORAIRE])
     artistes_styles = format_artists_styles(event[GENRE_EVT],
                                             event[SPECTACLE1], event[ARTISTE1], event[STYLE1],
@@ -67,10 +71,13 @@ def parse_bidul_event(event: dict, current_date: str):
     # ligne avec puces
     # line_bidul += f"""{P_MD_OPEN}&ensp;&#9643 {evenement}{fmt_virgule(artistes_styles)} {fmt_virgule(event[LIEU])} {ville} {heure} {prix}{P_MD_CLOSE}"""
     # ligne sans puces
-    line_bidul += f"""{P_MD_OPEN}{capfirst(evenement)}{fmt_virgule(artistes_styles)} {capfirst(fmt_virgule(event[LIEU]))} {capfirst(ville)} {heure} {prix}{P_MD_CLOSE}"""
-    line_agenda += f"""{P_MD_OPEN}&ensp;&#9643 {capfirst(evenement)}{fmt_virgule(artistes_styles)} {capfirst(fmt_virgule(event[LIEU]))} {ville.capitalize()} {heure} {prix}{liens}{P_MD_CLOSE}"""
+    string_event_bidul = f"""{capfirst(evenement)}{fmt_virgule(artistes_styles)} {capfirst(fmt_virgule(event[LIEU]))} {capfirst(ville)} {heure} {prix}"""
+    string_event_bidul_post = f"""&ensp;&#10087 <span style="color:#CF8E6D">{capfirst(evenement)}{artistes_styles}</span><br>&nbsp{capfirst(event[LIEU])} {capfirst(ville)}<br>&nbsp{heure} {prix}"""
+    line_bidul += f"""{P_MD_OPEN}{string_event_bidul}{P_MD_CLOSE}"""
+    line_agenda += f"""{P_MD_OPEN}&ensp;&##9643 {capfirst(evenement)}{fmt_virgule(artistes_styles)} {capfirst(fmt_virgule(event[LIEU]))} {ville.capitalize()} {heure} {prix}{liens}{P_MD_CLOSE}"""
+    line_post += f"""{current_date.split()[1]}|{P_MD_POST_OPEN}{string_event_bidul_post}{P_MD_CLOSE}"""
 
-    return line_bidul, line_agenda, current_date
+    return line_bidul, line_agenda, line_post, current_date
 
 
 def format_artists_styles(genre_evenement: str,
@@ -169,6 +176,12 @@ def fmt_heure(heure: str):
     return heure
 
 
+def fmt_prix(prix: str):
+    if prix:
+        return prix.replace(' a ', ' à ').replace(' €', '€')
+    return prix
+
+
 def format_style(style: str):
     """
 
@@ -176,7 +189,7 @@ def format_style(style: str):
     :return:
     """
     if style:
-        return f"<em> ({style.lower()})</em>"
+        return f" <em>({style.lower().replace('theâtre', 'th.')})</em>"
     else:
         return ""
 
@@ -206,7 +219,7 @@ def format_evenement(evenement: str, style_evenement: str):
         return ""
 
 
-def format_ville(ville: str):
+def fmt_ville(ville: str):
     """
 
     :param ville:
@@ -216,6 +229,15 @@ def format_ville(ville: str):
         return f"{ville}, "
     else:
         return ""
+
+
+def html_to_md(line: str):
+    """
+
+    :param line:
+    :return:
+    """
+    return line.replace("<strong>", "**").replace("</strong>", "**").replace("<em>", "*").replace("</em>", "*")
 
 
 def capfirst(s):

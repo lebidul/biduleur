@@ -20,3 +20,10 @@ def output_html_file(html_body: str, original_file_name: str = None, output_file
 </html>
 """
     open(output_filename, 'w+', encoding='utf-8').write(html_string)
+
+
+def output_file(body: str, output_filename: str = None,
+                output_folder_name: str = OUTPUT_FOLDER_NAME):
+    output_filename = os.path.join(output_folder_name, output_filename)
+
+    open(output_filename, 'w+', encoding='utf-8').write(body)
