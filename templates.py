@@ -1,6 +1,6 @@
 from jinja2 import Template
 
-HTML_TEMPLATE_WITH_IMAGE = """
+HTML_TEMPLATE_WITH_IMAGE_OLD = """
         <!DOCTYPE html>
         <html lang="en">
         <head>
@@ -8,7 +8,7 @@ HTML_TEMPLATE_WITH_IMAGE = """
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Instagram Image</title>
             <style>
-                body {{
+                body {
                     margin: 0;
                     padding: 0;
                     height: 100vh;
@@ -20,14 +20,14 @@ HTML_TEMPLATE_WITH_IMAGE = """
                     justify-content: center;
                     align-items: center;
                     
-                }}
-                .text {{
+                }
+                .text {
                     color: #FF0000;
                     font-size: 2rem;
                     font-family: Cutive Mono, sans-serif;
                     text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.7);
                     text-align: left;
-                }}
+                }
             </style>
         </head>
         <body>
@@ -38,7 +38,7 @@ HTML_TEMPLATE_WITH_IMAGE = """
         </html>
     """
 
-HTML_TEMPLATE_GREEN_GREY_ORANGE = """
+HTML_TEMPLATE_GREEN_GREY_ORANGE_OLD = """
         <!DOCTYPE html>
         <html lang="en">
         <head>
@@ -46,7 +46,7 @@ HTML_TEMPLATE_GREEN_GREY_ORANGE = """
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Instagram Image</title>
             <style>
-                body {{
+                body {
                     margin: 0;
                     padding: 0;
                     height: 100vh;
@@ -57,14 +57,14 @@ HTML_TEMPLATE_GREEN_GREY_ORANGE = """
                     justify-content: center;
                     align-items: center;
 
-                }}
-                .text {{
+                }
+                .text {
                     color: #5F826B;
                     font-size: 20px;
                     font-family: Cutive Mono, sans-serif;
                     text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.7);
                     text-align: left;
-                }}
+                }
             </style>
         </head>
         <body>
@@ -76,6 +76,63 @@ HTML_TEMPLATE_GREEN_GREY_ORANGE = """
         </body>
         </html>
     """
+
+
+HTML_TEMPLATE_GREEN_GREY_ORANGE = """
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Instagram Image</title>
+            <style>
+                body {            
+                    margin: 0;
+                    padding: 0;
+                    height: 100vh;
+                    width: 100vw;
+                    background-color: #313438;
+                    background-position: center;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    position: relative;
+                }
+                .text {
+                    color: #5F826B;
+                    font-size: 2rem;
+                    font-family: Lucida Console;
+                    text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.7);
+                    text-align: left;
+                }
+                .top-left,
+                .top-right {
+                    position: absolute;
+                    top: 20px;
+                    font-family: Lucida Console;
+                    font-size: 4rem; 
+                    color: #5F826B;
+                    text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.7);
+                }
+                .top-left {
+                    left: 25px;
+                }
+                .top-right {
+                    right: 25px;
+                    text-align: right;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="top-left">Le Bidul<br>{{ date }}</div>
+            <div class="text">
+                {{ content }}
+            </div>
+        </body>
+        </html>
+    """
+
+
 
 
 # Function to render a template with variables
