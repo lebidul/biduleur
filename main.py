@@ -120,8 +120,8 @@ def html_to_image(html_content, date, output_image):
 
 def post_to_instagram(image_path, caption, username=None, password=None):
     load_dotenv()
-    username = os.getenv("INSTAGRAM_USERNAME")
-    password = os.getenv("INSTAGRAM_PASSWORD")
+    username = os.environ.get("INSTAGRAM_USERNAME")
+    password = os.environ.get("INSTAGRAM_PASSWORD")
     if post_to_instagram:
         cl = login_with_challenge_handling(username, password)
         cl.photo_upload(image_path, caption)
