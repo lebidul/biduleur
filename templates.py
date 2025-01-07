@@ -86,7 +86,7 @@ HTML_TEMPLATE_GREEN_GREY_ORANGE = """
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Instagram Image</title>
             <style>
-                body {            
+                body {
                     margin: 0;
                     padding: 0;
                     height: 100vh;
@@ -97,10 +97,18 @@ HTML_TEMPLATE_GREEN_GREY_ORANGE = """
                     justify-content: center;
                     align-items: center;
                     position: relative;
+                    flex-direction: column;
+                }
+                .text-header {
+                    font-size: 3rem;
+                    margin-top: 100px; /* Adjust spacing below the top-left element */
+                    color: #5F826B;
+                    text-align: left;
+                    font-family: Lucida Console;
                 }
                 .text {
                     color: #5F826B;
-                    font-size: 2rem;
+                    font-size: 3rem;
                     font-family: Lucida Console;
                     text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.7);
                     text-align: left;
@@ -110,7 +118,7 @@ HTML_TEMPLATE_GREEN_GREY_ORANGE = """
                     position: absolute;
                     top: 20px;
                     font-family: Lucida Console;
-                    font-size: 4rem; 
+                    font-size: 4rem;
                     color: #5F826B;
                     text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.7);
                 }
@@ -124,7 +132,8 @@ HTML_TEMPLATE_GREEN_GREY_ORANGE = """
             </style>
         </head>
         <body>
-            <div class="top-left">Le Bidul<br>{{ date }}</div>
+            <div class="top-left">Le Bidul<br><span style="color:#CF8E6D">{{ date }}</span></div>
+            <div class="text-header">Événements du jour passés sous le radar du Bidul:</div>
             <div class="text">
                 {{ content }}
             </div>
