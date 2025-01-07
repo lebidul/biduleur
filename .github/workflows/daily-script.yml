@@ -38,6 +38,11 @@ jobs:
           INSTAGRAM_PASSWORD: ${{ secrets.INSTAGRAM_PASSWORD }}
           INSTAGRAM_VERIFICATION_CODE: ${{ secrets.INSTAGRAM_VERIFICATION_CODE }}
 
+      - name: Export Secrets to Environment
+        run: |
+          echo "INSTAGRAM_USERNAME=${{ secrets.INSTAGRAM_USERNAME }}" >> $GITHUB_ENV
+          echo "INSTAGRAM_PASSWORD=${{ secrets.INSTAGRAM_PASSWORD }}" >> $GITHUB_ENV
+          -
       # Run the Script
       - name: Run Script
         run: python main.py True
