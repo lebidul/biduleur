@@ -32,6 +32,7 @@ jobs:
         run: |
           echo "INSTAGRAM_USERNAME=${INSTAGRAM_USERNAME}"
           echo "INSTAGRAM_PASSWORD=${INSTAGRAM_PASSWORD}"
+          echo "INSTAGRAM_PASSWORD length: ${#INSTAGRAM_PASSWORD}"
         env:
           INSTAGRAM_USERNAME: ${{ secrets.INSTAGRAM_USERNAME }}
           INSTAGRAM_PASSWORD: ${{ secrets.INSTAGRAM_PASSWORD }}
