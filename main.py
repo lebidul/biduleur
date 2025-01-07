@@ -129,6 +129,7 @@ def post_to_instagram(image_path, caption, username=None, password=None):
 
 
 def login_with_challenge_handling(username, password):
+    print(f"Username login: {username}")
     client = Client()
     try:
         client.login(username, password)
