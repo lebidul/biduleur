@@ -178,12 +178,21 @@ def fetch_verification_code():
     return os.getenv("INSTAGRAM_VERIFICATION_CODE")  # Fetch code from env variable
 
 def main(instagram_post=True):
-    username_environ_get = os.environ.get("INSTAGRAM_USERNAME")
-    username_getenv = os.getenv("INSTAGRAM_USERNAME")
-    # username_environ = os.environ['INSTAGRAM_USERNAME']
-    print(f"Username.environ.get: {username_environ_get}")
-    print(f"Username.getenv: {username_getenv}")
-    # print(f"Username.environ: {username_environ}")
+    # username_environ_get = os.environ.get("INSTAGRAM_USERNAME")
+    # username_getenv = os.getenv("INSTAGRAM_USERNAME")
+    # # username_environ = os.environ['INSTAGRAM_USERNAME']
+    # print(f"Username.environ.get: {username_environ_get}")
+    # print(f"Username.getenv: {username_getenv}")
+    # # print(f"Username.environ: {username_environ}")
+
+    username = os.getenv("INSTAGRAM_USERNAME")
+    password = os.getenv("INSTAGRAM_PASSWORD")
+
+    if not username or not password:
+        print("Error: Environment variables not set!")
+    else:
+        print(f"Username: {username}")
+        print(f"Password: {password}")
 
 
     day, today, date_in_french = get_date_info()
