@@ -202,15 +202,6 @@ def main(instagram_post=True):
     print(f"Image Generated for {today} - output file: {output_image_path}")
 
 
-# # Schedule the task daily at a specific time
-# schedule.every().day.at("08:00").do(main)
-#
-# # Run the scheduler
-# while True:
-#     schedule.run_pending()
-#     time.sleep(1)
-
-
 if __name__ == "__main__":
     instagram_post = "False" not in sys.argv
     main(instagram_post)
