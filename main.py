@@ -119,7 +119,7 @@ def html_to_image(html_content, date, output_image):
 
 
 def post_to_instagram(image_path, caption, username=None, password=None):
-    # load_dotenv()
+    load_dotenv()
     username = os.environ.get("INSTAGRAM_USERNAME")
     password = os.environ.get("INSTAGRAM_PASSWORD")
     if post_to_instagram:
@@ -179,8 +179,11 @@ def fetch_verification_code():
 def main(instagram_post=True):
     username_environ_get = os.environ.get("INSTAGRAM_USERNAME")
     username_getenv = os.getenv("INSTAGRAM_USERNAME")
+    username_environ = os.environ['INSTAGRAM_USERNAME']
     print(f"Username.environ.get: {username_environ_get}")
     print(f"Username.getenv: {username_getenv}")
+    print(f"Username.environ: {username_environ}")
+
 
     day, today, date_in_french = get_date_info()
     # day = "12"
