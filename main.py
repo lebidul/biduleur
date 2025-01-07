@@ -130,7 +130,6 @@ def post_to_instagram(image_path, caption, username=None, password=None):
 
 def login_with_challenge_handling(username, password):
     client = Client()
-    print(f"Username: {username}")
     try:
         client.login(username, password)
         print("Login successful!")
@@ -178,22 +177,16 @@ def fetch_verification_code():
     return os.getenv("INSTAGRAM_VERIFICATION_CODE")  # Fetch code from env variable
 
 def main(instagram_post=True):
-    # username_environ_get = os.environ.get("INSTAGRAM_USERNAME")
-    # username_getenv = os.getenv("INSTAGRAM_USERNAME")
-    # # username_environ = os.environ['INSTAGRAM_USERNAME']
-    # print(f"Username.environ.get: {username_environ_get}")
-    # print(f"Username.getenv: {username_getenv}")
-    # # print(f"Username.environ: {username_environ}")
-
-    print("Environment Variables:")
-    for key, value in os.environ.items():
-        print(f"{key}: {value}")
+    # print("Environment Variables:")
+    # for key, value in os.environ.items():
+    #     print(f"{key}: {value}")
 
     username = os.getenv("INSTAGRAM_USERNAME")
     password = os.getenv("INSTAGRAM_PASSWORD")
 
     if not username or not password:
         print("Error: Environment variables not set!")
+        return
     else:
         print(f"Username: {username}")
         print(f"Password: {password}")
