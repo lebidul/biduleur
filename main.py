@@ -185,6 +185,10 @@ def main(instagram_post=True):
     # print(f"Username.getenv: {username_getenv}")
     # # print(f"Username.environ: {username_environ}")
 
+    print("Environment Variables:")
+    for key, value in os.environ.items():
+        print(f"{key}: {value}")
+
     username = os.getenv("INSTAGRAM_USERNAME")
     password = os.getenv("INSTAGRAM_PASSWORD")
 
