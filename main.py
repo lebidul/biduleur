@@ -127,8 +127,9 @@ def post_to_instagram(image_path, caption, username=None, password=None):
         cl.photo_upload(image_path, caption)
 
 
-def login_with_challenge_handling(username, password, loading_with_challenge=False):
+def login_with_challenge_handling(username, password):
     client = Client()
+    print(f"Username: {username}")
     try:
         client.login(username, password)
         print("Login successful!")
