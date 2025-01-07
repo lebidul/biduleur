@@ -29,11 +29,13 @@ jobs:
 
       # Set Up Environment
       - name: Set Up Environment
+        run: |
+          echo "INSTAGRAM_USERNAME=${INSTAGRAM_USERNAME}"
+          echo "INSTAGRAM_PASSWORD=${INSTAGRAM_PASSWORD}"
         env:
           INSTAGRAM_USERNAME: ${{ secrets.INSTAGRAM_USERNAME }}
           INSTAGRAM_PASSWORD: ${{ secrets.INSTAGRAM_PASSWORD }}
           INSTAGRAM_VERIFICATION_CODE: ${{ secrets.INSTAGRAM_VERIFICATION_CODE }}
-        run: echo "Environment variables set."
 
       # Run the Script
       - name: Run Script
