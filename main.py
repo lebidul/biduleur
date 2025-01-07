@@ -9,6 +9,7 @@ from datetime import datetime
 import requests
 import sys
 import os
+from dotenv import load_dotenv
 
 # Configuration
 CSV_FILE = "./sample/202501_tapage_biduleur_janvier_2025.csv.md.tsv"
@@ -118,6 +119,7 @@ def html_to_image(html_content, date, output_image):
 
 
 def post_to_instagram(image_path, caption, username=None, password=None):
+    load_dotenv()
     username = os.getenv("INSTAGRAM_USERNAME")
     password = os.getenv("INSTAGRAM_PASSWORD")
     if post_to_instagram:
@@ -125,7 +127,7 @@ def post_to_instagram(image_path, caption, username=None, password=None):
         cl.photo_upload(image_path, caption)
 
 
-def login_with_challenge_handling(username, password):
+def login_with_challenge_handling(username, password, loading_with_challenge=False):
     client = Client()
     try:
         client.login(username, password)
@@ -133,23 +135,29 @@ def login_with_challenge_handling(username, password):
         return client
     except ChallengeRequired as e:
         print("Challenge required. Resolving...")
-        handle_challenge(client)
+        resolve_challenge(client)
     except Exception as e:
         print(f"An error occurred: {e}")
         return None
 
 
-def handle_challenge(client):
-    # Get the challenge URL from the client
-    challenge_url = client.challenge_resolve(client.last_json["challenge"]["url"])
+def resolve_challenge(client):
+    # Get challenge URL
+    challenge_url = client.last_json.get("challenge", {}).get("url", "")
+    if not challenge_url:
+        print("No challenge URL found.")
+        return
 
-    # Choose the verification method: 0 for SMS, 1 for email
-    verification_method = 1  # Change to 0 for SMS
+    # Send verification code via email or SMS (0 for SMS, 1 for email)
+    verification_method = 1  # Email (change to 0 for SMS)
     client.challenge_code_send(challenge_url, verification_method)
-    print("Verification code sent. Please check your email/SMS.")
+    print("Verification code sent. Please check your email or SMS.")
 
-    # Prompt user to enter the verification code
-    code = input("Enter the verification code: ")
+    # Simulate fetching the verification code from an external source
+    code = fetch_verification_code()  # Replace with your logic
+    if not code:
+        print("Failed to fetch the verification code.")
+        return
 
     # Submit the verification code
     try:
@@ -158,6 +166,14 @@ def handle_challenge(client):
     except Exception as e:
         print(f"Failed to resolve challenge: {e}")
 
+def fetch_verification_code():
+    """
+    Replace this with logic to fetch the verification code
+    from an email or SMS API.
+    """
+    print("Waiting for verification code...")
+    time.sleep(30)  # Wait for the code to arrive
+    return os.getenv("INSTAGRAM_VERIFICATION_CODE")  # Fetch code from env variable
 
 def main(instagram_post=True):
     day, today, date_in_french = get_date_info()
