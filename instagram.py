@@ -5,7 +5,7 @@ from instagrapi.mixins.challenge import ChallengeChoice
 from instagrapi.exceptions import ChallengeRequired
 from dotenv import load_dotenv
 
-def post_to_instagram(image_path, caption, local_env=False):
+def post_to_instagram(image_path, caption, local_env):
     if local_env:
         load_dotenv()
     username = os.getenv("INSTAGRAM_USERNAME")

@@ -5,7 +5,7 @@ from instagram import post_to_instagram, get_post_text
 import constants
 import templates
 
-def main(instagram_post=True):
+def main(instagram_post=False, local_env=True):
     # print("Environment Variables:")
     # for key, value in os.environ.items():
     #     print(f"{key}: {value}")
@@ -34,12 +34,13 @@ def main(instagram_post=True):
     # Post to Instagram
     if instagram_post:
         text_post = get_post_text(date_in_french)
-        post_to_instagram(output_image_path[0], text_post)
+        post_to_instagram(output_image_path[0], text_post, local_env)
         print(f"Instagram post for {today} published - output file: {output_image_path}")
 
     print(f"Image Generated for {today} - output file: {output_image_path}")
 
 
 if __name__ == "__main__":
-    instagram_post = "False" not in sys.argv
-    main(instagram_post)
+    instagram_post = "--post-to-instagram" in sys.argv
+    local_env =  "--local-env" in sys.argv
+    main(instagram_post, local_env)

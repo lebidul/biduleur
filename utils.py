@@ -3,6 +3,7 @@ import constants
 import os
 from html2image import Html2Image
 import pandas as pd
+import templates
 
 def get_date_info():
     today = datetime.now().strftime("%Y-%m-%d")

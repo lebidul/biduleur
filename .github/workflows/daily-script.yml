@@ -45,4 +45,4 @@ jobs:
 
       # Run the Script
       - name: Run Script
-        run: python main.py True
+        run: python main.py --post-to-instagram
