@@ -10,6 +10,7 @@ import requests
 import sys
 import os
 from dotenv import load_dotenv
+import time
 
 # Configuration
 CSV_FILE = "./sample/202501_tapage_biduleur_janvier_2025.csv.md.tsv"
@@ -179,10 +180,10 @@ def fetch_verification_code():
 def main(instagram_post=True):
     username_environ_get = os.environ.get("INSTAGRAM_USERNAME")
     username_getenv = os.getenv("INSTAGRAM_USERNAME")
-    username_environ = os.environ['INSTAGRAM_USERNAME']
+    # username_environ = os.environ['INSTAGRAM_USERNAME']
     print(f"Username.environ.get: {username_environ_get}")
     print(f"Username.getenv: {username_getenv}")
-    print(f"Username.environ: {username_environ}")
+    # print(f"Username.environ: {username_environ}")
 
 
     day, today, date_in_french = get_date_info()
