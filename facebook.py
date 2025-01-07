@@ -1,3 +1,5 @@
+import requests
+
 # Upload the image to Facebook
 def upload_image_to_facebook(page_id, access_token, image_path, message):
     url = f"https://graph.facebook.com/v17.0/{page_id}/photos"

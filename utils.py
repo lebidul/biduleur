@@ -1,4 +1,8 @@
+from datetime import datetime
 import constants
+import os
+from html2image import Html2Image
+import pandas as pd
 
 def get_date_info():
     today = datetime.now().strftime("%Y-%m-%d")
@@ -52,16 +56,16 @@ def extract_markdown_by_date(csv_file, date):
     return today_data
 
 
-def html_to_image(html_content, date, output_image):
+def html_to_image(html_content, date, output_image, template):
 
     rendered_html = templates.render_template(
-        templates.HTML_TEMPLATE_GREEN_GREY_ORANGE,
+        template,
         content=html_content,
         date=date
     )
 
     # Render HTML to an image
     hti = Html2Image(output_path='./output/')
-    html_output_file_name = os.path.join(OUTPUT_PATH, f"{output_image}.html")
+    html_output_file_name = os.path.join(constants.OUTPUT_PATH, f"{output_image}.html")
     open(html_output_file_name, 'w+', encoding='utf-8').write(rendered_html)
     return hti.screenshot(html_str=rendered_html, save_as=output_image, size=(1080, 1080))

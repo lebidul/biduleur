@@ -1,19 +1,9 @@
 import pandas as pd
-from html2image import Html2Image
-from instagrapi import Client
-from instagrapi.mixins.challenge import ChallengeChoice
-from instagrapi.exceptions import ChallengeRequired
-import templates
-import os
-from datetime import datetime
-import requests
 import sys
-import os
-from dotenv import load_dotenv
-import time
-from utils import get_date_info, extract_markdown_by_date
+from utils import get_date_info, extract_markdown_by_date, html_to_image
 from instagram import post_to_instagram, get_post_text
 import constants
+import templates
 
 def main(instagram_post=True):
     # print("Environment Variables:")
@@ -29,7 +19,7 @@ def main(instagram_post=True):
 
     day, today, date_in_french = get_date_info()
     # day = "12"
-    data = extract_markdown_by_date(CSV_FILE, day)
+    data = extract_markdown_by_date(constants.CSV_FILE, day)
 
     if data.empty:
         print(f"No data found for {today}.")
@@ -39,7 +29,7 @@ def main(instagram_post=True):
     html_text = "\n\n".join(html_array)
 
     # Create image from html
-    output_image_path = html_to_image(html_text, date_in_french, OUTPUT_IMAGE)
+    output_image_path = html_to_image(html_text, date_in_french, constants.OUTPUT_IMAGE, templates.HTML_TEMPLATE_GREEN_GREY_ORANGE)
 
     # Post to Instagram
     if instagram_post:
