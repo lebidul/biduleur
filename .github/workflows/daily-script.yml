@@ -29,4 +29,7 @@ jobs:
 
       # Run the Script
       - name: Run Script
+        env:
+          INSTAGRAM_USERNAME: ${{ secrets.INSTAGRAM_USERNAME }}
+          INSTAGRAM_PASSWORD: ${{ secrets.INSTAGRAM_PASSWORD }}
         run: python main.py True

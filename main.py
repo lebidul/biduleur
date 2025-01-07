@@ -1,20 +1,19 @@
 import pandas as pd
 from html2image import Html2Image
 from instagrapi import Client
+from instagrapi.mixins.challenge import ChallengeChoice
+from instagrapi.exceptions import ChallengeRequired
 import templates
 import os
-import schedule
-import locale
 from datetime import datetime
 import requests
 import sys
+import os
 
 # Configuration
 CSV_FILE = "./sample/202501_tapage_biduleur_janvier_2025.csv.md.tsv"
 OUTPUT_IMAGE = "output_image.png"
 OUTPUT_PATH = "./output/"
-INSTAGRAM_USERNAME = "le_bidul_72"
-INSTAGRAM_PASSWORD = "Cucarach@1997"
 
 # Facebook API credentials
 ACCESS_TOKEN = "your_page_access_token"
@@ -118,11 +117,46 @@ def html_to_image(html_content, date, output_image):
     return hti.screenshot(html_str=rendered_html, save_as=output_image, size=(1080, 1080))
 
 
-def post_to_instagram(image_path, caption, username, password):
+def post_to_instagram(image_path, caption, username=None, password=None):
+    username = os.getenv("INSTAGRAM_USERNAME")
+    password = os.getenv("INSTAGRAM_PASSWORD")
     if post_to_instagram:
-        cl = Client()
-        cl.login(username, password)
+        cl = login_with_challenge_handling(username, password)
         cl.photo_upload(image_path, caption)
+
+
+def login_with_challenge_handling(username, password):
+    client = Client()
+    try:
+        client.login(username, password)
+        print("Login successful!")
+        return client
+    except ChallengeRequired as e:
+        print("Challenge required. Resolving...")
+        handle_challenge(client)
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return None
+
+
+def handle_challenge(client):
+    # Get the challenge URL from the client
+    challenge_url = client.challenge_resolve(client.last_json["challenge"]["url"])
+
+    # Choose the verification method: 0 for SMS, 1 for email
+    verification_method = 1  # Change to 0 for SMS
+    client.challenge_code_send(challenge_url, verification_method)
+    print("Verification code sent. Please check your email/SMS.")
+
+    # Prompt user to enter the verification code
+    code = input("Enter the verification code: ")
+
+    # Submit the verification code
+    try:
+        client.challenge_code_verify(code)
+        print("Challenge resolved successfully!")
+    except Exception as e:
+        print(f"Failed to resolve challenge: {e}")
 
 
 def main(instagram_post=True):
@@ -146,7 +180,7 @@ def main(instagram_post=True):
     # Post to Instagram
     text_post = get_post_text(date_in_french)
     if instagram_post:
-        post_to_instagram(output_image_path[0], text_post, INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD)
+        post_to_instagram(output_image_path[0], text_post)
         print(f"Instagram post for {today} published - output file: {output_image_path}")
 
     print(f"Image Generated for {today} - output file: {output_image_path}")
