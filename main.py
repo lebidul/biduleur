@@ -120,7 +120,7 @@ def html_to_image(html_content, date, output_image):
 
 
 def post_to_instagram(image_path, caption, username=None, password=None):
-    load_dotenv()
+    # load_dotenv()
     username = os.environ.get("INSTAGRAM_USERNAME")
     password = os.environ.get("INSTAGRAM_PASSWORD")
     if post_to_instagram:
@@ -181,16 +181,12 @@ def main(instagram_post=True):
     # for key, value in os.environ.items():
     #     print(f"{key}: {value}")
 
-    username = os.getenv("INSTAGRAM_USERNAME")
-    password = os.getenv("INSTAGRAM_PASSWORD")
-
-    if not username or not password:
-        print("Error: Environment variables not set!")
-        return
-    else:
-        print(f"Username: {username}")
-        print(f"Password: {password}")
-
+    # username = os.getenv("INSTAGRAM_USERNAME")
+    # password = os.getenv("INSTAGRAM_PASSWORD")
+    #
+    # if not username or not password:
+    #     print("Error: Environment variables not set!")
+    #     return
 
     day, today, date_in_french = get_date_info()
     # day = "12"
