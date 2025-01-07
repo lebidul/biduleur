@@ -177,8 +177,11 @@ def fetch_verification_code():
     return os.getenv("INSTAGRAM_VERIFICATION_CODE")  # Fetch code from env variable
 
 def main(instagram_post=True):
-    print(f"Username.environ.get: {os.environ.get("INSTAGRAM_USERNAME")}")
-    print(f"Username.getenv: {os.getenv("INSTAGRAM_USERNAME")}")
+    username_environ_get = os.environ.get("INSTAGRAM_USERNAME")
+    username_getenv = os.getenv("INSTAGRAM_USERNAME")
+    print(f"Username.environ.get: {username_environ_get}")
+    print(f"Username.getenv: {username_getenv}")
+
     day, today, date_in_french = get_date_info()
     # day = "12"
     data = extract_markdown_by_date(CSV_FILE, day)
