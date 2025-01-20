@@ -37,7 +37,7 @@ def parse_bidul(csv_reader):
     return body_content, body_content_agenda, body_post, number_of_lines
 
 
-def parse_bidul_event(event: dict, current_date: str):
+def parse_bidul_event(event: dict, current_date: str = None):
     """
 
     :param event:
