@@ -58,7 +58,7 @@ def extract_markdown_by_date(csv_file, date):
     today_data = df[df['date'] == int(date)]
     return today_data
 
-def extract_markdown_by_date_from_tapage(csv_file, date):
+def extract_event_by_date_from_tapage(csv_file, date):
     # Load data
     df = pd.read_csv(csv_file)
     # Filter rows matching the date
