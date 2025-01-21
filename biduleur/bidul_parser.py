@@ -45,6 +45,12 @@ def parse_bidul_event(event: dict, current_date: str = None):
     line_agenda = ""
     line_post = ""
 
+    # Strip all string values in event dictionary
+    event = {
+        key: value.strip() if isinstance(value, str) else value
+        for key, value in event.items()
+    }
+
     if not current_date or current_date != event[DATE]:
         line_bidul = f"""{P_MD_OPEN_DATE}{event[DATE]}{P_MD_CLOSE_DATE}"""
         line_agenda = f"""{P_MD_OPEN_DATE_AGENDA}{event[DATE]}{P_MD_CLOSE}"""
@@ -70,8 +76,10 @@ def parse_bidul_event(event: dict, current_date: str = None):
     # ligne sans puces
     string_event_bidul = f"""{capfirst(evenement)}{fmt_virgule(artistes_styles)} {capfirst(fmt_virgule(event[LIEU]))} {capfirst(ville)} {heure} {prix}"""
     string_event_bidul_post = f"""&ensp;&#10087 <span style="color:#CF8E6D">{capfirst(evenement)}{artistes_styles}</span><br>&nbsp{capfirst(event[LIEU])} {capfirst(ville)}<br>&nbsp{heure} {prix}"""
+    string_event_bidul_agenda = f"""&ensp;&##9643 {capfirst(evenement)}{fmt_virgule(artistes_styles)} {capfirst(fmt_virgule(event[LIEU]))} {ville.capitalize()} {heure} {prix}{liens}"""
+
     line_bidul += f"""{P_MD_OPEN}{string_event_bidul}{P_MD_CLOSE}"""
-    line_agenda += f"""{P_MD_OPEN}&ensp;&##9643 {capfirst(evenement)}{fmt_virgule(artistes_styles)} {capfirst(fmt_virgule(event[LIEU]))} {ville.capitalize()} {heure} {prix}{liens}{P_MD_CLOSE}"""
+    line_agenda += f"""{P_MD_OPEN}{string_event_bidul_agenda}{P_MD_CLOSE}"""
     line_post += f"""{P_MD_POST_OPEN}{string_event_bidul_post}{P_MD_CLOSE}"""
 
     return line_bidul, line_agenda, line_post, current_date

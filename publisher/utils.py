@@ -50,7 +50,7 @@ def get_date_in_french():
     month_name = months[today.month]          # Get the month
 
     # Format the date in the desired format
-    return f"{day_name} {day:02d} {month_name}", f"{capfirst(day_name)} {day}"
+    return f"{capfirst(day_name)} {day:02d} {month_name}", f"{capfirst(day_name)} {day}"
 
 
 def extract_markdown_by_date(csv_file, date):
@@ -86,10 +86,13 @@ def html_to_image(html_content, date, output_image, template):
 
 def event_df_to_html(event_df):
     sorted_df = event_df.sort_values([GENRE_EVT, HORAIRE])
-    cleaned_df = sorted_df.replace({np.nan: None})
+
+    # replace nan values in data frame with empty string
+    cleaned_df = sorted_df.replace({np.nan: ''})
 
     html_array = []
     for index, row in cleaned_df.iterrows():
+        # convert bidul event dictionary into html with the bidul typo convention
         _, _, formatted_event, _ = parse_bidul_event(row)
         html_array.append(formatted_event)
 
