@@ -1,6 +1,11 @@
 from datetime import datetime
-from constants import *
+
+import sys
 import os
+# Add the root directory to the Python path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from constants import *
+
 from html2image import Html2Image
 import pandas as pd
 import templates
