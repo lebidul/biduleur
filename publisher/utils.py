@@ -2,7 +2,7 @@ from datetime import datetime
 from os import walk
 from html2image import Html2Image
 import pandas as pd
-import templates
+from publisher.templates import *
 
 import sys
 import os
@@ -78,7 +78,7 @@ def extract_markdown_by_date_from_tapage(csv_file, date):
 
 def html_to_image(html_content, date, output_image, template):
 
-    rendered_html = templates.render_template(
+    rendered_html = render_template(
         template,
         content=html_content,
         date=date

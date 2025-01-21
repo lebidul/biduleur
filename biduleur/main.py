@@ -1,7 +1,7 @@
 import csv
 import os
 
-from bidul_parser import parse_bidul
+from biduleur.bidul_parser import parse_bidul
 from biduleur.utils import output_html_file
 
 # TODO: edge cases: entree libre, info complementaire

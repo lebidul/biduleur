@@ -1,8 +1,8 @@
 from publisher.utils import get_date_info, extract_markdown_by_date, extract_markdown_by_date_from_tapage, html_to_image
 from biduleur.bidul_parser import parse_bidul_event
-from instagram import post_to_instagram, get_post_text
+from publisher.instagram import post_to_instagram, get_post_text
 from constants import *
-import templates
+from publisher.templates import *
 import numpy as np
 
 import sys
@@ -44,7 +44,7 @@ def main(instagram_post=False, local_env=True):
     html_text = "\n\n".join(html_array)
 
     # Create image from html
-    output_image_path = html_to_image(html_text, date_in_french, OUTPUT_IMAGE, templates.HTML_TEMPLATE_GREEN_GREY_ORANGE)
+    output_image_path = html_to_image(html_text, date_in_french, OUTPUT_IMAGE, HTML_TEMPLATE_GREEN_GREY_ORANGE)
 
     # Post to Instagram
     if instagram_post:
