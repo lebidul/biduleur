@@ -1,5 +1,5 @@
 import os
-import constants
+import time
 from instagrapi import Client
 from instagrapi.mixins.challenge import ChallengeChoice
 from instagrapi.exceptions import ChallengeRequired
