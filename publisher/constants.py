@@ -1,7 +1,8 @@
 # Configuration
-CSV_FILE = "./sample/202501_tapage_biduleur_janvier_2025.csv.md.tsv"
+CSV_FILE = "./publisher/sample/202501_tapage_biduleur_janvier_2025.csv.md.tsv"
+CSV_TAPAGE = "./publisher/sample/202501_tapage_biduleur_janvier_2025.csv"
 OUTPUT_IMAGE = "output_image.png"
-OUTPUT_PATH = "./output/"
+OUTPUT_PATH = "./publisher/output/"
 
 # Facebook API credentials
 ACCESS_TOKEN = "your_page_access_token"

@@ -1,6 +1,7 @@
 import pandas as pd
 import sys
-from utils import get_date_info, extract_markdown_by_date, html_to_image
+from utils import get_date_info, extract_markdown_by_date, extract_markdown_by_date_from_tapage, html_to_image
+from ..biduleur.bidul_parser import parse_bidul_event
 from instagram import post_to_instagram, get_post_text
 import constants
 import templates
@@ -17,10 +18,12 @@ def main(instagram_post=False, local_env=True):
     #     print("Error: Environment variables not set!")
     #     return
 
-    day, today, date_in_french = get_date_info()
+    day, today, date_in_french, date_in_french_fichier_tapage = get_date_info()
     # day = "12"
     data = extract_markdown_by_date(constants.CSV_FILE, day)
+    data_from_tapage =  extract_markdown_by_date_from_tapage(constants.CSV_TAPAGE, date_in_french_fichier_tapage)
 
+    parsed_event = parse_bidul_event(data_from_tapage)
     if data.empty:
         print(f"No data found for {today}.")
         return
