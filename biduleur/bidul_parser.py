@@ -71,13 +71,11 @@ def parse_bidul_event(event: dict, current_date: str = None):
     liens = fmt_link(event[LIEN1], event[LIEN2], event[LIEN3], event[LIEN4])
 
     # html formatting of the event
-    # ligne avec puces
-    # line_bidul += f"""{P_MD_OPEN}&ensp;&#9643 {evenement}{fmt_virgule(artistes_styles)} {fmt_virgule(event[LIEU])} {ville} {heure} {prix}{P_MD_CLOSE}"""
-    # ligne sans puces
     string_event_bidul = f"""{capfirst(evenement)}{fmt_virgule(artistes_styles)} {capfirst(fmt_virgule(event[LIEU]))} {capfirst(ville)} {heure} {prix}"""
-    string_event_bidul_post = f"""&ensp;&#10087 <span style="color:#CF8E6D">{capfirst(evenement)}{artistes_styles}</span><br>&nbsp{capfirst(event[LIEU])} {capfirst(ville)}<br>&nbsp{heure} {prix}"""
+    string_event_bidul_post = f"""&ensp;&#10087 <span style="color:#CF8E6D">{capfirst(evenement)}{artistes_styles}</span><br>&nbsp{fmt_virgule(capfirst(event[LIEU]))} {capfirst(ville)}<br>&nbsp{heure} {prix}"""
     string_event_bidul_agenda = f"""&ensp;&##9643 {capfirst(evenement)}{fmt_virgule(artistes_styles)} {capfirst(fmt_virgule(event[LIEU]))} {ville.capitalize()} {heure} {prix}{liens}"""
 
+    # add paragraph markdown
     line_bidul += f"""{P_MD_OPEN}{string_event_bidul}{P_MD_CLOSE}"""
     line_agenda += f"""{P_MD_OPEN}{string_event_bidul_agenda}{P_MD_CLOSE}"""
     line_post += f"""{P_MD_POST_OPEN}{string_event_bidul_post}{P_MD_CLOSE}"""
