@@ -3,8 +3,11 @@ from os import walk
 from html2image import Html2Image
 import pandas as pd
 from publisher.templates import *
+from biduleur.bidul_parser import parse_bidul_event
 import os
 from constants import *
+import numpy as np
+
 
 def get_date_info():
     today = datetime.now().strftime("%Y-%m-%d")
@@ -74,14 +77,24 @@ def html_to_image(html_content, date, output_image, template):
         date=date
     )
 
-    # sorted_csv_reader = sorted(csv_reader, key=lambda d: (d[DATE].split()[1].zfill(2), d[GENRE_EVT], d[HORAIRE]))
-
-
     # Render HTML to an image
     hti = Html2Image(output_path=OUTPUT_PATH)
     html_output_file_name = os.path.join(OUTPUT_PATH, f"{output_image}.html")
     open(html_output_file_name, 'w+', encoding='utf-8').write(rendered_html)
     return hti.screenshot(html_str=rendered_html, save_as=output_image, size=(1080, 1080))
+
+
+def event_df_to_html(event_df):
+    sorted_df = event_df.sort_values([GENRE_EVT, HORAIRE])
+    cleaned_df = sorted_df.replace({np.nan: None})
+
+    html_array = []
+    for index, row in cleaned_df.iterrows():
+        _, _, formatted_event, _ = parse_bidul_event(row)
+        html_array.append(formatted_event)
+
+    html_text = "\n\n".join(html_array)
+    return html_text
 
 def capfirst(s):
     return s[:1].upper() + s[1:]

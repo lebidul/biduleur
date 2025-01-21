@@ -1,10 +1,8 @@
 import sys
-from publisher.utils import get_date_in_french, extract_event_by_date_from_tapage, html_to_image
-from biduleur.bidul_parser import parse_bidul_event
+from publisher.utils import get_date_in_french, extract_event_by_date_from_tapage, html_to_image, event_df_to_html
 from publisher.instagram import post_to_instagram, get_post_text
 from constants import *
 from publisher.templates import *
-import numpy as np
 
 def main(instagram_post=False, local_env=True):
     # print("Environment Variables:")
@@ -25,18 +23,7 @@ def main(instagram_post=False, local_env=True):
         print(f"No data found for {date_french_post}.")
         return
 
-    sorted_data = data.sort_values([GENRE_EVT, HORAIRE])
-    cleaned_df = sorted_data.replace({np.nan: None})
-
-    html_array = []
-    for index, row in cleaned_df.iterrows():
-        _, _, formatted_event, _ = parse_bidul_event(row)
-        html_array.append(formatted_event)
-
-
-
-    # html_array = data['event'].values
-    html_text = "\n\n".join(html_array)
+    html_text = event_df_to_html(data)
 
     # Create image from html
     output_image_path = html_to_image(html_text, date_french_tapage, OUTPUT_IMAGE, HTML_TEMPLATE_GREEN_GREY_ORANGE)
