@@ -1,5 +1,5 @@
 import sys
-from publisher.utils import get_date_in_french, extract_event_by_date_from_tapage, html_to_image, event_df_to_html
+from publisher.utils import get_date_in_french, extract_tapage_event_by_date, html_to_image, event_df_to_html
 from publisher.instagram import post_to_instagram, get_post_text
 from constants import *
 from publisher.templates import *
@@ -17,7 +17,7 @@ def main(instagram_post=False, local_env=True):
 
     date_french_post, date_french_tapage = get_date_in_french()
     # date_french_tapage = "Mardi 33"
-    data =  extract_event_by_date_from_tapage(CSV_TAPAGE, date_french_tapage)
+    data =  extract_tapage_event_by_date(CSV_TAPAGE, date_french_tapage)
 
     if data.empty:
         print(f"No data found for {date_french_post}.")
