@@ -1,4 +1,4 @@
 /.env
 /.idea
-/publisher/output/*test*
+/publisher/output/*
 #/bidueur/outputs/*
