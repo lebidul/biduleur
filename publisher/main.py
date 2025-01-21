@@ -1,10 +1,11 @@
 import pandas as pd
 import sys
 from utils import get_date_info, extract_markdown_by_date, extract_markdown_by_date_from_tapage, html_to_image
-from ..biduleur.bidul_parser import parse_bidul_event
+from biduleur.bidul_parser import parse_bidul_event
 from instagram import post_to_instagram, get_post_text
 import constants
 import templates
+import numpy as np
 
 def main(instagram_post=False, local_env=True):
     # print("Environment Variables:")
@@ -22,13 +23,20 @@ def main(instagram_post=False, local_env=True):
     # day = "12"
     data = extract_markdown_by_date(constants.CSV_FILE, day)
     data_from_tapage =  extract_markdown_by_date_from_tapage(constants.CSV_TAPAGE, date_in_french_fichier_tapage)
+    sorted_data = data_from_tapage.sort_values([constants.GENRE_EVT, constants.HORAIRE])
+    cleaned_data_data_frame = sorted_data.replace({np.nan: None})
 
-    parsed_event = parse_bidul_event(data_from_tapage)
+    html_array = []
+    for index, row in cleaned_data_data_frame.iterrows():
+        _, _, formatted_event, _ = parse_bidul_event(row)
+        html_array.append(formatted_event)
+
+    # parsed_event = parse_bidul_event(data_from_tapage)
     if data.empty:
         print(f"No data found for {today}.")
         return
 
-    html_array = data['event'].values
+    # html_array = data['event'].values
     html_text = "\n\n".join(html_array)
 
     # Create image from html

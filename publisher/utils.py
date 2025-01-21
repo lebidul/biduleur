@@ -79,7 +79,7 @@ def html_to_image(html_content, date, output_image, template):
 
 
     # Render HTML to an image
-    hti = Html2Image(output_path='./output/')
+    hti = Html2Image(output_path=constants.OUTPUT_PATH)
     html_output_file_name = os.path.join(constants.OUTPUT_PATH, f"{output_image}.html")
     open(html_output_file_name, 'w+', encoding='utf-8').write(rendered_html)
     return hti.screenshot(html_str=rendered_html, save_as=output_image, size=(1080, 1080))
