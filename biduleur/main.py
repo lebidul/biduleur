@@ -29,5 +29,5 @@ def run_biduleur(filename):
 
 
 if __name__ == '__main__':
-    filename = './tapages/202401_tapage_biduleur_janvier_2024_test.csv'
+    filename = './tapages/202401_tapage_biduleur_janvier_2024.csv'
     run_biduleur(filename)
