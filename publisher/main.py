@@ -8,7 +8,7 @@ import templates
 import numpy as np
 import os
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 def main(instagram_post=False, local_env=True):
     # print("Environment Variables:")
