@@ -45,4 +45,4 @@ jobs:
 
       # Run the Script
       - name: Run Script
-        run: python -m publisher/main --post-to-instagram
+        run: python -m publisher.main --post-to-instagram
