@@ -18,7 +18,7 @@ def main(instagram_post=False, local_env=True):
     #     print("Error: Environment variables not set!")
 
     date_french_post, date_french_tapage = get_date_in_french()
-    date_french_tapage = "Mardi 33"
+    # date_french_tapage = "Mardi 33"
     data =  extract_event_by_date_from_tapage(CSV_TAPAGE, date_french_tapage)
 
     if data.empty:
