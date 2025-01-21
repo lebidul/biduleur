@@ -1,15 +1,10 @@
+import sys
 from publisher.utils import get_date_info, extract_markdown_by_date, extract_markdown_by_date_from_tapage, html_to_image
 from biduleur.bidul_parser import parse_bidul_event
 from publisher.instagram import post_to_instagram, get_post_text
 from constants import *
 from publisher.templates import *
 import numpy as np
-
-import sys
-import os
-#
-# # Add the root directory to the Python path
-# sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 def main(instagram_post=False, local_env=True):
     # print("Environment Variables:")
