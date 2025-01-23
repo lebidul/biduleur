@@ -55,3 +55,7 @@ PAGE_ID = "your_page_id"
 # Image and message details
 IMAGE_PATH = "path_to_your_image.jpg"  # Path to the image
 MESSAGE = "Your message for the Facebook post."
+
+AGENDA_URL = "https://www.lebidul.com/agenda-culturel-le-bidul-du-mois/"
+
+TAPAGE_URL = "https://1drv.ms/x/c/7bcf2fd685d3ce6b/EWvO04XWL88ggHu6IwAAAAABt2VQECKtdpwJpDw7yfr1mw?e=fYcRdE"
