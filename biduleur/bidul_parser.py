@@ -1,6 +1,7 @@
 import warnings
 from constants import *
-import pandas as pd
+from utils import capfirst
+import csv
 
 warnings.filterwarnings(
     "ignore",
@@ -8,7 +9,7 @@ warnings.filterwarnings(
 )
 
 
-def parse_bidul(csv_reader):
+def parse_bidul(filename):
     """
 
     :param csv_reader:
@@ -18,20 +19,22 @@ def parse_bidul(csv_reader):
     body_content_agenda = ''
 
     # sort csv_reader dictionary by date and type of event (musique first theatre then)
-    try:
-        sorted_csv_reader = sorted(csv_reader, key=lambda d: (d[DATE].split()[1].zfill(2), d[GENRE_EVT], d[HORAIRE]))
-    except:
-        print("Oops!  Il y a un probleme pour classer le fichier. Reesssayez en s'assurant bien que chaque ligne a une date definie")
+    with open(filename, "r", errors="ignore", encoding="utf8") as csvfile:
+        reader = csv.DictReader(csvfile)
+        try:
+            sorted_csv_reader = sorted(reader, key=lambda d: (d[DATE].split()[1].zfill(2), d[GENRE_EVT], d[HORAIRE]))
+        except:
+            print("Oops!  Il y a un probleme pour classer le fichier. Reesssayez en s'assurant bien que chaque ligne a une date definie")
 
-    # Initialize date
-    current_date = None
-    number_of_lines = 0
-    # Handle csv content per row
-    for row in sorted_csv_reader:
-        formatted_line_bidul, formatted_line_agenda,  _, current_date = parse_bidul_event(row, current_date)
-        body_content += formatted_line_bidul + "\n\n"
-        body_content_agenda += formatted_line_agenda + "\n\n"
-        number_of_lines += 1
+        # Initialize date
+        current_date = None
+        number_of_lines = 0
+        # Handle csv content per row
+        for row in sorted_csv_reader:
+            formatted_line_bidul, formatted_line_agenda,  _, current_date = parse_bidul_event(row, current_date)
+            body_content += formatted_line_bidul + "\n\n"
+            body_content_agenda += formatted_line_agenda + "\n\n"
+            number_of_lines += 1
     return body_content, body_content_agenda, number_of_lines
 
 
@@ -236,7 +239,3 @@ def html_to_md(line: str):
     :return:
     """
     return line.replace("<strong>", "**").replace("</strong>", "**").replace("<em>", "*").replace("</em>", "*")
-
-
-def capfirst(s):
-    return s[:1].upper() + s[1:]
