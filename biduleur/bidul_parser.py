@@ -1,6 +1,6 @@
 import warnings
 from constants import *
-from utils import capfirst
+from utils import *
 import csv
 
 warnings.filterwarnings(
@@ -59,13 +59,13 @@ def parse_bidul_event(event: dict, current_date: str = None):
     # manuel_formatting = format_manuel_formatting(event['manuel'])
     evenement = format_evenement(event[FESTIVAL], event[STYLE_FESTIVAL])
     ville = format_ville(event[VILLE])
-    prix = event[PRIX].replace(' a ', ' à ')
+    prix = fmt_prix(event[PRIX])
     heure = fmt_heure(event[HORAIRE])
     artistes_styles = format_artists_styles(event[GENRE_EVT],
                                             event[SPECTACLE1], event[ARTISTE1], event[STYLE1],
                                             event[SPECTACLE2], event[ARTISTE2], event[STYLE2],
                                             event[SPECTACLE3], event[ARTISTE3], event[STYLE3],
-                                            event[SPECTACLE4], event[ARTISTE4], event[STYLE4]).replace(' a ', ' à ')
+                                            event[SPECTACLE4], event[ARTISTE4], event[STYLE4])
     liens = fmt_link(event[LIEN1], event[LIEN2], event[LIEN3], event[LIEN4])
 
     # html formatting of the event
@@ -73,9 +73,11 @@ def parse_bidul_event(event: dict, current_date: str = None):
     # line_bidul += f"""{P_MD_OPEN}&ensp;&#9643 {evenement}{fmt_virgule(artistes_styles)} {fmt_virgule(event[LIEU])} {ville} {heure} {prix}{P_MD_CLOSE}"""
     # ligne sans puces
     string_event_bidul = f"""{capfirst(evenement)}{fmt_virgule(artistes_styles)} {capfirst(fmt_virgule(event[LIEU]))} {capfirst(ville)} {heure} {prix}"""
+    string_event_agenda = f"""&ensp;&##9643 {capfirst(evenement)}{fmt_virgule(artistes_styles)} {capfirst(fmt_virgule(event[LIEU]))} {ville.capitalize()} {heure} {prix}{liens}"""
     string_event_bidul_post = f"""&ensp;&#10087 <span style="color:#CF8E6D">{capfirst(evenement)}{artistes_styles}</span><br>&nbsp{capfirst(event[LIEU])} {capfirst(ville)}<br>&nbsp{heure} {prix}"""
+
     line_bidul += f"""{P_MD_OPEN}{string_event_bidul}{P_MD_CLOSE}"""
-    line_agenda += f"""{P_MD_OPEN}&ensp;&##9643 {capfirst(evenement)}{fmt_virgule(artistes_styles)} {capfirst(fmt_virgule(event[LIEU]))} {ville.capitalize()} {heure} {prix}{liens}{P_MD_CLOSE}"""
+    line_agenda += f"""{P_MD_OPEN}{string_event_agenda}{P_MD_CLOSE}"""
     line_post += f"""{P_MD_POST_OPEN}{string_event_bidul_post}{P_MD_CLOSE}"""
 
     return line_bidul, line_agenda, line_post, current_date
@@ -92,51 +94,77 @@ def format_artists_styles(genre_evenement: str,
         # on verifie qu'il y ait un nom de spectacle. s'il y en a pas alors on ne met que l'artiste
         # sans les guillemets vides pour le nom du spectacle:
         # ex: "Edgar Yves (one man show), Comédie Le Mans, 21h, complet"
-        if piece1:
-            artistes_styles += f"<strong>\"{capfirst(piece1)}\"</strong> {artiste1}{format_style(style1)}"
-        elif not piece1 and artiste1:
-            artistes_styles += f"<strong>{capfirst(artiste1)}</strong>{format_style(style1)}"
-        elif not piece1 and not artiste1 and style1:
-            artistes_styles += f"<strong>{capfirst(style1)}</strong>"
-        if piece2:
-            artistes_styles += f"<strong> + \"{capfirst(piece2)}\"</strong> {capfirst(artiste2)}{format_style(style2)}"
-        elif not piece2 and artiste2:
-            artistes_styles += f"<strong> + {capfirst(artiste2)}</strong>{format_style(style2)}"
-        elif not piece2 and not artiste2 and style2:
-            artistes_styles += f"<strong> + {capfirst(style2)}</strong>"
-        if piece3:
-            artistes_styles += f"<strong> + \"{capfirst(piece3)}\"</strong> {capfirst(artiste3)}{format_style(style3)}"
-        elif not piece3 and artiste3:
-            artistes_styles += f"<strong> + {capfirst(artiste3)}</strong>{format_style(style3)}"
-        elif not piece3 and not artiste3 and style3:
-            artistes_styles += f"<strong> + {capfirst(style3)}</strong>"
-        if piece4:
-            artistes_styles += f"<strong> + \"{capfirst(piece4)}\"</strong> {capfirst(artiste4)}{format_style(style4)}"
-        elif not piece4 and artiste4:
-            artistes_styles += f"<strong> + {capfirst(artiste4)}</strong>{format_style(style4)}"
-        elif not piece4 and not artiste4 and style4:
-            artistes_styles += f"<strong> + {capfirst(style4)}</strong>"
+        artistes_styles += format_sv(piece1, artiste1, style1, 1)
+        artistes_styles += format_sv(piece2, artiste2, style2, 2)
+        artistes_styles += format_sv(piece3, artiste3, style3, 3)
+        artistes_styles += format_sv(piece4, artiste4, style4, 4)
     elif genre_evenement.lower() == GENRE_EVT_CONCERT:
         # on verifie qu'il y a un artiste sinon on ne met que le style mais sans italique
         # avec la premiere lettre en majuscule
         # ex: "Musique irlandaise, Blue Zinc, 21h, au chapeau"
-        if artiste1:
-            artistes_styles += f"<strong>{artiste1.upper()}</strong>{format_style(style1)}"
-        elif not artiste1 and style1:
-            artistes_styles += f"<strong> {style1.capitalize()}</strong>"
-        if artiste2:
-            artistes_styles += f"<strong> + {artiste2.upper()}</strong>{format_style(style2)}"
-        elif not artiste2 and style2:
-            artistes_styles += f"<strong> + {style2.capitalize()}</strong>"
-        if artiste3:
-            artistes_styles += f"<strong> + {artiste3.upper()}</strong>{format_style(style3)}"
-        elif not artiste3 and style3:
-            artistes_styles += f"<strong> + {style3.capitalize()}</strong>"
-        if artiste4:
-            artistes_styles += f"<strong> + {artiste4.upper()}</strong>{format_style(style4)}"
-        elif not artiste4 and style4:
-            artistes_styles += f"<strong> + {style4.capitalize()}</strong>"
+        artistes_styles += format_c(artiste1, style1, 1)
+        artistes_styles += format_c(artiste2, style2, 2)
+        artistes_styles += format_c(artiste3, style3, 3)
+        artistes_styles += format_c(artiste4, style4, 4)
     return artistes_styles
+
+def format_sv(piece: str, artiste: str, style: str, number: int) -> str:
+    # if piece1:
+    #     artistes_styles += f"<strong>\"{capfirst(piece1)}\"</strong> {artiste1}{format_style(style1)}"
+    # elif not piece1 and artiste1:
+    #     artistes_styles += f"<strong>{capfirst(artiste1)}</strong>{format_style(style1)}"
+    # elif not piece1 and not artiste1 and style1:
+    #     artistes_styles += f"<strong>{capfirst(style1)}</strong>"
+    # if piece2:
+    #     artistes_styles += f"<strong> + \"{capfirst(piece2)}\"</strong> {capfirst(artiste2)}{format_style(style2)}"
+    # elif not piece2 and artiste2:
+    #     artistes_styles += f"<strong> + {capfirst(artiste2)}</strong>{format_style(style2)}"
+    # elif not piece2 and not artiste2 and style2:
+    #     artistes_styles += f"<strong> + {capfirst(style2)}</strong>"
+    # if piece3:
+    #     artistes_styles += f"<strong> + \"{capfirst(piece3)}\"</strong> {capfirst(artiste3)}{format_style(style3)}"
+    # elif not piece3 and artiste3:
+    #     artistes_styles += f"<strong> + {capfirst(artiste3)}</strong>{format_style(style3)}"
+    # elif not piece3 and not artiste3 and style3:
+    #     artistes_styles += f"<strong> + {capfirst(style3)}</strong>"
+    # if piece4:
+    #     artistes_styles += f"<strong> + \"{capfirst(piece4)}\"</strong> {capfirst(artiste4)}{format_style(style4)}"
+    # elif not piece4 and artiste4:
+    #     artistes_styles += f"<strong> + {capfirst(artiste4)}</strong>{format_style(style4)}"
+    # elif not piece4 and not artiste4 and style4:
+    #     artistes_styles += f"<strong> + {capfirst(style4)}</strong>"
+    signe_plus = " + " if number != 1 else ""
+    if piece:
+        return f"<strong>{signe_plus}\"{capfirst(piece)}\"</strong> {artiste}{format_style(style)}"
+    elif artiste:
+        return f"<strong>{signe_plus}{capfirst(artiste)}</strong>{format_style(style)}"
+    elif style:
+        return f"<strong>{signe_plus}{capfirst(style)}</strong>"
+    return ""
+
+def format_c(artiste: str, style: str, number: int) -> str:
+    # if artiste1:
+    #     artistes_styles += f"<strong>{artiste1.upper()}</strong>{format_style(style1)}"
+    # elif not artiste1 and style1:
+    #     artistes_styles += f"<strong>{style1.capitalize()}</strong>"
+    # if artiste2:
+    #     artistes_styles += f"<strong> + {artiste2.upper()}</strong>{format_style(style2)}"
+    # elif not artiste2 and style2:
+    #     artistes_styles += f"<strong> + {style2.capitalize()}</strong>"
+    # if artiste3:
+    #     artistes_styles += f"<strong> + {artiste3.upper()}</strong>{format_style(style3)}"
+    # elif not artiste3 and style3:
+    #     artistes_styles += f"<strong> + {style3.capitalize()}</strong>"
+    # if artiste4:
+    #     artistes_styles += f"<strong> + {artiste4.upper()}</strong>{format_style(style4)}"
+    # elif not artiste4 and style4:
+    #     artistes_styles += f"<strong> + {style4.capitalize()}</strong>"
+    signe_plus = " + " if number != 1 else ""
+    if artiste:
+        return f"<strong>{signe_plus}{artiste.upper()}</strong>{format_style(style)}"
+    elif style:
+        return f"<strong>{signe_plus}{style.capitalize()}</strong>"
+    return ""
 
 
 def fmt_virgule(champ: str):
@@ -145,9 +173,9 @@ def fmt_virgule(champ: str):
     :param champ:
     :return:
     """
-    if champ:
-        return f"{champ},"
-    return champ
+    if not champ:
+        return
+    return f"{champ},"
 
 
 def fmt_link(link1: str, link2: str, link3: str, link4: str):
@@ -172,15 +200,22 @@ def fmt_heure(heure: str):
     :param heure:
     :return:
     """
-    if heure:
-        return f"{heure.lower().replace('h00', 'h').replace(' a ', ' à ')},"
-    return heure
+    replacements = {
+        "h00": "h",
+        " h": "h",
+        " a ": " à "
+    }
+    if not heure:
+        return ""
+    return f"{format_string(heure, replacements, lower=True)},"
 
 
 def fmt_prix(prix: str):
-    if prix:
-        return prix.replace(' a ', ' à ').replace(' €', '€')
-    return prix
+    replacements = {
+        " a ": " à ",
+        " €": "€"
+    }
+    return format_string(prix, replacements, lower=True)
 
 
 def format_style(style: str):
@@ -189,10 +224,38 @@ def format_style(style: str):
     :param style:
     :return:
     """
-    if style:
-        return f" <em>({style.lower().replace('theâtre', 'th.')})</em>"
-    else:
+    replacements = {
+        "theâtre": "th.",
+        "théâtre": "th.",
+        "electro": "électro",
+        "metal": "métal"
+    }
+    if not style:
         return ""
+    return f" <em>({format_string(style, replacements, lower=True)})</em>"
+
+def format_string(string: str, replacement_dictionary: dict, lower=False):
+    """
+
+    :param string:
+    :param replacement_dictionary:
+    :param lower:
+    :return:
+    """
+    replacements = {
+        "theâtre": "th.",
+        "théâtre": "th.",
+        "theatre": "th.",
+        "electro": "électro"
+    }
+    if not string:
+        return ""
+    if lower:
+        string = string.lower()
+    for old, new in replacement_dictionary.items():
+        string = string.replace(old, new)
+
+    return string
 
 
 def format_manuel_formatting(manuel: str):
@@ -201,10 +264,9 @@ def format_manuel_formatting(manuel: str):
     :param manuel:
     :return:
     """
-    if manuel:
-        return f"<strong><em>A FORMATER MANUELLEMENT - </em></strong>"
-    else:
+    if not manuel:
         return ""
+    return f"<strong><em>A FORMATER MANUELLEMENT - </em></strong>"
 
 
 def format_evenement(evenement: str, style_evenement: str):
@@ -214,22 +276,19 @@ def format_evenement(evenement: str, style_evenement: str):
     :param evenement:
     :return:
     """
-    if evenement:
-        return f"{evenement}{format_style(style_evenement)} // "
-    else:
+    if not evenement:
         return ""
+    return f"{evenement}{format_style(style_evenement)} // "
 
 
 def format_ville(ville: str):
     """
-
-    :param ville:
-    :return:
+    Return '{ville}, ' if 'ville' is non-empty and not 'Le Mans',
+    otherwise return an empty string.
     """
-    if ville and ville != "Le Mans":
-        return f"{ville}, "
-    else:
+    if not ville or ville == "Le Mans":
         return ""
+    return f"{ville}, "
 
 
 def html_to_md(line: str):

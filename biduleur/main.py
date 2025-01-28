@@ -1,7 +1,7 @@
 import os
 
 from bidul_parser import parse_bidul
-from .utils import output_html_file
+from utils import output_html_file
 
 # TODO: edge cases: entree libre, info complementaire
 # TODO: executable
@@ -26,5 +26,5 @@ def run_biduleur(filename):
 
 
 if __name__ == '__main__':
-    filename = './tapages/202401_tapage_biduleur_janvier_2024.csv'
+    filename = './tapages/202502_tapage_biduleur_février_2025.csv'
     run_biduleur(filename)
