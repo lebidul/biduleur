@@ -24,3 +24,6 @@ def output_html_file(html_body: str, original_file_name: str = None, output_file
 
 def capfirst(s):
     return s[:1].upper() + s[1:]
+
+def lowfirst(s):
+    return s[:1].lower() + s[1:]
