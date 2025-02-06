@@ -49,6 +49,11 @@ def parse_bidul_event(event: dict, current_date: str = None):
     line_agenda = ""
     line_post = ""
 
+    # strip all string values in event dictionary
+    event = {
+        key: value.strip() for key, value in event.items()
+    }
+
     if not current_date or current_date != event[DATE]:
         line_bidul = f"""{P_MD_OPEN_DATE}{event[DATE]}{P_MD_CLOSE_DATE}"""
         line_agenda = f"""{P_MD_OPEN_DATE_AGENDA}{event[DATE]}{P_MD_CLOSE}"""
@@ -109,33 +114,9 @@ def format_artists_styles(genre_evenement: str,
     return artistes_styles
 
 def format_sv(piece: str, artiste: str, style: str, number: int) -> str:
-    # if piece1:
-    #     artistes_styles += f"<strong>\"{capfirst(piece1)}\"</strong> {artiste1}{format_style(style1)}"
-    # elif not piece1 and artiste1:
-    #     artistes_styles += f"<strong>{capfirst(artiste1)}</strong>{format_style(style1)}"
-    # elif not piece1 and not artiste1 and style1:
-    #     artistes_styles += f"<strong>{capfirst(style1)}</strong>"
-    # if piece2:
-    #     artistes_styles += f"<strong> + \"{capfirst(piece2)}\"</strong> {capfirst(artiste2)}{format_style(style2)}"
-    # elif not piece2 and artiste2:
-    #     artistes_styles += f"<strong> + {capfirst(artiste2)}</strong>{format_style(style2)}"
-    # elif not piece2 and not artiste2 and style2:
-    #     artistes_styles += f"<strong> + {capfirst(style2)}</strong>"
-    # if piece3:
-    #     artistes_styles += f"<strong> + \"{capfirst(piece3)}\"</strong> {capfirst(artiste3)}{format_style(style3)}"
-    # elif not piece3 and artiste3:
-    #     artistes_styles += f"<strong> + {capfirst(artiste3)}</strong>{format_style(style3)}"
-    # elif not piece3 and not artiste3 and style3:
-    #     artistes_styles += f"<strong> + {capfirst(style3)}</strong>"
-    # if piece4:
-    #     artistes_styles += f"<strong> + \"{capfirst(piece4)}\"</strong> {capfirst(artiste4)}{format_style(style4)}"
-    # elif not piece4 and artiste4:
-    #     artistes_styles += f"<strong> + {capfirst(artiste4)}</strong>{format_style(style4)}"
-    # elif not piece4 and not artiste4 and style4:
-    #     artistes_styles += f"<strong> + {capfirst(style4)}</strong>"
     signe_plus = " + " if number != 1 else ""
     if piece:
-        return f"<strong>{signe_plus}\"{capfirst(piece)}\"</strong> {artiste}{format_style(style)}"
+        return f"<strong>{signe_plus}\"{capfirst(piece)}\"</strong>{format_artiste(artiste)}{format_style(style)}"
     elif artiste:
         return f"<strong>{signe_plus}{capfirst(artiste)}</strong>{format_style(style)}"
     elif style:
@@ -143,28 +124,18 @@ def format_sv(piece: str, artiste: str, style: str, number: int) -> str:
     return ""
 
 def format_c(artiste: str, style: str, number: int) -> str:
-    # if artiste1:
-    #     artistes_styles += f"<strong>{artiste1.upper()}</strong>{format_style(style1)}"
-    # elif not artiste1 and style1:
-    #     artistes_styles += f"<strong>{style1.capitalize()}</strong>"
-    # if artiste2:
-    #     artistes_styles += f"<strong> + {artiste2.upper()}</strong>{format_style(style2)}"
-    # elif not artiste2 and style2:
-    #     artistes_styles += f"<strong> + {style2.capitalize()}</strong>"
-    # if artiste3:
-    #     artistes_styles += f"<strong> + {artiste3.upper()}</strong>{format_style(style3)}"
-    # elif not artiste3 and style3:
-    #     artistes_styles += f"<strong> + {style3.capitalize()}</strong>"
-    # if artiste4:
-    #     artistes_styles += f"<strong> + {artiste4.upper()}</strong>{format_style(style4)}"
-    # elif not artiste4 and style4:
-    #     artistes_styles += f"<strong> + {style4.capitalize()}</strong>"
     signe_plus = " + " if number != 1 else ""
     if artiste:
         return f"<strong>{signe_plus}{artiste.upper()}</strong>{format_style(style)}"
     elif style:
-        return f"<strong>{signe_plus}{style.capitalize()}</strong>"
+        return f"<strong>{signe_plus}{capfirst(style)}</strong>"
     return ""
+
+def format_artiste(artiste: str):
+    if not artiste:
+        return ""
+    return f" {artiste}"
+
 
 
 def fmt_virgule(champ: str):
@@ -227,12 +198,18 @@ def format_style(style: str):
     replacements = {
         "theâtre": "th.",
         "théâtre": "th.",
+        "theatre": "th.",
+        "Theâtre": "Th.",
+        "Théâtre": "Th.",
+        "Theatre": "Th.",
         "electro": "électro",
-        "metal": "métal"
+        "Electro": "Électro",
+        "metal": "métal",
+        "Metal": "Métal"
     }
     if not style:
         return ""
-    return f" <em>({format_string(style, replacements, lower=True)})</em>"
+    return f" <em>({lowfirst(format_string(style, replacements, lower=False))})</em>"
 
 def format_string(string: str, replacement_dictionary: dict, lower=False):
     """
@@ -242,12 +219,6 @@ def format_string(string: str, replacement_dictionary: dict, lower=False):
     :param lower:
     :return:
     """
-    replacements = {
-        "theâtre": "th.",
-        "théâtre": "th.",
-        "theatre": "th.",
-        "electro": "électro"
-    }
     if not string:
         return ""
     if lower:
