@@ -1,13 +1,9 @@
-import pandas as pd
+from daily_post import publish_daily_post
+from agenda import publish_agenda
 import sys
-from utils import get_date_info, extract_markdown_by_date, extract_markdown_by_date_from_tapage, html_to_image
-from biduleur.bidul_parser import parse_bidul_event
-from instagram import post_to_instagram, get_post_text
-import constants
-import templates
-import numpy as np
 
-def main(instagram_post=False, local_env=True):
+
+def main(daily_post=True, instagram_post=False, update_agenda=False, local_env=True):
     # print("Environment Variables:")
     # for key, value in os.environ.items():
     #     print(f"{key}: {value}")
@@ -19,39 +15,14 @@ def main(instagram_post=False, local_env=True):
     #     print("Error: Environment variables not set!")
     #     return
 
-    day, today, date_in_french, date_in_french_fichier_tapage = get_date_info()
-    # day = "12"
-    data = extract_markdown_by_date(constants.CSV_FILE, day)
-    data_from_tapage =  extract_markdown_by_date_from_tapage(constants.CSV_TAPAGE, date_in_french_fichier_tapage)
-    sorted_data = data_from_tapage.sort_values([constants.GENRE_EVT, constants.HORAIRE])
-    cleaned_data_data_frame = sorted_data.replace({np.nan: None})
+    if daily_post:
+        publish_daily_post(instagram_post=instagram_post, local_env=local_env)
 
-    html_array = []
-    for index, row in cleaned_data_data_frame.iterrows():
-        _, _, formatted_event, _ = parse_bidul_event(row)
-        html_array.append(formatted_event)
-
-    # parsed_event = parse_bidul_event(data_from_tapage)
-    if data.empty:
-        print(f"No data found for {today}.")
-        return
-
-    # html_array = data['event'].values
-    html_text = "\n\n".join(html_array)
-
-    # Create image from html
-    output_image_path = html_to_image(html_text, date_in_french, constants.OUTPUT_IMAGE, templates.HTML_TEMPLATE_GREEN_GREY_ORANGE)
-
-    # Post to Instagram
-    if instagram_post:
-        text_post = get_post_text(date_in_french)
-        post_to_instagram(output_image_path[0], text_post, local_env)
-        print(f"Instagram post for {today} published - output file: {output_image_path}")
-
-    print(f"Image Generated for {today} - output file: {output_image_path}")
-
+    if update_agenda:
+        publish_agenda()
 
 if __name__ == "__main__":
     instagram_post = "--post-to-instagram" in sys.argv
+    update_agenda = "--update-agenda" in sys.argv
     local_env =  "--local-env" in sys.argv
-    main(instagram_post, local_env)
+    main(instagram_post, update_agenda, local_env)
