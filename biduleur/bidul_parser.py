@@ -174,7 +174,8 @@ def fmt_heure(heure: str):
     replacements = {
         "h00": "h",
         " h": "h",
-        " a ": " à "
+        " a ": " à ",
+        "h.n.c": "hnc"
     }
     if not heure:
         return ""
@@ -184,7 +185,9 @@ def fmt_heure(heure: str):
 def fmt_prix(prix: str):
     replacements = {
         " a ": " à ",
-        " €": "€"
+        " €": "€",
+        "gratuit": "0€",
+        "t.n.c": "tnc"
     }
     return format_string(prix, replacements, lower=True)
 
@@ -199,9 +202,10 @@ def format_style(style: str):
         "theâtre": "th.",
         "théâtre": "th.",
         "theatre": "th.",
+        "théatre": "th.",
         "Theâtre": "Th.",
         "Théâtre": "Th.",
-        "Theatre": "Th.",
+        "Théatre": "Th.",
         "electro": "électro",
         "Electro": "Électro",
         "metal": "métal",
@@ -209,7 +213,8 @@ def format_style(style: str):
     }
     if not style:
         return ""
-    return f" <em>({lowfirst(format_string(style, replacements, lower=False))})</em>"
+    # return f" <em>({lowfirst(format_string(style, replacements, lower=False))})</em>"
+    return f" <em>({format_string(style, replacements, lower=False).lower()})</em>"
 
 def format_string(string: str, replacement_dictionary: dict, lower=False):
     """
