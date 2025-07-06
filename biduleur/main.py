@@ -1,7 +1,7 @@
 import os
 
-from bidul_parser import parse_bidul
-from utils import output_html_file
+from csv_utils import parse_bidul
+from format_utils import output_html_file
 
 # TODO: edge cases: entree libre, info complementaire
 # TODO: executable

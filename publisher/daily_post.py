@@ -1,4 +1,4 @@
-from biduleur.bidul_parser import parse_bidul_event
+from biduleur.csv_utils import parse_bidul_event
 from instagram import post_to_instagram, get_post_text
 import numpy as np
 from datetime import datetime
