@@ -1,6 +1,7 @@
 import warnings
 from constants import *
 from utils import *
+import pandas as pd
 import csv
 
 warnings.filterwarnings(
@@ -37,7 +38,6 @@ def parse_bidul(filename):
             number_of_lines += 1
     return body_content, body_content_agenda, number_of_lines
 
-
 def parse_bidul_event(event: dict, current_date: str = None):
     """
 
@@ -51,7 +51,7 @@ def parse_bidul_event(event: dict, current_date: str = None):
 
     # strip all string values in event dictionary
     event = {
-        key: value.strip() for key, value in event.items()
+        key: (value.strip() if value is not None else "") for key, value in event.items()
     }
 
     if not current_date or current_date != event[DATE]:
@@ -134,7 +134,7 @@ def format_c(artiste: str, style: str, number: int) -> str:
 def format_artiste(artiste: str):
     if not artiste:
         return ""
-    return f" {artiste}"
+    return f" {capfirst(artiste)}"
 
 
 
@@ -175,7 +175,7 @@ def fmt_heure(heure: str):
         "h00": "h",
         " h": "h",
         " a ": " à ",
-        "h.n.c": "hnc"
+        "h.n.c": "hnc",
         " a ": " à "
     }
     if not heure:
@@ -188,8 +188,8 @@ def fmt_prix(prix: str):
         " a ": " à ",
         " €": "€",
         "gratuit": "0€",
-        "t.n.c": "tnc"
-        "h.n.c": "hnc"
+        "t.n.c": "tnc",
+        "h.n.c": "hnc",
         " €": "€"
     }
     return format_string(prix, replacements, lower=True)
