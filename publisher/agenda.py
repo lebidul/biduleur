@@ -1,6 +1,6 @@
 import constants
 import requests
-from biduleur.bidul_parser import parse_bidul
+from biduleur.csv_utils import parse_bidul
 from io import BytesIO
 import pandas as pd
 
