@@ -1,205 +1,256 @@
 import warnings
+import csv
+from typing import Dict, Tuple, List
+
 from constants import *
 from utils import *
-import pandas as pd
-import csv
 
 warnings.filterwarnings(
     "ignore",
     message="The localize method is no longer necessary, as this time zone supports the fold attribute",
 )
 
-
-def parse_bidul(filename):
+def parse_bidul(filename: str) -> Tuple[str, str, int]:
     """
+    Parse a CSV file and generate formatted content for events.
 
-    :param csv_reader:
-    :return:
+    Args:
+        filename: The name of the CSV file to parse.
+
+    Returns:
+        A tuple containing the formatted body content, agenda content, and the number of lines processed.
     """
     body_content = ''
     body_content_agenda = ''
 
-    # sort csv_reader dictionary by date and type of event (musique first theatre then)
-    with open(filename, "r", errors="ignore", encoding="utf8") as csvfile:
-        reader = csv.DictReader(csvfile)
-        try:
+    try:
+        with open(filename, "r", errors="ignore", encoding="utf8") as csvfile:
+            reader = csv.DictReader(csvfile)
             sorted_csv_reader = sorted(reader, key=lambda d: (d[DATE].split()[1].zfill(2), d[GENRE_EVT], d[HORAIRE]))
-        except:
-            print("Oops!  Il y a un probleme pour classer le fichier. Reesssayez en s'assurant bien que chaque ligne a une date definie")
+    except Exception as e:
+        print(f"Error sorting the file: {e}. Ensure each line has a defined date.")
+        return body_content, body_content_agenda, 0
 
-        # Initialize date
-        current_date = None
-        number_of_lines = 0
-        # Handle csv content per row
-        for row in sorted_csv_reader:
-            formatted_line_bidul, formatted_line_agenda,  _, current_date = parse_bidul_event(row, current_date)
-            body_content += formatted_line_bidul + "\n\n"
-            body_content_agenda += formatted_line_agenda + "\n\n"
-            number_of_lines += 1
+    current_date = None
+    number_of_lines = 0
+
+    for row in sorted_csv_reader:
+        formatted_line_bidul, formatted_line_agenda, _, current_date = parse_bidul_event(row, current_date)
+        body_content += formatted_line_bidul + "\n\n"
+        body_content_agenda += formatted_line_agenda + "\n\n"
+        number_of_lines += 1
+
     return body_content, body_content_agenda, number_of_lines
 
-def parse_bidul_event(event: dict, current_date: str = None):
+def parse_bidul_event(event: Dict, current_date: str = None) -> Tuple[str, str, str, str]:
     """
+    Parse a single event and format it for output.
 
-    :param event:
-    :param current_date:
-    :return:
+    Args:
+        event: A dictionary containing event details.
+        current_date: The current date being processed.
+
+    Returns:
+        A tuple containing the formatted lines for bidul, agenda, post, and the updated current date.
     """
     line_bidul = ""
     line_agenda = ""
     line_post = ""
 
-    # strip all string values in event dictionary
-    event = {
-        key: (value.strip() if value is not None else "") for key, value in event.items()
-    }
+    event = {key: (value.strip() if value is not None else "") for key, value in event.items()}
 
     if not current_date or current_date != event[DATE]:
-        line_bidul = f"""{P_MD_OPEN_DATE}{event[DATE]}{P_MD_CLOSE_DATE}"""
-        line_agenda = f"""{P_MD_OPEN_DATE_AGENDA}{event[DATE]}{P_MD_CLOSE}"""
-
+        line_bidul = f"{P_MD_OPEN_DATE}{event[DATE]}{P_MD_CLOSE_DATE}"
+        line_agenda = f"{P_MD_OPEN_DATE_AGENDA}{event[DATE]}{P_MD_CLOSE}"
         current_date = event[DATE]
-        
-    # Take in account particular formatting
-    # manuel_formatting = format_manuel_formatting(event['manuel'])
+
     evenement = format_evenement(event[FESTIVAL], event[STYLE_FESTIVAL])
-    ville = format_ville(event[VILLE])
+    ville = format_lieu(event[VILLE])
+    lieu = format_lieu(event[LIEU])
     prix = fmt_prix(event[PRIX])
     heure = fmt_heure(event[HORAIRE])
-    artistes_styles = format_artists_styles(event[GENRE_EVT],
-                                            event[SPECTACLE1], event[ARTISTE1], event[STYLE1],
-                                            event[SPECTACLE2], event[ARTISTE2], event[STYLE2],
-                                            event[SPECTACLE3], event[ARTISTE3], event[STYLE3],
-                                            event[SPECTACLE4], event[ARTISTE4], event[STYLE4])
+    artistes_styles = format_artists_styles(
+        event[GENRE_EVT], event[SPECTACLE1], event[ARTISTE1], event[STYLE1],
+        event[SPECTACLE2], event[ARTISTE2], event[STYLE2],
+        event[SPECTACLE3], event[ARTISTE3], event[STYLE3],
+        event[SPECTACLE4], event[ARTISTE4], event[STYLE4]
+    )
     liens = fmt_link(event[LIEN1], event[LIEN2], event[LIEN3], event[LIEN4])
 
-    # html formatting of the event
-    # ligne avec puces
-    # line_bidul += f"""{P_MD_OPEN}&ensp;&#9643 {evenement}{fmt_virgule(artistes_styles)} {fmt_virgule(event[LIEU])} {ville} {heure} {prix}{P_MD_CLOSE}"""
-    # ligne sans puces
-    string_event_bidul = f"""{capfirst(evenement)}{fmt_virgule(artistes_styles)} {capfirst(fmt_virgule(event[LIEU]))} {capfirst(ville)} {heure} {prix}"""
-    string_event_agenda = f"""&ensp;&##9643 {capfirst(evenement)}{fmt_virgule(artistes_styles)} {capfirst(fmt_virgule(event[LIEU]))} {ville.capitalize()} {heure} {prix}{liens}"""
-    string_event_bidul_post = f"""&ensp;&#10087 <span style="color:#CF8E6D">{capfirst(evenement)}{artistes_styles}</span><br>&nbsp{capfirst(event[LIEU])} {capfirst(ville)}<br>&nbsp{heure} {prix}"""
+    evenement_str = capfirst(evenement) if evenement else ''
+    artistes_styles_str = fmt_virgule(artistes_styles) if artistes_styles else ''
+    event_lieu_str = capfirst(fmt_virgule(event[LIEU])) if event.get(LIEU) else ''
+    ville_str = capfirst(ville) if ville else ''
+    lieu_str = capfirst(lieu) if lieu else ''
 
-    line_bidul += f"""{P_MD_OPEN}{string_event_bidul}{P_MD_CLOSE}"""
-    line_agenda += f"""{P_MD_OPEN}{string_event_agenda}{P_MD_CLOSE}"""
-    line_post += f"""{P_MD_POST_OPEN}{string_event_bidul_post}{P_MD_CLOSE}"""
+    string_event_bidul = f"{evenement_str}{artistes_styles_str}{lieu_str}{ville_str}{heure}{prix}"
+    string_event_agenda = f"&ensp;&##9643 {evenement_str}{artistes_styles_str}{event_lieu_str}{ville_str}{heure}{prix}{liens}"
+    string_event_bidul_post = f"&ensp;&#10087 <span style=\"color:#CF8E6D\">{evenement_str}{artistes_styles}</span><br>&nbsp{event_lieu_str}{ville_str}<br>&nbsp{heure}{prix}"
+
+    line_bidul += f"{P_MD_OPEN}{string_event_bidul}{P_MD_CLOSE}"
+    line_agenda += f"{P_MD_OPEN}{string_event_agenda}{P_MD_CLOSE}"
+    line_post += f"{P_MD_POST_OPEN}{string_event_bidul_post}{P_MD_CLOSE}"
 
     return line_bidul, line_agenda, line_post, current_date
 
+def format_artists_styles(genre_evenement: str, *args) -> str:
+    """
+    Format artists and styles based on the event genre.
 
-def format_artists_styles(genre_evenement: str,
-                          piece1: str, artiste1: str, style1: str,
-                          piece2: str, artiste2: str, style2: str,
-                          piece3: str, artiste3: str, style3: str,
-                          piece4: str, artiste4: str, style4: str):
+    Args:
+        genre_evenement: The genre of the event.
+        *args: Variable length argument list containing pieces, artists, and styles.
 
+    Returns:
+        A formatted string of artists and styles.
+    """
     artistes_styles = ""
     if genre_evenement.lower() == GENRE_EVT_SV:
-        # on verifie qu'il y ait un nom de spectacle. s'il y en a pas alors on ne met que l'artiste
-        # sans les guillemets vides pour le nom du spectacle:
-        # ex: "Edgar Yves (one man show), Comédie Le Mans, 21h, complet"
-        artistes_styles += format_sv(piece1, artiste1, style1, 1)
-        artistes_styles += format_sv(piece2, artiste2, style2, 2)
-        artistes_styles += format_sv(piece3, artiste3, style3, 3)
-        artistes_styles += format_sv(piece4, artiste4, style4, 4)
+        for i in range(0, len(args), 3):
+            piece = args[i]
+            artiste = args[i + 1]
+            style = args[i + 2]
+            artistes_styles += format_sv(piece, artiste, style, i // 3 + 1)
     elif genre_evenement.lower() == GENRE_EVT_CONCERT:
-        # on verifie qu'il y a un artiste sinon on ne met que le style mais sans italique
-        # avec la premiere lettre en majuscule
-        # ex: "Musique irlandaise, Blue Zinc, 21h, au chapeau"
-        artistes_styles += format_c(artiste1, style1, 1)
-        artistes_styles += format_c(artiste2, style2, 2)
-        artistes_styles += format_c(artiste3, style3, 3)
-        artistes_styles += format_c(artiste4, style4, 4)
+        for i in range(0, len(args), 3):
+            artiste = args[i + 1]
+            style = args[i + 2]
+            artistes_styles += format_concert(artiste, style, i // 3 + 1)
     return artistes_styles
 
 def format_sv(piece: str, artiste: str, style: str, number: int) -> str:
+    """
+    Format a single SV event entry.
+
+    Args:
+        piece: The piece name.
+        artiste: The artist name.
+        style: The style of the piece.
+        number: The entry number.
+
+    Returns:
+        A formatted string for the SV event.
+    """
     signe_plus = " + " if number != 1 else ""
     if piece:
-        return f"<strong>{signe_plus}\"{capfirst(piece)}\"</strong>{format_artiste(artiste)}{format_style(style)}"
+        return f"{signe_plus}\"{capfirst(piece)}\"{format_artiste(artiste)}{format_style(style)}"
     elif artiste:
-        return f"<strong>{signe_plus}{capfirst(artiste)}</strong>{format_style(style)}"
+        return f"{signe_plus}{capfirst(artiste)}{format_style(style)}"
     elif style:
-        return f"<strong>{signe_plus}{capfirst(style)}</strong>"
+        return f"{signe_plus}{capfirst(style)}"
     return ""
 
-def format_c(artiste: str, style: str, number: int) -> str:
+def format_concert(artiste: str, style: str, number: int) -> str:
+    """
+    Format a single concert event entry.
+
+    Args:
+        artiste: The artist name.
+        style: The style of the piece.
+        number: The entry number.
+
+    Returns:
+        A formatted string for the concert event.
+    """
     signe_plus = " + " if number != 1 else ""
     if artiste:
-        return f"<strong>{signe_plus}{artiste.upper()}</strong>{format_style(style)}"
+        return f"{signe_plus}{artiste.upper()}{format_style(style)}"
     elif style:
-        return f"<strong>{signe_plus}{capfirst(style)}</strong>"
+        return f"{signe_plus}{capfirst(style)}"
     return ""
 
-def format_artiste(artiste: str):
+def format_artiste(artiste: str) -> str:
+    """
+    Format the artist name.
+
+    Args:
+        artiste: The artist name.
+
+    Returns:
+        A formatted string for the artist.
+    """
     if not artiste:
         return ""
     return f" {capfirst(artiste)}"
 
-
-
-def fmt_virgule(champ: str):
+def fmt_virgule(champ: str) -> str:
     """
+    Format a string with a trailing comma if it is non-empty.
 
-    :param champ:
-    :return:
+    Args:
+        champ: The string to format.
+
+    Returns:
+        A formatted string with a trailing comma.
     """
     if not champ:
-        return
-    return f"{champ},"
+        return ""
+    return f"{champ}, "
 
-
-def fmt_link(link1: str, link2: str, link3: str, link4: str):
+def fmt_link(*links: str) -> str:
     """
+    Format a list of links.
 
-    :param link1:
-    :param link2:
-    :param link3:
-    :param link4:
-    :return:
+    Args:
+        *links: Variable length argument list of links.
+
+    Returns:
+        A formatted string of links.
     """
-    links = ""
-    for link in [link1, link2, link3, link4]:
+    formatted_links = ""
+    for link in links:
         if link:
-            links += f", <a href=\"{link}\" target=\"_blank\">lien</a>"
-    return links
+            formatted_links += f", <a href=\"{link}\" target=\"_blank\">lien</a>"
+    return formatted_links
 
-
-def fmt_heure(heure: str):
+def fmt_heure(heure: str) -> str:
     """
+    Format the time string.
 
-    :param heure:
-    :return:
+    Args:
+        heure: The time string to format.
+
+    Returns:
+        A formatted time string.
     """
     replacements = {
         "h00": "h",
         " h": "h",
         " a ": " à ",
         "h.n.c": "hnc",
-        " a ": " à "
     }
     if not heure:
         return ""
-    return f"{format_string(heure, replacements, lower=True)},"
+    return f"{format_string(heure, replacements, lower=True)}, "
 
+def fmt_prix(prix: str) -> str:
+    """
+    Format the price string.
 
-def fmt_prix(prix: str):
+    Args:
+        prix: The price string to format.
+
+    Returns:
+        A formatted price string.
+    """
     replacements = {
         " a ": " à ",
         " €": "€",
         "gratuit": "0€",
         "t.n.c": "tnc",
         "h.n.c": "hnc",
-        " €": "€"
     }
     return format_string(prix, replacements, lower=True)
 
-
-def format_style(style: str):
+def format_style(style: str) -> str:
     """
+    Format the style string.
 
-    :param style:
-    :return:
+    Args:
+        style: The style string to format.
+
+    Returns:
+        A formatted style string.
     """
     replacements = {
         "theâtre": "th.",
@@ -210,7 +261,6 @@ def format_style(style: str):
         "Théâtre": "Th.",
         "Théatre": "Th.",
         "Theâtre": "Th.",
-        "Théâtre": "Th.",
         "Theatre": "Th.",
         "electro": "électro",
         "Electro": "Électro",
@@ -219,17 +269,19 @@ def format_style(style: str):
     }
     if not style:
         return ""
-
-    # return f" <em>({lowfirst(format_string(style, replacements, lower=False))})</em>"
     return f" <em>({format_string(style, replacements, lower=False).lower()})</em>"
 
-def format_string(string: str, replacement_dictionary: dict, lower=False):
+def format_string(string: str, replacement_dictionary: Dict, lower: bool = False) -> str:
     """
+    Format a string using a replacement dictionary.
 
-    :param string:
-    :param replacement_dictionary:
-    :param lower:
-    :return:
+    Args:
+        string: The string to format.
+        replacement_dictionary: A dictionary of replacements.
+        lower: Whether to convert the string to lowercase.
+
+    Returns:
+        A formatted string.
     """
     if not string:
         return ""
@@ -237,47 +289,48 @@ def format_string(string: str, replacement_dictionary: dict, lower=False):
         string = string.lower()
     for old, new in replacement_dictionary.items():
         string = string.replace(old, new)
-
     return string
 
-
-def format_manuel_formatting(manuel: str):
+def format_evenement(evenement: str, style_evenement: str) -> str:
     """
+    Format the event name and style.
 
-    :param manuel:
-    :return:
-    """
-    if not manuel:
-        return ""
-    return f"<strong><em>A FORMATER MANUELLEMENT - </em></strong>"
+    Args:
+        evenement: The event name.
+        style_evenement: The style of the event.
 
-
-def format_evenement(evenement: str, style_evenement: str):
-    """
-
-    :param style_evenement:
-    :param evenement:
-    :return:
+    Returns:
+        A formatted string for the event.
     """
     if not evenement:
         return ""
     return f"{evenement}{format_style(style_evenement)} // "
 
+def format_lieu(lieu: str) -> str:
+    """
+    Format the location string.
 
-def format_ville(ville: str):
+    Args:
+        lieu: The location string to format.
+
+    Returns:
+        A formatted location string.
     """
-    Return '{ville}, ' if 'ville' is non-empty and not 'Le Mans',
-    otherwise return an empty string.
-    """
-    if not ville or ville == "Le Mans":
+    if not lieu or lieu == "Le Mans":
         return ""
-    return f"{ville}, "
+    return f"{lieu}, "
 
-
-def html_to_md(line: str):
+def html_to_md(line: str) -> str:
     """
+    Convert HTML tags to Markdown.
 
-    :param line:
-    :return:
+    Args:
+        line: The string containing HTML tags.
+
+    Returns:
+        A string with HTML tags converted to Markdown.
     """
-    return line.replace("<strong>", "**").replace("</strong>", "**").replace("<em>", "*").replace("</em>", "*")
+    return (line.replace("<strong>", "**")
+                .replace("</strong>", "**")
+                .replace("<em>", "*")
+                .replace("</em>", "*"))
