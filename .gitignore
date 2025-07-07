@@ -3,7 +3,6 @@
 /publisher/output/*
 #/bidueur/outputs/*
 __pycache__
-indexer/archives
 biduleur/outputs
 biduleur/__pycache__
 biduleur/outputs
