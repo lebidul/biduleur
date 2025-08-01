@@ -8,13 +8,13 @@ def extract_text_from_pdf(file_path, pages=[0, 1]):
     for page_num in pages:
         if page_num < len(doc):
             page = doc.load_page(page_num)
-            pix = page.get_pixmap()
+            """ pix = page.get_pixmap()
             img = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.width, pix.n)
 
             # Correct the orientation if needed
             img = correct_orientation(img)
 
-            # Extract text directly from the page
+            # Extract text directly from the page """
             text.append(page.get_text("text"))
     return "\n".join(text)
 

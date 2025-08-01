@@ -36,3 +36,11 @@ Thumbs.db
 venv
 node_modules
 .sass-cache
+
+# Résultat de l'indexation
+indexer_ia/results/
+
+# Credentials and configuration files
+indexer_ia/utils/credentials.json
+indexer_ia/utils/service_account.json
+indexer/archives/test/

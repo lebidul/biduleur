@@ -3,9 +3,7 @@ import cv2  # OpenCV
 import numpy as np
 import fitz  # PyMuPDF
 # from  indexer_ia.utils.google_drive import upload_file_to_drive
-#from  indexer_ia.utils.google_drive_2 import upload_file_to_drive
 #from utils.google_drive_2 import upload_file_to_drive
-from utils.local import upload_file_to_local
 
 def mistral_ocr(document_url, api_key):
     headers = {
@@ -94,7 +92,7 @@ def ocr_with_orientation_correction(file_path, api_key, folder_id, pages=[0, 1])
         temp_image_path = prepare_image_for_ocr(file_path, page_num)
 
         # Upload the image to Google Drive
-        image_url = upload_file_to_local(temp_image_path, folder_id, f"page_{page_num}.png")
+       # image_url = upload_file_to_drive(temp_image_path, folder_id, f"page_{page_num}.png")
 
         # Call the OCR API with the image URL
         ocr_response = mistral_ocr(image_url, api_key)
