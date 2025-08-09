@@ -1,5 +1,6 @@
 from config import API_KEY, FOLDER_ID, ORIENTATION_FOLDER_ID, ENABLE_EXTRACTION, ENABLE_POSTPROCESSING, OUTPUT_DIRECTORY, TMP_DIRECTORY
 from extractor.pdf_extractor import extract_text_from_pdf
+from extractor.ocr_extractor import ocr_with_orientation_correction_Geof
 from extractor.ocr_extractor import ocr_with_orientation_correction
 from postprocessing.text_corrector import correct_text_with_model
 from postprocessing.text_cleaner import clean_text
@@ -9,11 +10,26 @@ from utils.logging import log_processing
 import os
 import requests
 from datetime import datetime
-import pdb; pdb.set_trace()
+#import pdb; pdb.set_trace() #breakpoint pour le débogage
 
 
 USE_GOOGLE_DRIVE = False  # True pour Drive, False pour Local
 
+
+def demander_choix_utilisateur():
+    print("Veuillez choisir une option pour le traitement :")
+    print("1. Local")
+    print("2. Cloud")
+
+    while True:
+        choix = input("Entrez le numéro de votre choix (1 ou 2) : ")
+        if choix == "1":
+            return "Local"
+        elif choix == "2":
+            return "Cloud"
+        else:
+            print("Choix invalide. Veuillez entrer 1 ou 2.")
+            
 def get_files_from_local():
     """Retourne une liste de chemins de fichiers PDF dans un dossier local (sous-dossiers inclus)"""
     files = []
@@ -36,6 +52,7 @@ def process_files(extraction=False, postprocessing=False):
     if extraction:
         for local_file_path in input_files:
             file_name = os.path.basename(local_file_path)
+            print(f"Processing file: {local_file_path}")  # Ajoutez cette ligne pour le débogage
 
             # Extraire le texte des deux premières pages
             text = extract_text_from_pdf(local_file_path)
@@ -52,7 +69,16 @@ def process_files(extraction=False, postprocessing=False):
                 #TODO
             else:
                 # Si aucun texte n'est trouvé, utiliser l'API OCR avec correction d'orientation
-                ocr_text = ocr_with_orientation_correction(local_file_path, API_KEY, ORIENTATION_FOLDER_ID)
+                
+                choix_utilisateur = demander_choix_utilisateur()
+
+                if choix_utilisateur == "Local":
+                    ocr_text = ocr_with_orientation_correction_Geof(local_file_path, API_KEY, ORIENTATION_FOLDER_ID)
+                elif choix_utilisateur == "Cloud":
+                    ocr_text = ocr_with_orientation_correction(local_file_path, API_KEY, ORIENTATION_FOLDER_ID)
+                else:
+                    print("Choix invalide. Utilisation de l'API OCR par défaut.")
+                    ocr_text = ocr_with_orientation_correction_Geof(local_file_path, API_KEY, ORIENTATION_FOLDER_ID)
 
                 # Enregistrer le texte OCR dans un fichier texte
                 output_file_path = os.path.join(OUTPUT_DIRECTORY, f'{os.path.splitext(file_name)[0]}_pages_1_2_ocr.txt')

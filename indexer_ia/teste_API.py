@@ -1,6 +1,6 @@
 import requests
 
-API_KEY = "ta_clé_api_ici"  # remplace ceci par ta clé
+API_KEY = "1UALBtIGHPGTijdBecQeA00b7E3Gejnh"  # remplace ceci par ta clé
 
 headers = {
     "Authorization": f"Bearer 1UALBtIGHPGTijdBecQeA00b7E3Gejnh",

@@ -101,3 +101,48 @@ def ocr_with_orientation_correction(file_path, api_key, folder_id, pages=[0, 1])
         page_text = extract_pages_text(ocr_response, pages=[page_num + 1])
         all_text.append(page_text)
     return "\n".join(all_text)
+
+import pytesseract
+import os
+from pdf2image import convert_from_path
+
+def convert_pdf_to_images(file_path, page_nums):
+    """Convertit les pages spécifiées d'un PDF en images."""
+    images = convert_from_path(file_path, first_page=min(page_nums) + 1, last_page=max(page_nums) + 1)
+    image_paths = []
+    for i, image in enumerate(images):
+        temp_image_path = f"temp_page_{page_nums[i]}.png"
+        image.save(temp_image_path, 'PNG')
+        image_paths.append(temp_image_path)
+    return image_paths
+
+def prepare_image_for_ocr(image_path, page_num):
+    # Charger l'image
+    img = cv2.imread(image_path)
+    # Traiter l'image pour l'OCR
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
+    # Sauvegarder l'image temporairement
+    temp_image_path = f"temp_processed_page_{page_num}.png"
+    cv2.imwrite(temp_image_path, thresh)
+    return temp_image_path
+
+def local_ocr(image_path):
+    # Utiliser pytesseract pour extraire le texte de l'image
+    text = pytesseract.image_to_string(image_path)
+    return text
+
+def ocr_with_orientation_correction_Geof(file_path, api_key, folder_id, pages=[0, 1]):
+    all_text = []
+    # Convertir les pages du PDF en images
+    image_paths = convert_pdf_to_images(file_path, pages)
+    for page_num, image_path in zip(pages, image_paths):
+        # Préparer l'image pour l'OCR
+        temp_image_path = prepare_image_for_ocr(image_path, page_num)
+        # Effectuer l'OCR sur l'image préparée
+        page_text = local_ocr(temp_image_path)
+        all_text.append(page_text)
+        # Supprimer les images temporaires après traitement
+        os.remove(image_path)
+        os.remove(temp_image_path)
+    return "\n".join(all_text)
