@@ -1,0 +1,142 @@
+jour;date;artiste;style_musical;lieu;ville;heure;tarif;autre
+Voici les événements extraits de l'image sous forme de ligne CSV :
+
+```
+Ve;08/07/2005;Cabaret de Quat'sous;théâtre musical;Cie Comme la Lune, L'Inventaire;Le Mans;21h;6€ à 9€;résa obligatoire
+Ve;08/07/2005;Festival Les Affranchis;théâtre de rue;à la Flèche;Le Mans;-;gratuit;-
+Sa;02/07/2005;Festival JAM;-;Maison;-;-;-;-
+```
+
+Note: Certains détails comme les heures et les tarifs ne sont pas toujours spécifiés dans l'image, donc ils sont laissés vides ou indiqués comme "gratuit" ou "résa obligatoire" selon les informations disponibles.
+Voici les événements extraits de l'image sous forme de ligne CSV :
+
+```csv
+jour;date;artiste;style_musical;lieu;ville;heure;tarif;autre
+Sa;02/07/2005;GENS AKU;orchestra;MJC Jacques Prévert;Le Mans;18h00;1€;Exposition 100 Visages pour Sauver Prévert
+Sa;02/07/2005;JAM;impro;MJC Jacques Prévert;Le Mans;18h00;1€;
+Sa;02/07/2005;KARL LUDOVIC;spectacle;MJC Jacques Prévert;Le Mans;19h30;1€;Botanie
+Sa;02/07/2005;KARTEL DES GENS BIEN;concert;MJC Jacques Prévert;Le Mans;21h00;1€;
+Sa;02/07/2005;YPSILON;concert;MJC Jacques Prévert;Le Mans;21h00;1€;
+Sa;02/07/2005;MAP;concert;MJC Jacques Prévert;Le Mans;21h00;1€;
+Sa;02/07/2005;YARDBEAT;concert;MJC Jacques Prévert;Le Mans;21h00;1€;
+Sa;02/07/2005;DJ SONIC;radio;MJC Jacques Prévert;Le Mans;22h30;1€;
+Sa;02/07/2005;B.CHAIX;concert;MJC Jacques Prévert;Le Mans;22h30;1€;
+Sa;02/07/2005;WILLY GATOR;concert;MJC Jacques Prévert;Le Mans;22h30;1€;
+Sa;02/07/2005;MR BEE;concert;MJC Jacques Prévert;Le Mans;22h30;1€;
+Sa;02/07/2005;SAILOR PALMER;concert;MJC Jacques Prévert;Le Mans;23h00;1€;
+Sa;02/07/2005;PTIDAV;concert;MJC Jacques Prévert;Le Mans;23h00;1€;
+Sa;02/07/2005;DOUBLE FIRE;concert;MJC Jacques Prévert;Le Mans;23h00;1€;
+Sa;02/07/2005;K.POERA;concert;MJC Jacques Prévert;Le Mans;23h00;1€;
+Sa;02/07/2005;HAPPENING & GUEST;concert;MJC Jacques Prévert;Le Mans;23h00;1€;
+```
+Voici les événements extraits de l'image sous forme de lignes CSV avec les en-têtes demandés :
+
+```csv
+jour;date;artiste;style_musical;lieu;ville;heure;tarif;autre
+Je;07/07;ANAIS + KAAR KAAS SONN;chanson + rap;Salle 6 par 4;Entrammes;21h;7€;
+Me;13/07;STRUP X + DJ BEATSUCKER;techno jungle;Salle 6 par 4;Entrammes;21h;7€;
+Ve;22/07;MONTGOMERY + RILEY;rock;Salle 6 par 4;Entrammes;21h;7€;
+Ve;12/08;PERCUBABA + LA VENGEANCE DU TIGRE;ska, reggae;Salle 6 par 4;Entrammes;21h;12€;
+Sa;20/08;FANNY TASTIC + GUEST;rock + pop;Salle 6 par 4;Entrammes;21h;7€;
+Me;24/08;SANTA MACAIRO ORKESTAR;fanfare déjantée;Salle 6 par 4;Entrammes;21h;7€;
+Di;28/08;T'MP'P;piano, percus;Salle 6 par 4;Entrammes;16h;5€;
+Ve;29/07;FESTIVAL LES 3 ELEPHANTS;varié;A Lassay-les-Châteaux;Lassay-les-Châteaux;00:24;0€;avec Amadou & Mariam + Ghiznu + Rokia Traoré + Antibalas + Arno + the Film + High Tone + Kwal + DJ Vadim + Gomm + Pauline Croze
+Ve;01/07;Israel Vibration;reggae;Festival au Foin de la Rue;St Denis de Gastines;20h;15€/19€;Le Maximum kouette (rock alternatif), Rona hartner & DJ Click (electro-tzigane), Smooth (electro-soul), No Bluff Sound (afro breakbeat), D'elph (chanson electro-pop)
+Sa;02/07;Luke;rock;Festival au Foin de la Rue;St Denis de Gastines;20h;15€/19€;Magyd Cherfi (chanson), Balkan beat box (inclassable), Livin'soul (soul reggae), Idem (dub electro rock), Polo (chanson)
+Sa;23/07;FESTIVAL LA NUIT VERTE;varié;A Jallais;Jallais;18h30;14€ à 17€;avec La Ruda + K2R Riddim + Improvisators dub + Ahimsa
+Ve;22/Sa;23/07;FESTIVAL ART SONIC;varié;A Briouze;Briouze;00:43;0€;avec Tiken Jah Fakoly + Mass Hysteria + Lofofora + Svinkels + La Phaze + La Rumeur + Big Mama + N&SK + Kingston Kitchen 809 + Masnada + Sexyop + Scenario rock + Okloide + Guns of Brixton
+Ve;08/Sa;09/07;FESTIVAL LE CARREFOUR DU ROCK;varié;A l'Epinay Le Comte;Le Comte;00:24;16/20€ par soir et 28/36€ les 2 soirs;avec MATMATAH + RUDA + NO ONE IS INNOCENT + K2R RIDDIM + ETHS
+Ve;08/Sa;09/07;Festival du Thé Vert;varié;Théâtre de verdure, Nogent-le-Retrou;Nogent-le-Retrou;00:24;0€;avec swing manouche, ska, reggae, dub, electro
+Du;14/07 au 17/07;FESTIVAL CHAUFFER DANS LA NOIRCEUR;varié;A Montmartin sur mer, sur la plage;Montmartin sur mer;00:24;14€/36€;avec Rachid Taha, Kerry James, Tagada Jones, Spoke Orchestra, Aerolot, IL Fulgarante, Jon Smith & Deborah, Vive Le Rouge, Sole, Zurrumbanda, Orange Blossom, Experience, Shane Cough, Zeta Cancri, Sofa, Miss Hélium, Horace Andy, Olli & the Bollywood Orchestra, Kaly Live Dub, Non Stop, Positive Roots Band, Gabié, None ID, The Elektroduction + V.J.
+Je;14;Théâtre Blanche Aurore Céleste;théâtre;A Montmartin sur mer, sur la plage;Montmartin sur mer;00:24;0€;avec Serge Teyssot-Gay & Khaled Aljaramani, Présidentirac
+Ve;15;Rachid Taha;rock;A Montmartin sur mer, sur la plage;Montmartin sur mer;00:24;0€;
+Sa;16;Sole;rock;A Montmartin sur mer, sur la plage;Montmartin sur mer;00:24;0€;
+Di;17;Horace Andy;reggae;A Montmartin sur mer, sur la plage;Montmartin sur mer;00:24;0€;
+```
+
+Note : Certains événements n'ont pas de détails complets (comme les heures exactes ou les tarifs) et ont été laissés vides. Les événements avec des dates multiples ont été simplifiés pour correspondre au format demandé.
+Voici les événements extraits de l'image sous forme de lignes CSV :
+
+```csv
+jour;date;artiste;style_musical;lieu;ville;heure;tarif;autre
+Ve;01/07;POL'IN JAZZ BAND;jazz;Le Terminus;Le Mans;21h30;gratuit;
+Ve;01/07;LES SUPREMES DINDES + LA GAILLARDE + AN LAH SHOUQUE + LES BREUVACHONS;variété;Quais de l'Anille;St Calais;20h;gratuit;8ème festival Soirs au Village
+Ve;01/07;MATCHBOX;blues;Le Stan;Le Mans;21h30;0€;
+Sa;02/07;DANO HAIDER TRIO;blues;Le Mans;Le Mans;21h30;0€;
+Sa;02/07;NO ONE IS INNOCENT + WASHINGTON DEAD CATS + HIJODA;rock;Stade de la Pochetie;St Calais;15€ ou gratuit pour -12ans;8ème festival Soirs au Village
+Sa;02/07;BROKEN STICK SOUND SYSTEM;reggae/dancehall;ZMK LION & TOMAWOK;Le Mans;20h30;4€;
+Je;07/07;KOUROUDWE;percussions;PCV;Le Mans;21h30;0€;
+Ve;08/07;GRAND' MECQUE DES RURBOEFS + LES THANATONAUTES + MENTAT ROUTAGE + SEBKHA-CHOTT + CIE CLAQU'ETC + GENSAKU ORCHESTRA + VOX OF AN INDUSTRIAL NOWHERE;musiques nomades, jazz expérimental, Mekanik Metal Disco, orchestre d'improvisation collective dingée, Free-industriel tambourbier;Reuqueil;Reuqueil;02.43.78.04.97;5€;
+Ve;08/07;SISTER BREAK;soul/jazzy;La Ré Do;Sillé le Guillaume;21h30;gratuit;
+Sa;09/07;DJ SWEEK + GUEST;drum'n'bass;Tassillé;Tassillé;21h à 4h;4€, tél 06 89 88 80;
+Sa;09/07;LA CLASSE ORCHESTRE + VALENTIN + TONTON MONIK + OUTRAGE + SILYA;pop rock, rock festif, ska-rock, rock alternatif;Stade de Souligé-sous-Balcon;Souligé-sous-Balcon;19h à 4h;5€;Festival des Garennes
+Di;10/07;MILITANT SOUND & BROKEN STICK;reggae, dancehall, dubplates;Le Backstage;Le Mans;4€;
+Me;13/07;Soirée surprise;varié;Le Barouf;Le Mans;22h à 4h;gratuit;
+Je;14/07;MILITANT SOUND SYSTEM;reggae;Le Backstage;Le Mans;21h;4€;
+Ve;15/07;RICHARD ACCART QUARTET;jazz;L'Inventaire;Le Mans;21h;6€ à 9€;résa obligatoire
+Sa;16/07;DJ LORD J;reggae;La Casa;Le Mans;21h30;0€;
+Je;21/07;DJ LAURENZO;salsa;Le PCV;Le Mans;21h30;gratuit;
+Je;28/07;DJ GROOM;reggae;Le PCV;Le Mans;21h30;gratuit;
+Ve;22/07;BAHIAFRO + LES DOIGTS DE L'HOMME + Yelemba d'Abidjan + Kady Diarra + Bell Oeil + Santa Macairo Orkestar + Les Zetlaskars + La Trompida + Löbe Radiant Dub System + Fenugrec Beat;percussions brésiliennes, jazz manouche, chants et danses d'Afrique de l'Ouest, musique africaine, yiddish, transe balkanique, rock festif, électrodub, dj;Festival BCN;Grand Lucé;19h30;10€ pour le vendredi soir;
+Sa;23/07;NOMAD'S LAND + Del Monte + Kouroudwe + Heleno dos 8 Baixos + Didier Super + NOMAD'S LAND + Les Acrobates + Les Percuteurres de l'a Beauce + Fenugrec Beat et Lasco + Mashiro + La Smala Familia + Soulfighters + Kix et Lien + Les Débris Collés;musiques tziganes, caravane, musiques caravanes, jazz manouche, percussions brésiliennes, électrodub, électro, dub, drum'n'bass;Festival BCN;Grand Lucé;15h00;12€ pour le samedi soir;
+Di;24/07;Marché paysan, forum associatif, conférences, Cochon Fraise + Théâtre Billenbois + Les aventures de Gilbert + Delmonte + Humain à bord + Les Croquants + PRESKO;marionnettes, théâtre et chanson, théâtre clownesque, chanson française;Festival BCN;Grand Lucé;10h00 à 18h00;20€ pour le forfait 3 jours;
+Ve;19/08;DJ DOUBLE FIRE;électro festif;Le PCV;Le Mans;21h30;0€;
+Sa;27/08;DJ LAURENZO;salsa;Le PCV;Le Mans;21h30;0€;
+Sa;27/08;Festival TERIAKI;varié;Collectif Slang + La Danse du chien + Fanga + Iration steppas + Bananas at the audiance + PsyKick Lyrickah + Robert le Magnifik + Radio Bomb;Nu-jazz, soul-rock, afro-beat, dub, rock, hip hop, électro hip hop, mix drum'n'bass;Montbizot;19h;5€ à 6€;
+```
+Voici les événements extraits de l'image sous forme de lignes CSV :
+
+```
+jour;date;artiste;style_musical;lieu;ville;heure;tarif;autre
+Ve;01/07;POL'IN JAZZ BAND;jazz;Le Terminus;Le Mans;21h30;gratuit;
+Ve;01/07;LES SUPREMES DINDES + LA GAILLARDE + AN LAH SHOQUE + LES BREUVACHONS;variété;Quais de l'Anille;St Calais;20h;gratuit;
+Ve;01/07;MATCHBOX;blues;Le Stan;Le Mans;21h30;0€;
+Sa;02/07;DANO HAIDER TRIO;blues;Le Stan;Le Mans;21h30;0€;
+Sa;02/07;NO ONE IS INNOCENT + WASHINGTON DEAD CATS + HIJODATA;rock;Stade de la Pocherie;St Calais;20h30;15€ ou gratuit pour -12ans;
+Sa;02/07;BROKEN STICK SOUND SYSTEM avec ZMK LION & TOMAWOK;reggae/dancehall;bar La Casa;Le Mans;4€;
+Je;07/07;KOUROUDWE;percussions;PCV;Le Mans;21h30;0€;
+Ve;08/07;GRAND' MECQUE DES RURBOEUF avec BAJKA + LES THANATONAUTES + MENTAT ROUTAGE + SEBKHA-CHOTT + CIE CLAQU'ETC + GENSAKU ORCHESTRA + VOX OF AN INDUSTRIAL NOWHERE;musiques nomades;Quais de l'Anille;St Calais;21h;gratuit;
+Ve;08/07;SISTER BREAK;soul/jazz;bar La Ré Do;Sillé le Guillaume;21h30;gratuit;
+Sa;09/07;Soirée jungle/drum'n'bass avec DJ SWEEK + GUEST;jungle/drum'n'bass;Tassillé;21h à 4h;4€;tél 06 20 89 88 80
+Sa;09/07;Festival des Garennes avec LA CLASSE ORCHESTRE + VALENTIN + TONTON MONIK + OUTRAGE + SILVYA;rock;Stade de Souligé-sous-Ballon;19h / 4h;5€;
+Di;10/07;Soirée sound system avec MILITANT SOUND & BROKEN STICK;reggae/dancehall/dub;Le Backstage;Le Mans;4€;
+Me;13/07;Soirée surprise;variété;Le Barouf;Le Mans;22h à 4h;gratuit;
+Je;14/07;MILITANT SOUND SYSTEM;reggae;Le Backstage;Le Mans;21h;4€;
+Ve;15/07;RICHARD ACCART QUARTET;jazz;L'Inventaire;Le Mans;21h;6€ à 9€;résa obligatoire
+Sa;16/07;DJ LORD J;reggae;La Casa;Le Mans;21h30;0€;
+Je;21/07;DJ LAURENZO;reggae;PCV;Le Mans;21h30;gratuit;
+Je;28/07;DJ GROOM;reggae;PCV;Le Mans;21h30;gratuit;
+Ve;01/07;ANAIS + KAAR KAAS SONN;chanson + rap;Salle 6 par 4;Entrammes;21h;7€;
+Me;13/07;STRUP X + DJ BEATSUCKER;techno jungle;La Mayenne;21h;7€;
+Ve;22/07;MONTGOMERY + RILEY;rock;La Mayenne;21h;7€;
+Ve;12/08;PERCUBABA + LA VENGEANCE DU TIGRE;ska/reggae;La Mayenne;21h;7€;
+Sa;20/08;FANNY TASTIC + GUEST;rock;La Mayenne;21h;7€;
+Me;24/08;SANTA MACAIRO ORKESTAR;fanfare déjantée;La Mayenne;21h;7€;
+Di;28/08;T'MP.M.;piano/percussions;La Mayenne;16h;5€;
+Ve;29/Sa;30/07;FESTIVAL LES 3 ELEPHANTS;variété;Amadou & Mariam + Ghizlan + Rokia Traoré + Antibalas + Arno + The Film + High Tone + Kwal + DJ Vadim + Gomm + Pauline Croze;La Mayenne;0€;tél: 02.43.04.00.24
+Ve;22/07;FESTIVAL AU GRAND LUCÉ;variété;Bahiafro + Les Doigts de l'Homme + Yelema d'Abidjan + Kady Diarra + Bell Oeil + Santa Macairo Orkestar + Les Zetlaskars + La Trompida + Fénugrec Beat + Loebe Radiant Dub System;Le Grand Lucé;19h30;10€ pour le vendredi soir et 12€ pour le samedi soir
+Di;24/07;Marché paysan + HUMAN A BORD + Les Croquants + PReSKO;variété;Le Grand Lucé;10h à 18h;20€ pour le forfait 3 jours
+Ve;19/08;DJ DOUBLE FIRE;électro festive;PCV;Le Mans;21h30;0€;
+Sa;27/08;DJ LAURENZO;salsa;PCV;Le Mans;21h30;0€;
+Sa;27/08;Festival TERIAKI avec Collectif Slang + La Danse du chien + Fanga + Psykick Lyrikah + Robert le Magnifik + Radio Bomb;variété;Montbizot;19h;5€ à 6€;
+Ve;23/07;FESTIVAL LA NUIT VERTE avec La Ruda + K2R Riddim + Improvisators dub + Ahimsa;variété;Jallais;18h30;14€ à 17€;tél: 06.71.22.67.16
+Ve;22/Sa;23/07;FESTIVAL ART SONIC avec Tiken Jah Fakoly + Mass Hysteria + Lofofora + Svinxels + La Phaze + La Rumeur + Big Mama + N&SK + Kingston Kitchen 809 + Masnada + Sexypop + Scenario rock + Okploide + Guns of Brixton;variété;Briouze;17h;tél: 02.33.66.71.43
+Ve;08/Sa;09/07;FESTIVAL LE CARREFOUR DU ROCK avec MATMATAH + RUDA + NO ONE IS INNOCENT + K2R RIDDIM + ETHS;variété;L'Epinay Le Comte;17h;16/20€ par soir et 28/36€ les 2 soirs;tél: 02.33.38.72.63
+Ve;08/Sa;09/07;FESTIVAL LE THE VERT avec swing manouche + ska + reggae + dub + electro;variété;Nogent-le-Rotrou;17h;tél: 02.37.53.40.56
+Ve;14/07;FESTIVAL CHAUFFER DANS LA NOIRCEUR avec Serge Teyssot-Gay & Khaled Aljaramani + Présidentirac;variété;Montmartin sur mer;21h;02.33.09.71.91
+Ve;15/07;Rachid Taha + Kerry James + Tagada Jones + Spoke Orkestra;variété;Montmartin sur mer;21h;
+Sa;16/07;Sole + Zurribanda + Orange Blossom + Experience + Shane Cough + Zeta Cancri + Sofa + Miss Hélum;variété;Montmartin sur mer;21h;
+Di;17/07;Horace Andy + Olli & the Bollywood Orchestra + Kaly Live Dub + Non Stop + Positive Roots Band + Gablé + None ID + The Elektrocution + V.J.;variété;Montmartin sur mer;21h;un soir 14€, forfait 36€, sur place: un soir 18€, forfait 45€, gratuit pour les - de 10 ans
+Ve;01/07;FESTIVAL AU FOX DE LA RUE avec Israël Vibration + Le Maximum Kouette + Rona Hartner + DJ Click + Smooth + No Bluff Sound + D'elph;variété;St Denis de Gastines;20h;15€ sur place, 19€ sur réservation
+```
+Voici les événements extraits de l'image sous forme de ligne CSV :
+
+```csv
+Ve;08/07/2005;Cabaret de Quat'sous;théâtre musical;La Cie Comme la Lune;Le Mans;21h;6€;résa obligatoire
+Sa;02/07/2005;GENS BIE;Kartel des;MAP - YARDBEAT;MJC Jacques Prévert;Le Mans;23h00;0€;happening & guest
+Sa;02/07/2005;YPSILON;Kartel des;MAP - YARDBEAT;MJC Jacques Prévert;Le Mans;23h00;0€;happening & guest
+Sa;02/07/2005;SONIC (Radio FG);B.CHAIX - WILLY GATOR - MR BEE;MAP - YARDBEAT;MJC Jacques Prévert;Le Mans;23h00;0€;happening & guest
+Sa;02/07/2005;SAILOR PALMER;PTIDAV - DOUBLE FIRE - K.POERA;MAP - YARDBEAT;MJC Jacques Prévert;Le Mans;23h00;0€;happening & guest
+```
+
+Les autres événements mentionnés dans l'image ne contiennent pas suffisamment de détails pour être extraits sous la forme demandée.

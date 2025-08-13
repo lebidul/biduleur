@@ -1,0 +1,1 @@
+Extrais tous les événements de cette image sous la forme d'une ligne CSV avec les en-têtes suivants: jour;date;artiste;style_musical;lieu;ville;heure;tarif;autre. Utilise le format de l'exemple suivant: Sa;02/07/2005;DANO HAIDER TRIO;blues;Le Stan;Le Mans;21h30;0€;. Ne met aucun en-têtes ni commentaire dans le csv produit.

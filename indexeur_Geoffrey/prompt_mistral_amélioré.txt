@@ -1,0 +1,5 @@
+"Analyse l'image fournie et extrais les informations concernant les événements musicaux listés. Organise ces informations dans un fichier CSV avec les en-têtes suivants : jour, date, artiste, style_musical, lieu, ville, heure, tarif, autre. Assure-toi de suivre le format de l'exemple ci-dessous pour chaque entrée :
+Exemple de format :
+jour;date;artiste;style_musical;lieu;ville;heure;tarif;autre
+Sa;02/07/2005;DANO HAIDER TRIO;blues;Le Stan;Le Mans;21h30;0€;
+Assure-toi que chaque champ est correctement rempli avec les informations extraites de l'image. Si certaines informations ne sont pas disponibles, laisse le champ vide. Une fois les données extraites et organisées, sauvegarde-les dans un fichier CSV nommé 'evenements.csv'."
