@@ -8,7 +8,7 @@ def process_image(image_path, api_key):
     Traite une image pour en extraire le texte structuré en utilisant l'API d'OCR de Mistral.
     """
     # 1. Définir le chemin vers le fichier de la requête
-    prompt_filepath = "prompt_mistral.txt"
+    prompt_filepath = "prompt_mistral_13.txt"
 
     # 2. Lire le contenu du fichier de requête
     try:

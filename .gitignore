@@ -37,5 +37,5 @@ venv
 node_modules
 .sass-cache
 indexer_ia/results/
-indexeur_Geoffrey/csv/evenements_mistral.csv
-indexeur_Geoffrey/csv/evenements_mistral.sql
+indexeur_Geoffrey/csv/
+indexeur_Geoffrey/temporaire/
