@@ -1,1 +1,48 @@
-Extrais tous les événements de cette image sous la forme d'une ligne CSV avec les en-têtes suivants: jour;date;artiste;style_musical;lieu;ville;heure;tarif;autre. Utilise le format de l'exemple suivant: Sa;02/07/2005;DANO HAIDER TRIO;blues;Le Stan;Le Mans;21h30;0€;. Ne met aucun en-têtes ni commentaire dans le csv produit.
+"Analyse l'image fournie et extrais les informations concernant les événements musicaux listés. Organise ces informations dans une base de donnée sur ce modèle : -- Création de la table fanzine
+CREATE TABLE fanzine (
+    numero_fanzine INT PRIMARY KEY,
+    path_fichier_pdf VARCHAR(255) NOT NULL,
+    mois_parution INT NOT NULL,
+    annee_parution INT NOT NULL
+);
+
+-- Création de la table artiste
+CREATE TABLE artiste (
+    id_artiste INT PRIMARY KEY,
+    nom_artiste VARCHAR(255) NOT NULL,
+    adresse VARCHAR(255),
+    style VARCHAR(255)
+);
+
+-- Création de la table lieu
+CREATE TABLE lieu (
+    id_lieu INT PRIMARY KEY,
+    ville VARCHAR(255) NOT NULL,
+    adresse VARCHAR(255) NOT NULL,
+    type_lieu VARCHAR(255)
+);
+
+-- Création de la table événement
+CREATE TABLE evenement (
+    id_evenement INT PRIMARY KEY,
+    nom_evenement VARCHAR(255) NOT NULL,
+    numero_fanzine INT,
+    date DATE NOT NULL,
+    heure TIME NOT NULL,
+    id_lieu INT,
+    tarif DECIMAL(10, 2),
+    FOREIGN KEY (numero_fanzine) REFERENCES fanzine(numero_fanzine),
+    FOREIGN KEY (id_lieu) REFERENCES lieu(id_lieu)
+);
+
+-- Création de la table concert_spectacle
+CREATE TABLE concert_spectacle (
+    id_concert_spectacle INT PRIMARY KEY,
+    id_evenement INT,
+    id_artiste INT,
+    concert_ou_spectacle VARCHAR(20),
+    nom_spectacle VARCHAR(255) NOT NULL,
+    style_spectacle VARCHAR(255),
+    FOREIGN KEY (id_evenement) REFERENCES evenement(id_evenement),
+    FOREIGN KEY (id_artiste) REFERENCES artiste(id_artiste)
+);

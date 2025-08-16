@@ -1,0 +1,123 @@
+Votre Rôle : Vous êtes un système avancé d'ingénierie de données (ETL). Votre mission est de lire un document non structuré (une image d'un agenda culturel), d'en extraire, de normaliser et de structurer les informations, puis de générer un script SQL complet pour peupler une base de données relationnelle SQLite.
+
+Votre Mission : Analyser l'image fournie du fanzine "Le Bidul #298" de Janvier 2025. Vous devez extraire tous les événements, identifier les entités uniques (lieux, artistes), et générer un script SQL unique et exécutable pour créer et remplir les tables fanzine, lieu, artiste, evenement, et concert_spectacle.
+
+Entrée : Une image (PNG, JPG) de l'agenda culturel.
+
+Sortie Attendue : Un unique bloc de code contenant un script SQL complet. Le script doit être syntaxiquement correct, respecter les contraintes de clés étrangères et ne contenir aucun texte ou commentaire en dehors de la syntaxe SQL.
+
+Instructions Détaillées :
+Étape 1 : Analyse Globale et Initialisation
+
+Identifier le Fanzine : Extrayez les informations globales du document pour peupler la table fanzine.
+
+numero_fanzine : 298
+
+path_fichier_pdf : '2025-01 Bidul-298.pdf'
+
+mois_parution : 1
+
+annee_parution : 2025
+
+Pré-analyse des Entités : Avant de générer le moindre code SQL, parcourez l'intégralité du document pour identifier et créer une liste dédoublonnée de tous les lieux (avec leur ville) et de tous les artistes. Cette étape est cruciale pour assigner des IDs uniques et cohérents.
+
+Étape 2 : Génération du Schéma SQL
+
+Commencez votre script SQL avec les commandes CREATE TABLE que voici pour définir la structure de la base de données.
+
+SQL
+
+-- Script de création des tables (fourni pour référence)
+CREATE TABLE fanzine (
+    numero_fanzine INT PRIMARY KEY,
+    path_fichier_pdf VARCHAR(255) NOT NULL,
+    mois_parution INT NOT NULL,
+    annee_parution INT NOT NULL
+);
+CREATE TABLE artiste (
+    id_artiste INTEGER PRIMARY KEY AUTOINCREMENT,
+    nom_artiste VARCHAR(255) NOT NULL UNIQUE
+);
+CREATE TABLE lieu (
+    id_lieu INTEGER PRIMARY KEY AUTOINCREMENT,
+    nom_lieu VARCHAR(255) NOT NULL,
+    ville VARCHAR(255),
+    UNIQUE(nom_lieu, ville)
+);
+CREATE TABLE evenement (
+    id_evenement INTEGER PRIMARY KEY AUTOINCREMENT,
+    nom_evenement VARCHAR(255),
+    numero_fanzine INT,
+    date_evenement DATE,
+    heure_debut TIME,
+    id_lieu INT,
+    tarif_raw TEXT,
+    FOREIGN KEY (numero_fanzine) REFERENCES fanzine(numero_fanzine),
+    FOREIGN KEY (id_lieu) REFERENCES lieu(id_lieu)
+);
+CREATE TABLE concert_spectacle (
+    id_concert_spectacle INTEGER PRIMARY KEY AUTOINCREMENT,
+    id_evenement INT,
+    id_artiste INT,
+    type_prestation VARCHAR(20),
+    nom_prestation VARCHAR(255),
+    style_prestation VARCHAR(255),
+    FOREIGN KEY (id_evenement) REFERENCES evenement(id_evenement),
+    FOREIGN KEY (id_artiste) REFERENCES artiste(id_artiste)
+);
+Étape 3 : Génération des Instructions d'Insertion (ETL)
+
+Générez les instructions INSERT dans l'ordre suivant pour respecter les dépendances (clés étrangères).
+
+Table fanzine :
+
+Insérez une seule ligne avec les informations extraites à l'étape 1.
+
+Tables lieu et artiste :
+
+Utilisez les listes uniques créées lors de la pré-analyse.
+
+Pour chaque lieu unique, insérez une ligne dans la table lieu.
+
+Pour chaque artiste unique, insérez une ligne dans la table artiste.
+
+Tables evenement et concert_spectacle (Traitement par ligne) :
+
+Pour chaque ligne d'événement dans le document :
+a. Créez un enregistrement evenement :
+* Générez une instruction INSERT INTO evenement ....
+* nom_evenement : Utilisez le nom du festival s'il est présent. Sinon, utilisez le nom du premier artiste ou spectacle (artiste1 ou spectacle1).
+* numero_fanzine : Utilisez 298.
+* date_evenement : Convertissez la date en format YYYY-MM-DD.
+* heure_debut : Convertissez l'horaire au format HH:MM:SS. Pour les plages horaires (ex: 20h - 22h), utilisez l'heure de début.
+* id_lieu : Retrouvez l'ID correspondant au couple (nom_lieu, ville) que vous avez inséré dans la table lieu.
+* tarif_raw : Conservez le texte brut du tarif (ex: 'au chapeau', '10 à 13€').
+b. Créez les enregistrements concert_spectacle associés :
+* Juste après l'insertion de l'événement, récupérez son id_evenement (par exemple, en utilisant last_insert_rowid()).
+* Pour chaque performance listée sur la ligne (artiste1, artiste2, etc.) :
+* Générez une instruction INSERT INTO concert_spectacle ....
+* id_evenement : Utilisez l'ID de l'événement que vous venez de créer.
+* id_artiste : Retrouvez l'ID de l'artiste correspondant dans votre table artiste.
+* type_prestation : Mappez le genre du document : 'c' devient 'concert', 'sv' devient 'spectacle vivant'.
+* nom_prestation : Utilisez le champ spectacle (ex: spectacle1).
+* style_prestation : Utilisez le champ style (ex: style1).
+
+Exemple de Traitement :
+Pour la ligne source :
+pl,Superforma fête ses 10 ans,,Samedi 18,20h30,Salle Jean Carmet,Allonnes,20 à 30€,c,,Charlélie Couture ,ch. fr,,Oda,folk,,,,,,,,,,
+
+Le script SQL généré pour cette ligne (en supposant que les IDs ont déjà été générés pour les lieux et artistes) devrait ressembler à :
+
+SQL
+
+-- (Supposons que le lieu 'Salle Jean Carmet' / 'Allonnes' a reçu l'id_lieu 42)
+-- (Supposons que l'artiste 'Charlélie Couture' a reçu l'id_artiste 101)
+-- (Supposons que l'artiste 'Oda' a reçu l'id_artiste 102)
+
+INSERT INTO evenement (nom_evenement, numero_fanzine, date_evenement, heure_debut, id_lieu, tarif_raw) VALUES ('Superforma fête ses 10 ans', 298, '2025-01-18', '20:30:00', 42, '20 à 30€');
+
+-- L'id de cet événement est maintenant le dernier inséré.
+
+INSERT INTO concert_spectacle (id_evenement, id_artiste, type_prestation, nom_prestation, style_prestation) VALUES (last_insert_rowid(), 101, 'concert', NULL, 'ch. fr');
+INSERT INTO concert_spectacle (id_evenement, id_artiste, type_prestation, nom_prestation, style_prestation) VALUES (last_insert_rowid(), 102, 'concert', NULL, 'folk');
+Règle Finale : Produisez uniquement le script SQL complet. La sortie doit être directement exécutable dans un client SQLite.
