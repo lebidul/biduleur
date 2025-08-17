@@ -122,12 +122,21 @@ if __name__ == "__main__":
     DOSSIER_A_ANALYSER = "temporaire" # Dossier à analyser, à adapter selon vos besoins
     traiter_dossier(DOSSIER_A_ANALYSER)
     
-    i_orc = choix_de_ORC()
+    prompt_filepath = "prompt_mistral_13.txt"  # Chemin du fichier de prompt pour Mistral
+
+    
+    #i_orc = choix_de_ORC()
+    i_orc = 1  # Pour le test, on force l'utilisation de Mistral
+    
     
     if i_orc == 1:
         print("🔍 Traitement avec Mistral OCR...")
-        texte_resultat = traiter_images_decoupees_via_mistral(os.path.join(DOSSIER_A_ANALYSER, "tempo/découpé"))
- 
+        texte_resultat = traiter_images_decoupees_via_mistral(os.path.join(DOSSIER_A_ANALYSER, "tempo/découpé"), prompt_filepath)
+        
+        os.makedirs("csv", exist_ok=True)
+        with open(f"csv/evenements_{os.path.splitext(os.path.basename(prompt_filepath))[0]}.sql", "w") as f:
+                f.write(texte_resultat)
+
 
     elif i_orc == 2:
         print("🔍 Traitement avec Tesseract OCR...")
@@ -138,9 +147,8 @@ if __name__ == "__main__":
         
     print("✅ Traitement OCR terminé avec succès.")
     
-    os.makedirs("csv", exist_ok=True)
-    with open("csv/evenements_mistral.sql", "w") as f:
-        f.write(texte_resultat)
+
+
     
     if (False):
         print("🔄 Conversion du CSV en base de données...")
