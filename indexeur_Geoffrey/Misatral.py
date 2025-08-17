@@ -2,14 +2,20 @@ import os
 import base64
 import json
 import requests
+from dotenv import load_dotenv
+
 
 def traiter_images_decoupees_via_mistral(folder_path, prompt_filepath="prompt_mistral_9.txt"):
     """
     Parcourt un dossier, prend toutes les images .jpg et les envoie à l'API Mistral
     en une seule requête pour en extraire le texte structuré.
-    """
-    
-    api_key = "1UALBtIGHPGTijdBecQeA00b7E3Gejnh" # TODO: Retirer cette ligne pour la production
+    """    
+        
+    # Vérifier l'existence de la clé API
+    load_dotenv()
+
+    api_key = os.getenv("MISTRAL_API_KEY")
+
 
 
     # Vérifier l'existence du prompt
