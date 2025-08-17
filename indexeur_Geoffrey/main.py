@@ -126,7 +126,9 @@ if __name__ == "__main__":
     
     if i_orc == 1:
         print("🔍 Traitement avec Mistral OCR...")
-        traiter_images_decoupees_via_mistral(os.path.join(DOSSIER_A_ANALYSER, "tempo/découpé"))
+        texte_resultat = traiter_images_decoupees_via_mistral(os.path.join(DOSSIER_A_ANALYSER, "tempo/découpé"))
+ 
+
     elif i_orc == 2:
         print("🔍 Traitement avec Tesseract OCR...")
         traiter_images_decoupees_via_tesseract(os.path.join(DOSSIER_A_ANALYSER, "tempo/découpé"))
@@ -136,14 +138,19 @@ if __name__ == "__main__":
         
     print("✅ Traitement OCR terminé avec succès.")
     
-    print("🔄 Conversion du CSV en base de données...")
-    chemin_csv = "csv/evenements_mistral.csv"
-    if os.path.exists(chemin_csv):
-        convertir_csv_en_bdd(chemin_csv)
-        print("✅ Conversion terminée.")
+    os.makedirs("csv", exist_ok=True)
+    with open("csv/evenements_mistral.sql", "w") as f:
+        f.write(texte_resultat)
+    
+    if (False):
+        print("🔄 Conversion du CSV en base de données...")
+        chemin_csv = "csv/evenements_mistral.csv"
+        if os.path.exists(chemin_csv):
+            convertir_csv_en_bdd(chemin_csv)
+            print("✅ Conversion terminée.")
 
-    else:
-        print(f"❌ Le fichier CSV n'existe pas : {chemin_csv}")
-    print("📁 Tous les fichiers ont été traités avec succès.")
+        else:
+            print(f"❌ Le fichier CSV n'existe pas : {chemin_csv}")
+        print("📁 Tous les fichiers ont été traités avec succès.")
     
     
