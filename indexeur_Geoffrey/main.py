@@ -106,7 +106,7 @@ if __name__ == "__main__":
     
     # Choix de l'OCR
     #i_orc = choix_de_ORC()
-    i_orc = 2  # Pour le test, on force l'utilisation de Mistral
+    i_orc = 1  # Pour le test, on force l'utilisation de Mistral
 
     # 1. Lister tous les fichiers PDF dans le dossier source
     fichiers_pdf_a_traiter = []

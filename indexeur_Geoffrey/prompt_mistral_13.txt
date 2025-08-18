@@ -82,7 +82,7 @@ Utilisez les listes uniques créées lors de la pré-analyse.
 
 Pour chaque lieu unique, insérez une ligne dans la table lieu.
 
-Pour chaque artiste unique, insérez une ligne dans la table artiste. Les artistes sont en gras sur l'image et les différents artiste d'un même evènement sont souvent séparé d'un +
+Pour chaque artiste unique, insérez une ligne dans la table artiste. Les artistes sont en gras sur l'image et les différents artiste d'un même evènement sont souvent délimité par le symbole "+".
 
 Tables evenement et concert_spectacle (Traitement par ligne) :
 
