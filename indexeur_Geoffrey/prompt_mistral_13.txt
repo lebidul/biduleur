@@ -11,6 +11,8 @@ Instructions Détaillées :
 
 Identifier le Fanzine : Extrayez les informations globales du document pour peupler la table fanzine.
 
+Exemple: 
+
 numero_fanzine : 298
 
 path_fichier_pdf : '2025-01 Bidul-298.pdf'
@@ -52,6 +54,7 @@ CREATE TABLE evenement (
     heure_debut TIME,
     id_lieu INT,
     tarif_raw TEXT,
+    evenement_special BOOLEAN DEFAULT FALSE,
     FOREIGN KEY (numero_fanzine) REFERENCES fanzine(numero_fanzine),
     FOREIGN KEY (id_lieu) REFERENCES lieu(id_lieu)
 );
@@ -79,7 +82,7 @@ Utilisez les listes uniques créées lors de la pré-analyse.
 
 Pour chaque lieu unique, insérez une ligne dans la table lieu.
 
-Pour chaque artiste unique, insérez une ligne dans la table artiste.
+Pour chaque artiste unique, insérez une ligne dans la table artiste. Les artistes sont en gras sur l'image et les différents artiste d'un même evènement sont souvent séparé d'un +
 
 Tables evenement et concert_spectacle (Traitement par ligne) :
 
@@ -87,7 +90,7 @@ Pour chaque ligne d'événement dans le document :
 a. Créez un enregistrement evenement :
 * Générez une instruction INSERT INTO evenement ....
 * nom_evenement : Utilisez le nom du festival s'il est présent. Sinon, utilisez le nom du premier artiste ou spectacle (artiste1 ou spectacle1).
-* numero_fanzine : Utilisez 298.
+* numero_fanzine : 
 * date_evenement : Convertissez la date en format YYYY-MM-DD.
 * heure_debut : Convertissez l'horaire au format HH:MM:SS. Pour les plages horaires (ex: 20h - 22h), utilisez l'heure de début.
 * id_lieu : Retrouvez l'ID correspondant au couple (nom_lieu, ville) que vous avez inséré dans la table lieu.
@@ -100,7 +103,9 @@ b. Créez les enregistrements concert_spectacle associés :
 * id_artiste : Retrouvez l'ID de l'artiste correspondant dans votre table artiste.
 * type_prestation : Mappez le genre du document : 'c' devient 'concert', 'sv' devient 'spectacle vivant'.
 * nom_prestation : Utilisez le champ spectacle (ex: spectacle1).
-* style_prestation : Utilisez le champ style (ex: style1).
+* style_prestation : Utilisez le champ style (ex: style1). le style est en italique entre parenthèse
+
+La majorité des evènements commence avec le jour et la date de cette forme : "Sa 16/07" si ce n'est pas le cas, met la vairable evenement_special à TRUE
 
 Exemple de Traitement :
 Pour la ligne source :
