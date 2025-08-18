@@ -1,6 +1,6 @@
 import os
 import fitz  # PyMuPDF
-import shutil # Ajout pour la suppression de dossiers
+import shutil
 from DecoupePages import decoupe_avant_2000, decoupe_apres_2000
 from Tesseract import traiter_images_decoupees_via_tesseract
 from Misatral import traiter_images_decoupees_via_mistral
@@ -35,16 +35,16 @@ def convertir_pdf_en_images(chemin_pdf, dossier_sortie):
     doc.close()
     return noms_images
 
-# Nouvelle fonction qui traite un seul PDF à la fois
-def traiter_un_pdf(chemin_pdf, dossier_racine):
+# Traite un seul PDF et place les fichiers temporaires dans un dossier de sortie dédié
+def traiter_un_pdf(chemin_pdf, dossier_sortie_temporaire):
     """
     Traite un seul fichier PDF : le convertit en images et les découpe.
     Retourne le chemin du dossier temporaire créé pour ce PDF.
     """
     print(f"📄 Traitement du fichier : {chemin_pdf}")
 
-    # Crée un sous-dossier "tempo" à la racine pour stocker les images
-    dossier_images_temporaire = os.path.join(dossier_racine, "tempo")
+    # Crée un sous-dossier "tempo" dans le dossier de sortie spécifié
+    dossier_images_temporaire = os.path.join(dossier_sortie_temporaire, "tempo")
     os.makedirs(dossier_images_temporaire, exist_ok=True)
 
     # Conversion PDF → images
@@ -59,14 +59,13 @@ def traiter_un_pdf(chemin_pdf, dossier_racine):
 def decoupe_selon_date(images_pages):
     # Découpe selon la date
     for image_path in images_pages:
-        # Découpe en fonction de l'année du nom de fichier
         fichier = os.path.basename(image_path)
         try:
             annee = int(fichier[:4])
             if annee < 2000:
                 print(f"✂️ Découpe pour PDF avant 2000 : {image_path}")
-                decoupe_avant_2000(image_path) # Correction de la fonction appelée
-            else: # Gère les années >= 2000
+                decoupe_avant_2000(image_path)
+            else:
                 print(f"✂️ Découpe pour PDF après 2000 : {image_path}")
                 decoupe_apres_2000(image_path)
         except ValueError:
@@ -99,32 +98,35 @@ def convertir_csv_en_bdd(chemin_csv):
 
 # === Point d'entrée ===
 if __name__ == "__main__":
-    DOSSIER_A_ANALYSER = "temporaire" # Dossier racine à analyser
+    # **Nouveaux chemins de dossiers découplés**
+    DOSSIER_DES_PDFS = "pdfs_a_traiter"         # Dossier contenant les PDF à analyser
+    DOSSIER_TEMPORAIRE_RACINE = "fichiers_temporaires" # Dossier où sera créé le sous-dossier "tempo"
+    
     prompt_filepath = "prompt_mistral_13.txt"
     
-    # Choix de l'OCR fait une seule fois au début
+    # Choix de l'OCR
     #i_orc = choix_de_ORC()
-    i_orc = 1  # Pour le test, on force l'utilisation de Mistral
+    i_orc = 2  # Pour le test, on force l'utilisation de Mistral
 
-    # 1. Lister tous les fichiers PDF dans le dossier et ses sous-dossiers
+    # 1. Lister tous les fichiers PDF dans le dossier source
     fichiers_pdf_a_traiter = []
-    for racine, _, fichiers in os.walk(DOSSIER_A_ANALYSER):
+    for racine, _, fichiers in os.walk(DOSSIER_DES_PDFS):
         for fichier in fichiers:
             if fichier.lower().endswith(".pdf"):
                 fichiers_pdf_a_traiter.append(os.path.join(racine, fichier))
 
     if not fichiers_pdf_a_traiter:
-        print(f"❌ Aucun fichier PDF trouvé dans '{DOSSIER_A_ANALYSER}'.")
+        print(f"❌ Aucun fichier PDF trouvé dans le dossier '{DOSSIER_DES_PDFS}'.")
     else:
         print(f"✅ {len(fichiers_pdf_a_traiter)} PDF trouvés. Début du traitement...")
 
     # 2. Boucler sur chaque PDF trouvé
     for chemin_pdf in fichiers_pdf_a_traiter:
-        dossier_temporaire = None
+        dossier_tempo_specifique = None
         try:
             # Crée les images découpées et récupère le nom du dossier temporaire
-            dossier_temporaire = traiter_un_pdf(chemin_pdf, DOSSIER_A_ANALYSER)
-            dossier_images_decoupees = os.path.join(dossier_temporaire, "découpé")
+            dossier_tempo_specifique = traiter_un_pdf(chemin_pdf, DOSSIER_TEMPORAIRE_RACINE)
+            dossier_images_decoupees = os.path.join(dossier_tempo_specifique, "découpé")
 
             if not os.path.exists(dossier_images_decoupees):
                 print(f"⚠️  Le dossier 'découpé' n'a pas été trouvé pour {chemin_pdf}. Passage au suivant.")
@@ -136,7 +138,6 @@ if __name__ == "__main__":
                 texte_resultat = traiter_images_decoupees_via_mistral(dossier_images_decoupees, prompt_filepath)
                 
                 os.makedirs("csv", exist_ok=True)
-                # Nom du fichier de sortie basé sur le nom du PDF original
                 pdf_basename = os.path.splitext(os.path.basename(chemin_pdf))[0]
                 chemin_sortie = f"csv/{pdf_basename}_evenements.sql"
                 
@@ -149,25 +150,16 @@ if __name__ == "__main__":
                 traiter_images_decoupees_via_tesseract(dossier_images_decoupees)
             else:
                 print("❌ Aucune OCR sélectionnée, arrêt du traitement.")
-                break # Sort de la boucle si l'OCR n'est pas valide
+                break 
         
         except Exception as e:
             print(f"❌ Une erreur critique est survenue lors du traitement de {chemin_pdf}: {e}")
 
         finally:
-            # 3. Supprimer le dossier temporaire et son contenu après le traitement
-            if dossier_temporaire and os.path.exists(dossier_temporaire):
+            # 3. Supprimer le dossier temporaire spécifique à ce PDF
+            if dossier_tempo_specifique and os.path.exists(dossier_tempo_specifique):
                 print(f"🗑️  Nettoyage des fichiers temporaires pour '{os.path.basename(chemin_pdf)}'...")
-                shutil.rmtree(dossier_temporaire)
+                shutil.rmtree(dossier_tempo_specifique)
                 print("👍 Nettoyage terminé.\n" + "-"*50)
 
     print("🎉 Traitement de tous les fichiers PDF terminé.")
-    
-    if (False):
-        print("🔄 Conversion du CSV en base de données...")
-        chemin_csv = "csv/evenements_mistral.csv"
-        if os.path.exists(chemin_csv):
-            convertir_csv_en_bdd(chemin_csv)
-            print("✅ Conversion terminée.")
-        else:
-            print(f"❌ Le fichier CSV n'existe pas : {chemin_csv}")
