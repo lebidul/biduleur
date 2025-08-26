@@ -32,7 +32,7 @@ if not exist "biduleur.ico" (
 
 :: Exécuter PyInstaller
 echo Lancement de PyInstaller...
-python -m PyInstaller biduleur.main.spec --clean --workpath=build --distpath=dist
+python -m PyInstaller biduleur.spec --clean --workpath=build --distpath=dist
 
 :: Vérifier le résultat
 if exist "dist\biduleur.exe" (
