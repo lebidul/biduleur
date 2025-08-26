@@ -1,5 +1,5 @@
-# Module Biduleur
 
+# Module Biduleur
 Biduleur est un outil pour générer des événements à partir de fichiers CSV.
 
 ---
@@ -14,6 +14,7 @@ Biduleur est un outil pour générer des événements à partir de fichiers CSV.
 6. [Création d'une release](#création-dune-release)
    - [Manuellement](#manuellement)
    - [Automatiquement avec GitHub Actions](#automatiquement-avec-github-actions)
+   - [Déclenchement manuel via GitHub Actions](#déclenchement-manuel-via-github-actions)
 7. [Dépannage](#dépannage)
 8. [Fichiers de configuration](#fichiers-de-configuration)
    - [biduleur.spec](#biduleurspec)
@@ -21,20 +22,18 @@ Biduleur est un outil pour générer des événements à partir de fichiers CSV.
    - [build.sh](#buildsh)
    - [release.sh](#releasesh)
 9. [GitHub Actions](#github-actions)
+10. [Contribuer](#contribuer)
+11. [Licence](#licence)
 
 ---
-
 ## Prérequis
-
 - Python 3.9 ou supérieur
 - Pip (généralement installé avec Python)
 - Git (optionnel, pour cloner le dépôt)
 - UPX (optionnel, pour compresser l'exécutable)
 
 ---
-
 ## Structure du projet
-
 ```
 bidul.biduleur/
 ├── biduleur/               # Package Python
@@ -56,9 +55,7 @@ bidul.biduleur/
 ```
 
 ---
-
 ## Installation
-
 1. Clone le dépôt (si nécessaire) :
    ```bash
    git clone https://github.com/lebidul/biduleur.git
@@ -87,60 +84,45 @@ bidul.biduleur/
    ```
 
 ---
-
 ## Création du build
-
 ### Sur Windows
-
 1. Double-clique sur `build.bat` ou exécute-le depuis l'invite de commandes :
    ```cmd
    .\build.bat
    ```
-
 2. Le build sera généré dans `dist\biduleur\biduleur.exe`
 
 ### Sur Linux
-
 1. Rends le script exécutable :
    ```bash
    chmod +x build.sh
    ```
-
 2. Exécute le script :
    ```bash
    ./build.sh
    ```
-
 3. Le build sera généré dans `dist/biduleur/biduleur`
 
 ---
-
 ## Utilisation
-
 Après le build, exécute l'application :
-
 - **Windows** :
   ```cmd
   dist\biduleur\biduleur.exe
   ```
-
 - **Linux** :
   ```bash
   dist/biduleur/biduleur
   ```
 
 ---
-
 ## Création d'une release
-
 ### Manuellement
-
 1. Crée un tag :
    ```bash
    git tag -a v1.0.0 -m "Version 1.0.0 - Première version stable"
    git push origin v1.0.0
    ```
-
 2. Va sur [GitHub Releases](https://github.com/lebidul/biduleur/releases)
 3. Clique sur "Draft a new release"
 4. Sélectionne le tag `v1.0.0`
@@ -148,23 +130,30 @@ Après le build, exécute l'application :
 6. Publie la release
 
 ### Automatiquement avec GitHub Actions
-
 1. Exécute le script de release :
    ```bash
    ./release.sh 1.0.0
    ```
-
 2. GitHub Actions va automatiquement :
    - Builder l'application
    - Créer une release
    - Attacher l'exécutable
 
+### Déclenchement manuel via GitHub Actions
+Tu peux aussi déclencher manuellement le workflow GitHub Actions pour générer les binaires sans uploader manuellement :
+
+1. Va dans l'onglet **"Actions"** de ton dépôt GitHub
+2. Sélectionne le workflow **"Build and Release"** dans la liste à gauche
+3. Clique sur **"Run workflow"** (bouton dropdown)
+4. Saisis le numéro de version (ex: `1.0.0`)
+5. Clique sur **"Run workflow"**
+6. Une fois le workflow terminé :
+   - Télécharge l'artifact généré depuis la section "Artifacts" en bas de la page du run
+   - Crée une release manuellement et attache le fichier téléchargé
+
 ---
-
 ## Dépannage
-
 ### Problèmes courants
-
 1. **L'exécutable ne se lance pas** :
    - Active le mode console dans `biduleur.spec` (`console=True`)
    - Vérifie les dépendances : `pip install -r requirements.txt`
@@ -178,12 +167,12 @@ Après le build, exécute l'application :
    - Exécute avec plus de détails : `pyinstaller biduleur.spec --clean --debug=all`
    - Consulte les logs dans `build/`
 
+4. **Erreur avec GitHub Actions "deprecated version of actions/upload-artifact: v3"** :
+   - Mets à jour ton fichier `.github/workflows/release.yml` en utilisant les versions actuelles des actions (voir section [GitHub Actions](#github-actions))
+
 ---
-
 ## Fichiers de configuration
-
 ### biduleur.spec
-
 ```python
 # biduleur.spec
 from PyInstaller.utils.hooks import collect_submodules
@@ -258,7 +247,6 @@ coll = COLLECT(
 ```
 
 ### build.bat
-
 ```batch
 @echo off
 cd /d "%~dp0"
@@ -290,7 +278,6 @@ if exist "dist\biduleur\biduleur.exe" (
 ```
 
 ### build.sh
-
 ```bash
 #!/bin/bash
 cd "$(dirname "$0")" || exit 1
@@ -327,7 +314,6 @@ fi
 ```
 
 ### release.sh
-
 ```bash
 #!/bin/bash
 
@@ -353,10 +339,8 @@ echo "Release $VERSION créée. GitHub Actions va builder et publier automatique
 ```
 
 ---
-
 ## GitHub Actions
-
-Crée un fichier `.github/workflows/release.yml` :
+Crée un fichier `.github/workflows/release.yml` avec les versions actuelles des actions :
 
 ```yaml
 name: Build and Release
@@ -364,15 +348,21 @@ name: Build and Release
 on:
   push:
     tags:
-      - 'v*'
+      - 'v*'  # Déclenche automatiquement quand un tag est poussé
+  workflow_dispatch:  # Permet de déclencher manuellement
+    inputs:
+      version:
+        description: 'Numéro de version (ex: 1.0.0)'
+        required: true
+        default: '1.0.0'
 
 jobs:
   build:
     runs-on: windows-latest
 
     steps:
-    - name: Checkout
-      uses: actions/checkout@v3
+    - name: Checkout code
+      uses: actions/checkout@v4  # Version actuelle
 
     - name: Set up Python
       uses: actions/setup-python@v4
@@ -385,27 +375,34 @@ jobs:
         pip install -r requirements.txt
         pip install pyinstaller
 
-    - name: Build
+    - name: Build executable
       run: |
         pyinstaller biduleur.spec --clean --workpath=build --distpath=dist
 
-    - name: Prepare assets
+    - name: Prepare release assets
       run: |
         mkdir release_assets
-        copy dist\biduleur\biduleur.exe release_assets\biduleur-${{ github.ref_name }}-windows.exe
+        copy dist\biduleur\biduleur.exe release_assets\biduleur-${{ github.event.inputs.version || github.ref_name }}-windows.exe
 
-    - name: Create Release
+    - name: Create Release (automatic)
+      if: startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v1
       with:
+        name: Biduleur ${{ github.ref_name }}
         files: release_assets/*
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Upload artifact for manual release
+      if: github.event_name == 'workflow_dispatch'
+      uses: actions/upload-artifact@v4  # Version actuelle
+      with:
+        name: biduleur-${{ github.event.inputs.version || 'manual' }}-windows
+        path: release_assets/*
 ```
 
 ---
-
 ## Contribuer
-
 1. Fork le projet
 2. Crée une branche (`git checkout -b feature/ma-fonctionnalité`)
 3. Commit tes changements (`git commit -am 'Ajout fonctionnalité'`)
@@ -413,16 +410,14 @@ jobs:
 5. Ouvre une Pull Request
 
 ---
-
 ## Licence
-
 [MIT](LICENSE)
 ```
 
-Pour télécharger ce fichier :
-1. Copie tout le contenu ci-dessus
-2. Crée un nouveau fichier `README.md` dans ton projet
-3. Colle le contenu
-4. Enregistre le fichier
+J'ai ajouté :
+1. Une nouvelle section "Déclenchement manuel via GitHub Actions" qui explique comment utiliser le workflow manuellement
+2. Une entrée dans la section "Dépannage" pour l'erreur spécifique aux versions obsolètes des actions
+3. Mis à jour la section GitHub Actions avec les versions actuelles des actions (v4)
+4. Ajouté des explications sur comment récupérer l'artifact après un déclenchement manuel
 
-Ce README complet couvre toutes les étapes pour builder, utiliser et publier ton application sur toutes les plateformes. 🚀
+Ce README est maintenant complet et à jour avec toutes les informations nécessaires pour utiliser GitHub Actions de manière optimale. 🚀
