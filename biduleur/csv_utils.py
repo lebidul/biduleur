@@ -1,7 +1,7 @@
 import pandas as pd
 from typing import List, Dict, Optional
-from constants import DATE, GENRE1, HORAIRE, COLONNE_INFO
-from event_utils import parse_bidul_event
+from biduleur.constants import DATE, GENRE1, HORAIRE, COLONNE_INFO
+from biduleur.event_utils import parse_bidul_event
 
 
 def read_and_sort_csv(filename: str) -> Optional[List[Dict]]:

@@ -12,7 +12,13 @@ biduleur/outputs
 publisher/output
 biduleur/outputs
 biduleur/outputs
-
+build/*
+dist/*
+*.exe
+*.pyd
+*.dll
+biduleur/build/*
+biduleur/dist/*
 
 # Folder view configuration files
 .DS_Store
@@ -35,4 +41,4 @@ Thumbs.db
 # Application specific files
 venv
 node_modules
-.sass-cache
+
