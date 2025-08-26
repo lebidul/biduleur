@@ -93,7 +93,7 @@ def gui_mode():
 
     # --- Interface Graphique ---
     root = tk.Tk()
-    root.title("Biduleur - Générateur d'événements")
+    root.title("Biduleur - Générateur de fichiers .html pour le bidul pdf (via publisher) et l'agenda en ligne. aka la moulinette")
 
     # Configure les colonnes et lignes pour qu'elles s'étirent
     root.columnconfigure(1, weight=1)  # La colonne 1 (champs Entry) s'étire
@@ -149,9 +149,9 @@ def cli_mode():
 
 if __name__ == '__main__':
     # Détecte si des arguments sont passés (mode IDE) ou non (mode graphique)
-    # if len(sys.argv) > 1:
-    #     cli_mode()
-    # else:
-    #     gui_mode()
-    filename1 = './tapages/202509_tapage_biduleur_Septembre_2025 - lebiduleur.csv'
-    run_biduleur(filename1)
+    if len(sys.argv) > 1:
+        cli_mode()
+    else:
+        gui_mode()
+    # filename1 = './tapages/202509_tapage_biduleur_Septembre_2025 - lebiduleur.csv'
+    # run_biduleur(filename1)
