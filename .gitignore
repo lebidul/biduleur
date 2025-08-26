@@ -12,13 +12,13 @@ biduleur/outputs
 publisher/output
 biduleur/outputs
 biduleur/outputs
-build/*
-dist/*
+build
+dist
 *.exe
 *.pyd
 *.dll
-biduleur/build/*
-biduleur/dist/*
+biduleur/build
+biduleur/dist
 
 # Folder view configuration files
 .DS_Store
