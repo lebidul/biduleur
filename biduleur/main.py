@@ -26,7 +26,8 @@ def run_biduleur(filename):
 
 
 if __name__ == '__main__':
-    filename1 = './tapages/202507_tapage_biduleur_juillet_2025.csv'
+    filename1 = './tapages/202509_tapage_biduleur_Septembre_2025 - lebiduleur.csv'
+    # filename1 = './tapages/202509_tapage_biduleur_Septembre_2025 - lebiduleur_test_.csv'
     # filename2 = './tapages/202508_tapage_biduleur_août_2025.csv'
     run_biduleur(filename1)
     # run_biduleur(filename2)

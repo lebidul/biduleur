@@ -1,38 +1,37 @@
 from typing import Dict
+import math
 from constants import GENRE_EVT_SV, GENRE_EVT_CONCERT, OUTPUT_FOLDER_NAME
 import os.path
 
-def format_artists_styles(genre_evenement: str, *args) -> str:
+def format_artists_styles(*triplets) -> str:
     artistes_styles = ""
-    if genre_evenement.lower() == GENRE_EVT_SV:
-        for i in range(0, len(args), 3):
-            piece = args[i]
-            artiste = args[i + 1]
-            style = args[i + 2]
-            artistes_styles += format_sv(piece, artiste, style, i // 3 + 1)
-    elif genre_evenement.lower() == GENRE_EVT_CONCERT:
-        for i in range(0, len(args), 3):
-            artiste = args[i + 1]
-            style = args[i + 2]
-            artistes_styles += format_concert(artiste, style, i // 3 + 1)
+    for index, (genre, spectacle, artiste, style) in enumerate(triplets, start=1):
+        # Skip if genre is empty, None, or NaN (if genre is a string or None)
+        if not genre or str(genre).lower().strip() in ("", "nan"):
+            continue  # Skip this triplet
+
+        if genre.lower() == GENRE_EVT_SV:
+            artistes_styles += format_sv(spectacle, artiste, style, index)
+        elif genre.lower() == GENRE_EVT_CONCERT:
+            artistes_styles += format_concert(artiste, style, index)
     return artistes_styles
 
 def format_sv(piece: str, artiste: str, style: str, number: int) -> str:
     signe_plus = " + " if number != 1 else ""
     if piece:
-        return f"{signe_plus}\"{capfirst(piece)}\"{format_artiste(artiste)}{format_style(style)}"
+        return f"<strong>{signe_plus}\"{capfirst(piece)}\"</strong>{format_artiste(artiste)}{format_style(style)}"
     elif artiste:
-        return f"{signe_plus}{capfirst(artiste)}{format_style(style)}"
+        return f"<strong>{signe_plus}{capfirst(artiste)}</strong>{format_style(style)}"
     elif style:
-        return f"{signe_plus}{capfirst(style)}"
+        return f"<strong>{signe_plus}{capfirst(style)}</strong>"
     return ""
 
 def format_concert(artiste: str, style: str, number: int) -> str:
     signe_plus = " + " if number != 1 else ""
     if artiste:
-        return f"{signe_plus}{artiste.upper()}{format_style(style)}"
+        return f"<strong>{signe_plus}{artiste.upper()}</strong>{format_style(style)}"
     elif style:
-        return f"{signe_plus}{capfirst(style)}"
+        return f"<strong>{signe_plus}{capfirst(style)}</strong>"
     return ""
 
 def format_artiste(artiste: str) -> str:
@@ -54,7 +53,7 @@ def fmt_link(*links: str) -> str:
 
 def fmt_heure(heure: str) -> str:
     replacements = {"h00": "h", " h": "h", " a ": " à ", "h.n.c": "hnc"}
-    if not heure:
+    if not heure or str(heure).lower().strip() in ("", "nan"):
         return ""
     return f"{format_string(heure, replacements, lower=True)}, "
 
@@ -69,12 +68,12 @@ def format_style(style: str) -> str:
         "Theatre": "Th.", "electro": "électro", "Electro": "Électro",
         "metal": "métal", "Metal": "Métal"
     }
-    if not style:
+    if not style or str(style).lower().strip() in ("", "nan"):
         return ""
     return f" <em>({format_string(style, replacements, lower=False).lower()})</em>"
 
 def format_string(string: str, replacement_dictionary: Dict, lower: bool = False) -> str:
-    if not string:
+    if not string or str(string).lower().strip() in ("", "nan"):
         return ""
     if lower:
         string = string.lower()
@@ -83,12 +82,12 @@ def format_string(string: str, replacement_dictionary: Dict, lower: bool = False
     return string
 
 def format_evenement(evenement: str, style_evenement: str) -> str:
-    if not evenement:
+    if not evenement or str(evenement).lower().strip() in ("", "nan"):
         return ""
     return f"{evenement}{format_style(style_evenement)} // "
 
 def format_lieu(lieu: str) -> str:
-    if not lieu or lieu == "Le Mans":
+    if not lieu or lieu == "Le Mans" or str(lieu).lower().strip() in ("", "nan"):
         return ""
     return f"{lieu}, "
 

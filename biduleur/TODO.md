@@ -1,0 +1,29 @@
+# Liste des TODOs et Améliorations Futures
+
+## Priorité Élevée
+- [ ] Ajouter une validation des colonnes du CSV dans `read_and_sort_csv`.
+- [ ] Améliorer la gestion des erreurs pour les dates mal formatées (ex: "Mardi 1er").
+- [ ] Corriger le tri des événements lorsque la colonne `DATE` est vide ou invalide.
+- [ ] Rendre le Biduleur comme un éxécutable.
+
+## Priorité Moyenne
+- [ ] Optimiser les performances du tri pour les fichiers CSV volumineux.
+- [ ] Ajouter des logs pour faciliter le débogage.
+- [ ] Documenter les cas d'erreur possibles dans la docstring de `parse_bidul`.
+- [ ] Ajouter une interface en ligne de commande (CLI) pour le traitement par lots.
+
+## Priorité Faible
+- [ ] Prendre en charge les fichiers Excel en plus des CSV.
+- [ ] Ajouter une interface en ligne de commande (CLI) pour le traitement par lots.
+
+## Fonctionnalités Futures
+- [ ] Permettre la personnalisation des formats de date (ex: "1er mai" au lieu de "Mardi 1").
+- [ ] Ajouter des tests unitaires pour les cas limites (dates manquantes, formats invalides).
+
+## Réfactoring
+- [ ] Simplifier la logique de tri dans `read_and_sort_csv` en utilisant des clés de tri plus efficaces.
+- [ ] Décomposer `parse_bidul` en fonctions plus petites pour améliorer la lisibilité.
+
+## Documentation
+- [ ] Rédiger un guide utilisateur pour expliquer comment utiliser le module.
+- [ ] Ajouter des exemples d'utilisation dans la documentation.
