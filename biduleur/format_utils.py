@@ -1,6 +1,5 @@
 from typing import Dict
-import math
-from constants import GENRE_EVT_SV, GENRE_EVT_CONCERT, OUTPUT_FOLDER_NAME
+from biduleur.constants import GENRE_EVT_SV, GENRE_EVT_CONCERT, OUTPUT_FOLDER_NAME
 import os.path
 
 def format_artists_styles(*triplets) -> str:

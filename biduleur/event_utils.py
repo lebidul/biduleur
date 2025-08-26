@@ -1,5 +1,5 @@
-from format_utils import format_evenement, format_lieu, fmt_prix, fmt_heure, format_artists_styles, fmt_link, capfirst, fmt_virgule
-from constants import DATE, FESTIVAL, STYLE_FESTIVAL, VILLE, LIEU, PRIX, HORAIRE, GENRE1, SPECTACLE1, ARTISTE1, STYLE1, GENRE2, SPECTACLE2, ARTISTE2, STYLE2, GENRE3, SPECTACLE3, ARTISTE3, STYLE3, GENRE4, SPECTACLE4, ARTISTE4, STYLE4, LIEN1, LIEN2, LIEN3, LIEN4, P_MD_OPEN_DATE, P_MD_CLOSE_DATE, P_MD_OPEN_DATE_AGENDA, P_MD_CLOSE, P_MD_OPEN, P_MD_POST_OPEN
+from biduleur.format_utils import format_evenement, format_lieu, fmt_prix, fmt_heure, format_artists_styles, fmt_link, capfirst, fmt_virgule
+from biduleur.constants import DATE, FESTIVAL, STYLE_FESTIVAL, VILLE, LIEU, PRIX, HORAIRE, GENRE1, SPECTACLE1, ARTISTE1, STYLE1, GENRE2, SPECTACLE2, ARTISTE2, STYLE2, GENRE3, SPECTACLE3, ARTISTE3, STYLE3, GENRE4, SPECTACLE4, ARTISTE4, STYLE4, LIEN1, LIEN2, LIEN3, LIEN4, P_MD_OPEN_DATE, P_MD_CLOSE_DATE, P_MD_OPEN_DATE_AGENDA, P_MD_CLOSE, P_MD_OPEN, P_MD_POST_OPEN
 from typing import Dict, Tuple
 
 def parse_bidul_event(event: Dict, current_date: str = None) -> Tuple[str, str, str, str]:
