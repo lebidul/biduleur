@@ -45,6 +45,24 @@ jobs:
     - name: Prepare release assets
       run: |
         mkdir release_assets
+        # Créer un fichier README.txt pour les utilisateurs finaux
+        echo "Biduleur v${{ github.event.inputs.version || github.ref_name }}" > dist\biduleur\README.txt
+        echo "================================================" >> dist\biduleur\README.txt
+        echo "" >> dist\biduleur\README.txt
+        echo "Merci d'utiliser Biduleur !" >> dist\biduleur\README.txt
+        echo "" >> dist\biduleur\README.txt
+        echo "INSTRUCTIONS:" >> dist\biduleur\README.txt
+        echo "1. Extrayez le contenu de ce fichier ZIP dans un dossier de votre choix." >> dist\biduleur\README.txt
+        echo "2. Double-cliquez sur biduleur.exe pour lancer l'application." >> dist\biduleur\README.txt
+        echo "3. Suivez les instructions à l'écran." >> dist\biduleur\README.txt
+        echo "" >> dist\biduleur\README.txt
+        echo "REQUIREMENTS:" >> dist\biduleur\README.txt
+        echo "- Windows 10 ou supérieur" >> dist\biduleur\README.txt
+        echo "- Aucune installation supplémentaire nécessaire" >> dist\biduleur\README.txt
+        echo "" >> dist\biduleur\README.txt
+        echo "SUPPORT:" >> dist\biduleur\README.txt
+        echo "Pour toute question ou problème, contactez-nous via GitHub." >> dist\biduleur\README.txt
+        # Compresser le dossier biduleur en ZIP
         Compress-Archive -Path dist\biduleur\* -DestinationPath release_assets\biduleur-${{ github.event.inputs.version || github.ref_name }}-windows.zip -Force
 
     - name: Create Release
@@ -55,16 +73,21 @@ jobs:
         tag_name: ${{ github.event.inputs.version && format('v{0}', github.event.inputs.version) || github.ref_name }}
         body: |
           ## Biduleur ${{ github.event.inputs.version || github.ref_name }}
+
           ### Changements
           - [Liste des changements pour cette version]
+
           ### Instructions
           1. Téléchargez `biduleur-${{ github.event.inputs.version || github.ref_name }}-windows.zip`
           2. Extrayez le fichier ZIP dans un dossier de votre choix
           3. Exécutez `biduleur.exe` depuis le dossier extrait (aucune installation nécessaire)
+
           ### Contenu du ZIP
           - `biduleur.exe` : Exécutable principal
-          - `DLLs/` : Bibliothèques nécessaires (si applicable)
-          - Autres fichiers de données nécessaires au fonctionnement
+          - `README.txt` : Instructions pour les utilisateurs
+          - `run.bat` : Script pour exécuter l'application avec les logs (optionnel)
+          - Autres fichiers nécessaires au fonctionnement
+
         files: release_assets/*
         generate_release_notes: true
       env:

@@ -1,5 +1,5 @@
 # Module Biduleur
-Biduleur est un outil pour générer des événements à partir de fichiers CSV, disponible en **mode CLI (ligne de commande)** et **mode GUI (interface graphique)**.
+Biduleur est un outil pour générer des événements à partir de fichiers CSV, disponible en **mode GUI (interface graphique)** et **mode CLI (ligne de commande)**.
 
 ---
 ## Table des matières
@@ -16,23 +16,20 @@ Biduleur est un outil pour générer des événements à partir de fichiers CSV,
 7. [Création d'une release](#création-dune-release)
    - [Manuellement](#manuellement)
    - [Automatiquement avec GitHub Actions](#automatiquement-avec-github-actions)
-   - [Déclenchement manuel via GitHub Actions](#déclenchement-manuel-via-github-actions)
 8. [Dépannage](#dépannage)
 9. [Fichiers de configuration](#fichiers-de-configuration)
    - [biduleur.spec](#biduleurspec)
    - [build.bat](#buildbat)
    - [build.sh](#buildsh)
-   - [release.sh](#releasesh)
-10. [GitHub Actions](#github-actions)
-11. [Contribuer](#contribuer)
-12. [Licence](#licence)
+   - [release.yml](#releaseyml)
+10. [Contribuer](#contribuer)
+11. [Licence](#licence)
 
 ---
 ## Prérequis
-- Python 3.13 ou supérieur *(recommandé pour la compatibilité avec les builds GitHub Actions)*
+- Python 3.9 ou supérieur
 - Pip (généralement installé avec Python)
 - Git (optionnel, pour cloner le dépôt)
-- UPX (optionnel, pour compresser l'exécutable)
 - **Permissions GitHub** : Assurez-vous que votre dépôt a les permissions "Read and write" pour les GitHub Actions *(Settings > Actions > General > Workflow permissions)*
 
 ---
@@ -47,13 +44,10 @@ bidul.biduleur/
 │   ├── format_utils.py     # Utilitaires de formatage
 │   ├── constants.py        # Constantes du projet
 │   ├── event_utils.py      # Gestion des événements
-├── biduleur.ico            # Icône de l'application
 ├── biduleur.spec           # Fichier de configuration PyInstaller
 ├── build.bat               # Script de build pour Windows
 ├── build.sh                # Script de build pour Linux
-├── release.sh              # Script pour créer une release
 ├── requirements.txt        # Dépendances Python
-├── .gitignore              # Fichiers à ignorer
 ├── .github/                # Configuration GitHub Actions
 │   └── workflows/
 │       └── release.yml     # Workflow de release
@@ -120,9 +114,6 @@ Le mode GUI est **l'interface par défaut** lorsque vous exécutez Biduleur sans
 - **Export** des événements dans différents formats.
 - **Historique** des fichiers récemment ouverts.
 
-#### **Capture d'écran**
-*(À ajouter : capture d'écran de l'interface graphique)*
-
 ---
 
 ### **Mode CLI (Ligne de Commande)**
@@ -164,21 +155,14 @@ dist\biduleur\biduleur.exe --cli --help
    python -m biduleur.cli --input data.csv --delimiter ";" --output events.xml --format xml
    ```
 
-#### **Sortie standard**
-Si aucun fichier de sortie n'est spécifié, les événements sont affichés dans la console :
-```bash
-python -m biduleur.cli --input data.csv
-```
-
 ---
-
 ## Création du build
 ### Sur Windows
 1. Double-cliquez sur `build.bat` ou exécutez-le depuis l'invite de commandes :
    ```cmd
    .\build.bat
    ```
-2. Le build sera généré dans `dist\biduleur\biduleur.exe` (mode GUI par défaut).
+2. Le build sera généré dans `dist\biduleur\`.
 
 ### Sur Linux
 1. Rendez le script exécutable :
@@ -189,7 +173,7 @@ python -m biduleur.cli --input data.csv
    ```bash
    ./build.sh
    ```
-3. Le build sera généré dans `dist/biduleur/biduleur`.
+3. Le build sera généré dans `dist/biduleur/`.
 
 ---
 ## Utilisation
@@ -218,27 +202,14 @@ Après le build, exécutez l'application :
 6. Publiez la release
 
 ### Automatiquement avec GitHub Actions
-1. Exécutez le script de release :
-   ```bash
-   ./release.sh 1.0.0
-   ```
-   Ce script va :
-   - Créer un tag Git
-   - Pousser le tag sur GitHub
-   - Déclencher automatiquement le workflow GitHub Actions qui va :
-     - Builder l'application
-     - Créer une release dans l'espace GitHub Releases
-     - Attacher automatiquement l'exécutable à la release
-
-### Déclenchement manuel via GitHub Actions
-Vous pouvez aussi déclencher manuellement le workflow GitHub Actions pour générer et publier une release :
-1. Allez dans l'onglet **"Actions"** de votre dépôt GitHub
-2. Sélectionnez le workflow **"Build and Release"** dans la liste à gauche
-3. Cliquez sur **"Run workflow"** (bouton dropdown)
-4. Configurez les paramètres :
-   - **Version** : Numéro de version (ex: `1.0.0`)
-   - **Publier la release ?** : `true` (pour publier) ou `false` (pour juste builder)
-5. Cliquez sur **"Run workflow"**
+1. Exécutez le workflow manuellement depuis GitHub Actions :
+   - Allez dans l'onglet **"Actions"**
+   - Sélectionnez le workflow **"Build and Release"**
+   - Cliquez sur **"Run workflow"**
+   - Configurez les paramètres :
+     - **Version** : Numéro de version (ex: `1.0.0`)
+     - **Publier la release ?** : `true` (pour publier) ou `false` (pour juste builder)
+   - Cliquez sur **"Run workflow"**
 
 ---
 ## Dépannage
@@ -263,54 +234,49 @@ Vous pouvez aussi déclencher manuellement le workflow GitHub Actions pour gén�
    - Vérifiez que les permissions du dépôt sont correctement configurées *(Settings > Actions > General > Workflow permissions : "Read and write permissions")*
    - Assurez-vous que le tag n'existe pas déjà
 
-6. **Problèmes avec le mode CLI** :
-   - Vérifiez que `biduleur/cli.py` existe et est importable
-   - Testez en local : `python -m biduleur.cli --help`
-
 ---
 ## Fichiers de configuration
 ### biduleur.spec
 ```python
-# biduleur.spec (compatible local + GitHub Actions)
-from PyInstaller.utils.hooks import collect_submodules
+# biduleur.spec (version finale)
+from PyInstaller.utils.hooks import collect_submodules, collect_data_files
 import os
 import sys
-import glob
 
-def find_python_dll():
-    # Chemin pour GitHub Actions
-    github_dll = os.path.join(sys.prefix, 'python*.dll')
-    github_matches = glob.glob(github_dll)
-    if github_matches:
-        return github_matches[0]
+current_dir = os.getcwd()
+main_script = os.path.join(current_dir, 'biduleur', 'main.py')
 
-    # Chemin pour venv local
-    venv_dll = os.path.join(sys.prefix, 'Scripts', 'python3*.dll')
-    venv_matches = glob.glob(venv_dll)
-    if venv_matches:
-        return venv_matches[0]
+if not os.path.exists(main_script):
+    raise FileNotFoundError(f"Le fichier {main_script} est introuvable")
 
-    raise FileNotFoundError("DLL Python introuvable")
-
-python_dll = find_python_dll()
-print(f"Utilisation de la DLL : {python_dll}")
-
-hidden_imports = collect_submodules('tkinter') + [
+hidden_imports = collect_submodules('tkinter')
+hidden_imports += [
     'biduleur.csv_utils',
     'biduleur.format_utils',
     'biduleur.constants',
     'biduleur.event_utils',
-    'biduleur.cli',  # Ajoutez le module CLI
     'pkg_resources.py2_warn',
+    'pandas',
+    'numpy',
+    'python_dateutil',
+    'pytz',
+    'tzdata',
+    'six',
 ]
 
+datas = collect_data_files('tkinter')
+datas += [(os.path.join(current_dir, 'biduleur'), 'biduleur')]
+
+site_packages = os.path.join(sys.prefix, 'Lib', 'site-packages')
+datas += [(site_packages, 'site-packages')]
+
 a = Analysis(
-    ['biduleur/main.py'],
-    pathex=[os.path.dirname(os.path.abspath(__file__))],
-    binaries=[(python_dll, '.')],
-    datas=[],
+    [main_script],
+    pathex=[current_dir, site_packages],
+    binaries=[],
+    datas=datas,
     hiddenimports=hidden_imports,
-    hookspath=[],
+    hookspath=['hooks'],
     runtime_hooks=[],
     excludes=[],
     win_no_prefer_redirects=False,
@@ -324,17 +290,16 @@ pyz = PYZ(a.pure, a.zipped_data, cipher=None)
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
     [],
+    exclude_binaries=True,
     name='biduleur',
-    debug=False,
+    debug=True,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    upx=False,
     runtime_tmpdir=None,
-    console=True,  # Affiche la console pour le mode CLI
-    icon='biduleur.ico' if os.path.exists('biduleur.ico') else None,
-    onefile=True  # Exécutable unique
+    console=True,
+    icon=os.path.join(current_dir, 'biduleur.ico') if os.path.exists(os.path.join(current_dir, 'biduleur.ico')) else None
 )
 
 coll = COLLECT(
@@ -343,7 +308,7 @@ coll = COLLECT(
     a.zipfiles,
     a.datas,
     strip=False,
-    upx=True,
+    upx=False,
     upx_exclude=[],
     name='biduleur'
 )
@@ -354,11 +319,12 @@ coll = COLLECT(
 @echo off
 cd /d "%~dp0"
 
-:: Nettoyage
+:: Nettoyage des anciens builds
+echo Nettoyage des anciens builds...
 rmdir /s /q build 2>nul
 rmdir /s /q dist 2>nul
 
-:: Vérifications
+:: Vérification de la structure
 echo Vérification de la structure :
 dir /b
 if not exist "biduleur\main.py" (
@@ -368,10 +334,10 @@ if not exist "biduleur\main.py" (
 
 :: Build
 echo Création du build...
-python -m PyInstaller biduleur.spec --clean
+pyinstaller biduleur.spec --clean --workpath=build --distpath=dist
 
 :: Vérification
-if exist "dist\biduleur.exe" (
+if exist "dist\biduleur" (
     echo Build réussi !
     dir dist\
 ) else (
@@ -404,10 +370,10 @@ fi
 
 # Build
 echo "Création du build..."
-python -m PyInstaller biduleur.spec --clean
+pyinstaller biduleur.spec --clean --workpath=build --distpath=dist
 
 # Vérification
-if [ -f "dist/biduleur" ]; then
+if [ -d "dist/biduleur" ]; then
     echo "Build réussi !"
     ls -l dist/
 else
@@ -416,49 +382,9 @@ else
 fi
 ```
 
-### release.sh
-```bash
-#!/bin/bash
-
-# Vérification du numéro de version
-if [ -z "$1" ]; then
-    echo "Usage: $0 <version> (ex: 1.0.0)"
-    exit 1
-fi
-
-VERSION="v$1"
-
-# Vérification git
-if ! git diff-index --quiet HEAD; then
-    echo "ERREUR: Modifications non commitées. Commit avant de créer une release."
-    exit 1
-fi
-
-# Création du tag
-git tag -a "$VERSION" -m "Version $VERSION"
-git push origin "$VERSION"
-
-echo "Release $VERSION créée. GitHub Actions va builder et publier automatiquement."
-```
-
----
-## GitHub Actions
-### Configuration requise
-Pour que le workflow de release fonctionne correctement :
-1. Assurez-vous que les permissions sont configurées :
-   - Allez dans **Settings > Actions > General**
-   - Sélectionnez **"Read and write permissions"** pour les workflows
-2. Aucune configuration supplémentaire n'est nécessaire (le token GITHUB_TOKEN est automatiquement fourni)
-
-### Workflow détaillé
-Le fichier `.github/workflows/release.yml` gère :
-- Le build de l'application (GUI + CLI)
-- La création de releases automatiques
-- La gestion des tags
-- La publication des exécutables
-
+### release.yml
 ```yaml
-name: Build and Release
+name: Build and Release - Biduleur (moulinette)
 
 on:
   push:
@@ -470,6 +396,14 @@ on:
         description: 'Numéro de version (ex: 1.0.0)'
         required: true
         default: '1.0.0'
+      publish_release:
+        description: 'Publier la release ?'
+        required: true
+        default: 'true'
+        type: choice
+        options:
+        - 'true'
+        - 'false'
 
 jobs:
   build:
@@ -479,57 +413,68 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Set up Python 3.13
+    - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.13'
+        python-version: '3.9'
 
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
+        pip install -r biduleur/requirements.txt
         pip install pyinstaller
 
-    - name: Find Python DLL
-      id: find_dll
-      shell: python
+    - name: Build executable (mode --onedir)
       run: |
-        import os
-        import sys
-        import glob
-        dll_path = glob.glob(f"{sys.prefix}/python*.dll")[0]
-        print(f"::set-output name=dll_path::{dll_path}")
-
-    - name: Build executable
-      run: |
-        pyinstaller biduleur.spec --clean
+        pyinstaller biduleur.spec --clean --workpath=build --distpath=dist
 
     - name: Prepare release assets
       run: |
         mkdir release_assets
-        copy dist\biduleur.exe release_assets\biduleur-${{ github.event.inputs.version || github.ref_name }}-windows.exe
+        # Créer un fichier README.txt pour les utilisateurs finaux
+        echo "Biduleur v${{ github.event.inputs.version || github.ref_name }}" > dist\biduleur\README.txt
+        echo "================================================" >> dist\biduleur\README.txt
+        echo "" >> dist\biduleur\README.txt
+        echo "Merci d'utiliser Biduleur !" >> dist\biduleur\README.txt
+        echo "" >> dist\biduleur\README.txt
+        echo "INSTRUCTIONS:" >> dist\biduleur\README.txt
+        echo "1. Extrayez le contenu de ce fichier ZIP dans un dossier de votre choix." >> dist\biduleur\README.txt
+        echo "2. Double-cliquez sur biduleur.exe pour lancer l'application." >> dist\biduleur\README.txt
+        echo "3. Suivez les instructions à l'écran." >> dist\biduleur\README.txt
+        echo "" >> dist\biduleur\README.txt
+        echo "REQUIREMENTS:" >> dist\biduleur\README.txt
+        echo "- Windows 10 ou supérieur" >> dist\biduleur\README.txt
+        echo "- Aucune installation supplémentaire nécessaire" >> dist\biduleur\README.txt
+        echo "" >> dist\biduleur\README.txt
+        echo "SUPPORT:" >> dist\biduleur\README.txt
+        echo "Pour toute question ou problème, contactez-nous via GitHub." >> dist\biduleur\README.txt
+        # Compresser le dossier biduleur en ZIP
+        Compress-Archive -Path dist\biduleur\* -DestinationPath release_assets\biduleur-${{ github.event.inputs.version || github.ref_name }}-windows.zip -Force
 
     - name: Create Release
+      if: ${{ github.event.inputs.publish_release != 'false' && (github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')) }}
       uses: softprops/action-gh-release@v1
       with:
         name: Biduleur ${{ github.event.inputs.version || github.ref_name }}
-        tag_name: v${{ github.event.inputs.version || github.ref_name }}
+        tag_name: ${{ github.event.inputs.version && format('v{0}', github.event.inputs.version) || github.ref_name }}
         body: |
           ## Biduleur ${{ github.event.inputs.version || github.ref_name }}
 
           ### Changements
-          - [Liste des changements]
+          - [Liste des changements pour cette version]
 
-          ### Modes disponibles
-          - **GUI** : Double-cliquez sur l'exécutable
-          - **CLI** : Utilisez `--cli` pour le mode ligne de commande
+          ### Instructions
+          1. Téléchargez `biduleur-${{ github.event.inputs.version || github.ref_name }}-windows.zip`
+          2. Extrayez le fichier ZIP dans un dossier de votre choix
+          3. Exécutez `biduleur.exe` depuis le dossier extrait (aucune installation nécessaire)
 
-          ### Exemples
-          ```cmd
-          biduleur-${{ github.event.inputs.version || github.ref_name }}-windows.exe
-          biduleur-${{ github.event.inputs.version || github.ref_name }}-windows.exe --cli --input data.csv --output events.json
-          ```
+          ### Contenu du ZIP
+          - `biduleur.exe` : Exécutable principal
+          - `README.txt` : Instructions pour les utilisateurs
+          - Autres fichiers nécessaires au fonctionnement
+
         files: release_assets/*
+        generate_release_notes: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
@@ -546,33 +491,3 @@ jobs:
 ## Licence
 [MIT](LICENCE)
 ```
-
----
-### **🔧 Modifications apportées :**
-1. **Ajout d'une section "Modes d'utilisation"** :
-   - Sous-sections pour **GUI** et **CLI**.
-   - Exemples concrets pour chaque mode.
-   - Tableau des options CLI.
-
-2. **Mise à jour de `biduleur.spec`** :
-   - Ajout de `biduleur.cli` dans `hiddenimports`.
-   - Activation de la console (`console=True`) pour le mode CLI.
-
-3. **Mise à jour du workflow GitHub Actions** :
-   - Ajout d'une section **Modes disponibles** dans la description de la release.
-   - Exemples d'utilisation dans les notes de release.
-
-4. **Structure du projet** :
-   - Ajout de `cli.py` dans la liste des fichiers.
-
-5. **Dépannage** :
-   - Ajout d'une entrée pour les problèmes liés au mode CLI.
-
----
-### **📌 Prochaines étapes :**
-1. **Ajoutez une capture d'écran** de l'interface graphique dans la section **Mode GUI**.
-2. **Testez les deux modes** (GUI et CLI) avec l'exécutable généré.
-3. **Vérifiez que le mode CLI fonctionne** depuis l'exécutable :
-   ```cmd
-   dist\biduleur\biduleur.exe --cli --help
-   ```
