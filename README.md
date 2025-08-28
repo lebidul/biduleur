@@ -19,8 +19,8 @@ Biduleur est un outil pour générer des événements à partir de fichiers CSV,
 8. [Dépannage](#dépannage)
 9. [Fichiers de configuration](#fichiers-de-configuration)
    - [biduleur.spec](#biduleurspec)
-   - [build.bat](#buildbat)
-   - [build.sh](#buildsh)
+   - [build.biduleur.bat](#buildbat)
+   - [build.biduleur.sh](#buildsh)
    - [release.yml](#releaseyml)
 10. [Contribuer](#contribuer)
 11. [Licence](#licence)
@@ -45,8 +45,8 @@ bidul.biduleur/
 │   ├── constants.py        # Constantes du projet
 │   ├── event_utils.py      # Gestion des événements
 ├── biduleur.spec           # Fichier de configuration PyInstaller
-├── build.bat               # Script de build pour Windows
-├── build.sh                # Script de build pour Linux
+├── build.biduleur.bat               # Script de build pour Windows
+├── build.biduleur.sh                # Script de build pour Linux
 ├── requirements.txt        # Dépendances Python
 ├── .github/                # Configuration GitHub Actions
 │   └── workflows/
@@ -158,20 +158,20 @@ dist\biduleur\biduleur.exe --cli --help
 ---
 ## Création du build
 ### Sur Windows
-1. Double-cliquez sur `build.bat` ou exécutez-le depuis l'invite de commandes :
+1. Double-cliquez sur `build.biduleur.bat` ou exécutez-le depuis l'invite de commandes :
    ```cmd
-   .\build.bat
+   .\build.biduleur.bat
    ```
 2. Le build sera généré dans `dist\biduleur\`.
 
 ### Sur Linux
 1. Rendez le script exécutable :
    ```bash
-   chmod +x build.sh
+   chmod +x build.biduleur.sh
    ```
 2. Exécutez le script :
    ```bash
-   ./build.sh
+   ./build.biduleur.sh
    ```
 3. Le build sera généré dans `dist/biduleur/`.
 
@@ -314,7 +314,7 @@ coll = COLLECT(
 )
 ```
 
-### build.bat
+### build.biduleur.bat
 ```batch
 @echo off
 cd /d "%~dp0"
@@ -346,7 +346,7 @@ if exist "dist\biduleur" (
 )
 ```
 
-### build.sh
+### build.biduleur.sh
 ```bash
 #!/bin/bash
 cd "$(dirname "$0")" || exit 1
