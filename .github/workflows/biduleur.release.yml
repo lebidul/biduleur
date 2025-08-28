@@ -40,7 +40,7 @@ jobs:
 
     - name: Build executable (mode --onedir)
       run: |
-        pyinstaller biduleur.spec --clean --workpath=build --distpath=dist --onedir
+        pyinstaller biduleur.spec --clean --workpath=build --distpath=dist
 
     - name: Prepare release assets
       run: |
