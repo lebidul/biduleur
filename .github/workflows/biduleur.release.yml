@@ -3,8 +3,8 @@ name: Build and Release - Biduleur (moulinette)
 on:
   push:
     tags:
-      - 'v*'  # Déclenche automatiquement quand un tag comme v1.0.0 est poussé
-  workflow_dispatch:  # Permet de déclencher manuellement
+      - 'v*'
+  workflow_dispatch:
     inputs:
       version:
         description: 'Numéro de version (ex: 1.0.0)'
@@ -30,7 +30,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.9'  # Utilisez la même version que votre build local
+        python-version: '3.9'
 
     - name: Install dependencies
       run: |
@@ -45,7 +45,6 @@ jobs:
     - name: Prepare release assets
       run: |
         mkdir release_assets
-        # Compresser le dossier biduleur en ZIP
         Compress-Archive -Path dist\biduleur\* -DestinationPath release_assets\biduleur-${{ github.event.inputs.version || github.ref_name }}-windows.zip -Force
 
     - name: Create Release
@@ -56,20 +55,16 @@ jobs:
         tag_name: ${{ github.event.inputs.version && format('v{0}', github.event.inputs.version) || github.ref_name }}
         body: |
           ## Biduleur ${{ github.event.inputs.version || github.ref_name }}
-
           ### Changements
           - [Liste des changements pour cette version]
-
           ### Instructions
           1. Téléchargez `biduleur-${{ github.event.inputs.version || github.ref_name }}-windows.zip`
           2. Extrayez le fichier ZIP dans un dossier de votre choix
           3. Exécutez `biduleur.exe` depuis le dossier extrait (aucune installation nécessaire)
-
           ### Contenu du ZIP
           - `biduleur.exe` : Exécutable principal
           - `DLLs/` : Bibliothèques nécessaires (si applicable)
           - Autres fichiers de données nécessaires au fonctionnement
-
         files: release_assets/*
         generate_release_notes: true
       env:
