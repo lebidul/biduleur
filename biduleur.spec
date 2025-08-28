@@ -18,34 +18,31 @@ hidden_imports += [
     'biduleur.format_utils',
     'biduleur.constants',
     'biduleur.event_utils',
-    'pkg_resources.py2_warn',
-    'pandas',  # Ajoutez pandas
-    'numpy',   # Ajoutez numpy
-    'python_dateutil',
-    'pytz',
-    'tzdata',
-    'six',
+    'pkg_resources.py2_warn',  # Pour éviter les warnings
+]
+
+# Modules à exclure explicitement pour réduire la taille
+excludes = [
+    'Tkconstants', 'tcl', 'tk', 'Tix', 'sqlite3', 'email', 'http', 'xml', 'html',
+    'urllib', 'unittest', 'pytest', 'doctest', 'pydoc', 'inspect', 'pdb',
+    'matplotlib', 'scipy', 'sklearn', 'tensorflow', 'torch', 'torchvision', 'torchaudio',
+    'IPython', 'jupyter', 'sphinx', 'pytest', 'setuptools', 'pip', 'wheel',
+    'scipy.linalg', 'scipy.sparse', 'scipy.stats', 'scipy.integrate', 'scipy.optimize'
 ]
 
 # Collecte des fichiers de données
 datas = collect_data_files('tkinter')  # Pour tkinter
-datas += [(os.path.join(current_dir, 'biduleur'), 'biduleur')]  # Copie tout le dossier biduleur
-
-# Ajoutez les fichiers des dépendances installées
-site_packages = os.path.join(sys.prefix, 'Lib', 'site-packages')
-datas += [
-    (site_packages, 'site-packages'),  # Copie les dépendances installées
-]
+datas += collect_data_files('biduleur')  # Pour les fichiers dans biduleur/
 
 a = Analysis(
     [main_script],
-    pathex=[current_dir, site_packages],  # Ajoutez site-packages au chemin de recherche
+    pathex=[current_dir],
     binaries=[],
     datas=datas,
     hiddenimports=hidden_imports,
     hookspath=[],
     runtime_hooks=[],
-    excludes=[],
+    excludes=excludes,
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=None,
@@ -60,12 +57,12 @@ exe = EXE(
     [],
     exclude_binaries=True,
     name='biduleur',
-    debug=True,
+    debug=True,  # Active le mode debug
     bootloader_ignore_signals=False,
     strip=False,
-    upx=False,
+    upx=True,
     runtime_tmpdir=None,
-    console=True,
+    console=False,
     icon=os.path.join(current_dir, 'biduleur.ico') if os.path.exists(os.path.join(current_dir, 'biduleur.ico')) else None
 )
 
@@ -75,7 +72,7 @@ coll = COLLECT(
     a.zipfiles,
     a.datas,
     strip=False,
-    upx=False,
+    upx=True,
     upx_exclude=[],
     name='biduleur'
 )
