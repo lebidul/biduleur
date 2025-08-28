@@ -19,19 +19,27 @@ hidden_imports += [
     'biduleur.constants',
     'biduleur.event_utils',
     'pkg_resources.py2_warn',
+    'pandas',  # Ajoutez pandas
+    'numpy',   # Ajoutez numpy
+    'python_dateutil',
+    'pytz',
+    'tzdata',
+    'six',
 ]
 
 # Collecte des fichiers de données
 datas = collect_data_files('tkinter')  # Pour tkinter
+datas += [(os.path.join(current_dir, 'biduleur'), 'biduleur')]  # Copie tout le dossier biduleur
 
-# Ajoutez explicitement les fichiers du package biduleur
+# Ajoutez les fichiers des dépendances installées
+site_packages = os.path.join(sys.prefix, 'Lib', 'site-packages')
 datas += [
-    (os.path.join(current_dir, 'biduleur'), 'biduleur')  # Copie tout le dossier biduleur
+    (site_packages, 'site-packages'),  # Copie les dépendances installées
 ]
 
 a = Analysis(
     [main_script],
-    pathex=[current_dir],
+    pathex=[current_dir, site_packages],  # Ajoutez site-packages au chemin de recherche
     binaries=[],
     datas=datas,
     hiddenimports=hidden_imports,
