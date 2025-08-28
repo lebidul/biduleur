@@ -1,5 +1,4 @@
 # Module Biduleur
-
 Biduleur est un outil pour générer des événements à partir de fichiers CSV.
 
 ---
@@ -14,6 +13,7 @@ Biduleur est un outil pour générer des événements à partir de fichiers CSV.
 6. [Création d'une release](#création-dune-release)
    - [Manuellement](#manuellement)
    - [Automatiquement avec GitHub Actions](#automatiquement-avec-github-actions)
+   - [Déclenchement manuel via GitHub Actions](#déclenchement-manuel-via-github-actions)
 7. [Dépannage](#dépannage)
 8. [Fichiers de configuration](#fichiers-de-configuration)
    - [biduleur.spec](#biduleurspec)
@@ -21,20 +21,21 @@ Biduleur est un outil pour générer des événements à partir de fichiers CSV.
    - [build.sh](#buildsh)
    - [release.sh](#releasesh)
 9. [GitHub Actions](#github-actions)
+   - [Configuration requise](#configuration-requise)
+   - [Workflow détaillé](#workflow-détaillé)
+10. [Contribuer](#contribuer)
+11. [Licence](#licence)
 
 ---
-
 ## Prérequis
-
 - Python 3.9 ou supérieur
 - Pip (généralement installé avec Python)
 - Git (optionnel, pour cloner le dépôt)
 - UPX (optionnel, pour compresser l'exécutable)
+- **Permissions GitHub** : Assurez-vous que votre dépôt a les permissions "Read and write" pour les GitHub Actions (Settings > Actions > General > Workflow permissions)
 
 ---
-
 ## Structure du projet
-
 ```
 bidul.biduleur/
 ├── biduleur/               # Package Python
@@ -51,14 +52,15 @@ bidul.biduleur/
 ├── release.sh              # Script pour créer une release
 ├── requirements.txt        # Dépendances Python
 ├── .gitignore              # Fichiers à ignorer
+├── .github/                # Configuration GitHub Actions
+│   └── workflows/
+│       └── release.yml     # Workflow de release
 ├── build/                  # (généré par PyInstaller)
 └── dist/                   # (généré par PyInstaller)
 ```
 
 ---
-
 ## Installation
-
 1. Clone le dépôt (si nécessaire) :
    ```bash
    git clone https://github.com/lebidul/biduleur.git
@@ -87,60 +89,45 @@ bidul.biduleur/
    ```
 
 ---
-
 ## Création du build
-
 ### Sur Windows
-
 1. Double-clique sur `build.bat` ou exécute-le depuis l'invite de commandes :
    ```cmd
    .\build.bat
    ```
-
 2. Le build sera généré dans `dist\biduleur\biduleur.exe`
 
 ### Sur Linux
-
 1. Rends le script exécutable :
    ```bash
    chmod +x build.sh
    ```
-
 2. Exécute le script :
    ```bash
    ./build.sh
    ```
-
 3. Le build sera généré dans `dist/biduleur/biduleur`
 
 ---
-
 ## Utilisation
-
 Après le build, exécute l'application :
-
 - **Windows** :
   ```cmd
   dist\biduleur\biduleur.exe
   ```
-
 - **Linux** :
   ```bash
   dist/biduleur/biduleur
   ```
 
 ---
-
 ## Création d'une release
-
 ### Manuellement
-
 1. Crée un tag :
    ```bash
    git tag -a v1.0.0 -m "Version 1.0.0 - Première version stable"
    git push origin v1.0.0
    ```
-
 2. Va sur [GitHub Releases](https://github.com/lebidul/biduleur/releases)
 3. Clique sur "Draft a new release"
 4. Sélectionne le tag `v1.0.0`
@@ -148,23 +135,43 @@ Après le build, exécute l'application :
 6. Publie la release
 
 ### Automatiquement avec GitHub Actions
-
 1. Exécute le script de release :
    ```bash
    ./release.sh 1.0.0
    ```
+   Ce script va :
+   - Créer un tag Git
+   - Pousser le tag sur GitHub
+   - Déclencher automatiquement le workflow GitHub Actions qui va :
+     - Builder l'application
+     - Créer une release dans l'espace GitHub Releases
+     - Attacher automatiquement l'exécutable à la release
 
-2. GitHub Actions va automatiquement :
-   - Builder l'application
-   - Créer une release
-   - Attacher l'exécutable
+### Déclenchement manuel via GitHub Actions
+Vous pouvez aussi déclencher manuellement le workflow GitHub Actions pour générer et publier une release :
+
+1. Va dans l'onglet **"Actions"** de ton dépôt GitHub
+2. Sélectionne le workflow **"Build and Release"** dans la liste à gauche
+3. Clique sur **"Run workflow"** (bouton dropdown)
+4. Configure les paramètres :
+   - **Version** : Numéro de version (ex: `1.0.0`)
+   - **Publier la release ?** : `true` (pour publier) ou `false` (pour juste builder)
+5. Clique sur **"Run workflow"**
+
+Le workflow va :
+- Builder l'application
+- Créer un tag (si nécessaire)
+- Publier une release dans l'espace GitHub Releases avec l'exécutable attaché
+- Générer automatiquement des notes de release basées sur les commits
+
+**Avantages de cette méthode** :
+- Pas besoin d'uploader manuellement les binaires
+- Tout est géré automatiquement dans un environnement propre
+- Historique clair des releases dans l'onglet dédié
 
 ---
-
 ## Dépannage
-
 ### Problèmes courants
-
 1. **L'exécutable ne se lance pas** :
    - Active le mode console dans `biduleur.spec` (`console=True`)
    - Vérifie les dépendances : `pip install -r requirements.txt`
@@ -178,12 +185,16 @@ Après le build, exécute l'application :
    - Exécute avec plus de détails : `pyinstaller biduleur.spec --clean --debug=all`
    - Consulte les logs dans `build/`
 
+4. **Erreur avec GitHub Actions "deprecated version of actions/upload-artifact: v3"** :
+   - Le workflow fourni utilise déjà les versions actuelles des actions (v4)
+
+5. **Erreur 403 lors de la création de release** :
+   - Vérifiez que les permissions du dépôt sont correctement configurées (Settings > Actions > General > Workflow permissions : "Read and write permissions")
+   - Assurez-vous que le tag n'existe pas déjà
+
 ---
-
 ## Fichiers de configuration
-
 ### biduleur.spec
-
 ```python
 # biduleur.spec
 from PyInstaller.utils.hooks import collect_submodules
@@ -258,7 +269,6 @@ coll = COLLECT(
 ```
 
 ### build.bat
-
 ```batch
 @echo off
 cd /d "%~dp0"
@@ -290,7 +300,6 @@ if exist "dist\biduleur\biduleur.exe" (
 ```
 
 ### build.sh
-
 ```bash
 #!/bin/bash
 cd "$(dirname "$0")" || exit 1
@@ -327,7 +336,6 @@ fi
 ```
 
 ### release.sh
-
 ```bash
 #!/bin/bash
 
@@ -353,10 +361,20 @@ echo "Release $VERSION créée. GitHub Actions va builder et publier automatique
 ```
 
 ---
-
 ## GitHub Actions
+### Configuration requise
+Pour que le workflow de release fonctionne correctement :
+1. Assurez-vous que les permissions sont configurées :
+   - Allez dans **Settings > Actions > General**
+   - Sélectionnez **"Read and write permissions"** pour les workflows
+2. Aucune configuration supplémentaire n'est nécessaire (le token GITHUB_TOKEN est automatiquement fourni)
 
-Crée un fichier `.github/workflows/release.yml` :
+### Workflow détaillé
+Le fichier `.github/workflows/release.yml` gère :
+- Le build de l'application
+- La création de releases automatiques
+- La gestion des tags
+- La publication des exécutables
 
 ```yaml
 name: Build and Release
@@ -364,20 +382,36 @@ name: Build and Release
 on:
   push:
     tags:
-      - 'v*'
+      - 'v*'  # Déclenche automatiquement quand un tag est poussé
+  workflow_dispatch:  # Permet de déclencher manuellement
+    inputs:
+      version:
+        description: 'Numéro de version (ex: 1.0.0)'
+        required: true
+        default: '1.0.0'
+      publish_release:
+        description: 'Publier la release ?'
+        required: true
+        default: 'true'
+        type: choice
+        options:
+        - 'true'
+        - 'false'
 
 jobs:
   build:
     runs-on: windows-latest
 
     steps:
-    - name: Checkout
-      uses: actions/checkout@v3
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Nécessaire pour manipuler les tags
 
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.9'
+        python-version: '3.9.13'  # Doit correspondre à la version utilisée localement
 
     - name: Install dependencies
       run: |
@@ -385,27 +419,55 @@ jobs:
         pip install -r requirements.txt
         pip install pyinstaller
 
-    - name: Build
+    - name: Build executable
       run: |
-        pyinstaller biduleur.spec --clean --workpath=build --distpath=dist
+        pyinstaller biduleur.spec --clean --onefile --workpath=build --distpath=dist
 
-    - name: Prepare assets
+    - name: Prepare release assets
       run: |
         mkdir release_assets
-        copy dist\biduleur\biduleur.exe release_assets\biduleur-${{ github.ref_name }}-windows.exe
+        copy dist\biduleur.exe release_assets\biduleur-${{ github.event.inputs.version || github.ref_name }}-windows.exe
+
+    - name: Delete existing tag (if it exists)
+      if: github.event_name == 'workflow_dispatch' && github.event.inputs.publish_release == 'true'
+      run: |
+        git push origin :refs/tags/v${{ github.event.inputs.version }} || true
+
+    - name: Create new tag (for manual dispatch)
+      if: github.event_name == 'workflow_dispatch' && github.event.inputs.publish_release == 'true'
+      run: |
+        git tag -a v${{ github.event.inputs.version }} -m "Release v${{ github.event.inputs.version }}"
+        git push origin v${{ github.event.inputs.version }}
 
     - name: Create Release
+      if: github.event.inputs.publish_release == 'true' && (github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/'))
       uses: softprops/action-gh-release@v1
       with:
+        name: Biduleur ${{ github.event.inputs.version || github.ref_name }}
+        tag_name: v${{ github.event.inputs.version || github.ref_name }}
+        body: |
+          ## Biduleur ${{ github.event.inputs.version || github.ref_name }}
+
+          ### Changements
+          - [Liste des changements pour cette version]
+
+          ### Instructions
+          1. Téléchargez `biduleur-${{ github.event.inputs.version || github.ref_name }}-windows.exe`
+          2. Exécutez le fichier (aucune installation nécessaire)
         files: release_assets/*
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
+**Fonctionnalités du workflow** :
+- Utilise `--onefile` pour créer un exécutable autonome
+- Gère les versions via des inputs
+- Supprime les tags existants avant création pour éviter les conflits
+- Crée des releases avec des notes automatiques
+- Permet de choisir entre build seulement ou build + publication
+
 ---
-
 ## Contribuer
-
 1. Fork le projet
 2. Crée une branche (`git checkout -b feature/ma-fonctionnalité`)
 3. Commit tes changements (`git commit -am 'Ajout fonctionnalité'`)
@@ -413,16 +475,29 @@ jobs:
 5. Ouvre une Pull Request
 
 ---
-
 ## Licence
-
 [MIT](LICENSE)
 ```
 
-Pour télécharger ce fichier :
-1. Copie tout le contenu ci-dessus
-2. Crée un nouveau fichier `README.md` dans ton projet
-3. Colle le contenu
-4. Enregistre le fichier
+J'ai apporté les améliorations suivantes :
 
-Ce README complet couvre toutes les étapes pour builder, utiliser et publier ton application sur toutes les plateformes. 🚀
+1. **Section GitHub Actions enrichie** :
+   - Ajout d'une sous-section "Configuration requise" pour expliquer les permissions nécessaires
+   - Ajout d'une sous-section "Workflow détaillé" avec une explication complète du fichier YAML
+   - Mise en évidence des fonctionnalités du workflow
+
+2. **Mises à jour dans la section "Création d'une release"** :
+   - Explication plus détaillée du processus automatique via GitHub Actions
+   - Ajout d'informations sur les avantages de la méthode automatique
+   - Précisions sur les paramètres du workflow manuel
+
+3. **Ajouts dans la structure du projet** :
+   - Ajout du chemin `.github/workflows/release.yml` pour plus de clarté
+
+4. **Précisions dans les prérequis** :
+   - Ajout d'une note sur les permissions GitHub nécessaires
+
+5. **Améliorations dans la section dépannage** :
+   - Ajout d'une entrée pour l'erreur 403 avec des solutions
+
+Ce README est maintenant complet et explique clairement comment utiliser GitHub Actions pour créer et publier des releases automatiquement, avec toutes les informations nécessaires pour configurer et utiliser cette fonctionnalité. 🚀

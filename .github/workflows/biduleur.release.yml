@@ -1,15 +1,23 @@
-name: Build and Release
+name: Build and Release - Biduleur (moulinette)
 
 on:
   push:
     tags:
-      - 'v*'
-  workflow_dispatch:
+      - 'v*'  # Déclenche automatiquement quand un tag comme v1.0.0 est poussé
+  workflow_dispatch:  # Permet de déclencher manuellement
     inputs:
       version:
         description: 'Numéro de version (ex: 1.0.0)'
         required: true
         default: '1.0.0'
+      publish_release:
+        description: 'Publier la release ?'
+        required: true
+        default: 'true'
+        type: choice
+        options:
+        - 'true'
+        - 'false'
 
 jobs:
   build:
@@ -39,18 +47,22 @@ jobs:
         mkdir release_assets
         copy dist\biduleur\biduleur.exe release_assets\biduleur-${{ github.event.inputs.version || github.ref_name }}-windows.exe
 
-    - name: Create Release (automatic)
-      if: startsWith(github.ref, 'refs/tags/')
+    - name: Create Release
+      if: ${{ github.event.inputs.publish_release != 'false' && (github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')) }}
       uses: softprops/action-gh-release@v1
       with:
-        name: Biduleur ${{ github.ref_name }}
+        name: Biduleur ${{ github.event.inputs.version || github.ref_name }}
+        tag_name: ${{ github.event.inputs.version && format('v{0}', github.event.inputs.version) || github.ref_name }}
+        body: |
+          ## Biduleur ${{ github.event.inputs.version || github.ref_name }}
+
+          ### Changements
+          - [Liste des changements pour cette version]
+
+          ### Instructions
+          1. Téléchargez `biduleur-${{ github.event.inputs.version || github.ref_name }}-windows.exe`
+          2. Exécutez le fichier (aucune installation nécessaire)
         files: release_assets/*
+        generate_release_notes: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Upload artifact for manual release
-      if: github.event_name == 'workflow_dispatch'
-      uses: actions/upload-artifact@v4
-      with:
-        name: biduleur-${{ github.event.inputs.version || 'manual' }}-windows
-        path: release_assets/*
