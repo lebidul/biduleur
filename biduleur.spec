@@ -18,7 +18,13 @@ hidden_imports += [
     'biduleur.format_utils',
     'biduleur.constants',
     'biduleur.event_utils',
-    'pkg_resources.py2_warn',  # Pour éviter les warnings
+    'pkg_resources.py2_warn',
+    'pandas',  # Ajoutez pandas
+    'numpy',   # Ajoutez numpy
+    'python_dateutil',
+    'pytz',
+    'tzdata',
+    'six',
 ]
 
 # Modules à exclure explicitement pour réduire la taille
@@ -32,11 +38,17 @@ excludes = [
 
 # Collecte des fichiers de données
 datas = collect_data_files('tkinter')  # Pour tkinter
-datas += collect_data_files('biduleur')  # Pour les fichiers dans biduleur/
+datas += [(os.path.join(current_dir, 'biduleur'), 'biduleur')]  # Copie tout le dossier biduleur
+
+# Ajoutez les fichiers des dépendances installées
+site_packages = os.path.join(sys.prefix, 'Lib', 'site-packages')
+datas += [
+    (site_packages, 'site-packages'),  # Copie les dépendances installées
+]
 
 a = Analysis(
     [main_script],
-    pathex=[current_dir],
+    pathex=[current_dir, site_packages],  # Ajoutez site-packages au chemin de recherche
     binaries=[],
     datas=datas,
     hiddenimports=hidden_imports,
@@ -57,12 +69,12 @@ exe = EXE(
     [],
     exclude_binaries=True,
     name='biduleur',
-    debug=True,  # Active le mode debug
+    debug=True,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    upx=False,
     runtime_tmpdir=None,
-    console=False,
+    console=True,
     icon=os.path.join(current_dir, 'biduleur.ico') if os.path.exists(os.path.join(current_dir, 'biduleur.ico')) else None
 )
 
@@ -72,7 +84,7 @@ coll = COLLECT(
     a.zipfiles,
     a.datas,
     strip=False,
-    upx=True,
+    upx=False,
     upx_exclude=[],
     name='biduleur'
 )
