@@ -1,15 +1,23 @@
-name: Build and Release
+name: Build and Release - Biduleur (moulinette)
 
 on:
   push:
     tags:
-      - 'v*'
-  workflow_dispatch:
+      - 'v*'  # Déclenche automatiquement quand un tag comme v1.0.0 est poussé
+  workflow_dispatch:  # Permet de déclencher manuellement
     inputs:
       version:
         description: 'Numéro de version (ex: 1.0.0)'
         required: true
         default: '1.0.0'
+      publish_release:
+        description: 'Publier la release ?'
+        required: true
+        default: 'true'
+        type: choice
+        options:
+        - 'true'
+        - 'false'
 
 jobs:
   build:
@@ -19,10 +27,10 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Set up Python 3.13
+    - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.13'  # Version correspondante à votre environnement local
+        python-version: '3.9'  # Utilisez la même version que votre build local
 
     - name: Install dependencies
       run: |
@@ -30,36 +38,39 @@ jobs:
         pip install -r requirements.txt
         pip install pyinstaller
 
-    - name: Find Python DLL
-      id: find_dll
-      shell: python
+    - name: Build executable (mode --onedir)
       run: |
-        import os
-        import sys
-        import glob
-        dll_path = glob.glob(f"{sys.prefix}/python*.dll")[0]
-        print(f"::set-output name=dll_path::{dll_path}")
-
-    - name: Build executable
-      run: |
-        pyinstaller biduleur.spec --clean
-      env:
-        PYINSTALLER_DLL_PATH: ${{ steps.find_dll.outputs.dll_path }}
+        pyinstaller biduleur.spec --clean --workpath=build --distpath=dist --onedir
 
     - name: Prepare release assets
       run: |
         mkdir release_assets
-        copy dist\biduleur.exe release_assets\biduleur-${{ github.event.inputs.version || github.ref_name }}-windows.exe
+        # Compresser le dossier biduleur en ZIP
+        Compress-Archive -Path dist\biduleur\* -DestinationPath release_assets\biduleur-${{ github.event.inputs.version || github.ref_name }}-windows.zip -Force
 
     - name: Create Release
+      if: ${{ github.event.inputs.publish_release != 'false' && (github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')) }}
       uses: softprops/action-gh-release@v1
       with:
         name: Biduleur ${{ github.event.inputs.version || github.ref_name }}
-        tag_name: v${{ github.event.inputs.version || github.ref_name }}
+        tag_name: ${{ github.event.inputs.version && format('v{0}', github.event.inputs.version) || github.ref_name }}
         body: |
           ## Biduleur ${{ github.event.inputs.version || github.ref_name }}
+
           ### Changements
-          - [Liste des changements]
+          - [Liste des changements pour cette version]
+
+          ### Instructions
+          1. Téléchargez `biduleur-${{ github.event.inputs.version || github.ref_name }}-windows.zip`
+          2. Extrayez le fichier ZIP dans un dossier de votre choix
+          3. Exécutez `biduleur.exe` depuis le dossier extrait (aucune installation nécessaire)
+
+          ### Contenu du ZIP
+          - `biduleur.exe` : Exécutable principal
+          - `DLLs/` : Bibliothèques nécessaires (si applicable)
+          - Autres fichiers de données nécessaires au fonctionnement
+
         files: release_assets/*
+        generate_release_notes: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
