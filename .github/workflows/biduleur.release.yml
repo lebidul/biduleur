@@ -1,23 +1,15 @@
-name: Build and Release - Biduleur (moulinette)
+name: Build and Release
 
 on:
   push:
     tags:
-      - 'v*'  # Déclenche automatiquement quand un tag comme v1.0.0 est poussé
-  workflow_dispatch:  # Permet de déclencher manuellement
+      - 'v*'
+  workflow_dispatch:
     inputs:
       version:
         description: 'Numéro de version (ex: 1.0.0)'
         required: true
         default: '1.0.0'
-      publish_release:
-        description: 'Publier la release ?'
-        required: true
-        default: 'true'
-        type: choice
-        options:
-        - 'true'
-        - 'false'
 
 jobs:
   build:
@@ -27,10 +19,10 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Set up Python
+    - name: Set up Python 3.13
       uses: actions/setup-python@v4
       with:
-        python-version: '3.9'
+        python-version: '3.13'  # Version correspondante à votre environnement local
 
     - name: Install dependencies
       run: |
@@ -38,31 +30,36 @@ jobs:
         pip install -r requirements.txt
         pip install pyinstaller
 
+    - name: Find Python DLL
+      id: find_dll
+      shell: python
+      run: |
+        import os
+        import sys
+        import glob
+        dll_path = glob.glob(f"{sys.prefix}/python*.dll")[0]
+        print(f"::set-output name=dll_path::{dll_path}")
+
     - name: Build executable
       run: |
-        pyinstaller biduleur.spec --clean --workpath=build --distpath=dist
+        pyinstaller biduleur.spec --clean
+      env:
+        PYINSTALLER_DLL_PATH: ${{ steps.find_dll.outputs.dll_path }}
 
     - name: Prepare release assets
       run: |
         mkdir release_assets
-        copy dist\biduleur\biduleur.exe release_assets\biduleur-${{ github.event.inputs.version || github.ref_name }}-windows.exe
+        copy dist\biduleur.exe release_assets\biduleur-${{ github.event.inputs.version || github.ref_name }}-windows.exe
 
     - name: Create Release
-      if: ${{ github.event.inputs.publish_release != 'false' && (github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')) }}
       uses: softprops/action-gh-release@v1
       with:
         name: Biduleur ${{ github.event.inputs.version || github.ref_name }}
-        tag_name: ${{ github.event.inputs.version && format('v{0}', github.event.inputs.version) || github.ref_name }}
+        tag_name: v${{ github.event.inputs.version || github.ref_name }}
         body: |
           ## Biduleur ${{ github.event.inputs.version || github.ref_name }}
-
           ### Changements
-          - [Liste des changements pour cette version]
-
-          ### Instructions
-          1. Téléchargez `biduleur-${{ github.event.inputs.version || github.ref_name }}-windows.exe`
-          2. Exécutez le fichier (aucune installation nécessaire)
+          - [Liste des changements]
         files: release_assets/*
-        generate_release_notes: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
