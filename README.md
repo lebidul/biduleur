@@ -156,24 +156,28 @@ dist\biduleur\biduleur.exe --cli --help
    ```
 
 ---
-## Création du build
-### Sur Windows
-1. Double-cliquez sur `build.biduleur.bat` ou exécutez-le depuis l'invite de commandes :
-   ```cmd
-   .\build.biduleur.bat
-   ```
-2. Le build sera généré dans `dist\biduleur\`.
 
-### Sur Linux
-1. Rendez le script exécutable :
-   ```bash
-   chmod +x build.biduleur.sh
-   ```
-2. Exécutez le script :
-   ```bash
-   ./build.biduleur.sh
-   ```
-3. Le build sera généré dans `dist/biduleur/`.
+## Création du build
+
+### Windows (local)
+
+```cmd
+pyinstaller biduleur.spec --clean --workpath=build --distpath=dist
+```
+
+Le résultat est dans `dist\biduleur\` :
+
+* `biduleur.exe`
+* `_internal\` (dépendances embarquées)
+
+### GitHub Actions
+
+Le workflow `${repo}/.github/workflows/release.yml` :
+
+* utilise **Python 3.10**
+* installe `pyinstaller` + `pyinstaller-hooks-contrib`
+* installe les deps depuis `biduleur/requirements.txt`
+* build en **onedir** et génère un ZIP prêt à publier
 
 ---
 ## Utilisation
