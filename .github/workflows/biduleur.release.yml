@@ -16,8 +16,8 @@ on:
         default: 'true'
         type: choice
         options:
-        - 'true'
-        - 'false'
+          - 'true'
+          - 'false'
 
 jobs:
   build:
@@ -30,7 +30,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.9'
+        python-version: '3.10'   # recommandé pour PyInstaller stable
 
     - name: Install dependencies
       run: |
@@ -38,14 +38,14 @@ jobs:
         pip install -r biduleur/requirements.txt
         pip install pyinstaller
 
-    - name: Build executable (mode --onedir)
+    - name: Build executable (mode onefile)
       run: |
-        pyinstaller biduleur.spec --clean --workpath=build --distpath=dist
+        pyinstaller biduleur.spec --clean --workpath build --distpath dist
 
     - name: Prepare release assets
       run: |
         mkdir release_assets
-        # Créer un fichier README.txt pour les utilisateurs finaux
+        # Créer un fichier README.txt pour les utilisateurs
         echo "Biduleur v${{ github.event.inputs.version || github.ref_name }}" > dist\biduleur\README.txt
         echo "================================================" >> dist\biduleur\README.txt
         echo "" >> dist\biduleur\README.txt
@@ -54,7 +54,6 @@ jobs:
         echo "INSTRUCTIONS:" >> dist\biduleur\README.txt
         echo "1. Extrayez le contenu de ce fichier ZIP dans un dossier de votre choix." >> dist\biduleur\README.txt
         echo "2. Double-cliquez sur biduleur.exe pour lancer l'application." >> dist\biduleur\README.txt
-        echo "3. Suivez les instructions à l'écran." >> dist\biduleur\README.txt
         echo "" >> dist\biduleur\README.txt
         echo "REQUIREMENTS:" >> dist\biduleur\README.txt
         echo "- Windows 10 ou supérieur" >> dist\biduleur\README.txt
@@ -62,10 +61,11 @@ jobs:
         echo "" >> dist\biduleur\README.txt
         echo "SUPPORT:" >> dist\biduleur\README.txt
         echo "Pour toute question ou problème, contactez-nous via GitHub." >> dist\biduleur\README.txt
-        # Compresser le dossier biduleur en ZIP
+
+        # Compresser le contenu de dist/biduleur dans un ZIP
         Compress-Archive -Path dist\biduleur\* -DestinationPath release_assets\biduleur-${{ github.event.inputs.version || github.ref_name }}-windows.zip -Force
 
-    - name: Create Release
+    - name: Create GitHub Release
       if: ${{ github.event.inputs.publish_release != 'false' && (github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')) }}
       uses: softprops/action-gh-release@v1
       with:
@@ -87,7 +87,6 @@ jobs:
           - `README.txt` : Instructions pour les utilisateurs
           - `run.bat` : Script pour exécuter l'application avec les logs (optionnel)
           - Autres fichiers nécessaires au fonctionnement
-
         files: release_assets/*
         generate_release_notes: true
       env:

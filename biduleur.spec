@@ -1,43 +1,42 @@
-# biduleur.spec (version corrigée)
+# biduleur.spec (version optimisée pour réduire la taille)
 from PyInstaller.utils.hooks import collect_submodules, collect_data_files
 import os
-import sys
 
-# Solution pour obtenir le chemin du dossier parent
 current_dir = os.getcwd()
-
-# Vérification que main.py existe
 main_script = os.path.join(current_dir, 'biduleur', 'main.py')
 if not os.path.exists(main_script):
     raise FileNotFoundError(f"Le fichier {main_script} est introuvable")
 
-# Collecte des dépendances supplémentaires
-hidden_imports = collect_submodules('tkinter')
-hidden_imports += [
+# Hidden imports : uniquement ceux nécessaires
+hidden_imports = [
+    'pkg_resources.py2_warn',
     'biduleur.csv_utils',
     'biduleur.format_utils',
     'biduleur.constants',
-    'biduleur.event_utils',
-    'pkg_resources.py2_warn',
-    'pandas',
-    'numpy',
-    'python_dateutil',
-    'pytz',
-    'tzdata',
-    'six',
+    'biduleur.event_utils'
 ]
 
-# Modules à exclure explicitement pour réduire la taille
+# Exclusions pour réduire la taille
 excludes = [
-    'Tkconstants', 'tcl', 'tk', 'Tix', 'sqlite3', 'email', 'http', 'xml', 'html',
-    'urllib', 'unittest', 'pytest', 'doctest', 'pydoc', 'inspect', 'pdb',
-    'matplotlib', 'scipy', 'sklearn', 'tensorflow', 'torch', 'torchvision', 'torchaudio',
-    'IPython', 'jupyter', 'sphinx', 'pytest', 'setuptools', 'pip', 'wheel',
-    'scipy.linalg', 'scipy.sparse', 'scipy.stats', 'scipy.integrate', 'scipy.optimize'
+    'Tkconstants', 'tcl', 'tk', 'Tix', 'sqlite3',
+    'email', 'http', 'xml', 'html',
+    'unittest', 'pytest', 'doctest', 'pdb',
+    'matplotlib', 'scipy', 'sklearn', 'tensorflow',
+    'torch', 'torchvision', 'torchaudio',
+    'IPython', 'jupyter', 'sphinx', 'setuptools',
+    'pip', 'wheel'
 ]
 
-# Collecte des fichiers de données
-datas = collect_data_files('biduleur')  # Pour les fichiers dans biduleur/
+# Datas : uniquement les fichiers non-Python nécessaires
+datas = collect_data_files('tkinter')  # nécessaire pour tkinter
+
+# Inclure uniquement les fichiers Python du package biduleur, sans __pycache__
+for root, dirs, files in os.walk(os.path.join(current_dir, 'biduleur')):
+    files = [f for f in files if f.endswith('.py')]  # inclure seulement les .py
+    for f in files:
+        src = os.path.join(root, f)
+        dest = os.path.relpath(root, current_dir)
+        datas.append((src, dest))
 
 a = Analysis(
     [main_script],
@@ -62,12 +61,12 @@ exe = EXE(
     [],
     exclude_binaries=True,
     name='biduleur',
-    debug=False,  # Désactivez le mode debug pour réduire la taille
+    debug=False,
     bootloader_ignore_signals=False,
-    strip=False,  # Désactivez le strip pour éviter les erreurs sur Windows
-    upx=True,     # Activez UPX pour compresser l'exécutable
+    strip=False,
+    upx=True,
     runtime_tmpdir=None,
-    console=True,  # Activez la console pour voir les erreurs
+    console=True,
     icon=os.path.join(current_dir, 'biduleur.ico') if os.path.exists(os.path.join(current_dir, 'biduleur.ico')) else None
 )
 
@@ -76,8 +75,8 @@ coll = COLLECT(
     a.binaries,
     a.zipfiles,
     a.datas,
-    strip=False,  # Désactivez le strip pour éviter les erreurs sur Windows
-    upx=True,     # Activez UPX pour compresser l'exécutable
+    strip=False,
+    upx=True,
     upx_exclude=[],
     name='biduleur'
 )
