@@ -49,11 +49,11 @@ jobs:
         run: |
           pyinstaller biduleur.spec --clean --workpath build --distpath dist
 
-      - name: Inspect dist (debug)
-        run: |
-          dir dist
-          dir dist\biduleur
-          IF EXIST dist\biduleur\_internal\Lib\site-packages\pandas (dir dist\biduleur\_internal\Lib\site-packages\pandas) ELSE (echo "pandas folder not found in bundle")
+#      - name: Inspect dist (debug)
+#        run: |
+#          dir dist
+#          dir dist\biduleur
+#          IF EXIST dist\biduleur\_internal\Lib\site-packages\pandas (dir dist\biduleur\_internal\Lib\site-packages\pandas) ELSE (echo "pandas folder not found in bundle")
 
       - name: Package ZIP
         run: |
