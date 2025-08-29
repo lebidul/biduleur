@@ -1,4 +1,4 @@
-# biduleur.spec
+# biduleur.spec (version corrigée)
 from PyInstaller.utils.hooks import collect_submodules, collect_data_files
 import os
 import sys
@@ -19,8 +19,8 @@ hidden_imports += [
     'biduleur.constants',
     'biduleur.event_utils',
     'pkg_resources.py2_warn',
-    'pandas',  # Ajoutez pandas
-    'numpy',   # Ajoutez numpy
+    'pandas',
+    'numpy',
     'python_dateutil',
     'pytz',
     'tzdata',
@@ -37,18 +37,11 @@ excludes = [
 ]
 
 # Collecte des fichiers de données
-datas = collect_data_files('tkinter')  # Pour tkinter
-datas += [(os.path.join(current_dir, 'biduleur'), 'biduleur')]  # Copie tout le dossier biduleur
-
-# Ajoutez les fichiers des dépendances installées
-site_packages = os.path.join(sys.prefix, 'Lib', 'site-packages')
-datas += [
-    (site_packages, 'site-packages'),  # Copie les dépendances installées
-]
+datas = collect_data_files('biduleur')  # Pour les fichiers dans biduleur/
 
 a = Analysis(
     [main_script],
-    pathex=[current_dir, site_packages],  # Ajoutez site-packages au chemin de recherche
+    pathex=[current_dir],
     binaries=[],
     datas=datas,
     hiddenimports=hidden_imports,
@@ -69,12 +62,12 @@ exe = EXE(
     [],
     exclude_binaries=True,
     name='biduleur',
-    debug=True,
+    debug=False,  # Désactivez le mode debug pour réduire la taille
     bootloader_ignore_signals=False,
-    strip=False,
-    upx=False,
+    strip=False,  # Désactivez le strip pour éviter les erreurs sur Windows
+    upx=True,     # Activez UPX pour compresser l'exécutable
     runtime_tmpdir=None,
-    console=True,
+    console=True,  # Activez la console pour voir les erreurs
     icon=os.path.join(current_dir, 'biduleur.ico') if os.path.exists(os.path.join(current_dir, 'biduleur.ico')) else None
 )
 
@@ -83,8 +76,8 @@ coll = COLLECT(
     a.binaries,
     a.zipfiles,
     a.datas,
-    strip=False,
-    upx=False,
+    strip=False,  # Désactivez le strip pour éviter les erreurs sur Windows
+    upx=True,     # Activez UPX pour compresser l'exécutable
     upx_exclude=[],
     name='biduleur'
 )
