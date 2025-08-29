@@ -33,7 +33,7 @@ jobs:
       - name: Install build tooling
         run: |
           python -m pip install --upgrade pip setuptools wheel
-          pip install pyinstaller==6.6.0
+          pip install pyinstaller==6.6.0 pyinstaller-hooks-contrib
 
       - name: Install project dependencies
         run: |
@@ -42,35 +42,24 @@ jobs:
       - name: Sanity-check deps
         run: |
           python -c "import sys; print(sys.version)"
-          pip show pandas || (echo "pandas not installed" && exit /b 1)
+          pip show pandas || (echo pandas missing && exit /b 1)
+          pip show numpy  || (echo numpy missing  && exit /b 1)
 
-      - name: Build executable with PyInstaller
+      - name: Build with PyInstaller
         run: |
           pyinstaller biduleur.spec --clean --workpath build --distpath dist
 
-      - name: List dist contents (debug)
+      - name: Inspect dist (debug)
         run: |
           dir dist
           dir dist\biduleur
+          IF EXIST dist\biduleur\_internal\Lib\site-packages\pandas (dir dist\biduleur\_internal\Lib\site-packages\pandas) ELSE (echo "pandas folder not found in bundle")
 
-      - name: Prepare release assets
+      - name: Package ZIP
         run: |
           mkdir release_assets
-          echo "Biduleur v${{ github.event.inputs.version || github.ref_name }}" > dist\biduleur\README.txt
-          echo "================================================" >> dist\biduleur\README.txt
-          echo "" >> dist\biduleur\README.txt
-          echo "Instructions :" >> dist\biduleur\README.txt
-          echo "1. Extraire le ZIP" >> dist\biduleur\README.txt
-          echo "2. Lancer biduleur.exe" >> dist\biduleur\README.txt
-          echo "" >> dist\biduleur\README.txt
-          echo "Requis : Windows 10+" >> dist\biduleur\README.txt
+          echo "Biduleur ${{ github.event.inputs.version || github.ref_name }}" > dist\biduleur\README.txt
           Compress-Archive -Path dist\biduleur\* -DestinationPath release_assets\biduleur-${{ github.event.inputs.version || github.ref_name }}-windows.zip -Force
-
-      - name: Upload artifact (debug)
-        uses: actions/upload-artifact@v4
-        with:
-          name: biduleur-dist
-          path: dist/biduleur
 
       - name: Create Release
         if: ${{ github.event.inputs.publish_release != 'false' && (github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')) }}
@@ -78,17 +67,10 @@ jobs:
         with:
           name: Biduleur ${{ github.event.inputs.version || github.ref_name }}
           tag_name: ${{ github.event.inputs.version && format('v{0}', github.event.inputs.version) || github.ref_name }}
-          body: |
-            ## Biduleur ${{ github.event.inputs.version || github.ref_name }}
-
-            **Contenu**
-            - `biduleur.exe`
-            - `README.txt`
-
-            **Instructions**
-            1) Téléchargez le ZIP
-            2) Extrayez-le
-            3) Lancez `biduleur.exe`
           files: release_assets/*
+          body: |
+            - Téléchargez le ZIP
+            - Extrayez-le
+            - Lancez `biduleur.exe`
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

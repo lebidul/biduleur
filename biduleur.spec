@@ -7,24 +7,26 @@ main_script = os.path.join(current_dir, 'biduleur', 'main.py')
 if not os.path.exists(main_script):
     raise FileNotFoundError(f"Le fichier {main_script} est introuvable")
 
-# Hidden imports : uniquement ceux nécessaires
+# Hidden imports : ajoute pandas/numpy (fiable sur CI)
 hidden_imports = [
     'pkg_resources.py2_warn',
     'biduleur.csv_utils',
     'biduleur.format_utils',
     'biduleur.constants',
-    'biduleur.event_utils'
+    'biduleur.event_utils',
 ]
+# 👉 force l’inclusion de pandas & numpy
+hidden_imports += collect_submodules('pandas')
+hidden_imports += collect_submodules('numpy')
 
-# Exclusions pour réduire la taille
+# Exclusions : n’exclus PAS urllib / inspect / pydoc
 excludes = [
-    'Tkconstants', 'tcl', 'tk', 'Tix', 'sqlite3',
-    'email', 'http', 'xml', 'html',
-    'unittest', 'pytest', 'doctest', 'pdb',
-    'matplotlib', 'scipy', 'sklearn', 'tensorflow',
-    'torch', 'torchvision', 'torchaudio',
-    'IPython', 'jupyter', 'sphinx', 'setuptools',
-    'pip', 'wheel'
+    'Tkconstants','tcl','tk','Tix','sqlite3',
+    'unittest','pytest','doctest','pdb',
+    'matplotlib','scipy','sklearn','tensorflow',
+    'torch','torchvision','torchaudio',
+    'IPython','jupyter','sphinx','setuptools','pip','wheel',
+    # ⚠️ pas: 'urllib', 'inspect', 'pydoc', 'email', 'http', 'xml', 'html'
 ]
 
 # Datas : uniquement les fichiers non-Python nécessaires
