@@ -15,79 +15,83 @@ on:
         required: true
         default: 'true'
         type: choice
-        options:
-          - 'true'
-          - 'false'
+        options: ['true','false']
 
 jobs:
   build:
     runs-on: windows-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.10'   # recommandé pour PyInstaller stable
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r biduleur/requirements.txt
-        pip install pyinstaller
+      - name: Install build tooling
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          pip install pyinstaller==6.6.0
 
-    - name: Build executable (mode onefile)
-      run: |
-        pyinstaller biduleur.spec --clean --workpath build --distpath dist
+      - name: Install project dependencies
+        run: |
+          REM requirements.txt is at the repo root
+          pip install -r requirements.txt
 
-    - name: Prepare release assets
-      run: |
-        mkdir release_assets
-        # Créer un fichier README.txt pour les utilisateurs
-        echo "Biduleur v${{ github.event.inputs.version || github.ref_name }}" > dist\biduleur\README.txt
-        echo "================================================" >> dist\biduleur\README.txt
-        echo "" >> dist\biduleur\README.txt
-        echo "Merci d'utiliser Biduleur !" >> dist\biduleur\README.txt
-        echo "" >> dist\biduleur\README.txt
-        echo "INSTRUCTIONS:" >> dist\biduleur\README.txt
-        echo "1. Extrayez le contenu de ce fichier ZIP dans un dossier de votre choix." >> dist\biduleur\README.txt
-        echo "2. Double-cliquez sur biduleur.exe pour lancer l'application." >> dist\biduleur\README.txt
-        echo "" >> dist\biduleur\README.txt
-        echo "REQUIREMENTS:" >> dist\biduleur\README.txt
-        echo "- Windows 10 ou supérieur" >> dist\biduleur\README.txt
-        echo "- Aucune installation supplémentaire nécessaire" >> dist\biduleur\README.txt
-        echo "" >> dist\biduleur\README.txt
-        echo "SUPPORT:" >> dist\biduleur\README.txt
-        echo "Pour toute question ou problème, contactez-nous via GitHub." >> dist\biduleur\README.txt
+      - name: Sanity-check deps
+        run: |
+          python -c "import sys; print(sys.version)"
+          pip show pandas || (echo "pandas not installed" && exit /b 1)
+          REM If you use pyarrow via pandas, keep this:
+          pip show pyarrow || echo "pyarrow not installed (ok if unused)"
 
-        # Compresser le contenu de dist/biduleur dans un ZIP
-        Compress-Archive -Path dist\biduleur\* -DestinationPath release_assets\biduleur-${{ github.event.inputs.version || github.ref_name }}-windows.zip -Force
+      - name: Build executable with PyInstaller
+        run: |
+          pyinstaller biduleur.spec --clean --workpath build --distpath dist
 
-    - name: Create GitHub Release
-      if: ${{ github.event.inputs.publish_release != 'false' && (github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')) }}
-      uses: softprops/action-gh-release@v1
-      with:
-        name: Biduleur ${{ github.event.inputs.version || github.ref_name }}
-        tag_name: ${{ github.event.inputs.version && format('v{0}', github.event.inputs.version) || github.ref_name }}
-        body: |
-          ## Biduleur ${{ github.event.inputs.version || github.ref_name }}
+      - name: List dist contents (debug)
+        run: |
+          dir dist
+          dir dist\biduleur
 
-          ### Changements
-          - [Liste des changements pour cette version]
+      - name: Prepare release assets
+        run: |
+          mkdir release_assets
+          echo "Biduleur v${{ github.event.inputs.version || github.ref_name }}" > dist\biduleur\README.txt
+          echo "================================================" >> dist\biduleur\README.txt
+          echo "" >> dist\biduleur\README.txt
+          echo "Instructions :" >> dist\biduleur\README.txt
+          echo "1. Extraire le ZIP" >> dist\biduleur\README.txt
+          echo "2. Lancer biduleur.exe" >> dist\biduleur\README.txt
+          echo "" >> dist\biduleur\README.txt
+          echo "Requis : Windows 10+" >> dist\biduleur\README.txt
+          Compress-Archive -Path dist\biduleur\* -DestinationPath release_assets\biduleur-${{ github.event.inputs.version || github.ref_name }}-windows.zip -Force
 
-          ### Instructions
-          1. Téléchargez `biduleur-${{ github.event.inputs.version || github.ref_name }}-windows.zip`
-          2. Extrayez le fichier ZIP dans un dossier de votre choix
-          3. Exécutez `biduleur.exe` depuis le dossier extrait (aucune installation nécessaire)
+      - name: Upload artifact (debug)
+        uses: actions/upload-artifact@v4
+        with:
+          name: biduleur-dist
+          path: dist/biduleur
 
-          ### Contenu du ZIP
-          - `biduleur.exe` : Exécutable principal
-          - `README.txt` : Instructions pour les utilisateurs
-          - `run.bat` : Script pour exécuter l'application avec les logs (optionnel)
-          - Autres fichiers nécessaires au fonctionnement
-        files: release_assets/*
-        generate_release_notes: true
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create Release
+        if: ${{ github.event.inputs.publish_release != 'false' && (github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')) }}
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Biduleur ${{ github.event.inputs.version || github.ref_name }}
+          tag_name: ${{ github.event.inputs.version && format('v{0}', github.event.inputs.version) || github.ref_name }}
+          body: |
+            ## Biduleur ${{ github.event.inputs.version || github.ref_name }}
+
+            **Contenu**
+            - `biduleur.exe`
+            - `README.txt`
+
+            **Instructions**
+            1) Téléchargez le ZIP
+            2) Extrayez-le
+            3) Lancez `biduleur.exe`
+          files: release_assets/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
