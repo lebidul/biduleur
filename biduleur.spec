@@ -1,29 +1,45 @@
-# biduleur.spec
+# biduleur.spec (version optimisée pour réduire la taille)
 from PyInstaller.utils.hooks import collect_submodules, collect_data_files
 import os
-import sys
 
-# Solution pour obtenir le chemin du dossier parent
 current_dir = os.getcwd()
-
-# Vérification que main.py existe
 main_script = os.path.join(current_dir, 'biduleur', 'main.py')
 if not os.path.exists(main_script):
     raise FileNotFoundError(f"Le fichier {main_script} est introuvable")
 
-# Collecte des dépendances supplémentaires
-hidden_imports = collect_submodules('tkinter')
-hidden_imports += [
+# Hidden imports : NE PAS inclure pkg_resources
+hidden_imports = [
     'biduleur.csv_utils',
     'biduleur.format_utils',
     'biduleur.constants',
     'biduleur.event_utils',
-    'pkg_resources.py2_warn',  # Pour éviter les warnings
 ]
 
-# Collecte des fichiers de données
-datas = collect_data_files('tkinter')  # Pour tkinter
-datas += collect_data_files('biduleur')  # Pour les fichiers dans biduleur/
+# Si tu forces pandas/numpy (recommandé en CI) :
+from PyInstaller.utils.hooks import collect_submodules
+hidden_imports += collect_submodules('pandas')
+hidden_imports += collect_submodules('numpy')
+
+# Exclusions (pas d'exclusion agressive de la stdlib comme urllib/inspect/pydoc)
+excludes = [
+    'Tkconstants','tcl','tk','Tix','sqlite3',
+    'unittest','pytest','doctest','pdb',
+    'matplotlib','scipy','sklearn','tensorflow',
+    'torch','torchvision','torchaudio',
+    'IPython','jupyter','sphinx','setuptools','pip','wheel',
+    'pkg_resources'
+]
+
+# Datas : uniquement les fichiers non-Python nécessaires
+datas = collect_data_files('tkinter')  # nécessaire pour tkinter
+
+# Inclure uniquement les fichiers Python du package biduleur, sans __pycache__
+for root, dirs, files in os.walk(os.path.join(current_dir, 'biduleur')):
+    files = [f for f in files if f.endswith('.py')]  # inclure seulement les .py
+    for f in files:
+        src = os.path.join(root, f)
+        dest = os.path.relpath(root, current_dir)
+        datas.append((src, dest))
 
 a = Analysis(
     [main_script],
@@ -33,7 +49,7 @@ a = Analysis(
     hiddenimports=hidden_imports,
     hookspath=[],
     runtime_hooks=[],
-    excludes=[],
+    excludes=excludes,
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=None,
@@ -48,12 +64,12 @@ exe = EXE(
     [],
     exclude_binaries=True,
     name='biduleur',
-    debug=True,  # Active le mode debug
+    debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
     runtime_tmpdir=None,
-    console=False,
+    console=True,
     icon=os.path.join(current_dir, 'biduleur.ico') if os.path.exists(os.path.join(current_dir, 'biduleur.ico')) else None
 )
 

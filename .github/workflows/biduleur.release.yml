@@ -3,8 +3,8 @@ name: Build and Release - Biduleur (moulinette)
 on:
   push:
     tags:
-      - 'v*'  # Déclenche automatiquement quand un tag comme v1.0.0 est poussé
-  workflow_dispatch:  # Permet de déclencher manuellement
+      - 'v*'
+  workflow_dispatch:
     inputs:
       version:
         description: 'Numéro de version (ex: 1.0.0)'
@@ -15,54 +15,62 @@ on:
         required: true
         default: 'true'
         type: choice
-        options:
-        - 'true'
-        - 'false'
+        options: ['true','false']
 
 jobs:
   build:
     runs-on: windows-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.9'
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install pyinstaller
+      - name: Install build tooling
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          pip install pyinstaller==6.6.0 pyinstaller-hooks-contrib
 
-    - name: Build executable
-      run: |
-        pyinstaller biduleur.spec --clean --workpath=build --distpath=dist
+      - name: Install project dependencies
+        run: |
+          pip install -r biduleur/requirements.txt
 
-    - name: Prepare release assets
-      run: |
-        mkdir release_assets
-        copy dist\biduleur\biduleur.exe release_assets\biduleur-${{ github.event.inputs.version || github.ref_name }}-windows.exe
+      - name: Sanity-check deps
+        run: |
+          python -c "import sys; print(sys.version)"
+          pip show pandas || (echo pandas missing && exit /b 1)
+          pip show numpy  || (echo numpy missing  && exit /b 1)
 
-    - name: Create Release
-      if: ${{ github.event.inputs.publish_release != 'false' && (github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')) }}
-      uses: softprops/action-gh-release@v1
-      with:
-        name: Biduleur ${{ github.event.inputs.version || github.ref_name }}
-        tag_name: ${{ github.event.inputs.version && format('v{0}', github.event.inputs.version) || github.ref_name }}
-        body: |
-          ## Biduleur ${{ github.event.inputs.version || github.ref_name }}
+      - name: Build with PyInstaller
+        run: |
+          pyinstaller biduleur.spec --clean --workpath build --distpath dist
 
-          ### Changements
-          - [Liste des changements pour cette version]
+#      - name: Inspect dist (debug)
+#        run: |
+#          dir dist
+#          dir dist\biduleur
+#          IF EXIST dist\biduleur\_internal\Lib\site-packages\pandas (dir dist\biduleur\_internal\Lib\site-packages\pandas) ELSE (echo "pandas folder not found in bundle")
 
-          ### Instructions
-          1. Téléchargez `biduleur-${{ github.event.inputs.version || github.ref_name }}-windows.exe`
-          2. Exécutez le fichier (aucune installation nécessaire)
-        files: release_assets/*
-        generate_release_notes: true
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Package ZIP
+        run: |
+          mkdir release_assets
+          echo "Biduleur ${{ github.event.inputs.version || github.ref_name }}" > dist\biduleur\README.txt
+          Compress-Archive -Path dist\biduleur\* -DestinationPath release_assets\biduleur-${{ github.event.inputs.version || github.ref_name }}-windows.zip -Force
+
+      - name: Create Release
+        if: ${{ github.event.inputs.publish_release != 'false' && (github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')) }}
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Biduleur ${{ github.event.inputs.version || github.ref_name }}
+          tag_name: ${{ github.event.inputs.version && format('v{0}', github.event.inputs.version) || github.ref_name }}
+          files: release_assets/*
+          body: |
+            - Téléchargez le ZIP
+            - Extrayez-le
+            - Lancez `biduleur.exe`
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
