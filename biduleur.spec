@@ -7,26 +7,27 @@ main_script = os.path.join(current_dir, 'biduleur', 'main.py')
 if not os.path.exists(main_script):
     raise FileNotFoundError(f"Le fichier {main_script} est introuvable")
 
-# Hidden imports : ajoute pandas/numpy (fiable sur CI)
+# Hidden imports : NE PAS inclure pkg_resources
 hidden_imports = [
-    'pkg_resources.py2_warn',
     'biduleur.csv_utils',
     'biduleur.format_utils',
     'biduleur.constants',
     'biduleur.event_utils',
 ]
-# 👉 force l’inclusion de pandas & numpy
+
+# Si tu forces pandas/numpy (recommandé en CI) :
+from PyInstaller.utils.hooks import collect_submodules
 hidden_imports += collect_submodules('pandas')
 hidden_imports += collect_submodules('numpy')
 
-# Exclusions : n’exclus PAS urllib / inspect / pydoc
+# Exclusions (pas d'exclusion agressive de la stdlib comme urllib/inspect/pydoc)
 excludes = [
     'Tkconstants','tcl','tk','Tix','sqlite3',
     'unittest','pytest','doctest','pdb',
     'matplotlib','scipy','sklearn','tensorflow',
     'torch','torchvision','torchaudio',
     'IPython','jupyter','sphinx','setuptools','pip','wheel',
-    # ⚠️ pas: 'urllib', 'inspect', 'pydoc', 'email', 'http', 'xml', 'html'
+    'pkg_resources'
 ]
 
 # Datas : uniquement les fichiers non-Python nécessaires
