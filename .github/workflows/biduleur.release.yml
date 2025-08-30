@@ -15,7 +15,7 @@ on:
       publish_release:
         description: 'Publier la release ?'
         required: true
-        default: 'true'
+        default: 'false'
         type: choice
         options: ['true','false']
 
