@@ -4,16 +4,19 @@
 - [ ] Ajouter une validation des colonnes du CSV dans `read_and_sort_csv`.
 - [ ] Améliorer la gestion des erreurs pour les dates mal formatées (ex: "Mardi 1er").
 - [ ] Corriger le tri des événements lorsque la colonne `DATE` est vide ou invalide.
-- [ ] Rendre le Biduleur comme un éxécutable.
+- [x] Rendre le Biduleur comme un éxécutable.
+- [ ] Unit tests
 
 ## Priorité Moyenne
 - [ ] Optimiser les performances du tri pour les fichiers CSV volumineux.
+- [ ] Ajouter fichiers templates au gui
 - [ ] Ajouter des logs pour faciliter le débogage.
 - [ ] Documenter les cas d'erreur possibles dans la docstring de `parse_bidul`.
 - [ ] Ajouter une interface en ligne de commande (CLI) pour le traitement par lots.
 
 ## Priorité Faible
-- [ ] Prendre en charge les fichiers Excel en plus des CSV.
+- [x] Prendre en charge les fichiers Excel en plus des CSV.
+- [ ] Prendre en charge google sheet
 - [ ] Ajouter une interface en ligne de commande (CLI) pour le traitement par lots.
 
 ## Fonctionnalités Futures
