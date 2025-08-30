@@ -103,6 +103,7 @@ jobs:
           echo "" >> dist\biduleur\README.txt
           echo "SUPPORT:" >> dist\biduleur\README.txt
           echo "Pour toute question ou problème, contactez-nous via GitHub." >> dist\biduleur\README.txt
+          copy dist\biduleur\* release_assets\biduleur-${{ github.event.inputs.version || github.ref_name }}-windows
 #          Compress-Archive -Path dist\biduleur\* -DestinationPath release_assets\biduleur-$version-windows.zip -Force
 
       - name: Upload Artifact
