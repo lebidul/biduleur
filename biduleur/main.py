@@ -152,9 +152,9 @@ def cli_mode():
 
 if __name__ == '__main__':
     # Détecte si des arguments sont passés (mode IDE) ou non (mode graphique)
-    # if len(sys.argv) > 1:
-    #     cli_mode()
-    # else:
-    #     gui_mode()
-    filename1 = './tapages/Copy of 202509_tapage_biduleur_Septembre_2025.xls.xlsx'
-    run_biduleur(filename1)
+    if len(sys.argv) > 1:
+        cli_mode()
+    else:
+        gui_mode()
+    # filename1 = './tapages/Copy of 202509_tapage_biduleur_Septembre_2025.xls.xlsx'
+    # run_biduleur(filename1)
