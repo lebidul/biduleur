@@ -103,13 +103,13 @@ jobs:
           echo "" >> dist\biduleur\README.txt
           echo "SUPPORT:" >> dist\biduleur\README.txt
           echo "Pour toute question ou problème, contactez-nous via GitHub." >> dist\biduleur\README.txt
-          copy dist\* release_assets\biduleur-${{ github.event.inputs.version || github.ref_name }}-windows
+#          copy dist\* release_assets\biduleur\
 #          Compress-Archive -Path dist\biduleur\* -DestinationPath release_assets\biduleur-$version-windows.zip -Force
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: biduleur-${{ github.event.inputs.version || 'manual' }}-windows
+          name: biduleur-${{ steps.get_latest_tag.outputs.new_version || github.event.inputs.version || 'manual' }}-windows
           path: release_assets/*
 
       - name: Create and push new tag
