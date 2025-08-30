@@ -85,7 +85,6 @@ jobs:
       - name: Package ZIP
         shell: pwsh
         run: |
-          mkdir release_assets
           $version = "${{ steps.get_latest_tag.outputs.new_version || github.event.inputs.version || github.ref_name }}"
           echo "Biduleur $version" > dist\biduleur\README.txt
           echo "================================================" >> dist\biduleur\README.txt
@@ -103,14 +102,15 @@ jobs:
           echo "" >> dist\biduleur\README.txt
           echo "SUPPORT:" >> dist\biduleur\README.txt
           echo "Pour toute question ou problème, contactez-nous via GitHub." >> dist\biduleur\README.txt
-#          copy dist\* release_assets\biduleur\
-#          Compress-Archive -Path dist\biduleur\* -DestinationPath release_assets\biduleur-$version-windows.zip -Force
+
+          # Crée le fichier ZIP directement avec la structure souhaitée
+          Compress-Archive -Path dist\biduleur\* -DestinationPath biduleur-$version-windows.zip -Force
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: biduleur-${{ steps.get_latest_tag.outputs.new_version || github.event.inputs.version || 'manual' }}-windows
-          path: release_assets/*
+          path: biduleur-*-windows.zip
 
       - name: Create and push new tag
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
