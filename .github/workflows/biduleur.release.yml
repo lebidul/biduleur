@@ -77,7 +77,7 @@ jobs:
           Compress-Archive -Path dist\biduleur\* -DestinationPath release_assets\biduleur-${{ github.event.inputs.version || github.ref_name }}-windows.zip -Force
 
       - name: Upload Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: biduleur-${{ github.event.inputs.version || github.ref_name }}-windows
           path: release_assets\biduleur-${{ github.event.inputs.version || github.ref_name }}-windows.zip
