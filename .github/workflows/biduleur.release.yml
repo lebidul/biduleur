@@ -13,7 +13,7 @@ on:
       publish_release:
         description: 'Publier la release ?'
         required: true
-        default: 'true'
+        default: 'false'
         type: choice
         options: ['true','false']
 
@@ -75,6 +75,12 @@ jobs:
           echo "SUPPORT:" >> dist\biduleur\README.txt
           echo "Pour toute question ou problème, contactez-nous via GitHub." >> dist\biduleur\README.txt
           Compress-Archive -Path dist\biduleur\* -DestinationPath release_assets\biduleur-${{ github.event.inputs.version || github.ref_name }}-windows.zip -Force
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: biduleur-${{ github.event.inputs.version || github.ref_name }}-windows
+          path: release_assets\biduleur-${{ github.event.inputs.version || github.ref_name }}-windows.zip
 
       - name: Create Release
         if: ${{ github.event.inputs.publish_release != 'false' && (github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')) }}
