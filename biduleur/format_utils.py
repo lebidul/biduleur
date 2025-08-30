@@ -72,7 +72,7 @@ def format_style(style: str) -> str:
     return f" <em>({format_string(style, replacements, lower=False).lower()})</em>"
 
 def format_string(string: str, replacement_dictionary: Dict, lower: bool = False) -> str:
-    if not string or str(string).lower().strip() in ("", "nan"):
+    if not string or str(string).lower().strip() in ("", "nan") or isinstance(string, int):
         return ""
     if lower:
         string = string.lower()
@@ -86,7 +86,7 @@ def format_evenement(evenement: str, style_evenement: str) -> str:
     return f"{evenement}{format_style(style_evenement)} // "
 
 def format_lieu(lieu: str) -> str:
-    if not lieu or lieu == "Le Mans" or str(lieu).lower().strip() in ("", "nan"):
+    if not lieu or lieu == "Le Mans" or str(lieu).lower().strip() in ("", "nan") or isinstance(lieu, int):
         return ""
     return f"{lieu}, "
 

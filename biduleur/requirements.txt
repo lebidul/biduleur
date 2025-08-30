@@ -1,1 +1,2 @@
 pandas==2.3.2
+openpyxl>=3.0.0
