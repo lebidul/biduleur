@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - 'v*'
+    branches:
+      - master
   workflow_dispatch:
     inputs:
       version:
@@ -13,7 +15,7 @@ on:
       publish_release:
         description: 'Publier la release ?'
         required: true
-        default: 'true'
+        default: 'false'
         type: choice
         options: ['true','false']
 
@@ -24,6 +26,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Nécessaire pour récupérer les tags
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -49,25 +53,81 @@ jobs:
         run: |
           pyinstaller biduleur.spec --clean --workpath build --distpath dist
 
-#      - name: Inspect dist (debug)
-#        run: |
-#          dir dist
-#          dir dist\biduleur
-#          IF EXIST dist\biduleur\_internal\Lib\site-packages\pandas (dir dist\biduleur\_internal\Lib\site-packages\pandas) ELSE (echo "pandas folder not found in bundle")
+      - name: Get latest tag
+        id: get_latest_tag
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        shell: bash
+        run: |
+          # Récupère le dernier tag
+          latest_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "Latest tag: $latest_tag"
+
+          # Extrait la version du tag (ex: v1.0.0 -> 1.0.0)
+          version=${latest_tag#v}
+          echo "Latest version: $version"
+
+          # Incrémente la version (ex: 1.0.0 -> 1.0.1)
+          IFS='.' read -ra version_parts <<< "$version"
+          major=${version_parts[0]}
+          minor=${version_parts[1]}
+          patch=${version_parts[2]}
+
+          new_patch=$((patch + 1))
+          new_version="$major.$minor.$new_patch"
+          new_tag="v$new_version"
+
+          echo "New version: $new_version"
+          echo "New tag: $new_tag"
+
+          echo "new_version=$new_version" >> $GITHUB_OUTPUT
+          echo "new_tag=$new_tag" >> $GITHUB_OUTPUT
 
       - name: Package ZIP
+        shell: pwsh
         run: |
-          mkdir release_assets
-          echo "Biduleur ${{ github.event.inputs.version || github.ref_name }}" > dist\biduleur\README.txt
-          Compress-Archive -Path dist\biduleur\* -DestinationPath release_assets\biduleur-${{ github.event.inputs.version || github.ref_name }}-windows.zip -Force
+          $version = "${{ steps.get_latest_tag.outputs.new_version || github.event.inputs.version || github.ref_name }}"
+          "Biduleur $version" | Out-File -FilePath dist\biduleur\README.txt -Encoding utf8
+          "================================================" | Out-File -FilePath dist\biduleur\README.txt -Append
+          "" | Out-File -FilePath dist\biduleur\README.txt -Append
+          "Merci d'utiliser Biduleur !" | Out-File -FilePath dist\biduleur\README.txt -Append
+          "" | Out-File -FilePath dist\biduleur\README.txt -Append
+          "INSTRUCTIONS:" | Out-File -FilePath dist\biduleur\README.txt -Append
+          "1. Extrayez le contenu de ce fichier ZIP dans un dossier de votre choix." | Out-File -FilePath dist\biduleur\README.txt -Append
+          "2. Double-cliquez sur biduleur.exe pour lancer l'application." | Out-File -FilePath dist\biduleur\README.txt -Append
+          "3. Suivez les instructions à l'écran." | Out-File -FilePath dist\biduleur\README.txt -Append
+          "" | Out-File -FilePath dist\biduleur\README.txt -Append
+          "REQUIREMENTS:" | Out-File -FilePath dist\biduleur\README.txt -Append
+          "- Windows 10 ou supérieur" | Out-File -FilePath dist\biduleur\README.txt -Append
+          "- Aucune installation supplémentaire nécessaire" | Out-File -FilePath dist\biduleur\README.txt -Append
+          "" | Out-File -FilePath dist\biduleur\README.txt -Append
+          "SUPPORT:" | Out-File -FilePath dist\biduleur\README.txt -Append
+          "Pour toute question ou problème, contactez-nous via GitHub." | Out-File -FilePath dist\biduleur\README.txt -Append
+
+          # ⚠️ Zipper le DOSSIER pour conserver le répertoire racine "biduleur" dans l’archive
+          Compress-Archive -Path dist\biduleur -DestinationPath biduleur-$version-windows.zip -Force
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: biduleur-${{ steps.get_latest_tag.outputs.new_version || github.event.inputs.version || 'manual' }}-windows
+          path: dist/biduleur
+
+      - name: Create and push new tag
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git tag ${{ steps.get_latest_tag.outputs.new_tag }}
+          git push origin ${{ steps.get_latest_tag.outputs.new_tag }}
 
       - name: Create Release
-        if: ${{ github.event.inputs.publish_release != 'false' && (github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')) }}
+        if: ${{ (github.event.inputs.publish_release != 'false' && (github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/'))) || (github.event_name == 'push' && github.ref == 'refs/heads/master') }}
         uses: softprops/action-gh-release@v2
         with:
-          name: Biduleur ${{ github.event.inputs.version || github.ref_name }}
-          tag_name: ${{ github.event.inputs.version && format('v{0}', github.event.inputs.version) || github.ref_name }}
-          files: release_assets/*
+          name: Biduleur ${{ steps.get_latest_tag.outputs.new_version || github.event.inputs.version || github.ref_name }}
+          tag_name: ${{ steps.get_latest_tag.outputs.new_tag || (github.event.inputs.version && format('v{0}', github.event.inputs.version)) || github.ref_name }}
+          files: |
+            biduleur-${{ steps.get_latest_tag.outputs.new_version || github.event.inputs.version || github.ref_name }}-windows.zip
           body: |
             - Téléchargez le ZIP
             - Extrayez-le

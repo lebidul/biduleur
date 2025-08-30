@@ -10,12 +10,12 @@ def run_biduleur(input_file, bidul_output_file=None, agenda_output_file=None):
     Traite le fichier CSV et génère les fichiers HTML.
 
     Args:
-        input_file (str): Chemin du fichier CSV d'entrée.
+        input_file (str): Chemin du fichier CSV ou XLS XLSX d'entrée.
         bidul_output_file (str, optional): Chemin du fichier de sortie pour Bidul. Par défaut, basé sur input_file.
         agenda_output_file (str, optional): Chemin du fichier de sortie pour Agenda. Par défaut, basé sur input_file.
     """
     try:
-        # Génère les chemins par défaut si non fournis
+    # Génère les chemins par défaut si non fournis
         if not bidul_output_file or not agenda_output_file:
             base_name = os.path.splitext(os.path.basename(input_file))[0]
             output_dir = os.path.dirname(input_file)
@@ -41,8 +41,12 @@ def gui_mode():
 
     def select_input_file():
         file_path = filedialog.askopenfilename(
-            title="Sélectionner le fichier CSV d'entrée",
-            filetypes=[("Fichiers CSV", "*.csv"), ("Tous les fichiers", "*.*")]
+            title="Sélectionner le fichier d'entrée",
+            filetypes=[
+                ("Fichiers Excel", "*.xls;*.xlsx"),
+                ("Fichiers CSV", "*.csv"),
+                ("Tous les fichiers", "*.*")
+            ]
         )
         if file_path:
             input_entry.delete(0, tk.END)
@@ -76,7 +80,7 @@ def gui_mode():
         agenda_output_file = agenda_output_entry.get()
 
         if not input_file:
-            messagebox.showerror("Erreur", "Veuillez sélectionner un fichier CSV d'entrée.")
+            messagebox.showerror("Erreur", "Veuillez sélectionner un fichier tapageur (.csv,.xls,.xlsx) d'entrée.")
             return
 
         success, result = run_biduleur(input_file, bidul_output_file, agenda_output_file)
@@ -100,7 +104,7 @@ def gui_mode():
     root.rowconfigure(4, weight=1)     # Ajoute une ligne vide en bas pour permettre l'expansion verticale
 
     # Fichier d'entrée
-    tk.Label(root, text="Fichier CSV d'entrée :").grid(row=0, column=0, padx=5, pady=5, sticky="e")
+    tk.Label(root, text="Fichier tapageur d'entrée (.csv,.xls,.xlsx) :").grid(row=0, column=0, padx=5, pady=5, sticky="e")
     input_entry = tk.Entry(root)
     input_entry.grid(row=0, column=1, padx=5, pady=5, sticky="ew")  # sticky="ew" pour étirer horizontalement
     tk.Button(root, text="Parcourir...", command=select_input_file).grid(row=0, column=2, padx=5, pady=5)
@@ -136,13 +140,12 @@ def gui_mode():
 def cli_mode():
     """Mode ligne de commande pour l'IDE."""
     if len(sys.argv) < 2:
-        print("Usage: python main.py <fichier_csv> [fichier_sortie_bidul] [fichier_sortie_agenda]")
+        print("Usage: python main.py <fichier_entrée> [fichier_sortie_bidul] [fichier_sortie_agenda]")
+        print("Types de fichiers supportés : CSV, XLS, XLSX")
         sys.exit(1)
-
     input_file = sys.argv[1]
     bidul_output_file = sys.argv[2] if len(sys.argv) > 2 else None
     agenda_output_file = sys.argv[3] if len(sys.argv) > 3 else None
-
     success, result = run_biduleur(input_file, bidul_output_file, agenda_output_file)
     if not success:
         sys.exit(1)
@@ -153,5 +156,5 @@ if __name__ == '__main__':
         cli_mode()
     else:
         gui_mode()
-    # filename1 = './tapages/202509_tapage_biduleur_Septembre_2025 - lebiduleur.csv'
+    # filename1 = './tapages/Copy of 202509_tapage_biduleur_Septembre_2025.xls.xlsx'
     # run_biduleur(filename1)

@@ -1,5 +1,5 @@
 # Module Biduleur
-Biduleur est un outil pour générer des événements à partir de fichiers CSV, disponible en **mode GUI (interface graphique)** et **mode CLI (ligne de commande)**.
+Biduleur est un outil pour générer des événements à partir de fichiers de tapage CSV ou XLS, XLSX, disponible en **mode GUI (interface graphique)** et **mode CLI (ligne de commande)**.
 
 ---
 ## Table des matières
@@ -40,7 +40,7 @@ bidul.biduleur/
 │   ├── __init__.py         # Fichier vide obligatoire
 │   ├── main.py             # Point d'entrée (mode GUI par défaut)
 │   ├── cli.py              # Module pour le mode CLI
-│   ├── csv_utils.py        # Utilitaires pour les fichiers CSV
+│   ├── csv_utils.py        # Utilitaires pour les fichiers CSV et XLS/XLSX
 │   ├── format_utils.py     # Utilitaires de formatage
 │   ├── constants.py        # Constantes du projet
 │   ├── event_utils.py      # Gestion des événements
@@ -109,7 +109,7 @@ Le mode GUI est **l'interface par défaut** lorsque vous exécutez Biduleur sans
     ```
 
 #### **Fonctionnalités du mode GUI**
-- **Interface intuitive** pour sélectionner les fichiers CSV.
+- **Interface intuitive** pour sélectionner les fichiers CSV et XLS/XLSX.
 - **Prévisualisation** des événements générés.
 - **Export** des événements dans différents formats.
 - **Historique** des fichiers récemment ouverts.
@@ -131,7 +131,7 @@ dist\biduleur\biduleur.exe --cli --help
 #### **Options disponibles**
 | Option | Description | Exemple |
 |--------|-------------|---------|
-| `--input` | Chemin vers le fichier CSV d'entrée | `--input data.csv` |
+| `--input` | Chemin vers le fichier CSV et XLS/XLSX d'entrée | `--input data.csv` |
 | `--output` | Chemin vers le fichier de sortie | `--output output.json` |
 | `--format` | Format de sortie (`json`, `xml`, `txt`) | `--format json` |
 | `--delimiter` | Délimiteur du CSV (défaut: `,`) | `--delimiter ;` |

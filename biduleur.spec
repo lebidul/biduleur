@@ -19,6 +19,7 @@ hidden_imports = [
 from PyInstaller.utils.hooks import collect_submodules
 hidden_imports += collect_submodules('pandas')
 hidden_imports += collect_submodules('numpy')
+hidden_imports += collect_submodules('openpyxl')
 
 # Exclusions (pas d'exclusion agressive de la stdlib comme urllib/inspect/pydoc)
 excludes = [

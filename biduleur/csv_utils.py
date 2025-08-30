@@ -2,23 +2,36 @@ import pandas as pd
 from typing import List, Dict, Optional
 from biduleur.constants import DATE, GENRE1, HORAIRE, COLONNE_INFO
 from biduleur.event_utils import parse_bidul_event
+import os
 
-
-def read_and_sort_csv(filename: str) -> Optional[List[Dict]]:
+def read_and_sort_file(filename: str) -> Optional[List[Dict]]:
+    """
+    Lit et trie un fichier (CSV, XLS, ou XLSX).
+    Args:
+        filename (str): Chemin du fichier d'entrée.
+    Returns:
+        Optional[List[Dict]]: Liste des enregistrements triés ou None en cas d'erreur.
+    """
     try:
-        df = pd.read_csv(filename, encoding='utf8', keep_default_na=False, na_values=[''])
-        df = df.where(pd.notnull(df), None)
+        # Détermine le type de fichier en fonction de l'extension
+        file_extension = os.path.splitext(filename)[1].lower()
 
+        if file_extension in ['.csv']:
+            df = pd.read_csv(filename, encoding='utf8', keep_default_na=False, na_values=[''])
+        elif file_extension in ['.xls', '.xlsx']:
+            df = pd.read_excel(filename, keep_default_na=False, na_values=[''])
+        else:
+            raise ValueError(f"Format de fichier non supporté : {file_extension}")
+
+        df = df.where(pd.notnull(df), None)
         df['Day'] = df[DATE].apply(lambda x: x.split()[1].zfill(2) if x else None)
 
-        # Création d'une colonne temporaire pour le tri personnalisé afin de mettre une colonne info au début
+        # Création d'une colonne temporaire pour le tri personnalisé
         df['sort_key'] = df[DATE].apply(lambda x: 0 if x == COLONNE_INFO else 1)
 
         # Tri : d'abord par 'sort_key' (pour mettre 'En Bref' à la fin),
         # puis par 'Day', 'GENRE1', 'HORAIRE' comme avant
-        df_sorted = df.sort_values(
-            by=['sort_key', 'Day', GENRE1, HORAIRE]
-        )
+        df_sorted = df.sort_values(by=['sort_key', 'Day', GENRE1, HORAIRE])
 
         # Suppression de la colonne temporaire
         df_sorted = df_sorted.drop(columns=['sort_key'])
@@ -29,22 +42,24 @@ def read_and_sort_csv(filename: str) -> Optional[List[Dict]]:
         return None
 
 def parse_bidul(filename: str) -> tuple:
+    """
+    Traite le fichier d'entrée (CSV, XLS, ou XLSX) et génère les données nécessaires.
+    Args:
+        filename (str): Chemin du fichier d'entrée.
+    Returns:
+        tuple: (html_body_bidul, html_body_agenda, number_of_lines)
+    """
     body_content = ''
     body_content_agenda = ''
-
-    sorted_events = read_and_sort_csv(filename)
+    sorted_events = read_and_sort_file(filename)
     if sorted_events is None:
         return body_content, body_content_agenda, 0
-
     current_date = None
     number_of_lines = 0
-
     for row in sorted_events:
         row = {key: (value.strip() if isinstance(value, str) else value) for key, value in row.items()}
         formatted_line_bidul, formatted_line_agenda, formatted_line_post, current_date = parse_bidul_event(row, current_date)
-
         body_content += formatted_line_bidul + "\n\n"
         body_content_agenda += formatted_line_agenda + "\n\n"
         number_of_lines += 1
-
     return body_content, body_content_agenda, number_of_lines
