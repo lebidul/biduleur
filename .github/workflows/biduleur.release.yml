@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - 'v*'
+    branches:
+      - master
   workflow_dispatch:
     inputs:
       version:
@@ -13,7 +15,7 @@ on:
       publish_release:
         description: 'Publier la release ?'
         required: true
-        default: 'false'
+        default: 'true'
         type: choice
         options: ['true','false']
 
@@ -24,6 +26,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Nécessaire pour récupérer les tags
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -34,27 +38,54 @@ jobs:
         run: |
           python -m pip install --upgrade pip setuptools wheel
           pip install pyinstaller==6.6.0 pyinstaller-hooks-contrib
+
       - name: Install project dependencies
         run: |
           pip install -r biduleur/requirements.txt
+
       - name: Sanity-check deps
         run: |
           python -c "import sys; print(sys.version)"
           pip show pandas || (echo pandas missing && exit /b 1)
           pip show numpy  || (echo numpy missing  && exit /b 1)
+
       - name: Build with PyInstaller
         run: |
           pyinstaller biduleur.spec --clean --workpath build --distpath dist
-#      - name: Inspect dist (debug)
-#        run: |
-#          dir dist
-#          dir dist\biduleur
-#          IF EXIST dist\biduleur\_internal\Lib\site-packages\pandas (dir dist\biduleur\_internal\Lib\site-packages\pandas) ELSE (echo "pandas folder not found in bundle")
+
+      - name: Get latest tag
+        id: get_latest_tag
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        run: |
+          # Récupère le dernier tag
+          latest_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "Latest tag: $latest_tag"
+
+          # Extrait la version du tag (ex: v1.0.0 -> 1.0.0)
+          version=${latest_tag#v}
+          echo "Latest version: $version"
+
+          # Incrémente la version (ex: 1.0.0 -> 1.0.1)
+          IFS='.' read -ra version_parts <<< "$version"
+          major=${version_parts[0]}
+          minor=${version_parts[1]}
+          patch=${version_parts[2]}
+
+          new_patch=$((patch + 1))
+          new_version="$major.$minor.$new_patch"
+          new_tag="v$new_version"
+
+          echo "New version: $new_version"
+          echo "New tag: $new_tag"
+
+          echo "new_version=$new_version" >> $GITHUB_OUTPUT
+          echo "new_tag=$new_tag" >> $GITHUB_OUTPUT
 
       - name: Package ZIP
         run: |
           mkdir release_assets
-          echo "Biduleur ${{ github.event.inputs.version || github.ref_name }}" > dist\biduleur\README.txt
+          version=${{ steps.get_latest_tag.outputs.new_version || github.event.inputs.version || github.ref_name }}
+          echo "Biduleur $version" > dist\biduleur\README.txt
           echo "================================================" >> dist\biduleur\README.txt
           echo "" >> dist\biduleur\README.txt
           echo "Merci d'utiliser Biduleur !" >> dist\biduleur\README.txt
@@ -70,19 +101,28 @@ jobs:
           echo "" >> dist\biduleur\README.txt
           echo "SUPPORT:" >> dist\biduleur\README.txt
           echo "Pour toute question ou problème, contactez-nous via GitHub." >> dist\biduleur\README.txt
-          Compress-Archive -Path dist\biduleur\* -DestinationPath release_assets\biduleur-${{ github.event.inputs.version || github.ref_name }}-windows.zip -Force
+          Compress-Archive -Path dist\biduleur\* -DestinationPath release_assets\biduleur-${{ steps.get_latest_tag.outputs.new_version || github.event.inputs.version || github.ref_name }}-windows.zip -Force
+
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: biduleur-${{ github.event.inputs.version || 'manual' }}-windows
+          name: biduleur-${{ steps.get_latest_tag.outputs.new_version || github.event.inputs.version || 'manual' }}-windows
           path: release_assets/*
 
+      - name: Create and push new tag
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git tag ${{ steps.get_latest_tag.outputs.new_tag }}
+          git push origin ${{ steps.get_latest_tag.outputs.new_tag }}
+
       - name: Create Release
-        if: ${{ github.event.inputs.publish_release != 'false' && (github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')) }}
+        if: ${{ (github.event.inputs.publish_release != 'false' && (github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/'))) || (github.event_name == 'push' && github.ref == 'refs/heads/master') }}
         uses: softprops/action-gh-release@v2
         with:
-          name: Biduleur ${{ github.event.inputs.version || github.ref_name }}
-          tag_name: ${{ github.event.inputs.version && format('v{0}', github.event.inputs.version) || github.ref_name }}
+          name: Biduleur ${{ steps.get_latest_tag.outputs.new_version || github.event.inputs.version || github.ref_name }}
+          tag_name: ${{ steps.get_latest_tag.outputs.new_tag || (github.event.inputs.version && format('v{0}', github.event.inputs.version)) || github.ref_name }}
           files: release_assets/*
           body: |
             - Téléchargez le ZIP
