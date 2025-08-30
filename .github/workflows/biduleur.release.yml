@@ -108,8 +108,8 @@ jobs:
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: biduleur-${{ github.event.inputs.version || github.ref_name }}-windows
-          path: release_assets\*
+          name: biduleur-${{ github.event.inputs.version || 'manual' }}-windows
+          path: release_assets/*
 
       - name: Create and push new tag
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
