@@ -7,7 +7,9 @@
   - Mise à jour de l'interface graphique pour permettre la sélection de fichiers Excel.
 
 ### 🔧 Améliorations
-- Optimisation du processus de build pour réduire la taille du fichier exécutable.
+- Optimisation du processus de build pour:
+  - réduire la taille du fichier exécutable.
+  - créer une release après une PR mergée sur master avc gestion automatique des tags.
 - Meilleure gestion des erreurs lors de la lecture des fichiers.
 
 ---
