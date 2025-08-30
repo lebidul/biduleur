@@ -34,6 +34,12 @@ excludes = [
 # Datas : uniquement les fichiers non-Python nécessaires
 datas = collect_data_files('tkinter')  # nécessaire pour tkinter
 
+templates_dir = os.path.join(current_dir, 'biduleur', 'templates')
+datas += [
+    (os.path.join(templates_dir, 'tapage_template.csv'), 'biduleur/templates'),
+    (os.path.join(templates_dir, 'tapage_template.xlsx'), 'biduleur/templates'),
+]
+
 # Inclure uniquement les fichiers Python du package biduleur, sans __pycache__
 for root, dirs, files in os.walk(os.path.join(current_dir, 'biduleur')):
     files = [f for f in files if f.endswith('.py')]  # inclure seulement les .py
