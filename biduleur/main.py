@@ -10,31 +10,31 @@ def run_biduleur(input_file, bidul_output_file=None, agenda_output_file=None):
     Traite le fichier CSV et génère les fichiers HTML.
 
     Args:
-        input_file (str): Chemin du fichier CSV d'entrée.
+        input_file (str): Chemin du fichier CSV ou XLS XLSX d'entrée.
         bidul_output_file (str, optional): Chemin du fichier de sortie pour Bidul. Par défaut, basé sur input_file.
         agenda_output_file (str, optional): Chemin du fichier de sortie pour Agenda. Par défaut, basé sur input_file.
     """
-    # try:
+    try:
     # Génère les chemins par défaut si non fournis
-    if not bidul_output_file or not agenda_output_file:
-        base_name = os.path.splitext(os.path.basename(input_file))[0]
-        output_dir = os.path.dirname(input_file)
-        bidul_output_file = os.path.basename(input_file) + ".html"
-        agenda_output_file = os.path.basename(input_file) + ".agenda.html"
+        if not bidul_output_file or not agenda_output_file:
+            base_name = os.path.splitext(os.path.basename(input_file))[0]
+            output_dir = os.path.dirname(input_file)
+            bidul_output_file = os.path.basename(input_file) + ".html"
+            agenda_output_file = os.path.basename(input_file) + ".agenda.html"
 
-    html_body_bidul, html_body_agenda, number_of_lines = parse_bidul(input_file)
-    output_html_file(html_body_bidul, original_file_name=input_file, output_filename=bidul_output_file)
-    output_html_file(html_body_agenda, original_file_name=input_file, output_filename=agenda_output_file)
+        html_body_bidul, html_body_agenda, number_of_lines = parse_bidul(input_file)
+        output_html_file(html_body_bidul, original_file_name=input_file, output_filename=bidul_output_file)
+        output_html_file(html_body_agenda, original_file_name=input_file, output_filename=agenda_output_file)
 
-    print(f"Fichiers générés avec succès :")
-    print(f"- {os.path.basename(bidul_output_file)}")
-    print(f"- {os.path.basename(agenda_output_file)}")
-    print(f"Nombre d'événements créés : {number_of_lines}")
+        print(f"Fichiers générés avec succès :")
+        print(f"- {os.path.basename(bidul_output_file)}")
+        print(f"- {os.path.basename(agenda_output_file)}")
+        print(f"Nombre d'événements créés : {number_of_lines}")
 
-    return True, number_of_lines
-    # except Exception as e:
-    #     print(f"Erreur : {str(e)}")
-    #     return False, str(e)
+        return True, number_of_lines
+    except Exception as e:
+        print(f"Erreur : {str(e)}")
+        return False, str(e)
 
 def gui_mode():
     """Mode graphique pour les utilisateurs non-techniques."""
@@ -43,8 +43,8 @@ def gui_mode():
         file_path = filedialog.askopenfilename(
             title="Sélectionner le fichier d'entrée",
             filetypes=[
-                ("Fichiers CSV", "*.csv"),
                 ("Fichiers Excel", "*.xls;*.xlsx"),
+                ("Fichiers CSV", "*.csv"),
                 ("Tous les fichiers", "*.*")
             ]
         )
