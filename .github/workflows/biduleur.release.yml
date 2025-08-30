@@ -74,8 +74,8 @@ jobs:
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: biduleur-${{ github.event.inputs.version || github.ref_name }}-windows
-          path: biduleur-${{ github.event.inputs.version || github.ref_name }}-windows.zip
+          name: biduleur-${{ github.event.inputs.version || 'manual' }}-windows
+          path: release_assets/*
 
       - name: Create Release
         if: ${{ github.event.inputs.publish_release != 'false' && (github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')) }}
