@@ -86,31 +86,31 @@ jobs:
         shell: pwsh
         run: |
           $version = "${{ steps.get_latest_tag.outputs.new_version || github.event.inputs.version || github.ref_name }}"
-          echo "Biduleur $version" > dist\biduleur\README.txt
-          echo "================================================" >> dist\biduleur\README.txt
-          echo "" >> dist\biduleur\README.txt
-          echo "Merci d'utiliser Biduleur !" >> dist\biduleur\README.txt
-          echo "" >> dist\biduleur\README.txt
-          echo "INSTRUCTIONS:" >> dist\biduleur\README.txt
-          echo "1. Extrayez le contenu de ce fichier ZIP dans un dossier de votre choix." >> dist\biduleur\README.txt
-          echo "2. Double-cliquez sur biduleur.exe pour lancer l'application." >> dist\biduleur\README.txt
-          echo "3. Suivez les instructions à l'écran." >> dist\biduleur\README.txt
-          echo "" >> dist\biduleur\README.txt
-          echo "REQUIREMENTS:" >> dist\biduleur\README.txt
-          echo "- Windows 10 ou supérieur" >> dist\biduleur\README.txt
-          echo "- Aucune installation supplémentaire nécessaire" >> dist\biduleur\README.txt
-          echo "" >> dist\biduleur\README.txt
-          echo "SUPPORT:" >> dist\biduleur\README.txt
-          echo "Pour toute question ou problème, contactez-nous via GitHub." >> dist\biduleur\README.txt
+          "Biduleur $version" | Out-File -FilePath dist\biduleur\README.txt -Encoding utf8
+          "================================================" | Out-File -FilePath dist\biduleur\README.txt -Append
+          "" | Out-File -FilePath dist\biduleur\README.txt -Append
+          "Merci d'utiliser Biduleur !" | Out-File -FilePath dist\biduleur\README.txt -Append
+          "" | Out-File -FilePath dist\biduleur\README.txt -Append
+          "INSTRUCTIONS:" | Out-File -FilePath dist\biduleur\README.txt -Append
+          "1. Extrayez le contenu de ce fichier ZIP dans un dossier de votre choix." | Out-File -FilePath dist\biduleur\README.txt -Append
+          "2. Double-cliquez sur biduleur.exe pour lancer l'application." | Out-File -FilePath dist\biduleur\README.txt -Append
+          "3. Suivez les instructions à l'écran." | Out-File -FilePath dist\biduleur\README.txt -Append
+          "" | Out-File -FilePath dist\biduleur\README.txt -Append
+          "REQUIREMENTS:" | Out-File -FilePath dist\biduleur\README.txt -Append
+          "- Windows 10 ou supérieur" | Out-File -FilePath dist\biduleur\README.txt -Append
+          "- Aucune installation supplémentaire nécessaire" | Out-File -FilePath dist\biduleur\README.txt -Append
+          "" | Out-File -FilePath dist\biduleur\README.txt -Append
+          "SUPPORT:" | Out-File -FilePath dist\biduleur\README.txt -Append
+          "Pour toute question ou problème, contactez-nous via GitHub." | Out-File -FilePath dist\biduleur\README.txt -Append
 
-          # Crée le fichier ZIP directement avec la structure souhaitée
-          Compress-Archive -Path dist\biduleur\* -DestinationPath biduleur-$version-windows.zip -Force
+          # ⚠️ Zipper le DOSSIER pour conserver le répertoire racine "biduleur" dans l’archive
+          Compress-Archive -Path dist\biduleur -DestinationPath biduleur-$version-windows.zip -Force
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: biduleur-${{ steps.get_latest_tag.outputs.new_version || github.event.inputs.version || 'manual' }}-windows
-          path: biduleur-*-windows.zip
+          path: dist/biduleur
 
       - name: Create and push new tag
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
@@ -126,7 +126,8 @@ jobs:
         with:
           name: Biduleur ${{ steps.get_latest_tag.outputs.new_version || github.event.inputs.version || github.ref_name }}
           tag_name: ${{ steps.get_latest_tag.outputs.new_tag || (github.event.inputs.version && format('v{0}', github.event.inputs.version)) || github.ref_name }}
-          files: release_assets/*
+          files: |
+            biduleur-${{ steps.get_latest_tag.outputs.new_version || github.event.inputs.version || github.ref_name }}-windows.zip
           body: |
             - Téléchargez le ZIP
             - Extrayez-le
