@@ -3,6 +3,7 @@
 ## v1.1.2
 ### 🌟 Nouvelles fonctionnalités
 - Template de fichiers tapageurs .csv et .xlsx disponibles pour les utilisateurs du gui.
+- Repository devient public.
 
 ### 🔧 Améliorations
 - Amélioration du workflow build and release:
