@@ -39,9 +39,10 @@
 
 ## 📅 Historique des versions
 
-| Version | Date       | Description                                      |
-|---------|------------|--------------------------------------------------|
-| v1.1.0  | 30/08/2025 | Ajout du support des fichiers Excel (.xls, .xlsx) |
+| Version | Date       | Description                                           |
+|---------|------------|-------------------------------------------------------|
+| v1.2.0  | 31/08/2025  | Ajout de tapageurs templates sur le gui               |
+| v1.1.0  | 30/08/2025 | Ajout du support des fichiers Excel (.xls, .xlsx)     |
 | v1.0.0  | 29/8/2025  | Première version stable avec support des fichiers CSV |
 
 ---
