@@ -1,5 +1,14 @@
 # Release Notes - Biduleur
 
+## v1.1.2
+### 🌟 Nouvelles fonctionnalités
+- Template de fichiers tapageurs .csv et .xlsx disponibles pour les utilisateurs du gui.
+
+### 🔧 Améliorations
+- Amélioration du workflow build and release:
+  - Optimisation de la structure des .zip du build et des releases.
+  - Release créée après merge sur la branche aster avec incrémentation du tag.
+
 ## v1.1.0
 ### 🌟 Nouvelles fonctionnalités
 - **Support des fichiers Excel** : Ajout de la prise en charge des fichiers `.xls` et `.xlsx` en plus des fichiers `.csv`.
