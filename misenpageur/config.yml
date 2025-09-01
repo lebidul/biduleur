@@ -48,3 +48,5 @@ text_sections_order:
   - "S6"
   - "S3"
   - "S4"
+
+split_min_gain_ratio: 0.10   # n’autoriser la césure A→B que si elle comble ≥10% de la hauteur de la section A (et ≥1 ligne)

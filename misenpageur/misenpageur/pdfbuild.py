@@ -1,20 +1,31 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
+
 import os
 from typing import List, Tuple
+
 from reportlab.pdfgen import canvas
+
 from .config import Config
 from .layout import Layout
 from .html_utils import extract_paragraphs_from_html
 from .drawing import draw_s1, draw_s2_cover, list_images
 from .fonts import register_arial_narrow, register_dejavu_sans
-from .textflow import measure_fit_at_fs, draw_section_fixed_fs
+from .textflow import (
+    measure_fit_at_fs,
+    draw_section_fixed_fs,
+    draw_section_fixed_fs_with_prelude,
+    draw_section_fixed_fs_with_tail,
+    plan_pair_with_split,
+)
+
 
 def read_text(path: str) -> str:
     if not os.path.exists(path):
         return ""
     with open(path, "r", encoding="utf-8") as f:
         return f.read()
+
 
 def _simulate_allocation_at_fs(
     c: canvas.Canvas, S, order: List[str], paras: List[str],
@@ -30,12 +41,13 @@ def _simulate_allocation_at_fs(
         remaining = remaining[k:]
     return used_by, total
 
+
 def build_pdf(project_root: str, cfg: Config, layout: Layout, out_path: str) -> dict:
     report = {"unused_paragraphs": 0}
 
     c = canvas.Canvas(out_path, pagesize=(layout.page.width, layout.page.height))
 
-    # Polices
+    # Polices (Arial Narrow + fallback glyphes)
     req = (cfg.font_name or "").strip().lower().replace(" ", "")
     if req in ("arialnarrow", "arialnarrowmt", "arial", "arialmt"):
         if register_arial_narrow():
@@ -53,19 +65,30 @@ def build_pdf(project_root: str, cfg: Config, layout: Layout, out_path: str) -> 
     paras: List[str] = extract_paragraphs_from_html(html_text)
     print("Paragraphes HTML:", len(paras))
 
-    ours_text = read_text(os.path.join(project_root, cfg.ours_md))
+    # Ours
+    ours_path = cfg.ours_md if os.path.isabs(cfg.ours_md) else os.path.join(project_root, cfg.ours_md)
+    if not os.path.exists(ours_path):
+        print(f"[WARN] ours_md introuvable: {ours_path}")
+        ours_text = "(Ours manquant — vérifiez config.yml: ours_md)"
+    else:
+        ours_text = read_text(ours_path)
+        print(f"[INFO] ours_md: {ours_path} ({len(ours_text.encode('utf-8'))} bytes)")
+        if not ours_text.strip():
+            print(f"[WARN] ours_md vide: {ours_path}")
+            ours_text = "(Ours vide — remplissez le fichier indiqué dans config.yml)"
+
     logos = list_images(os.path.join(project_root, cfg.logos_dir), max_images=10)
     cover_path = os.path.join(project_root, cfg.cover_image) if cfg.cover_image else ""
 
     S = layout.sections
-    order = ["S5", "S6", "S3", "S4"]  # page 2 colonnes puis page 1 bas
 
-    # --- Chercher la plus grande taille commune fs telle que TOUT tienne ---
+    # --- Chercher la plus grande taille commune fs telle que tout rentre (sans césure) ---
+    order_fs = ["S5", "S6", "S3", "S4"]  # ordre logique pour la mesure
     lo, hi = cfg.font_size_min, cfg.font_size_max
     best_fs = lo
     for _ in range(24):  # binaire
         mid = (lo + hi) / 2.0
-        _alloc, tot = _simulate_allocation_at_fs(c, S, order, paras, cfg.font_name, mid, cfg.leading_ratio, cfg.inner_padding)
+        _alloc, tot = _simulate_allocation_at_fs(c, S, order_fs, paras, cfg.font_name, mid, cfg.leading_ratio, cfg.inner_padding)
         if tot >= len(paras):
             best_fs = mid
             lo = mid
@@ -74,38 +97,44 @@ def build_pdf(project_root: str, cfg: Config, layout: Layout, out_path: str) -> 
         if abs(hi - lo) < 0.05:
             break
 
-    used_by_section, placed = _simulate_allocation_at_fs(c, S, order, paras, cfg.font_name, best_fs, cfg.leading_ratio, cfg.inner_padding)
-    remaining = len(paras) - placed
-    if remaining > 0:
-        # On n'accepte pas de restes : baisse ultime à fs_min si besoin
-        used_by_section, placed = _simulate_allocation_at_fs(c, S, order, paras, cfg.font_name, cfg.font_size_min, cfg.leading_ratio, cfg.inner_padding)
-        best_fs = cfg.font_size_min
-        remaining = len(paras) - placed
+    # Seuil de césure "utile" (configurable)
+    split_min_gain_ratio = getattr(cfg, "split_min_gain_ratio", 0.10)
 
-    # Debug
-    for k in order:
-        print(k, "→", len(used_by_section.get(k, [])))
-    print("fs_common:", round(best_fs, 2), "Restants:", remaining)
+    # --- PLANIFICATION par paires avec césure contrôlée ---
+    # Paire page 2 : S5 -> S6
+    s5_full, s5_tail, s6_prelude, s6_full, rest_after_p2 = plan_pair_with_split(
+        c, S["S5"], S["S6"], paras, cfg.font_name, best_fs, cfg.leading_ratio, cfg.inner_padding,
+        split_min_gain_ratio=split_min_gain_ratio
+    )
 
-    # --- RENDU : PAGE 1 ---
+    # Paire page 1 (bas) : S3 -> S4 sur le reste
+    s3_full, s3_tail, s4_prelude, s4_full, rest_after_p1 = plan_pair_with_split(
+        c, S["S3"], S["S4"], rest_after_p2, cfg.font_name, best_fs, cfg.leading_ratio, cfg.inner_padding,
+        split_min_gain_ratio=split_min_gain_ratio
+    )
+
+    if rest_after_p1:
+        print(f"[WARN] {len(rest_after_p1)} paragraphes non placés (réduire font_size_max ou ajuster layout).")
+
+    # --- RENDU : PAGE 1 (S1,S2 puis S3,S4) ---
     draw_s1(c, S["S1"], ours_text, logos, cfg.font_name, cfg.leading_ratio, cfg.inner_padding, layout.s1_split)
     draw_s2_cover(c, S["S2"], cover_path, cfg.inner_padding)
 
-    draw_section_fixed_fs(c, S["S3"], used_by_section.get("S3", []), cfg.font_name, best_fs, cfg.leading_ratio, cfg.inner_padding)
-    draw_section_fixed_fs(c, S["S4"], used_by_section.get("S4", []), cfg.font_name, best_fs, cfg.leading_ratio, cfg.inner_padding)
+    # S3 : paragraphes entiers puis éventuelle 'tail'
+    draw_section_fixed_fs_with_tail(c, S["S3"], s3_full, s3_tail, cfg.font_name, best_fs, cfg.leading_ratio, cfg.inner_padding)
+    # S4 : éventuelle 'préface' puis paragraphes entiers
+    draw_section_fixed_fs_with_prelude(c, S["S4"], s4_prelude, s4_full, cfg.font_name, best_fs, cfg.leading_ratio, cfg.inner_padding)
+
     c.showPage()
 
-    # --- RENDU : PAGE 2 (2 colonnes S5|S6) ---
-    drew = False
-    if used_by_section.get("S5"):
-        draw_section_fixed_fs(c, S["S5"], used_by_section["S5"], cfg.font_name, best_fs, cfg.leading_ratio, cfg.inner_padding)
-        drew = True
-    if used_by_section.get("S6"):
-        draw_section_fixed_fs(c, S["S6"], used_by_section["S6"], cfg.font_name, best_fs, cfg.leading_ratio, cfg.inner_padding)
-        drew = True
-    if not drew:
-        c.setFont("Helvetica", 1); c.drawString(0, 0, " ")
-    c.save()
+    # --- RENDU : PAGE 2 (S5 | S6) ---
+    # S5 : paragraphes entiers puis éventuelle 'tail'
+    draw_section_fixed_fs_with_tail(c, S["S5"], s5_full, s5_tail, cfg.font_name, best_fs, cfg.leading_ratio, cfg.inner_padding)
+    # S6 : éventuelle 'préface' puis paragraphes entiers
+    draw_section_fixed_fs_with_prelude(c, S["S6"], s6_prelude, s6_full, cfg.font_name, best_fs, cfg.leading_ratio, cfg.inner_padding)
 
-    report["unused_paragraphs"] = 0
+    # Finaliser
+    c.save()
+    report["unused_paragraphs"] = len(rest_after_p1)
+    print("fs_common:", round(best_fs, 2), "split_min_gain_ratio:", split_min_gain_ratio)
     return report
