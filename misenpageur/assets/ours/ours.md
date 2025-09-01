@@ -1,4 +1,3 @@
-:
 Le Le Bidul, agenda culturel, mensuel et
 0€ depuis février 1997, édité par
 l'association, loi de 1901, ayant pour but

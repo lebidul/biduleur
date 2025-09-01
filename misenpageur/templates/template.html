@@ -21,6 +21,7 @@
       overflow: hidden;
       font-size: 10pt;
       line-height: 1.2;
+      border: 1px solid #ccc; /* Pour visualiser les sections */
     }
     .logos {
       display: grid;
@@ -42,6 +43,7 @@
   </style>
 </head>
 <body>
+  <!-- Page 1 -->
   <!-- Section 1 : Logos + texte constant -->
   <div class="section">
     <div class="logos">
@@ -57,11 +59,35 @@
     <img src="{{ image_couverture }}" width="100%" height="100%">
   </div>
 
-  <!-- Sections 3 à 8 : Blocs d'événements -->
-  {% for bloc in blocs %}
+  <!-- Section 3 -->
   <div class="section">
-    {% for event in bloc %}<div class="event">{{ event|safe }}</div>{% endfor %}
+    {% for event in blocs[0] %}<div class="event">{{ event|safe }}</div>{% endfor %}
   </div>
-  {% endfor %}
+
+  <!-- Section 4 -->
+  <div class="section">
+    {% for event in blocs[1] %}<div class="event">{{ event|safe }}</div>{% endfor %}
+  </div>
+
+  <!-- Page 2 -->
+  <!-- Section 5 -->
+  <div class="section">
+    {% for event in blocs[2] %}<div class="event">{{ event|safe }}</div>{% endfor %}
+  </div>
+
+  <!-- Section 6 -->
+  <div class="section">
+    {% for event in blocs[3] %}<div class="event">{{ event|safe }}</div>{% endfor %}
+  </div>
+
+  <!-- Section 7 -->
+  <div class="section">
+    {% for event in blocs[4] %}<div class="event">{{ event|safe }}</div>{% endfor %}
+  </div>
+
+  <!-- Section 8 -->
+  <div class="section">
+    {% for event in blocs[5] %}<div class="event">{{ event|safe }}</div>{% endfor %}
+  </div>
 </body>
 </html>
