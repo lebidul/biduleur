@@ -13,7 +13,7 @@ from .drawing import draw_s1, draw_s2_cover, list_images, paragraph_style
 from .fonts import register_arial_narrow, register_dejavu_sans
 from .spacing import SpacingConfig, SpacingPolicy
 from .textflow import (
-    BulletConfig,
+    BulletConfig, DateBoxConfig,
     measure_fit_at_fs,
     draw_section_fixed_fs,
     draw_section_fixed_fs_with_prelude,
@@ -34,6 +34,7 @@ def _simulate_allocation_at_fs(
     font_name: str, font_size: float, leading_ratio: float, inner_pad: float,
     spacing_policy: SpacingPolicy,
     bullet_cfg: BulletConfig,
+    date_box: DateBoxConfig,
 ) -> Tuple[dict, int]:
     remaining = list(paras)
     used_by = {}
@@ -41,12 +42,61 @@ def _simulate_allocation_at_fs(
     for name in order:
         k = measure_fit_at_fs(
             c, S[name], remaining, font_name, font_size, leading_ratio, inner_pad,
-            section_name=name, spacing_policy=spacing_policy, bullet_cfg=bullet_cfg
+            section_name=name, spacing_policy=spacing_policy,
+            bullet_cfg=bullet_cfg, date_box=date_box
         )
         used_by[name] = remaining[:k]
         total += k
         remaining = remaining[k:]
     return used_by, total
+
+
+from collections.abc import Mapping
+
+def _read_date_box_config(cfg: Config) -> DateBoxConfig:
+    """Lit date_box depuis cfg, qu'il soit un dict, un Mapping (OmegaConf, etc.)
+    ou un objet-namespace avec attributs. Fallback sur les clés à plat."""
+    def as_bool(v, default=False):
+        if v is None: return default
+        if isinstance(v, bool): return v
+        if isinstance(v, (int, float)): return bool(v)
+        if isinstance(v, str): return v.strip().lower() in ("1", "true", "yes", "y", "on")
+        return default
+
+    def as_float(v, default):
+        try:
+            return float(v)
+        except Exception:
+            return default
+
+    def get_from_block(b, key, default=None):
+        if b is None:
+            return default
+        if isinstance(b, Mapping):
+            return b.get(key, default)
+        # objet type namespace (SimpleNamespace, Box, etc.)
+        return getattr(b, key, default)
+
+    block = getattr(cfg, "date_box", None)
+
+    if block is not None:
+        return DateBoxConfig(
+            enabled=as_bool(get_from_block(block, "enabled"), False),
+            padding=as_float(get_from_block(block, "padding"), 2.0),
+            border_width=as_float(get_from_block(block, "border_width"), 0.5),
+            border_color=get_from_block(block, "border_color", "#000000"),
+            back_color=get_from_block(block, "back_color", None),
+        )
+
+    # Fallback : clés à plat
+    return DateBoxConfig(
+        enabled=as_bool(getattr(cfg, "date_box_enabled", False), False),
+        padding=as_float(getattr(cfg, "date_box_padding", 2.0), 2.0),
+        border_width=as_float(getattr(cfg, "date_box_border_width", 0.5), 0.5),
+        border_color=getattr(cfg, "date_box_border_color", "#000000"),
+        back_color=getattr(cfg, "date_box_back_color", None),
+    )
+
 
 
 def build_pdf(project_root: str, cfg: Config, layout: Layout, out_path: str) -> dict:
@@ -89,7 +139,7 @@ def build_pdf(project_root: str, cfg: Config, layout: Layout, out_path: str) -> 
 
     S = layout.sections
 
-    # --- Spacing Policy ---
+    # --- Spacing Policy & Bullet/DateBox ---
     spacing_cfg = SpacingConfig(
         date_spaceBefore=getattr(cfg, "date_spaceBefore", 6.0),
         date_spaceAfter=getattr(cfg, "date_spaceAfter", 3.0),
@@ -99,14 +149,15 @@ def build_pdf(project_root: str, cfg: Config, layout: Layout, out_path: str) -> 
         min_event_spaceAfter=getattr(cfg, "min_event_spaceAfter", 1.0),
         first_non_event_spaceBefore_in_S5=getattr(cfg, "first_non_event_spaceBefore_in_S5", 0.0),
     )
-    # Bullet / Hanging indent
     bullet_cfg = BulletConfig(
         show_event_bullet=getattr(cfg, "show_event_bullet", True),
         event_bullet_replacement=getattr(cfg, "event_bullet_replacement", None),
         event_hanging_indent=getattr(cfg, "event_hanging_indent", 10.0),
     )
+    date_box = _read_date_box_config(cfg)
+    print("[INFO] DateBoxConfig:", date_box, "type(cfg.date_box)=", type(getattr(cfg, "date_box", None)))
 
-    # --- Chercher la plus grande taille commune fs (mesure AVEC spacing + indent) ---
+    # --- Chercher la plus grande taille commune fs (mesure AVEC spacing + indent + box) ---
     order_fs = ["S5", "S6", "S3", "S4"]
     lo, hi = cfg.font_size_min, cfg.font_size_max
     best_fs = lo
@@ -117,7 +168,7 @@ def build_pdf(project_root: str, cfg: Config, layout: Layout, out_path: str) -> 
 
         _alloc, tot = _simulate_allocation_at_fs(
             c, S, order_fs, paras, cfg.font_name, mid, cfg.leading_ratio, cfg.inner_padding,
-            spacing_policy=spacing_mid, bullet_cfg=bullet_cfg
+            spacing_policy=spacing_mid, bullet_cfg=bullet_cfg, date_box=date_box
         )
         if tot >= len(paras):
             best_fs = mid
@@ -138,12 +189,14 @@ def build_pdf(project_root: str, cfg: Config, layout: Layout, out_path: str) -> 
     # Paire page 2 : S5 -> S6
     s5_full, s5_tail, s6_prelude, s6_full, rest_after_p2 = plan_pair_with_split(
         c, S["S5"], S["S6"], "S5", "S6", paras, cfg.font_name, best_fs, cfg.leading_ratio, cfg.inner_padding,
-        split_min_gain_ratio=split_min_gain_ratio, spacing_policy=spacing_policy, bullet_cfg=bullet_cfg
+        split_min_gain_ratio=split_min_gain_ratio, spacing_policy=spacing_policy,
+        bullet_cfg=bullet_cfg, date_box=date_box
     )
     # Paire page 1 (bas) : S3 -> S4
     s3_full, s3_tail, s4_prelude, s4_full, rest_after_p1 = plan_pair_with_split(
         c, S["S3"], S["S4"], "S3", "S4", rest_after_p2, cfg.font_name, best_fs, cfg.leading_ratio, cfg.inner_padding,
-        split_min_gain_ratio=split_min_gain_ratio, spacing_policy=spacing_policy, bullet_cfg=bullet_cfg
+        split_min_gain_ratio=split_min_gain_ratio, spacing_policy=spacing_policy,
+        bullet_cfg=bullet_cfg, date_box=date_box
     )
     if rest_after_p1:
         print(f"[WARN] {len(rest_after_p1)} paragraphes non placés (réduire font_size_max ou ajuster layout).")
@@ -154,22 +207,22 @@ def build_pdf(project_root: str, cfg: Config, layout: Layout, out_path: str) -> 
 
     draw_section_fixed_fs_with_tail(
         c, S["S3"], s3_full, s3_tail, cfg.font_name, best_fs, cfg.leading_ratio, cfg.inner_padding,
-        section_name="S3", spacing_policy=spacing_policy, bullet_cfg=bullet_cfg
+        section_name="S3", spacing_policy=spacing_policy, bullet_cfg=bullet_cfg, date_box=date_box
     )
     draw_section_fixed_fs_with_prelude(
         c, S["S4"], s4_prelude, s4_full, cfg.font_name, best_fs, cfg.leading_ratio, cfg.inner_padding,
-        section_name="S4", spacing_policy=spacing_policy, bullet_cfg=bullet_cfg
+        section_name="S4", spacing_policy=spacing_policy, bullet_cfg=bullet_cfg, date_box=date_box
     )
     c.showPage()
 
     # --- RENDU : PAGE 2 ---
     draw_section_fixed_fs_with_tail(
         c, S["S5"], s5_full, s5_tail, cfg.font_name, best_fs, cfg.leading_ratio, cfg.inner_padding,
-        section_name="S5", spacing_policy=spacing_policy, bullet_cfg=bullet_cfg
+        section_name="S5", spacing_policy=spacing_policy, bullet_cfg=bullet_cfg, date_box=date_box
     )
     draw_section_fixed_fs_with_prelude(
         c, S["S6"], s6_prelude, s6_full, cfg.font_name, best_fs, cfg.leading_ratio, cfg.inner_padding,
-        section_name="S6", spacing_policy=spacing_policy, bullet_cfg=bullet_cfg
+        section_name="S6", spacing_policy=spacing_policy, bullet_cfg=bullet_cfg, date_box=date_box
     )
 
     # Finaliser

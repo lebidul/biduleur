@@ -8,6 +8,7 @@ from typing import List, Tuple
 from reportlab.pdfgen import canvas
 from reportlab.platypus import Paragraph
 from reportlab.lib.styles import ParagraphStyle
+from reportlab.lib.colors import HexColor
 
 from .layout import Section
 from .drawing import paragraph_style
@@ -31,9 +32,19 @@ def _strip_leading_bullet(raw: str) -> str:
 # ---------- Bullet / Hanging indent ----------
 @dataclass
 class BulletConfig:
-    show_event_bullet: bool = True     # True: garder le symbole; False: masquer
-    event_bullet_replacement: str | None = None  # ex. "■" ou "▣" ; si None => garder "❑"
-    event_hanging_indent: float = 10.0 # retrait suspendu (pt) pour les événements
+    show_event_bullet: bool = True            # True: garder le symbole; False: masquer
+    event_bullet_replacement: str | None = None  # ex. "■" ; si None => garder l'entrée
+    event_hanging_indent: float = 10.0        # retrait suspendu (pt) pour les événements
+
+
+# ---------- Cadre/fond pour les "DATE" ----------
+@dataclass
+class DateBoxConfig:
+    enabled: bool = False
+    padding: float = 2.0
+    border_width: float = 0.5
+    border_color: str | None = "#000000"
+    back_color: str | None = None
 
 
 # ---------- Helpers communs ----------
@@ -46,39 +57,41 @@ def _strip_head_tail_breaks(s: str) -> str:
     s = re.sub(r"(?:\s*<br/>\s*){3,}", "<br/><br/>", s)
     return s.strip()
 
-def _mk_style_for_kind(base: ParagraphStyle, kind: str, bullet_cfg: BulletConfig) -> ParagraphStyle:
-    """Clone le style de base et applique, pour EVENT, un retrait suspendu."""
+def _mk_style_for_kind(base: ParagraphStyle, kind: str,
+                       bullet_cfg: BulletConfig,
+                       date_box: DateBoxConfig) -> ParagraphStyle:
+    """Clone le style de base et applique, pour EVENT, un retrait suspendu; pour DATE, un cadre/fond optionnel."""
     if kind == "EVENT":
-        st = ParagraphStyle(
+        return ParagraphStyle(
             name=f"{base.name}_event",
             parent=base,
             leftIndent=bullet_cfg.event_hanging_indent,
             firstLineIndent=-bullet_cfg.event_hanging_indent,
         )
-        return st
-    else:
-        return base
+    if kind == "DATE" and date_box.enabled:
+        return ParagraphStyle(
+            name=f"{base.name}_date",
+            parent=base,
+            borderWidth=date_box.border_width,
+            borderColor=HexColor(date_box.border_color) if date_box.border_color else None,
+            backColor=HexColor(date_box.back_color) if date_box.back_color else None,
+            borderPadding=date_box.padding,
+        )
+    return base
 
 def _mk_text_for_kind(raw: str, kind: str, bullet_cfg: BulletConfig) -> str:
     """Prépare le texte: nettoyage, bullet visible/masqué/remplacé, glyphes."""
     txt = _strip_head_tail_breaks(sanitize_inline_markup(raw))
-
     if kind == "EVENT":
-        # On garde le ❑ dans le texte pour un rendu simple & robuste
-        if bullet_cfg.event_bullet_replacement:  # remplacer le symbole d'entrée
+        if bullet_cfg.event_bullet_replacement:
             if _is_event(txt):
                 txt = _BULLET_RE.sub(bullet_cfg.event_bullet_replacement + " ", txt, count=1)
-        elif not bullet_cfg.show_event_bullet:   # masquer le symbole
+        elif not bullet_cfg.show_event_bullet:
             txt = _strip_leading_bullet(txt)
-        # (sinon on garde tel quel, typiquement avec ❑ au début)
-    else:
-        # dates: ne rien changer
-        pass
-
     return apply_glyph_fallbacks(txt)
 
 
-# ---------- Mesure pour la recherche de taille commune (avec espacement & indent) ----------
+# ---------- Mesure pour la recherche de taille commune (avec espacement & styles) ----------
 def measure_fit_at_fs(
     c: canvas.Canvas,
     section: Section,
@@ -87,10 +100,11 @@ def measure_fit_at_fs(
     section_name: str,
     spacing_policy: SpacingPolicy,
     bullet_cfg: BulletConfig,
+    date_box: DateBoxConfig,
 ) -> int:
     """
     Compte combien de paragraphes ENTIERs tiennent dans 'section' à font_size,
-    en intégrant spaceBefore/spaceAfter + retrait suspendu (événements).
+    en intégrant spaceBefore/spaceAfter + hanging indent (EVENT) + cadre/fond (DATE).
     """
     x0 = section.x + inner_pad
     y0 = section.y + inner_pad
@@ -105,7 +119,7 @@ def measure_fit_at_fs(
 
     for raw in paras_text:
         kind = "EVENT" if _is_event(raw) else "DATE"
-        st   = _mk_style_for_kind(base, kind, bullet_cfg)
+        st   = _mk_style_for_kind(base, kind, bullet_cfg, date_box)
         txt  = _mk_text_for_kind(raw, kind, bullet_cfg)
 
         p = Paragraph(txt, st)
@@ -125,7 +139,7 @@ def measure_fit_at_fs(
     return used
 
 
-# ---------- Rendu manuel top-align (sans KeepInFrame) + espacement & indent ----------
+# ---------- Rendu (top-align) avec espacement & styles ----------
 def draw_section_fixed_fs(
     c: canvas.Canvas,
     section: Section,
@@ -134,14 +148,15 @@ def draw_section_fixed_fs(
     section_name: str,
     spacing_policy: SpacingPolicy,
     bullet_cfg: BulletConfig,
+    date_box: DateBoxConfig,
 ) -> Tuple[List[str], float]:
-    """Dessine la section (paragraphes entiers) en top-align STRICT, avec espacement + hanging indent (événements)."""
+    """Dessine la section (paragraphes entiers) en top-align STRICT, avec espacement + hanging indent (EVENT) + cadre/fond (DATE)."""
     # Nettoyage + drop vides
     cleaned: List[str] = []
     for t in paras_text:
-        st = _strip_head_tail_breaks(sanitize_inline_markup(t))
-        if st:
-            cleaned.append(st)
+        stxt = _strip_head_tail_breaks(sanitize_inline_markup(t))
+        if stxt:
+            cleaned.append(stxt)
     if not cleaned:
         return [], font_size
 
@@ -159,7 +174,7 @@ def draw_section_fixed_fs(
     y = y_top
     for raw in cleaned:
         kind = "EVENT" if _is_event(raw) else "DATE"
-        st   = _mk_style_for_kind(base, kind, bullet_cfg)
+        st   = _mk_style_for_kind(base, kind, bullet_cfg, date_box)
         txt  = _mk_text_for_kind(raw, kind, bullet_cfg)
 
         p = Paragraph(txt, st)
@@ -190,8 +205,9 @@ def draw_section_fixed_fs_with_prelude(
     section_name: str,
     spacing_policy: SpacingPolicy,
     bullet_cfg: BulletConfig,
+    date_box: DateBoxConfig,
 ) -> None:
-    """Dessine une préface (suite césurée) PUIS des paragraphes entiers, avec espacement & indent."""
+    """Dessine une préface (suite césurée) PUIS des paragraphes entiers, avec espacement & styles."""
     x0 = section.x + inner_pad
     y0 = section.y + inner_pad
     w  = max(1.0, section.w - 2 * inner_pad)
@@ -219,7 +235,7 @@ def draw_section_fixed_fs_with_prelude(
     # 2) paragraphes entiers
     for raw in (paras_text or []):
         kind = "EVENT" if _is_event(raw) else "DATE"
-        st   = _mk_style_for_kind(base, kind, bullet_cfg)
+        st   = _mk_style_for_kind(base, kind, bullet_cfg, date_box)
         txt  = _mk_text_for_kind(raw, kind, bullet_cfg)
 
         p = Paragraph(txt, st)
@@ -249,8 +265,9 @@ def draw_section_fixed_fs_with_tail(
     section_name: str,
     spacing_policy: SpacingPolicy,
     bullet_cfg: BulletConfig,
+    date_box: DateBoxConfig,
 ) -> None:
-    """Dessine des paragraphes entiers PUIS une 'tail' (fin césurée), avec espacement & indent."""
+    """Dessine des paragraphes entiers PUIS une 'tail' (fin césurée), avec espacement & styles."""
     x0 = section.x + inner_pad
     y0 = section.y + inner_pad
     w  = max(1.0, section.w - 2 * inner_pad)
@@ -267,7 +284,7 @@ def draw_section_fixed_fs_with_tail(
     # 1) paragraphes entiers
     for raw in (paras_text or []):
         kind = "EVENT" if _is_event(raw) else "DATE"
-        st   = _mk_style_for_kind(base, kind, bullet_cfg)
+        st   = _mk_style_for_kind(base, kind, bullet_cfg, date_box)
         txt  = _mk_text_for_kind(raw, kind, bullet_cfg)
 
         p = Paragraph(txt, st)
@@ -308,13 +325,14 @@ def plan_pair_with_split(
     split_min_gain_ratio: float,
     spacing_policy: SpacingPolicy,
     bullet_cfg: BulletConfig,
+    date_box: DateBoxConfig,
 ) -> Tuple[List[str], List[Paragraph], List[Paragraph], List[str], List[str]]:
     """
     Planifie (A puis B) avec UNE césure A→B possible (si gain significatif),
-    en tenant compte des espacements & hanging indent.
+    en tenant compte des espacements, hanging indent et cadre/fond.
     Retourne : A_full, A_tail, B_prelude, B_full, remaining
     """
-    from reportlab.platypus import Paragraph  # locale pour éviter import cycles
+    from reportlab.platypus import Paragraph  # éviter import cycles
 
     wA = max(1.0, secA.w - 2 * inner_pad)
     hA = max(1.0, secA.h - 2 * inner_pad)
@@ -342,7 +360,7 @@ def plan_pair_with_split(
     while i < n and remA > 0:
         raw = paras_text[i]
         kind = "EVENT" if _is_event(raw) else "DATE"
-        stA  = _mk_style_for_kind(base, kind, bullet_cfg)
+        stA  = _mk_style_for_kind(base, kind, bullet_cfg, date_box)
         txtA = _mk_text_for_kind(raw, kind, bullet_cfg)
 
         p = Paragraph(txtA, stA)
@@ -368,21 +386,20 @@ def plan_pair_with_split(
             if parts and len(parts) >= 2:
                 _w0, h0 = parts[0].wrap(wA, avail_for_split_in_A)
                 if h0 >= min_gain_pt:
-                    # Vérifier que le(s) reste(s) tien(nen)t en B
+                    # Vérifier place en B pour les suites
                     needB = 0.0
                     for k in range(1, len(parts)):
                         _wk, hk = parts[k].wrap(wB, remB)
                         needB += hk + spacing_policy.space_after("EVENT", hk)
                     if needB <= remB:
                         # Commit césure
-                        A_tail.append(parts[0])  # première partie (contient le bullet rendu)
+                        A_tail.append(parts[0])
                         remA -= (sbA + h0 + spacing_policy.space_after("EVENT", h0))
                         for k in range(1, len(parts)):
                             _wk, hk = parts[k].wrap(wB, remB)
-                            B_prelude.append(parts[k])  # suites (pas de spaceBefore)
+                            B_prelude.append(parts[k])
                             remB -= (hk + spacing_policy.space_after("EVENT", hk))
                         i += 1
-                # sinon: gain insuffisant -> pas de césure
         # Quoi qu'il arrive, on s'arrête pour A (paragraphe entier ira à B)
         break
 
@@ -390,7 +407,7 @@ def plan_pair_with_split(
     while i < n and remB > 0:
         raw = paras_text[i]
         kind = "EVENT" if _is_event(raw) else "DATE"
-        stB  = _mk_style_for_kind(base, kind, bullet_cfg)
+        stB  = _mk_style_for_kind(base, kind, bullet_cfg, date_box)
         txtB = _mk_text_for_kind(raw, kind, bullet_cfg)
 
         q = Paragraph(txtB, stB)
