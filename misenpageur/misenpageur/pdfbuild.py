@@ -83,7 +83,7 @@ def build_pdf(project_root: str, cfg: Config, layout: Layout, out_path: str) -> 
     S = layout.sections
 
     # --- Chercher la plus grande taille commune fs telle que tout rentre (sans césure) ---
-    order_fs = ["S5", "S6", "S3", "S4"]  # ordre logique pour la mesure
+    order_fs = ["S5", "S6", "S3", "S4"]
     lo, hi = cfg.font_size_min, cfg.font_size_max
     best_fs = lo
     for _ in range(24):  # binaire
@@ -116,22 +116,40 @@ def build_pdf(project_root: str, cfg: Config, layout: Layout, out_path: str) -> 
     if rest_after_p1:
         print(f"[WARN] {len(rest_after_p1)} paragraphes non placés (réduire font_size_max ou ajuster layout).")
 
+    # --- Prépare la config d'espacement ---
+    spacing_cfg = {
+        "date_spaceBefore": getattr(cfg, "date_spaceBefore", 6.0),
+        "date_spaceAfter": getattr(cfg, "date_spaceAfter", 3.0),
+        "event_spaceBefore": getattr(cfg, "event_spaceBefore", 1.0),
+        "event_spaceAfter": getattr(cfg, "event_spaceAfter", 1.0),
+        "event_spaceAfter_perLine": getattr(cfg, "event_spaceAfter_perLine", 0.4),
+        "min_event_spaceAfter": getattr(cfg, "min_event_spaceAfter", 1.0),
+        "first_non_event_spaceBefore_in_S5": getattr(cfg, "first_non_event_spaceBefore_in_S5", 0.0),
+    }
+
     # --- RENDU : PAGE 1 (S1,S2 puis S3,S4) ---
     draw_s1(c, S["S1"], ours_text, logos, cfg.font_name, cfg.leading_ratio, cfg.inner_padding, layout.s1_split)
     draw_s2_cover(c, S["S2"], cover_path, cfg.inner_padding)
 
-    # S3 : paragraphes entiers puis éventuelle 'tail'
-    draw_section_fixed_fs_with_tail(c, S["S3"], s3_full, s3_tail, cfg.font_name, best_fs, cfg.leading_ratio, cfg.inner_padding)
-    # S4 : éventuelle 'préface' puis paragraphes entiers
-    draw_section_fixed_fs_with_prelude(c, S["S4"], s4_prelude, s4_full, cfg.font_name, best_fs, cfg.leading_ratio, cfg.inner_padding)
-
+    draw_section_fixed_fs_with_tail(
+        c, S["S3"], s3_full, s3_tail, cfg.font_name, best_fs, cfg.leading_ratio, cfg.inner_padding,
+        section_name="S3", spacing=spacing_cfg
+    )
+    draw_section_fixed_fs_with_prelude(
+        c, S["S4"], s4_prelude, s4_full, cfg.font_name, best_fs, cfg.leading_ratio, cfg.inner_padding,
+        section_name="S4", spacing=spacing_cfg
+    )
     c.showPage()
 
     # --- RENDU : PAGE 2 (S5 | S6) ---
-    # S5 : paragraphes entiers puis éventuelle 'tail'
-    draw_section_fixed_fs_with_tail(c, S["S5"], s5_full, s5_tail, cfg.font_name, best_fs, cfg.leading_ratio, cfg.inner_padding)
-    # S6 : éventuelle 'préface' puis paragraphes entiers
-    draw_section_fixed_fs_with_prelude(c, S["S6"], s6_prelude, s6_full, cfg.font_name, best_fs, cfg.leading_ratio, cfg.inner_padding)
+    draw_section_fixed_fs_with_tail(
+        c, S["S5"], s5_full, s5_tail, cfg.font_name, best_fs, cfg.leading_ratio, cfg.inner_padding,
+        section_name="S5", spacing=spacing_cfg
+    )
+    draw_section_fixed_fs_with_prelude(
+        c, S["S6"], s6_prelude, s6_full, cfg.font_name, best_fs, cfg.leading_ratio, cfg.inner_padding,
+        section_name="S6", spacing=spacing_cfg
+    )
 
     # Finaliser
     c.save()

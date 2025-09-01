@@ -19,7 +19,7 @@ def parse_args():
     p.add_argument("--root", default=".", help="Racine du projet (contient config.yml, layout.yml)")
     p.add_argument("--config", default="config.yml", help="Chemin du fichier de configuration YAML")
     p.add_argument("--layout", default="layout.yml", help="Chemin du fichier de layout YAML")
-    p.add_argument("--out", default="bidul/bidul.pdf", help="Chemin de sortie PDF (écrase output_pdf du config si fourni)")
+    p.add_argument("--out", default="bidul/bidul_bullets.pdf", help="Chemin de sortie PDF (écrase output_pdf du config si fourni)")
     return p.parse_args()
 
 def main():

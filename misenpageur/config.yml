@@ -6,7 +6,7 @@
 month_label: "2025-09"
 
 # Chemins relatifs à la racine du projet
-input_html: "fichier_biduleur/biduleur.html"   # fichier HTML source
+input_html: "fichier_biduleur/biduleur_bullets.html"   # fichier HTML source
 template_pdf: "templates/bidul_template.pdf"  # gabarit optionnel (non utilisé en sortie ici)
 output_pdf: "bidul/bidul_prototype.pdf"      # chemin du PDF généré
 
@@ -23,8 +23,8 @@ ours_md: "assets/ours/ours.md"   # fichier texte constant (ours)
 font_name: "Arial Narrow"
 
 # Taille de police : min/max autorisées pour le shrink
-font_size_min: 5.5
-font_size_max: 11.0
+font_size_min: 5
+font_size_max: 12.0
 
 # Ratio entre taille et interligne (leading = font_size * leading_ratio)
 leading_ratio: 1.12
@@ -50,3 +50,13 @@ text_sections_order:
   - "S4"
 
 split_min_gain_ratio: 0.10   # n’autoriser la césure A→B que si elle comble ≥10% de la hauteur de la section A (et ≥1 ligne)
+
+# Espacement (pt)
+date_spaceBefore: 3
+date_spaceAfter: 3
+event_spaceBefore: 1
+event_spaceAfter: 1
+event_spaceAfter_perLine: 0.4
+min_event_spaceAfter: 1
+# Spécifique à S5 : pas de marge avant pour la 1re ligne non-événement (ex. "En bref")
+first_non_event_spaceBefore_in_S5: 0

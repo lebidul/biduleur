@@ -144,14 +144,6 @@ misenpageur/
 
 ---
 
-## Variante InDesign (optionnelle)
-
-Un flux ExtendScript peut piloter un `.indd` avec des cadres nommés (`S1_LOGOS`, `S1_OURS`, `S2_COVER`, `S5`, `S6`, `S3`, `S4`) : injection du texte HTML, chaînage **S5→S6→S3→S4**, ajustement de corps jusqu’à disparition du surdébordement, placement des logos et de l’ours.
-
-> Si besoin, on peut fournir un `indesign_flow.jsx` adapté à votre gabarit.
-
----
-
 ## Conseils & Dépannage
 
 * **Arial Narrow non trouvée** : message `[WARN] Arial Narrow introuvable - fallback Helvetica.`
