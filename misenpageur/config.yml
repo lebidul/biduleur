@@ -1,0 +1,50 @@
+# =========================
+# Configuration mensuelle
+# =========================
+
+# Label du mois (optionnel, juste pour les logs)
+month_label: "2025-09"
+
+# Chemins relatifs à la racine du projet
+input_html: "fichier_biduleur/biduleur.html"   # fichier HTML source
+template_pdf: "templates/bidul_template.pdf"  # gabarit optionnel (non utilisé en sortie ici)
+output_pdf: "bidul/bidul_prototype.pdf"      # chemin du PDF généré
+
+logos_dir: "assets/logos"   # dossier contenant jusqu'à 10 logos
+cover_image: "assets/couv/couverture.png"  # image de couverture
+ours_md: "assets/ours/ours.md"   # fichier texte constant (ours)
+
+# =========================
+# Paramètres typographiques
+# =========================
+
+# Police utilisée (assure-toi que ArialNarrow est installée et déclarée dans ReportLab,
+# sinon change pour Helvetica ou Liberation Sans Narrow)
+font_name: "Arial Narrow"
+
+# Taille de police : min/max autorisées pour le shrink
+font_size_min: 5.5
+font_size_max: 11.0
+
+# Ratio entre taille et interligne (leading = font_size * leading_ratio)
+leading_ratio: 1.12
+
+# =========================
+# Marges internes
+# =========================
+
+# Pour ne PAS avoir de marge → 0
+inner_padding: 2
+
+# =========================
+# Répartition du texte HTML
+# =========================
+
+# Ordre d’alimentation des sections texte
+# (attention: le rendu final est en 2 pages :
+#  page 1 = S1,S2,S3,S4 ; page 2 = S5,S6,S7,S8)
+text_sections_order:
+  - "S5"
+  - "S6"
+  - "S3"
+  - "S4"
