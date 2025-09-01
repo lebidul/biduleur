@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    @page {
+      size: A4;
+      margin: 0;
+    }
+    body {
+      font-family: Arial, sans-serif;
+      width: 210mm;
+      height: 297mm;
+      display: flex;
+      flex-wrap: wrap;
+    }
+    .section {
+      width: 148.5mm;
+      height: 210mm;
+      box-sizing: border-box;
+      padding: 5mm;
+      overflow: hidden;
+      font-size: 10pt;
+      line-height: 1.2;
+    }
+    .logos {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 2mm;
+      margin-bottom: 5mm;
+    }
+    .logos img {
+      max-width: 30mm;
+      max-height: 30mm;
+    }
+    .texte-constant {
+      margin-top: 5mm;
+      font-size: 10pt;
+    }
+    .event {
+      margin-bottom: 3mm;
+    }
+  </style>
+</head>
+<body>
+  <!-- Section 1 : Logos + texte constant -->
+  <div class="section">
+    <div class="logos">
+      {% for logo in logos %}
+      <img src="{{ logo }}">
+      {% endfor %}
+    </div>
+    <div class="texte-constant">{{ texte_constant }}</div>
+  </div>
+
+  <!-- Section 2 : Image de couverture -->
+  <div class="section">
+    <img src="{{ image_couverture }}" width="100%" height="100%">
+  </div>
+
+  <!-- Sections 3 à 8 : Blocs d'événements -->
+  {% for bloc in blocs %}
+  <div class="section">
+    {% for event in bloc %}<div class="event">{{ event|safe }}</div>{% endfor %}
+  </div>
+  {% endfor %}
+</body>
+</html>
