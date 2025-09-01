@@ -69,7 +69,7 @@ event_hanging_indent: 10
 
 # Date box (bloc)
 date_box:
-  enabled: true
+  enabled: false
   padding: 3
   border_width: 0
   border_color: "#000000"

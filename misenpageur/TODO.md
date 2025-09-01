@@ -5,7 +5,7 @@
 - [ ] Intégration Scribus
 - [ ] Config ours, logos, cucaracha
 - [ ] Poster (page 3)
-- [] Qualité pdf
+- [ ] Qualité pdf
 - [ ] Unit tests
 
 ## Priorité Moyenne
