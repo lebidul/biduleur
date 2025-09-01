@@ -2,17 +2,18 @@
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from typing import List, Tuple
 
 from reportlab.pdfgen import canvas
 from reportlab.platypus import Paragraph
-from reportlab.pdfbase import pdfmetrics
+from reportlab.lib.styles import ParagraphStyle
 
 from .layout import Section
 from .drawing import paragraph_style
 from .html_utils import sanitize_inline_markup
 from .glyphs import apply_glyph_fallbacks
-from .spacing import SpacingPolicy, SpacingConfig
+from .spacing import SpacingPolicy
 
 
 # ---------- Classification "date" vs "événement" ----------
@@ -23,9 +24,19 @@ _BULLET_RE = re.compile(r'^\s*(?:❑|□|■|&#9643;)\s*', re.I)
 def _is_event(raw: str) -> bool:
     return bool(_BULLET_RE.match(raw or ""))
 
+def _strip_leading_bullet(raw: str) -> str:
+    return _BULLET_RE.sub("", raw or "", count=1)
+
+
+# ---------- Bullet / Hanging indent ----------
+@dataclass
+class BulletConfig:
+    show_event_bullet: bool = True     # True: garder le symbole; False: masquer
+    event_bullet_replacement: str | None = None  # ex. "■" ou "▣" ; si None => garder "❑"
+    event_hanging_indent: float = 10.0 # retrait suspendu (pt) pour les événements
+
 
 # ---------- Helpers communs ----------
-
 def _strip_head_tail_breaks(s: str) -> str:
     """Retire <br/> de tête/queue et compresse les suites."""
     if not s:
@@ -35,14 +46,39 @@ def _strip_head_tail_breaks(s: str) -> str:
     s = re.sub(r"(?:\s*<br/>\s*){3,}", "<br/><br/>", s)
     return s.strip()
 
-def _mk_para(txt: str, font_name: str, font_size: float, leading_ratio: float) -> Paragraph:
-    style = paragraph_style(font_name, font_size, leading_ratio)
-    cleaned = _strip_head_tail_breaks(sanitize_inline_markup(txt))
-    return Paragraph(apply_glyph_fallbacks(cleaned), style)
+def _mk_style_for_kind(base: ParagraphStyle, kind: str, bullet_cfg: BulletConfig) -> ParagraphStyle:
+    """Clone le style de base et applique, pour EVENT, un retrait suspendu."""
+    if kind == "EVENT":
+        st = ParagraphStyle(
+            name=f"{base.name}_event",
+            parent=base,
+            leftIndent=bullet_cfg.event_hanging_indent,
+            firstLineIndent=-bullet_cfg.event_hanging_indent,
+        )
+        return st
+    else:
+        return base
+
+def _mk_text_for_kind(raw: str, kind: str, bullet_cfg: BulletConfig) -> str:
+    """Prépare le texte: nettoyage, bullet visible/masqué/remplacé, glyphes."""
+    txt = _strip_head_tail_breaks(sanitize_inline_markup(raw))
+
+    if kind == "EVENT":
+        # On garde le ❑ dans le texte pour un rendu simple & robuste
+        if bullet_cfg.event_bullet_replacement:  # remplacer le symbole d'entrée
+            if _is_event(txt):
+                txt = _BULLET_RE.sub(bullet_cfg.event_bullet_replacement + " ", txt, count=1)
+        elif not bullet_cfg.show_event_bullet:   # masquer le symbole
+            txt = _strip_leading_bullet(txt)
+        # (sinon on garde tel quel, typiquement avec ❑ au début)
+    else:
+        # dates: ne rien changer
+        pass
+
+    return apply_glyph_fallbacks(txt)
 
 
-# ---------- Mesure pour la recherche de taille commune (avec espacement) ----------
-
+# ---------- Mesure pour la recherche de taille commune (avec espacement & indent) ----------
 def measure_fit_at_fs(
     c: canvas.Canvas,
     section: Section,
@@ -50,10 +86,11 @@ def measure_fit_at_fs(
     font_name: str, font_size: float, leading_ratio: float, inner_pad: float,
     section_name: str,
     spacing_policy: SpacingPolicy,
+    bullet_cfg: BulletConfig,
 ) -> int:
     """
     Compte combien de paragraphes ENTIERs tiennent dans 'section' à font_size,
-    en intégrant spaceBefore/spaceAfter via spacing_policy.
+    en intégrant spaceBefore/spaceAfter + retrait suspendu (événements).
     """
     x0 = section.x + inner_pad
     y0 = section.y + inner_pad
@@ -64,16 +101,20 @@ def measure_fit_at_fs(
     used = 0
     first_non_event_seen_in_S5 = False
 
-    for t in paras_text:
-        p = _mk_para(t, font_name, font_size, leading_ratio)
+    base = paragraph_style(font_name, font_size, leading_ratio)
+
+    for raw in paras_text:
+        kind = "EVENT" if _is_event(raw) else "DATE"
+        st   = _mk_style_for_kind(base, kind, bullet_cfg)
+        txt  = _mk_text_for_kind(raw, kind, bullet_cfg)
+
+        p = Paragraph(txt, st)
         _w, ph = p.wrap(w, 1e6)
 
-        kind = "EVENT" if _is_event(t) else "DATE"
-        sb = spacing_policy.space_before(kind if kind=="DATE" else "EVENT",
-                                         section_name, first_non_event_seen_in_S5)
+        sb = spacing_policy.space_before(kind, section_name, first_non_event_seen_in_S5)
         if section_name == "S5" and kind == "DATE" and not first_non_event_seen_in_S5:
             first_non_event_seen_in_S5 = True
-        sa = spacing_policy.space_after(kind if kind=="DATE" else "EVENT", ph)
+        sa = spacing_policy.space_after(kind, ph)
 
         need = sb + ph + sa
         if (y - need) < y0:
@@ -84,8 +125,7 @@ def measure_fit_at_fs(
     return used
 
 
-# ---------- Rendu manuel top-align (sans KeepInFrame) + espacement ----------
-
+# ---------- Rendu manuel top-align (sans KeepInFrame) + espacement & indent ----------
 def draw_section_fixed_fs(
     c: canvas.Canvas,
     section: Section,
@@ -93,8 +133,9 @@ def draw_section_fixed_fs(
     font_name: str, font_size: float, leading_ratio: float, inner_pad: float,
     section_name: str,
     spacing_policy: SpacingPolicy,
+    bullet_cfg: BulletConfig,
 ) -> Tuple[List[str], float]:
-    """Dessine la section (paragraphes entiers) en top-align STRICT, avec espacement date/événement."""
+    """Dessine la section (paragraphes entiers) en top-align STRICT, avec espacement + hanging indent (événements)."""
     # Nettoyage + drop vides
     cleaned: List[str] = []
     for t in paras_text:
@@ -110,7 +151,7 @@ def draw_section_fixed_fs(
     h  = max(1.0, section.h - 2 * inner_pad)
     y_top = y0 + h
 
-    style = paragraph_style(font_name, font_size, leading_ratio)
+    base = paragraph_style(font_name, font_size, leading_ratio)
 
     first_non_event_seen_in_S5 = False
 
@@ -118,7 +159,10 @@ def draw_section_fixed_fs(
     y = y_top
     for raw in cleaned:
         kind = "EVENT" if _is_event(raw) else "DATE"
-        p = Paragraph(apply_glyph_fallbacks(raw), style)
+        st   = _mk_style_for_kind(base, kind, bullet_cfg)
+        txt  = _mk_text_for_kind(raw, kind, bullet_cfg)
+
+        p = Paragraph(txt, st)
         _w, ph = p.wrap(w, h)
 
         sb = spacing_policy.space_before(kind, section_name, first_non_event_seen_in_S5)
@@ -126,8 +170,8 @@ def draw_section_fixed_fs(
             first_non_event_seen_in_S5 = True
         sa = spacing_policy.space_after(kind, ph)
 
-        needed = sb + ph + sa
-        if (y - needed) < y0:
+        need = sb + ph + sa
+        if (y - need) < y0:
             break
         y -= sb
         p.drawOn(c, x0, y - ph)
@@ -145,8 +189,9 @@ def draw_section_fixed_fs_with_prelude(
     font_name: str, font_size: float, leading_ratio: float, inner_pad: float,
     section_name: str,
     spacing_policy: SpacingPolicy,
+    bullet_cfg: BulletConfig,
 ) -> None:
-    """Dessine une préface (suite césurée) PUIS des paragraphes entiers, avec espacement."""
+    """Dessine une préface (suite césurée) PUIS des paragraphes entiers, avec espacement & indent."""
     x0 = section.x + inner_pad
     y0 = section.y + inner_pad
     w  = max(1.0, section.w - 2 * inner_pad)
@@ -160,7 +205,7 @@ def draw_section_fixed_fs_with_prelude(
     c.saveState()
     y = y_top
 
-    # 1) préface : pas de spaceBefore ; petit spaceAfter comme un EVENT "continuation"
+    # 1) préface (continuation : pas de spaceBefore ; on considère EVENT pour spaceAfter)
     for pf in prelude_flows or []:
         _w, ph = pf.wrap(w, h)
         sa = spacing_policy.space_after("EVENT", ph)
@@ -174,7 +219,10 @@ def draw_section_fixed_fs_with_prelude(
     # 2) paragraphes entiers
     for raw in (paras_text or []):
         kind = "EVENT" if _is_event(raw) else "DATE"
-        p = Paragraph(apply_glyph_fallbacks(_strip_head_tail_breaks(sanitize_inline_markup(raw))), base)
+        st   = _mk_style_for_kind(base, kind, bullet_cfg)
+        txt  = _mk_text_for_kind(raw, kind, bullet_cfg)
+
+        p = Paragraph(txt, st)
         _w, ph = p.wrap(w, h)
 
         sb = spacing_policy.space_before(kind, section_name, first_non_event_seen_in_S5)
@@ -200,8 +248,9 @@ def draw_section_fixed_fs_with_tail(
     font_name: str, font_size: float, leading_ratio: float, inner_pad: float,
     section_name: str,
     spacing_policy: SpacingPolicy,
+    bullet_cfg: BulletConfig,
 ) -> None:
-    """Dessine des paragraphes entiers PUIS une 'tail' (fin césurée), avec espacement."""
+    """Dessine des paragraphes entiers PUIS une 'tail' (fin césurée), avec espacement & indent."""
     x0 = section.x + inner_pad
     y0 = section.y + inner_pad
     w  = max(1.0, section.w - 2 * inner_pad)
@@ -218,7 +267,10 @@ def draw_section_fixed_fs_with_tail(
     # 1) paragraphes entiers
     for raw in (paras_text or []):
         kind = "EVENT" if _is_event(raw) else "DATE"
-        p = Paragraph(apply_glyph_fallbacks(_strip_head_tail_breaks(sanitize_inline_markup(raw))), base)
+        st   = _mk_style_for_kind(base, kind, bullet_cfg)
+        txt  = _mk_text_for_kind(raw, kind, bullet_cfg)
+
+        p = Paragraph(txt, st)
         _w, ph = p.wrap(w, h)
 
         sb = spacing_policy.space_before(kind, section_name, first_non_event_seen_in_S5)
@@ -255,19 +307,22 @@ def plan_pair_with_split(
     font_name: str, font_size: float, leading_ratio: float, inner_pad: float,
     split_min_gain_ratio: float,
     spacing_policy: SpacingPolicy,
+    bullet_cfg: BulletConfig,
 ) -> Tuple[List[str], List[Paragraph], List[Paragraph], List[str], List[str]]:
     """
     Planifie (A puis B) avec UNE césure A→B possible (si gain significatif),
-    en tenant compte des espacement (spaceBefore/After) pour la place disponible.
+    en tenant compte des espacements & hanging indent.
     Retourne : A_full, A_tail, B_prelude, B_full, remaining
     """
+    from reportlab.platypus import Paragraph  # locale pour éviter import cycles
+
     wA = max(1.0, secA.w - 2 * inner_pad)
     hA = max(1.0, secA.h - 2 * inner_pad)
     wB = max(1.0, secB.w - 2 * inner_pad)
     hB = max(1.0, secB.h - 2 * inner_pad)
 
-    style = paragraph_style(font_name, font_size, leading_ratio)
-    min_gain_pt = max(split_min_gain_ratio * hA, 0.9 * style.leading)
+    base = paragraph_style(font_name, font_size, leading_ratio)
+    min_gain_pt = max(split_min_gain_ratio * hA, 0.9 * base.leading)
 
     remA = hA
     remB = hB
@@ -280,15 +335,18 @@ def plan_pair_with_split(
     i = 0
     n = len(paras_text)
 
-    first_non_event_seen_in_S5_A = False  # S5 only
+    first_non_event_seen_in_S5_A = False
     first_non_event_seen_in_S5_B = False
 
     # Remplir A (entier + éventuelle césure)
     while i < n and remA > 0:
         raw = paras_text[i]
-        p = Paragraph(apply_glyph_fallbacks(_strip_head_tail_breaks(sanitize_inline_markup(raw))), style)
-        _w, ph = p.wrap(wA, 1e6)
         kind = "EVENT" if _is_event(raw) else "DATE"
+        stA  = _mk_style_for_kind(base, kind, bullet_cfg)
+        txtA = _mk_text_for_kind(raw, kind, bullet_cfg)
+
+        p = Paragraph(txtA, stA)
+        _w, ph = p.wrap(wA, 1e6)
 
         sbA = spacing_policy.space_before(kind, nameA, first_non_event_seen_in_S5_A)
         if nameA == "S5" and kind == "DATE" and not first_non_event_seen_in_S5_A:
@@ -303,39 +361,40 @@ def plan_pair_with_split(
             i += 1
             continue
 
-        # Trop grand pour A -> tenter césure A→B si le gain en A est significatif
-        # Hauteur disponible pour la "miette" dans A (hors saA, qu'on veut garder après)
-        avail_for_split_in_A = max(0.0, remA - sbA - spacing_policy.space_after("EVENT", style.leading))
+        # Trop grand pour A -> tenter césure A→B (gain significatif)
+        avail_for_split_in_A = max(0.0, remA - sbA - spacing_policy.space_after("EVENT", base.leading))
         if avail_for_split_in_A > 0 and (ph > avail_for_split_in_A) and (ph <= (remA + remB)):
             parts = p.split(wA, avail_for_split_in_A)
             if parts and len(parts) >= 2:
                 _w0, h0 = parts[0].wrap(wA, avail_for_split_in_A)
                 if h0 >= min_gain_pt:
-                    # Vérifier que le(s) reste(s) tien(nen)t en B (préface), avec spaceAfter pour chaque morceau
-                    needed_B = 0.0
+                    # Vérifier que le(s) reste(s) tien(nen)t en B
+                    needB = 0.0
                     for k in range(1, len(parts)):
                         _wk, hk = parts[k].wrap(wB, remB)
-                        needed_B += hk + spacing_policy.space_after("EVENT", hk)
-                    if needed_B <= remB:
+                        needB += hk + spacing_policy.space_after("EVENT", hk)
+                    if needB <= remB:
                         # Commit césure
-                        A_tail.append(parts[0])
-                        remA -= (sbA + h0 + spacing_policy.space_after("EVENT", h0))  # on réserve la fin en A
-                        # Préface en B
+                        A_tail.append(parts[0])  # première partie (contient le bullet rendu)
+                        remA -= (sbA + h0 + spacing_policy.space_after("EVENT", h0))
                         for k in range(1, len(parts)):
                             _wk, hk = parts[k].wrap(wB, remB)
-                            B_prelude.append(parts[k])
+                            B_prelude.append(parts[k])  # suites (pas de spaceBefore)
                             remB -= (hk + spacing_policy.space_after("EVENT", hk))
                         i += 1
                 # sinon: gain insuffisant -> pas de césure
-        # Quoi qu'il arrive, on s'arrête sur ce paragraphe pour A (entier ira à B)
+        # Quoi qu'il arrive, on s'arrête pour A (paragraphe entier ira à B)
         break
 
     # Remplir B (préface déjà comptée), avec des paragraphes ENTIERs
     while i < n and remB > 0:
         raw = paras_text[i]
-        q = Paragraph(apply_glyph_fallbacks(_strip_head_tail_breaks(sanitize_inline_markup(raw))), style)
-        _w, hq = q.wrap(wB, 1e6)
         kind = "EVENT" if _is_event(raw) else "DATE"
+        stB  = _mk_style_for_kind(base, kind, bullet_cfg)
+        txtB = _mk_text_for_kind(raw, kind, bullet_cfg)
+
+        q = Paragraph(txtB, stB)
+        _w, hq = q.wrap(wB, 1e6)
 
         sbB = spacing_policy.space_before(kind, nameB, first_non_event_seen_in_S5_B)
         if nameB == "S5" and kind == "DATE" and not first_non_event_seen_in_S5_B:

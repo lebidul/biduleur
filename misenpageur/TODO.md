@@ -1,14 +1,15 @@
 # Liste des TODOs et Améliorations Futures
 
 ## Priorité Élevée
-- [ ] Workflow global. xls -> pdf
-- [ ] Export Supro
+- [ ] Workflow global. csv/xls/xlsx (biduleur) -> pdf (misenpageur)
+- [ ] Intégration Scribus
 - [ ] Config ours, logos, cucaracha
 - [ ] Poster (page 3)
+- [] Qualité pdf
 - [ ] Unit tests
 
 ## Priorité Moyenne
-- [ ] Amélioration lisibilité finale (caractère de bullet point comme paramètre)
+- [ ] Amélioration lisibilité finale (ex. caractère de bullet point comme paramètre, cadre pour date)
 - [ ] Options d’hyphénation pour rendre des strings insécables
 
 

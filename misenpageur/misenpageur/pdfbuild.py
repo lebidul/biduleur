@@ -9,10 +9,11 @@ from reportlab.pdfgen import canvas
 from .config import Config
 from .layout import Layout
 from .html_utils import extract_paragraphs_from_html
-from .drawing import draw_s1, draw_s2_cover, list_images
+from .drawing import draw_s1, draw_s2_cover, list_images, paragraph_style
 from .fonts import register_arial_narrow, register_dejavu_sans
 from .spacing import SpacingConfig, SpacingPolicy
 from .textflow import (
+    BulletConfig,
     measure_fit_at_fs,
     draw_section_fixed_fs,
     draw_section_fixed_fs_with_prelude,
@@ -32,6 +33,7 @@ def _simulate_allocation_at_fs(
     c: canvas.Canvas, S, order: List[str], paras: List[str],
     font_name: str, font_size: float, leading_ratio: float, inner_pad: float,
     spacing_policy: SpacingPolicy,
+    bullet_cfg: BulletConfig,
 ) -> Tuple[dict, int]:
     remaining = list(paras)
     used_by = {}
@@ -39,7 +41,7 @@ def _simulate_allocation_at_fs(
     for name in order:
         k = measure_fit_at_fs(
             c, S[name], remaining, font_name, font_size, leading_ratio, inner_pad,
-            section_name=name, spacing_policy=spacing_policy
+            section_name=name, spacing_policy=spacing_policy, bullet_cfg=bullet_cfg
         )
         used_by[name] = remaining[:k]
         total += k
@@ -87,7 +89,7 @@ def build_pdf(project_root: str, cfg: Config, layout: Layout, out_path: str) -> 
 
     S = layout.sections
 
-    # --- Spacing Policy (config -> policy) ---
+    # --- Spacing Policy ---
     spacing_cfg = SpacingConfig(
         date_spaceBefore=getattr(cfg, "date_spaceBefore", 6.0),
         date_spaceAfter=getattr(cfg, "date_spaceAfter", 3.0),
@@ -97,12 +99,14 @@ def build_pdf(project_root: str, cfg: Config, layout: Layout, out_path: str) -> 
         min_event_spaceAfter=getattr(cfg, "min_event_spaceAfter", 1.0),
         first_non_event_spaceBefore_in_S5=getattr(cfg, "first_non_event_spaceBefore_in_S5", 0.0),
     )
-    # leading provisoire pour initialiser la policy pendant la recherche fs
-    from .drawing import paragraph_style
-    tmp_style = paragraph_style(cfg.font_name, cfg.font_size_max, cfg.leading_ratio)
-    spacing_policy_for_search = SpacingPolicy(spacing_cfg, tmp_style.leading)
+    # Bullet / Hanging indent
+    bullet_cfg = BulletConfig(
+        show_event_bullet=getattr(cfg, "show_event_bullet", True),
+        event_bullet_replacement=getattr(cfg, "event_bullet_replacement", None),
+        event_hanging_indent=getattr(cfg, "event_hanging_indent", 10.0),
+    )
 
-    # --- Chercher la plus grande taille commune fs telle que tout rentre (mesure AVEC espacement) ---
+    # --- Chercher la plus grande taille commune fs (mesure AVEC spacing + indent) ---
     order_fs = ["S5", "S6", "S3", "S4"]
     lo, hi = cfg.font_size_min, cfg.font_size_max
     best_fs = lo
@@ -113,7 +117,7 @@ def build_pdf(project_root: str, cfg: Config, layout: Layout, out_path: str) -> 
 
         _alloc, tot = _simulate_allocation_at_fs(
             c, S, order_fs, paras, cfg.font_name, mid, cfg.leading_ratio, cfg.inner_padding,
-            spacing_policy=spacing_mid
+            spacing_policy=spacing_mid, bullet_cfg=bullet_cfg
         )
         if tot >= len(paras):
             best_fs = mid
@@ -123,24 +127,24 @@ def build_pdf(project_root: str, cfg: Config, layout: Layout, out_path: str) -> 
         if abs(hi - lo) < 0.05:
             break
 
-    # Seuil de césure "utile" (configurable)
-    split_min_gain_ratio = getattr(cfg, "split_min_gain_ratio", 0.10)
-    # Policy finale (à best_fs)
+    # Policies finales (à best_fs)
     final_style = paragraph_style(cfg.font_name, best_fs, cfg.leading_ratio)
     spacing_policy = SpacingPolicy(spacing_cfg, final_style.leading)
 
-    # --- PLANIFICATION par paires avec césure contrôlée (gain significatif) ---
+    # Seuil de césure "utile"
+    split_min_gain_ratio = getattr(cfg, "split_min_gain_ratio", 0.10)
+
+    # --- PLANIFICATION par paires avec césure contrôlée ---
     # Paire page 2 : S5 -> S6
     s5_full, s5_tail, s6_prelude, s6_full, rest_after_p2 = plan_pair_with_split(
         c, S["S5"], S["S6"], "S5", "S6", paras, cfg.font_name, best_fs, cfg.leading_ratio, cfg.inner_padding,
-        split_min_gain_ratio=split_min_gain_ratio, spacing_policy=spacing_policy
+        split_min_gain_ratio=split_min_gain_ratio, spacing_policy=spacing_policy, bullet_cfg=bullet_cfg
     )
-    # Paire page 1 (bas) : S3 -> S4 sur le reste
+    # Paire page 1 (bas) : S3 -> S4
     s3_full, s3_tail, s4_prelude, s4_full, rest_after_p1 = plan_pair_with_split(
         c, S["S3"], S["S4"], "S3", "S4", rest_after_p2, cfg.font_name, best_fs, cfg.leading_ratio, cfg.inner_padding,
-        split_min_gain_ratio=split_min_gain_ratio, spacing_policy=spacing_policy
+        split_min_gain_ratio=split_min_gain_ratio, spacing_policy=spacing_policy, bullet_cfg=bullet_cfg
     )
-
     if rest_after_p1:
         print(f"[WARN] {len(rest_after_p1)} paragraphes non placés (réduire font_size_max ou ajuster layout).")
 
@@ -150,22 +154,22 @@ def build_pdf(project_root: str, cfg: Config, layout: Layout, out_path: str) -> 
 
     draw_section_fixed_fs_with_tail(
         c, S["S3"], s3_full, s3_tail, cfg.font_name, best_fs, cfg.leading_ratio, cfg.inner_padding,
-        section_name="S3", spacing_policy=spacing_policy
+        section_name="S3", spacing_policy=spacing_policy, bullet_cfg=bullet_cfg
     )
     draw_section_fixed_fs_with_prelude(
         c, S["S4"], s4_prelude, s4_full, cfg.font_name, best_fs, cfg.leading_ratio, cfg.inner_padding,
-        section_name="S4", spacing_policy=spacing_policy
+        section_name="S4", spacing_policy=spacing_policy, bullet_cfg=bullet_cfg
     )
     c.showPage()
 
     # --- RENDU : PAGE 2 ---
     draw_section_fixed_fs_with_tail(
         c, S["S5"], s5_full, s5_tail, cfg.font_name, best_fs, cfg.leading_ratio, cfg.inner_padding,
-        section_name="S5", spacing_policy=spacing_policy
+        section_name="S5", spacing_policy=spacing_policy, bullet_cfg=bullet_cfg
     )
     draw_section_fixed_fs_with_prelude(
         c, S["S6"], s6_prelude, s6_full, cfg.font_name, best_fs, cfg.leading_ratio, cfg.inner_padding,
-        section_name="S6", spacing_policy=spacing_policy
+        section_name="S6", spacing_policy=spacing_policy, bullet_cfg=bullet_cfg
     )
 
     # Finaliser
