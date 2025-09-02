@@ -1,8 +1,9 @@
 # Liste des TODOs et Améliorations Futures
 
 ## Priorité Élevée
-- [ ] Workflow global. csv/xls/xlsx (biduleur) -> pdf (misenpageur)
-- [ ] Intégration Scribus
+- [x] Workflow global. csv/xls/xlsx (biduleur) -> pdf (misenpageur)
+- [x] Intégration Scribus
+- [ ] Fichier .sla comme argument dans cli
 - [ ] Config ours, logos, cucaracha
 - [ ] Poster (page 3)
 - [ ] Qualité pdf
