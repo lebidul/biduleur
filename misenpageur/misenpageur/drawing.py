@@ -1,688 +1,524 @@
+# drawing.py
 # -*- coding: utf-8 -*-
+"""
+S1 : colonne LOGOS (gauche) + OURS "rich" (droite)
+
+- La colonne logos utilise TOUTE la hauteur de la section.
+- L'ours est top-aligned, avec icônes mappées depuis le YAML
+  (ours_rich.icons) et QR code cliquable.
+- Compatible avec fonts custom : conf["fonts"] = {"regular": "...", "bold": "..."}.
+- Debug : conf["debug_boxes"] = True affiche les cadres de layout.
+
+Attendu dans config.yml (extrait) :
+    ours_mode: rich
+    ours_rich:
+      split: 0.42
+      padding: 6
+      title: "Les Arts Services"
+      title_size: 18
+      body_size: 9.5
+      separators: dotted
+      icons:
+        address: "misenpageur/assets/icons/address.png"
+        mail:    "misenpageur/assets/icons/mail.png"
+        phone:   "misenpageur/assets/icons/phone.png"
+        web:     "misenpageur/assets/icons/web.png"
+        riso:       "misenpageur/assets/icons/riso.png"
+        volunteer:  "misenpageur/assets/icons/volunteer.png"
+        cover:      "misenpageur/assets/icons/cover.png"
+      address_lines:
+        - "16, rue Guillaume Apollinaire"
+        - "72000 LE MANS"
+      email: "lebidul@live.fr"
+      phone: "07 82 52 63 00"
+      site:  "lebidul.com"
+      notes:
+        - { text: "Numéro imprimé en Riso à 2000 exemplaires", icon: "riso" }
+        - { text: "Nous recrutons toujours des bénévoles…",   icon: "volunteer" }
+        - { text: "Nous attendons vos dessins…",              icon: "cover" }
+      qr:
+        url: "https://agenda.lebidul.com"
+        title: "Agenda culturel !"
+        size_mm: 28
+    auteur_couv: "@Steph"
+    auteur_couv_url: "https://exemple.com/steph"
+
+Optionnel (logos) :
+    s1_logos:
+      padding: 6        # padding interne (pt)
+      gap: 8            # espace vertical entre logos (pt)
+      fit: "width"      # "width" (par défaut) ou "height"
+      items:
+        - "misenpageur/assets/logos/biocoop.png"
+        - "misenpageur/assets/logos/brasserie.png"
+        - ...
+
+Publié sous licence MIT.
+"""
 from __future__ import annotations
 
-import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Dict, Iterable, List, Optional, Tuple, Union
 
-from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-from reportlab.lib.enums import TA_JUSTIFY, TA_LEFT
 from reportlab.lib.units import mm
-from reportlab.lib.colors import black
 from reportlab.lib.utils import ImageReader
-
-from reportlab.platypus import Paragraph, KeepInFrame, Frame
-from reportlab.pdfgen.canvas import Canvas
-
-# Barcodes / QR
+from reportlab.pdfbase import pdfmetrics
 from reportlab.graphics.barcode import qr
-from reportlab.graphics.shapes import Drawing as RLDrawing
+from reportlab.graphics.shapes import Drawing
 from reportlab.graphics import renderPDF
 
-# --- util commun (mettre en haut de drawing.py) ---
-def _sec_get(sec, key):
-    v = getattr(sec, key, None)
-    if v is None:
-        # si sec est un dict, on peut indexer; sinon on renvoie None
-        try:
-            return sec[key]
-        except Exception:
-            return None
-    return v
 
+# --------------------------------------------------------------------------------------
+# Utils
+# --------------------------------------------------------------------------------------
 
-# --------------------------------------------------------------------
-# Styles & utilitaires généraux
-# --------------------------------------------------------------------
+Number = Union[int, float]
 
-def paragraph_style(font_name: str, font_size: float, leading_ratio: float) -> ParagraphStyle:
-    """
-    Style justifié pour le corps de texte (S3..S6), réutilisable ailleurs.
-    """
-    leading = font_size * float(leading_ratio or 1.15)
-    return ParagraphStyle(
-        name=f"Body_{font_size:.2f}",
-        fontName=font_name or "Helvetica",
-        fontSize=font_size,
-        leading=leading,
-        alignment=TA_JUSTIFY,
-        spaceBefore=0,
-        spaceAfter=0,
-    )
-
-
-def list_images(folder: str, exts: tuple = (".png", ".jpg", ".jpeg", ".webp", ".tif", ".tiff"), max_images: int = 10) -> List[str]:
-    """
-    Retourne une liste triée de chemins d’images depuis un dossier.
-    """
-    paths: List[str] = []
-    if not folder:
-        return paths
-    p = Path(folder)
-    if not p.exists() or not p.is_dir():
-        return paths
-    for f in sorted(p.iterdir()):
-        if f.suffix.lower() in exts:
-            paths.append(str(f))
-            if len(paths) >= max_images:
-                break
-    return paths
-
-
-# --------------------------------------------------------------------
-# Aides dessin Ours “riche”
-# --------------------------------------------------------------------
-
-def _hr(c: Canvas, x: float, y: float, w: float, style: str = "dotted", thick: float = 0.8, gap: float = 2.0):
-    c.saveState()
-    c.setLineWidth(thick)
-    if style == "dotted":
-        c.setDash(gap, gap)
-    elif style == "solid":
-        c.setDash()
-    else:
-        c.restoreState()
-        return
-    c.line(x, y, x + w, y)
-    c.restoreState()
-
-
-def _draw_icon(c: Canvas, path: str, x: float, y: float, h: float) -> float:
-    """
-    Dessine une icône (si dispo) de hauteur h, retourne la largeur peinte.
-    """
+def _box(sec) -> Tuple[Number, Number, Number, Number]:
+    """Robuste : accepte dict-like ou objet .x/.y/.w/.h."""
     try:
-        if not path or not os.path.exists(path):
-            return 0.0
-        img = ImageReader(path)
-        iw, ih = img.getSize()
-        w = (iw / ih) * h if ih else h
-        c.drawImage(img, x, y, width=w, height=h, preserveAspectRatio=True, mask='auto')
-        return float(w)
+        return sec["x"], sec["y"], sec["w"], sec["h"]
     except Exception:
+        return sec.x, sec.y, sec.w, sec.h  # type: ignore[attr-defined]
+
+
+def _fonts(conf: dict) -> Tuple[str, str]:
+    """Retourne (regular, bold) à partir de conf["fonts"]. Fallback Helvetica."""
+    fonts = conf.get("fonts") or {}
+    reg = fonts.get("regular") or "Helvetica"
+    bold = fonts.get("bold") or "Helvetica-Bold"
+    return reg, bold
+
+
+def _text_width(text: str, font_name: str, size: Number) -> float:
+    return pdfmetrics.stringWidth(text or "", font_name, size)
+
+
+def _norm_url(url: str) -> str:
+    if not url:
+        return url
+    u = url.strip()
+    if u.startswith(("http://", "https://", "mailto:", "tel:")):
+        return u
+    if "@" in u and " " not in u:
+        return "mailto:" + u
+    if all(c.isdigit() or c in " +().-" for c in u):
+        return "tel:" + u
+    return "https://" + u
+
+
+# --------------------------------------------------------------------------------------
+# Icons & QR
+# --------------------------------------------------------------------------------------
+
+def _icon_path(icon_key_or_path: str, icons_map: Dict[str, str], assets_root: Path) -> str:
+    """Accepte clé ('riso') ou chemin relatif/absolu. Retourne un chemin absolu."""
+    if icon_key_or_path in icons_map:
+        p = assets_root / icons_map[icon_key_or_path]
+    else:
+        p = assets_root / icon_key_or_path
+    return str(p.resolve())
+
+
+def draw_icon(canvas, x_left: Number, y_top: Number, size_pt: Number,
+              icon_key_or_path: str, icons_map: Dict[str, str], assets_root: Path) -> bool:
+    """Dessine une icône carrée dont le coin SUPÉRIEUR GAUCHE est (x_left, y_top)."""
+    try:
+        path = _icon_path(icon_key_or_path, icons_map, assets_root)
+        canvas.drawImage(
+            path,
+            x_left,
+            y_top - size_pt,
+            width=size_pt,
+            height=size_pt,
+            preserveAspectRatio=True,
+            mask="auto",
+        )
+        return True
+    except Exception:
+        return False
+
+
+def draw_qr(canvas, x: Number, y: Number, w: Number, h: Number, qr_conf: Optional[dict]) -> float:
+    """Dessine un QR en haut-droite du bloc (x,y,w,h). Retourne la taille (pt) du QR ou 0."""
+    if not qr_conf:
+        return 0.0
+    url = (qr_conf or {}).get("url")
+    if not url:
         return 0.0
 
+    size_pt = float(qr_conf.get("size_mm") or 28) * mm
+    pad = 6
+    qr_x = x + w - pad - size_pt
+    qr_y = y + h - pad - size_pt
 
-def _wrap_text(c: Canvas, text: str, max_w: float, font: str, size: float) -> List[str]:
-    """
-    Word-wrap très simple pour éviter les dépassements.
-    """
+    widget = qr.QrCodeWidget(url)
+    bounds = widget.getBounds()
+    bw = bounds[2] - bounds[0]
+    bh = bounds[3] - bounds[1]
+    scale = min(size_pt / bw, size_pt / bh)
+
+    d = Drawing(size_pt, size_pt)
+    d.add(widget)
+    d.transform(scale, 0, 0, scale, 0, 0)
+    renderPDF.draw(d, canvas, qr_x, qr_y)
+
+    # Lien cliquable
+    canvas.linkURL(url, (qr_x, qr_y, qr_x + size_pt, qr_y + size_pt), relative=0, thickness=0)
+
+    title = qr_conf.get("title")
+    if title:
+        canvas.setFont("Helvetica", 8.5)  # titre discret
+        canvas.drawString(qr_x, qr_y - 10, title)
+
+    return size_pt
+
+
+# --------------------------------------------------------------------------------------
+# Wrapping text
+# --------------------------------------------------------------------------------------
+
+def wrap_text(text: str, font_name: str, size: Number, max_width: Number) -> List[str]:
+    """Word-wrap simple pour dessiner des paragraphes en drawString."""
+    text = (text or "").replace("\n", " ").strip()
     if not text:
-        return [""]
+        return []
     words = text.split()
     lines: List[str] = []
-    cur = ""
+    cur: List[str] = []
+    cur_w = 0.0
+    space_w = _text_width(" ", font_name, size)
+
     for w in words:
-        test = (cur + " " + w).strip()
-        if c.stringWidth(test, font, size) <= max_w or not cur:
-            cur = test
+        ww = _text_width(w, font_name, size)
+        if not cur:
+            cur = [w]
+            cur_w = ww
+            continue
+        if cur_w + space_w + ww <= max_width:
+            cur.append(w)
+            cur_w += space_w + ww
         else:
-            lines.append(cur)
-            cur = w
+            lines.append(" ".join(cur))
+            cur = [w]
+            cur_w = ww
     if cur:
-        lines.append(cur)
+        lines.append(" ".join(cur))
     return lines
 
 
-def _draw_qr(c: Canvas, url: str, x: float, y: float, size_pt: float):
-    if not url:
+# --------------------------------------------------------------------------------------
+# LOGOS (colonne gauche)
+# --------------------------------------------------------------------------------------
+
+def draw_logos_column(canvas, x: Number, y: Number, w: Number, h: Number,
+                      conf: dict, assets_root: Path) -> None:
+    """
+    Empile les logos verticalement avec un espacement constant.
+    Config attendue : conf["s1_logos"] = {padding, gap, fit, items: [paths...]}
+
+    Si conf["s1_logos"] est absent, la fonction ne fait rien (safe).
+    """
+    s1 = conf.get("s1_logos") or {}
+    items: List[str] = s1.get("items") or []
+    if not items:
         return
-    w = qr.QrCodeWidget(url)
-    b = w.getBounds()
-    bw = b[2] - b[0]
-    bh = b[3] - b[1]
-    d = RLDrawing(size_pt, size_pt, transform=[size_pt / bw, 0, 0, size_pt / bh, 0, 0])
-    d.add(w)
-    renderPDF.draw(d, c, x, y)
-    # zone cliquable
-    c.linkURL(url, (x, y, x + size_pt, y + size_pt), relative=0)
 
+    pad = float(s1.get("padding", 6))
+    gap = float(s1.get("gap", 8))
+    fit_mode = (s1.get("fit") or "width").lower()  # "width" or "height"
 
-def _text(c: Canvas, s: str, x: float, y: float, font: str, size: float):
-    c.setFont(font, size)
-    c.drawString(x, y, s)
+    inner_x = x + pad
+    inner_y = y + pad
+    inner_w = w - 2 * pad
+    inner_h = h - 2 * pad
 
+    # Calcule une hauteur par logo simple : on répartit à peu près la hauteur
+    # en tenant compte des gaps (n-1).
+    n = len(items)
+    if n <= 0:
+        return
+    total_gap = gap * max(0, n - 1)
+    # taille max disponible (si fit "height", on s'en servira directement)
+    max_h_per_logo = max(1.0, (inner_h - total_gap) / n)
 
-def _link(c: Canvas, s: str, url: str, x: float, y: float, font: str, size: float):
-    c.setFont(font, size)
-    c.drawString(x, y, s)
-    w = c.stringWidth(s, font, size)
-    c.linkURL(url, (x, y - 1, x + w, y + size * 1.1), relative=0)
-
-
-def _block_gap_y(y: float, gap: float) -> float:
-    return y - gap
-
-
-# --------------------------------------------------------------------
-# Ours “riche” (logos à gauche + colonne info à droite)
-# --------------------------------------------------------------------
-
-def draw_s1_rich(
-    c: Canvas,
-    sec: Union[dict, Any],
-    cfg: Any,
-    ours_cfg: Dict[str, Any],
-    logos: List[str],
-    default_font: str,
-    leading_ratio: float,
-):
-    """
-    S1 => logos à gauche + ours structuré à droite (titre, contact, socials, notes, QR).
-    Supporte des icônes pour :
-      - address_lines  -> ours_rich.icons.address
-      - notes          -> via item.icon ou mapping ours_rich.icons.{riso, volunteer, cover}
-    """
-    # Frame S1
-    x = _sec_get(sec, "x"); y = _sec_get(sec, "y")
-    w = _sec_get(sec, "w"); h = _sec_get(sec, "h")
-
-
-    pad = float(ours_cfg.get("padding", 6))
-    split = float(ours_cfg.get("split", 0.42))
-    left_w = w * split
-    right_w = w - left_w
-
-    # Sous-frames (logos / ours)
-    lx = x + pad
-    ly = y + pad
-    lw = left_w - 2 * pad
-    lh = h - 2 * pad
-
-    rx = x + left_w + pad
-    ry = y + pad
-    rw = right_w - 2 * pad
-    rh = h - 2 * pad
-
-    # 1) Grille LOGOS (simple 2 colonnes si aucun helper spécifique)
-    cols = 2
-    gutter = 6
-    cell_w = (lw - gutter) / cols
-    cell_h = cell_w * 0.6
-    cx, cy = 0, 0
-    for p in logos[:10]:
+    y_cursor = inner_y + inner_h  # top
+    for p in items:
         try:
-            img = ImageReader(p)
+            path = str((assets_root / p).resolve())
+            img = ImageReader(path)
+            iw, ih = img.getSize()
         except Exception:
-            continue
-        gx = lx + (cx * (cell_w + gutter))
-        gy = ly + lh - (cy + 1) * (cell_h + gutter)
-        if gy < ly:
-            break
-        c.drawImage(img, gx, gy, width=cell_w, height=cell_h, preserveAspectRatio=True, anchor='sw', mask='auto')
-        cx += 1
-        if cx >= cols:
-            cx = 0
-            cy += 1
+            # Passe si l'image est introuvable
+            iw, ih, img = 100, 100, None
 
-    # 2) Colonne droite (ours)
-    title = ours_cfg.get("title", "")
-    title_size = float(ours_cfg.get("title_size", 18))
-    body_size = float(ours_cfg.get("body_size", 9.5))
-    lead_ratio = float(ours_cfg.get("leading_ratio", leading_ratio))
-    L_body = body_size * lead_ratio
+        if fit_mode == "height":
+            target_h = max_h_per_logo
+            scale = target_h / ih
+            target_w = iw * scale
+            if target_w > inner_w:
+                scale = inner_w / iw
+                target_w = inner_w
+                target_h = ih * scale
+        else:
+            # fit width (par défaut)
+            target_w = inner_w
+            scale = target_w / iw
+            target_h = ih * scale
+            if target_h > max_h_per_logo:
+                target_h = max_h_per_logo
+                scale = target_h / ih
+                target_w = iw * scale
 
-    sep_style = ours_cfg.get("separators", "dotted")
-    sep_th = float(ours_cfg.get("sep_thickness", 0.8))
-    sep_gap = float(ours_cfg.get("sep_gap", 2))
-    block_gap = float(ours_cfg.get("block_gap", 6))
+        y_cursor -= target_h
+        if img:
+            canvas.drawImage(
+                path,
+                inner_x,
+                y_cursor,
+                width=target_w,
+                height=target_h,
+                preserveAspectRatio=True,
+                mask="auto",
+            )
+        y_cursor -= gap
+        if (y_cursor - gap) < inner_y:
+            break  # plus de place, on arrête
 
-    icons_map: Dict[str, str] = dict(ours_cfg.get("icons", {}) or {})
 
-    usable_top = ry + rh
-    cursor_y = usable_top
+# --------------------------------------------------------------------------------------
+# OURS RICH (colonne droite)
+# --------------------------------------------------------------------------------------
+
+def draw_ours_rich(canvas, x: Number, y: Number, w: Number, h: Number,
+                   conf: dict, assets_root: Path) -> None:
+    """
+    Dessine l'ours "rich" : titre, adresse, email/tel/site (avec icônes),
+    séparateurs, notes (icônes), crédit visuel (lien), QR en haut-droite.
+    """
+    pad = float(conf.get("padding", 6))
+    title = conf.get("title", "")
+    title_size = float(conf.get("title_size", 18))
+    body_size = float(conf.get("body_size", 9.5))
+    icons_map: Dict[str, str] = conf.get("icons", {}) or {}
+
+    font_reg, font_bold = _fonts(conf)
+
+    top = y + h
+    cx = x + pad
+    cw = w - 2 * pad
+    cursor = top - pad
 
     # Titre
     if title:
-        c.setFont(default_font, title_size)
-        cursor_y -= title_size
-        _text(c, title, rx, cursor_y, default_font, title_size)
-        cursor_y = _block_gap_y(cursor_y, block_gap)
-        _hr(c, rx, cursor_y, rw, style=sep_style, thick=sep_th, gap=sep_gap)
-        cursor_y = _block_gap_y(cursor_y, block_gap)
+        canvas.setFont(font_bold, title_size)
+        canvas.drawString(cx, cursor - title_size, title)
+        cursor -= (title_size + 6)
 
-    c.setFont(default_font, body_size)
+    canvas.setFont(font_reg, body_size)
 
-    # Bloc adresse (avec icône)
-    addr_lines: List[str] = list(ours_cfg.get("address_lines", []) or [])
-    if addr_lines:
-        icon_h = body_size
-        used_w = _draw_icon(c, icons_map.get("address", ""), rx, cursor_y - body_size + 1, icon_h)
-        text_x = rx + (used_w + 4 if used_w else 0)
+    # Helper ligne avec icône + wrapping
+    def line_with_icon(icon_key: Optional[str], text: Optional[str], indent_no_icon: float = 18.0):
+        nonlocal cursor
+        if not text:
+            return
+        icon_px = body_size + 2
+        icon_drawn = False
+        tx = cx
+        max_w = cw
+        if icon_key:
+            icon_drawn = draw_icon(canvas, cx, cursor, icon_px, icon_key, icons_map, assets_root)
+            if icon_drawn:
+                tx = cx + icon_px + 4
+                max_w = cw - (icon_px + 4)
 
-        for i, line in enumerate(addr_lines):
-            if i == 0:
-                cursor_y -= body_size
-            else:
-                cursor_y -= L_body
-            _text(c, line, text_x, cursor_y, default_font, body_size)
+        lines = wrap_text(text, font_reg, body_size, max_w)
+        for i, ln in enumerate(lines):
+            canvas.drawString(tx if i == 0 else (cx + (icon_px + 4 if icon_drawn else indent_no_icon)),
+                              cursor - body_size, ln)
+            cursor -= (body_size + 2)
 
-        cursor_y = _block_gap_y(cursor_y, block_gap)
-        _hr(c, rx, cursor_y, rw, style=sep_style, thick=sep_th, gap=sep_gap)
-        cursor_y = _block_gap_y(cursor_y, block_gap)
+    # Adresse
+    addr = conf.get("address_lines") or []
+    if addr:
+        # première ligne avec icône
+        line_with_icon("address", addr[0])
+        # suivantes sans icône
+        for extra in addr[1:]:
+            line_with_icon(None, extra)
 
-    # Coordonnées (mail / téléphone / web) – icônes facultatives
-    icon_h = body_size
+    # Mail / Phone / Web (avec liens cliquables)
+    def linked_line(icon_key: str, raw: Optional[str]):
+        if not raw:
+            return
+        nonlocal cursor
+        text = raw.strip()
+        url = _norm_url(text)
+        x0 = cx
+        y0 = cursor - body_size - 2
+        line_with_icon(icon_key, text)
+        # on mesure la dernière ligne écrite (simple : on prend la première ligne)
+        wtxt = _text_width(text, font_reg, body_size)
+        canvas.linkURL(url, (x0, y0, x0 + wtxt + 40, y0 + body_size + 6), relative=0, thickness=0)
 
-    email = ours_cfg.get("email", "")
-    phone = ours_cfg.get("phone", "")
-    site  = ours_cfg.get("site", "")
+    linked_line("mail", conf.get("email"))
+    linked_line("phone", conf.get("phone"))
+    linked_line("web", conf.get("site"))
 
-    if email:
-        cursor_y -= body_size
-        used = _draw_icon(c, icons_map.get("mail", ""), rx, cursor_y - 1, icon_h)
-        _link(c, f"Courriel : {email}", f"mailto:{email}", rx + used + 4, cursor_y, default_font, body_size)
-    if phone:
-        cursor_y -= L_body
-        used = _draw_icon(c, icons_map.get("phone", ""), rx, cursor_y - 1, icon_h)
-        _text(c, f"Tél : {phone}", rx + used + 4, cursor_y, default_font, body_size)
-    if site:
-        cursor_y -= L_body
-        used = _draw_icon(c, icons_map.get("web", ""), rx, cursor_y - 1, icon_h)
-        site_url = f"https://{site}" if not str(site).lower().startswith("http") else site
-        _link(c, str(site), site_url, rx + used + 4, cursor_y, default_font, body_size)
+    # Séparateur optionnel
+    if (conf.get("separators") or "").lower() == "dotted":
+        canvas.setDash(1, 2)
+        canvas.line(cx, cursor - 4, cx + cw, cursor - 4)
+        canvas.setDash()
+        cursor -= 10
 
-    if email or phone or site:
-        cursor_y = _block_gap_y(cursor_y, block_gap)
-        _hr(c, rx, cursor_y, rw, style=sep_style, thick=sep_th, gap=sep_gap)
-        cursor_y = _block_gap_y(cursor_y, block_gap)
-
-    # Socials (inchangé ; s'il y a des icônes, place-les dans notes `icons_map`)
-    for s in ours_cfg.get("socials", []):
-        label = s.get("label", "")
-        url   = s.get("url", "")
-        icon  = s.get("icon", "")
-        if not label:
-            continue
-        cursor_y -= body_size
-        used = _draw_icon(c, icon, rx, cursor_y - 1, icon_h)
-        if url:
-            _link(c, label, url, rx + used + 4, cursor_y, default_font, body_size)
-        else:
-            _text(c, label, rx + used + 4, cursor_y, default_font, body_size)
-
-    if ours_cfg.get("socials"):
-        cursor_y = _block_gap_y(cursor_y, block_gap)
-        _hr(c, rx, cursor_y, rw, style=sep_style, thick=sep_th, gap=sep_gap)
-        cursor_y = _block_gap_y(cursor_y, block_gap)
-
-    # Notes – avec icônes :
-    #   - soit items dict: { text: "...", icon: "path.png" }
-    #   - soit strings + mapping icons_map['riso'|'volunteer'|'cover'] selon le contenu
-    notes_raw = ours_cfg.get("notes", []) or []
-    for note in notes_raw:
-        if isinstance(note, dict):
-            text = note.get("text", "")
-            icon = note.get("icon", "")
-        else:
-            text = str(note)
-            low = text.lower()
-            if "riso" in low:
-                icon = icons_map.get("riso", "")
-            elif "bénévol" in low or "benevol" in low:
-                icon = icons_map.get("volunteer", "")
-            elif "dessin" in low or "couverture" in low:
-                icon = icons_map.get("cover", "")
-            else:
-                icon = ""
-
+    # Notes avec icônes
+    for note in conf.get("notes", []) or []:
+        icon_key = note.get("icon")
+        text = note.get("text")
         if not text:
             continue
+        line_with_icon(icon_key, text)
 
-        # Word-wrap pour rester dans la colonne
-        left_indent = 0.0
-        if icon:
-            used = _draw_icon(c, icon, rx, cursor_y - body_size + 1, icon_h)
-            left_indent = used + 4
+    # Crédit visuel
+    a = conf.get("auteur_couv") or ""
+    a_url = conf.get("auteur_couv_url")
+    if a:
+        txt = f"Visuel : {a}"
+        canvas.drawString(cx, cursor - body_size, txt)
+        if a_url:
+            w_txt = _text_width(txt, font_reg, body_size)
+            canvas.linkURL(a_url, (cx, cursor - body_size - 2, cx + w_txt, cursor + 2),
+                           relative=0, thickness=0)
+        cursor -= (body_size + 6)
 
-        wrapped = _wrap_text(c, text, rw - left_indent, default_font, body_size)
-        for i, line in enumerate(wrapped):
-            cursor_y -= body_size if i == 0 else (body_size * 1.05)
-            _text(c, line, rx + left_indent, cursor_y, default_font, body_size)
-
-        # espace entre notes
-        cursor_y -= 2
-
-    if notes_raw:
-        cursor_y = _block_gap_y(cursor_y, block_gap)
-        _hr(c, rx, cursor_y, rw, style=sep_style, thick=sep_th, gap=sep_gap)
-        cursor_y = _block_gap_y(cursor_y, block_gap)
-
-    # Ligne "Visuel : …" (si cfg.auteur_couv présent)
-    if getattr(cfg, "auteur_couv", ""):
-        cursor_y -= body_size
-        vis = f"Visuel : {cfg.auteur_couv}"
-        if getattr(cfg, "auteur_couv_url", ""):
-            _link(c, vis, cfg.auteur_couv_url, rx, cursor_y, default_font, body_size)
-        else:
-            _text(c, vis, rx, cursor_y, default_font, body_size)
-
-        cursor_y = _block_gap_y(cursor_y, block_gap)
-        _hr(c, rx, cursor_y, rw, style=sep_style, thick=sep_th, gap=sep_gap)
-        cursor_y = _block_gap_y(cursor_y, block_gap)
-
-    # QR code final
-    qr_cfg = ours_cfg.get("qr", {}) or {}
-    qr_url = qr_cfg.get("url", "")
-    qr_title = qr_cfg.get("title", "")
-    qr_size = float(qr_cfg.get("size_mm", 28)) * mm
-    qr_gap  = float(qr_cfg.get("top_gap", 8))
-
-    if qr_url:
-        if qr_title:
-            cursor_y -= body_size
-            _text(c, qr_title, rx, cursor_y, default_font, body_size)
-        cursor_y -= (qr_gap + qr_size)
-        _draw_qr(c, qr_url, rx, cursor_y, qr_size)
+    # QR en haut-droite (ne consomme pas la hauteur du contenu)
+    draw_qr(canvas, x, y, w, h, conf.get("qr"))
 
 
-# --------------------------------------------------------------------
-# Ours “simple” (rendu existant) et couverture
-# --------------------------------------------------------------------
+# --------------------------------------------------------------------------------------
+# S1 : orchestration
+# --------------------------------------------------------------------------------------
 
-def _split_ratio(split_info: Any, default: float = 0.42) -> float:
+def draw_s1(canvas, sec, conf: dict, assets_root: Union[str, Path]) -> None:
     """
-    Extrait un ratio de split (logos/textes) depuis un dict/objet/float.
+    S1 : logos (gauche) + ours (droite).
+    - La colonne logos utilise TOUTE la hauteur de la section.
+    - L'ours est dessiné à droite (mode 'rich' si configuré).
+    - assets_root peut être un str ou un Path.
     """
-    if split_info is None:
-        return default
-    if isinstance(split_info, (int, float)):
-        return float(split_info)
-    # objets/dicts possibles
-    for k in ("ratio", "split", "left_ratio", "logos_ratio"):
-        v = getattr(split_info, k, None) if not isinstance(split_info, dict) else split_info.get(k)
-        if isinstance(v, (int, float)):
-            return float(v)
-    return default
+    assets_root = Path(assets_root)
+    x, y, w, h = _box(sec)
 
+    ours_mode = conf.get("ours_mode", "rich")
+    ours_conf = dict(conf.get("ours_rich", {}) or {})
+    # Propager les métadonnées auteur de couv définies à la racine
+    for k in ("auteur_couv", "auteur_couv_url"):
+        if conf.get(k) is not None:
+            ours_conf[k] = conf[k]
 
-def draw_s1(
-    c: Canvas,
-    sec: Union[dict, Any],
-    ours_text: str,
-    logos: List[str],
-    font_name: str,
-    leading_ratio: float,
-    inner_pad: float,
-    split_info: Any,
-):
-    """
-    Rendu S1 historique :
-      - logos à gauche
-      - ours (Markdown -> plaintext Paragraph) à droite, aligné en haut
-    """
-    x = _sec_get(sec, "x"); y = _sec_get(sec, "y")
-    w = _sec_get(sec, "w"); h = _sec_get(sec, "h")
+    split = float(ours_conf.get("split", 0.42))
+    split = max(0.10, min(0.90, split))  # garde-fous
 
-    pad = float(inner_pad or 0.0)
-    ratio = _split_ratio(split_info, default=0.42)
-    left_w = w * ratio
-    right_w = w - left_w
-
-    # zone logos
-    lx = x + pad
-    ly = y + pad
-    lw = left_w - 2 * pad
-    lh = h - 2 * pad
-
-    # zone texte
-    tx = x + left_w + pad
-    ty = y + pad
-    tw = right_w - 2 * pad
-    th = h - 2 * pad
-
-    # --- Logos (grille simple 2 colonnes) ---
-    cols = 2
-    gutter = 6
-    cell_w = (lw - gutter) / cols
-    cell_h = cell_w * 0.6
-    cx, cy = 0, 0
-    for p in logos[:10]:
-        try:
-            img = ImageReader(p)
-        except Exception:
-            continue
-        gx = lx + (cx * (cell_w + gutter))
-        gy = ly + lh - (cy + 1) * (cell_h + gutter)
-        if gy < ly:
-            break
-        c.drawImage(img, gx, gy, width=cell_w, height=cell_h, preserveAspectRatio=True, anchor='sw', mask='auto')
-        cx += 1
-        if cx >= cols:
-            cx = 0
-            cy += 1
-
-    # --- Ours texte (Paragraph dans KeepInFrame, aligné haut) ---
-    style = ParagraphStyle(
-        name="Ours",
-        fontName=font_name or "Helvetica",
-        fontSize=9.5,
-        leading=9.5 * float(leading_ratio or 1.15),
-        alignment=TA_LEFT,
-        spaceBefore=0,
-        spaceAfter=0,
-    )
-    p = Paragraph(ours_text or "", style)
-    kif = KeepInFrame(maxWidth=tw, maxHeight=th, content=[p], hAlign='LEFT', vAlign='TOP', mode='shrink')
-    # wrap/draw
-    kif.wrapOn(c, tw, th)
-    kif.drawOn(c, tx, ty)
-
-def draw_s1_rich(
-    c: Canvas,
-    sec,                      # frame S1 (dict ou obj avec x,y,w,h)
-    cfg: "Config",
-    ours_cfg: Dict[str, Any],
-    logos: List[str],
-    default_font: str,
-    leading_ratio: float,
-):
-    """S1 => logos à gauche + ours 'riche' à droite (titre, contact, socials, notes, QR)."""
-
-    # Frame S1
-    x = getattr(sec, "x", None) or sec["x"]
-    y = getattr(sec, "y", None) or sec["y"]
-    w = getattr(sec, "w", None) or sec["w"]
-    h = getattr(sec, "h", None) or sec["h"]
-
-    pad = float(ours_cfg.get("padding", 6))
-    split = float(ours_cfg.get("split", 0.42))
     left_w = w * split
     right_w = w - left_w
+    right_x = x + left_w
 
-    # Sous-frames
-    lx = x + pad
-    ly = y + pad
-    lw = left_w - 2 * pad
-    lh = h - 2 * pad
+    # LOGOS (pleine hauteur)
+    draw_logos_column(canvas, x, y, left_w, h, conf, assets_root)
 
-    rx = x + left_w + pad
-    ry = y + pad
-    rw = right_w - 2 * pad
-    rh = h - 2 * pad
-
-    # 1) Grille logos existante (réutilise ta routine actuelle si tu en as une)
-    #    Ici on recycle draw_s1 logos-only en lui passant un ours vide si besoin.
-    try:
-        draw_logos_grid = globals().get("draw_logos_grid")  # si tu as ce helper
-    except Exception:
-        draw_logos_grid = None
-    if draw_logos_grid:
-        draw_logos_grid(c, lx, ly, lw, lh, logos)
+    # OURS
+    if ours_mode == "rich":
+        draw_ours_rich(canvas, right_x, y, right_w, h, ours_conf, assets_root)
     else:
-        # fallback simple: range les logos en colonnes
-        from reportlab.lib.utils import ImageReader
-        cols = 2
-        gutter = 6
-        cell_w = (lw - gutter) / cols
-        cell_h = cell_w * 0.6
-        cx, cy = 0, 0
-        for idx, p in enumerate(logos[:10]):
-            try:
-                img = ImageReader(p)
-            except Exception:
-                continue
-            gx = lx + (cx * (cell_w + gutter))
-            gy = ly + lh - (cy + 1) * (cell_h + gutter)
-            if gy < ly:
-                break
-            c.drawImage(img, gx, gy, width=cell_w, height=cell_h, preserveAspectRatio=True, anchor='sw', mask='auto')
-            cx += 1
-            if cx >= cols:
-                cx = 0
-                cy += 1
+        # Fallback très simple (texte brut)
+        font_reg, font_bold = _fonts(conf)
+        pad = float(ours_conf.get("padding", 6))
+        cx, cy, cw, ch = right_x + pad, y + pad, right_w - 2 * pad, h - 2 * pad
+        top = y + h - pad
+        canvas.setFont(font_bold, float(ours_conf.get("title_size", 18)))
+        canvas.drawString(cx, top - float(ours_conf.get("title_size", 18)),
+                          ours_conf.get("title", ""))
+        canvas.setFont(font_reg, float(ours_conf.get("body_size", 9.5)))
+        canvas.drawString(cx, top - 28, ours_conf.get("email", ""))
 
-    # 2) Colonne droite (ours riche)
-    title = ours_cfg.get("title", "")
-    title_size = float(ours_cfg.get("title_size", 18))
-    body_size = float(ours_cfg.get("body_size", 9.5))
-    lead_ratio = float(ours_cfg.get("leading_ratio", leading_ratio))
-    L_body = body_size * lead_ratio
-    sep_style = ours_cfg.get("separators", "dotted")
-    sep_th = float(ours_cfg.get("sep_thickness", 0.8))
-    sep_gap = float(ours_cfg.get("sep_gap", 2))
-    block_gap = float(ours_cfg.get("block_gap", 6))
+    # Debug boxes
+    if conf.get("debug_boxes"):
+        canvas.saveState()
+        try:
+            canvas.setLineWidth(0.5)
+            canvas.setDash(2, 2)
+            # Section
+            canvas.setStrokeColorRGB(1, 0, 0)
+            canvas.rect(x, y, w, h, stroke=1, fill=0)
+            # Colonne logos
+            canvas.setStrokeColorRGB(0, 0, 1)
+            canvas.rect(x, y, left_w, h, stroke=1, fill=0)
+            # Colonne ours
+            canvas.setStrokeColorRGB(0, 0.5, 0)
+            canvas.rect(right_x, y, right_w, h, stroke=1, fill=0)
+        finally:
+            canvas.restoreState()
 
-    usable_top = ry + rh
-    cursor_y = usable_top
+# =========================
+# Compat / Helpers attendus
+# =========================
 
-    # Titre
-    if title:
-        c.setFont(default_font, title_size)
-        cursor_y -= title_size
-        _text(c, title, rx, cursor_y, default_font, title_size)
-        cursor_y = _block_gap_y(cursor_y, block_gap)
-        _hr(c, rx, cursor_y, rw, style=sep_style, thick=sep_th, gap=sep_gap)
-        cursor_y = _block_gap_y(cursor_y, block_gap)
+# Alias rétro-compat : si un ancien code appelle draw_s1_rich
+def draw_s1_rich(canvas, sec, conf, assets_root):
+    return draw_s1(canvas, sec, conf, assets_root)
 
-    c.setFont(default_font, body_size)
+# list_images: lister les images d'un dossier
+from pathlib import Path
+def list_images(folder, exts=(".png", ".jpg", ".jpeg", ".tif", ".tiff", ".webp", ".bmp", ".gif")):
+    p = Path(folder)
+    if not p.exists():
+        return []
+    exts_low = tuple(e.lower() for e in exts)
+    return sorted(str(fp) for fp in p.iterdir() if fp.is_file() and fp.suffix.lower() in exts_low)
 
-    # Bloc adresse
-    for line in ours_cfg.get("address_lines", []):
-        cursor_y -= body_size
-        _text(c, line, rx, cursor_y, default_font, body_size)
-    if ours_cfg.get("address_lines"):
-        cursor_y = _block_gap_y(cursor_y, block_gap)
-        _hr(c, rx, cursor_y, rw, style=sep_style, thick=sep_th, gap=sep_gap)
-        cursor_y = _block_gap_y(cursor_y, block_gap)
+# paragraph_style: petit wrapper pour créer un ParagraphStyle
+from reportlab.lib.styles import ParagraphStyle
+def paragraph_style(font_name="Helvetica", font_size=10.0, leading_ratio=1.25, **kw):
+    leading = kw.pop("leading", None)
+    if leading is None:
+        leading = round(float(font_size) * float(leading_ratio))
+    return ParagraphStyle(name=f"{font_name}-{font_size}",
+                          fontName=font_name, fontSize=font_size, leading=leading, **kw)
 
-    icon_h = body_size  # taille icône ≈ hauteur texte
-
-    # Coordonnées
-    email = ours_cfg.get("email", "")
-    phone = ours_cfg.get("phone", "")
-    site  = ours_cfg.get("site", "")
-    icons = ours_cfg.get("icons", {})  # optionnel: {mail:..., phone:..., web:...}
-
-    if email:
-        cursor_y -= body_size
-        used = _draw_icon(c, icons.get("mail", ""), rx, cursor_y - 1, icon_h)
-        _link(c, f"Courriel : {email}", f"mailto:{email}", rx + used + 4, cursor_y, default_font, body_size)
-    if phone:
-        cursor_y -= L_body
-        used = _draw_icon(c, icons.get("phone", ""), rx, cursor_y - 1, icon_h)
-        _text(c, f"Tél : {phone}", rx + used + 4, cursor_y, default_font, body_size)
-    if site:
-        cursor_y -= L_body
-        used = _draw_icon(c, icons.get("web", ""), rx, cursor_y - 1, icon_h)
-        _link(c, site, f"https://{site}" if not site.startswith("http") else site, rx + used + 4, cursor_y, default_font, body_size)
-
-    if email or phone or site:
-        cursor_y = _block_gap_y(cursor_y, block_gap)
-        _hr(c, rx, cursor_y, rw, style=sep_style, thick=sep_th, gap=sep_gap)
-        cursor_y = _block_gap_y(cursor_y, block_gap)
-
-    # Socials
-    for s in ours_cfg.get("socials", []):
-        label = s.get("label", "")
-        url   = s.get("url", "")
-        icon  = s.get("icon", "")
-        if not label:
-            continue
-        cursor_y -= body_size
-        used = _draw_icon(c, icon, rx, cursor_y - 1, icon_h)
-        if url:
-            _link(c, label, url, rx + used + 4, cursor_y, default_font, body_size)
-        else:
-            _text(c, label, rx + used + 4, cursor_y, default_font, body_size)
-
-    if ours_cfg.get("socials"):
-        cursor_y = _block_gap_y(cursor_y, block_gap)
-        _hr(c, rx, cursor_y, rw, style=sep_style, thick=sep_th, gap=sep_gap)
-        cursor_y = _block_gap_y(cursor_y, block_gap)
-
-    # Notes diverses
-    for line in ours_cfg.get("notes", []):
-        lines = [line]  # simple; sinon, wrapper si tu veux
-        for t in lines:
-            cursor_y -= body_size
-            _text(c, t, rx, cursor_y, default_font, body_size)
-
-    if ours_cfg.get("notes"):
-        cursor_y = _block_gap_y(cursor_y, block_gap)
-        _hr(c, rx, cursor_y, rw, style=sep_style, thick=sep_th, gap=sep_gap)
-        cursor_y = _block_gap_y(cursor_y, block_gap)
-
-    # Ligne "Visuel : …" (déjà injectée dans l’ours .md -> si tu tiens à l’afficher ici aussi)
-    # Tu peux la tirer de cfg.auteur_couv / cfg.auteur_couv_url si tu préfères l’avoir ici :
-    if getattr(cfg, "auteur_couv", ""):
-        cursor_y -= body_size
-        vis = f"Visuel : {cfg.auteur_couv}"
-        if getattr(cfg, "auteur_couv_url", ""):
-            _link(c, vis, cfg.auteur_couv_url, rx, cursor_y, default_font, body_size)
-        else:
-            _text(c, vis, rx, cursor_y, default_font, body_size)
-
-        cursor_y = _block_gap_y(cursor_y, block_gap)
-        _hr(c, rx, cursor_y, rw, style=sep_style, thick=sep_th, gap=sep_gap)
-        cursor_y = _block_gap_y(cursor_y, block_gap)
-
-    # QR code
-    qr_cfg = ours_cfg.get("qr", {}) or {}
-    qr_url = qr_cfg.get("url", "")
-    qr_title = qr_cfg.get("title", "")
-    qr_size = float(qr_cfg.get("size_mm", 28)) * mm
-    qr_gap  = float(qr_cfg.get("top_gap", 8))
-
-    if qr_url:
-        if qr_title:
-            cursor_y -= body_size
-            _text(c, qr_title, rx, cursor_y, default_font, body_size)
-        cursor_y -= (qr_gap + qr_size)
-        _draw_qr(c, qr_url, rx, cursor_y, qr_size)
-
-
-def draw_s2_cover(
-    c: Canvas,
-    sec: Union[dict, Any],
-    cover_path: Optional[str],
-    inner_pad: float,
-):
+# draw_s2_cover: place l'image de couverture centrée et à l'échelle dans S2
+from reportlab.lib.utils import ImageReader
+def draw_s2_cover(canvas, sec, conf, assets_root):
     """
-    Dessine l'image de couverture (S2), pleine largeur dans la frame, en conservant le ratio.
+    conf peut contenir:
+      - "cover_image": chemin vers l'image finale à placer
+      - sinon (optionnel) "cover": {"image": "..."}
     """
-    if not cover_path or not os.path.exists(cover_path):
+    # _box vient du fichier (helper déjà défini plus haut)
+    x, y, w, h = _box(sec)
+
+    cover_path = (conf or {}).get("cover_image") \
+                 or ((conf or {}).get("cover") or {}).get("image")
+    if not cover_path:
         return
-    x = _sec_get(sec, "x"); y = _sec_get(sec, "y")
-    w = _sec_get(sec, "w"); h = _sec_get(sec, "h")
 
-    pad = float(inner_pad or 0.0)
-    box_x = x + pad
-    box_y = y + pad
-    box_w = w - 2 * pad
-    box_h = h - 2 * pad
+    p = Path(assets_root) / cover_path if not Path(cover_path).is_absolute() else Path(cover_path)
+    p = p.resolve()
+    if not p.exists():
+        return
 
     try:
-        img = ImageReader(cover_path)
+        img = ImageReader(str(p))
         iw, ih = img.getSize()
-        if iw <= 0 or ih <= 0:
-            return
-        # fit-contain dans la box
-        scale = min(box_w / iw, box_h / ih)
-        dw = iw * scale
-        dh = ih * scale
-        ox = box_x + (box_w - dw) / 2.0
-        oy = box_y + (box_h - dh) / 2.0
-        c.drawImage(img, ox, oy, width=dw, height=dh, preserveAspectRatio=True, mask='auto')
     except Exception:
         return
+
+    # Fit dans la boîte en conservant le ratio
+    scale = min(w / iw, h / ih)
+    tw, th = iw * scale, ih * scale
+    ox = x + (w - tw) / 2.0
+    oy = y + (h - th) / 2.0
+
+    canvas.drawImage(str(p), ox, oy, width=tw, height=th,
+                     preserveAspectRatio=True, mask="auto")
+

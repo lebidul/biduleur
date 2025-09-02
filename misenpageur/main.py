@@ -28,6 +28,31 @@ import argparse
 from pathlib import Path
 import sys
 
+# --- bootstrap & config path ---
+import os, sys, argparse
+from pathlib import Path
+
+THIS_DIR = Path(__file__).resolve().parent      # .../bidul/misenpageur
+REPO_ROOT = THIS_DIR.parent                     # .../bidul
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+parser = argparse.ArgumentParser()
+parser.add_argument("-c", "--config", default=None,
+                    help="Chemin vers config.yml (par défaut: misenpageur/config.yml)")
+args, _ = parser.parse_known_args()
+
+# Par défaut: config.yml au niveau du module misenpageur
+if args.config is None:
+    cfg_path = THIS_DIR / "config.yml"
+else:
+    p = Path(args.config)
+    cfg_path = p if p.is_absolute() else (Path.cwd() / p)
+
+if not cfg_path.exists():
+    sys.exit(f"[ERR] config.yml introuvable: {cfg_path}")
+# --- fin bootstrap & config path ---
+
 # API internes
 # Imports robustes (exécution depuis la racine OU depuis le dossier misenpageur)
 try:
@@ -98,10 +123,15 @@ def main(argv: list[str] | None = None) -> int:
         print("[ERR] layout.yml introuvable:", layout_path)
         return 2
 
+    from misenpageur.misenpageur.config import Config
+    from misenpageur.misenpageur.pdfbuild import build_pdf
+    from misenpageur.misenpageur.layout import Layout  # si tu as un loader de layout
+
     # Charger configuration + layout
     try:
         cfg = Config.from_yaml(str(cfg_path))
         lay = Layout.from_yaml(str(layout_path))
+        project_root = str(cfg_path.parent)  # <-- racine des chemins relatifs
     except Exception as e:
         print("[ERR] Lecture config/layout :", e)
         return 2

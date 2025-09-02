@@ -95,6 +95,8 @@ prepress:
   pdfx_icc: ""                  # ICC de sortie (ex: ISOcoated_v2_300_eci.icc) si pdfx:true
 
   ours_mode: rich   # "rich" => nouveau rendu, "simple" => rendu actuel
+#  ours_mode: simple   # "rich" => nouveau rendu, "simple" => rendu actuel
+
 
   ours_rich:
     split: 0.42          # largeur colonne logos (0–1). 0.42 ≈ maquette
@@ -132,9 +134,9 @@ prepress:
 
   # address_lines idem
   notes:
-    - { text: "Numéro imprimé en Riso à 2000 exemplaires", icon: "assets/icons/riso.png" }
-    - { text: "Nous recrutons toujours des bénévoles au sein de l’association, contactez nous !", icon: "assets/icons/volunteer.png" }
-    - { text: "Nous attendons vos dessins pour nos couvertures de l’an de grâce 2025 !", icon: "assets/icons/cover.png" }
+    - { text: "Numéro imprimé en Riso à 2000 exemplaires", icon: "riso" }
+    - { text: "Nous recrutons toujours des bénévoles au sein de l’association, contactez nous !", icon: "volunteer" }
+    - { text: "Nous attendons vos dessins pour nos couvertures de l’an de grâce 2025 !", icon: "acover" }
 
   # la ligne "Visuel : …" est déjà gérée par l’injection auteur (auteur_couv + url)
   qr:
