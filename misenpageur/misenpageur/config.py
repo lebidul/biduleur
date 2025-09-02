@@ -75,6 +75,9 @@ class Config:
     # --- date box (bloc YAML ou clés à plat) ---
     date_box: Dict[str, Any] = field(default_factory=dict)
 
+    # --- process preimpression ---
+    prepress: Dict[str, Any] = field(default_factory=dict)
+
     @classmethod
     def from_yaml(cls, path: str) -> "Config":
         with open(path, "r", encoding="utf-8") as f:
@@ -136,6 +139,9 @@ class Config:
             cfg.show_event_bullet = _as_bool(data["show_event_bullet"], cfg.show_event_bullet)
         setv("event_bullet_replacement", "event_bullet_replacement", str)
         setv("event_hanging_indent", "event_hanging_indent", float)
+
+        if "prepress" in data and isinstance(data["prepress"], dict):
+            cfg.prepress = dict(data["prepress"])
 
         # --- date_box : bloc ou clés à plat ---
         block = data.get("date_box", None)

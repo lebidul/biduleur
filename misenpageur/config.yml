@@ -77,3 +77,19 @@ date_box:
 
 auteur_couv: ""
 auteur_couv_url: ""
+
+# Qualité impression / prépresse
+prepress:
+  convert_images: true          # Convertir les images en CMYK avant insertion
+  jpeg_quality: 95              # Qualité JPEG lors de la conversion (85–100)
+  min_effective_dpi: 300        # Alerte si l'image descend sous ce DPI
+  max_effective_dpi: 450        # (optionnel) Surdimension > ce DPI -> on peut réduire (pour le poids)
+  cmyk_profile: ""              # (optionnel) ICC CMYK pour une meilleure conversion (ex: "CoatedFOGRA39.icc")
+
+  add_crop_marks: false          # Tracer des traits de coupe
+  bleed_mm: 0                   # Fond perdu (mm) pour la page (cosmétique des repères visuels)
+
+  # Post-traitement PDF/X via Ghostscript (facultatif, avancé)
+  pdfx: false                   # true -> tente une conversion PDF/X-1a
+  ghostscript_path: "gswin64c"  # Chemin `gswin64c` (Windows) ou `gs` (macOS/Linux)
+  pdfx_icc: ""                  # ICC de sortie (ex: ISOcoated_v2_300_eci.icc) si pdfx:true
