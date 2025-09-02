@@ -84,11 +84,11 @@ def make_parser() -> argparse.ArgumentParser:
     )
     # Defaults repris de parse_args() historique
     p.add_argument("--root",   default=".",            help="Racine du projet (contient config.yml, layout.yml)")
-    p.add_argument("--config", default="config.yml",   help="Chemin du fichier de configuration YAML")
-    p.add_argument("--layout", default="layout.yml",   help="Chemin du fichier de layout YAML")
+    p.add_argument("--config", default="misenpageur/config.yml",   help="Chemin du fichier de configuration YAML")
+    p.add_argument("--layout", default="misenpageur/layout.yml",   help="Chemin du fichier de layout YAML")
 
     # Sortie PDF (défaut identique à l'ancien parse_args)
-    p.add_argument("--out",    default="bidul/bidul_cli.pdf",
+    p.add_argument("--out",    default="misenpageur/bidul/bidul_cli.pdf",
                    help="Chemin de sortie PDF (écrase output_pdf du config si fourni)")
 
     # Overrides utiles (pas de défaut => opt-in)
@@ -100,8 +100,8 @@ def make_parser() -> argparse.ArgumentParser:
     p.add_argument("--auteur-couv-url", default="", help="URL associée au crédit visuel (hyperlien)")
 
     # Export Scribus (pas de défaut => opt-in)
-    p.add_argument("--scribus-script", default="bidul/bidul.scribus.py", help="Chemin du script Scribus .py à générer")
-    p.add_argument("--scribus-sla", default="bidul/bidul.sla", help="Chemin du .sla que le script enregistrera")
+    p.add_argument("--scribus-script", default="misenpageur/bidul/bidul.scribus.py", help="Chemin du script Scribus .py à générer")
+    p.add_argument("--scribus-sla", default="misenpageur/bidul/bidul.sla", help="Chemin du .sla que le script enregistrera")
 
     # Modes
     p.add_argument("--pdf-only",     action="store_true", help="Ne générer que le PDF (ignorer Scribus)")

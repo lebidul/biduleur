@@ -6,13 +6,13 @@
 month_label: "2025-09"
 
 # Chemins relatifs à la racine du projet
-input_html: "fichier_biduleur/biduleur_bullets.html"   # fichier HTML source
-template_pdf: "templates/bidul_template.pdf"  # gabarit optionnel (non utilisé en sortie ici)
-output_pdf: "bidul/bidul_prototype.pdf"      # chemin du PDF généré
+input_html: "misenpageur/fichier_biduleur/biduleur_bullets.html"   # fichier HTML source
+template_pdf: "misenpageur/templates/bidul_template.pdf"  # gabarit optionnel (non utilisé en sortie ici)
+output_pdf: "misenpageur/bidul/bidul_prototype.pdf"      # chemin du PDF généré
 
-logos_dir: "assets/logos"   # dossier contenant jusqu'à 10 logos
-cover_image: "assets/couv/couverture.png"  # image de couverture
-ours_md: "assets/ours/ours.md"   # fichier texte constant (ours)
+logos_dir: "misenpageur/assets/logos"   # dossier contenant jusqu'à 10 logos
+cover_image: "misenpageur/assets/couv/couverture.png"  # image de couverture
+ours_md: "misenpageur/assets/ours/ours.md"   # fichier texte constant (ours)
 
 # =========================
 # Paramètres typographiques

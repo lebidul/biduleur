@@ -3,7 +3,7 @@
 ## Priorité Élevée
 - [x] Workflow global. csv/xls/xlsx (biduleur) -> pdf (misenpageur)
 - [ ] Infos couv (flag couv/no couv, nom dessinat.eur.rice + hyperlink) (cli)
-- [ ] Redimensionnement éventuel de l'image de couv.
+- [x] Redimensionnement éventuel de l'image de couv.
 - [x] Intégration Scribus
 - [ ] Fichier .sla comme argument dans cli
 - [ ] Config ours
