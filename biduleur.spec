@@ -1,66 +1,55 @@
-# biduleur.spec (version optimisée pour réduire la taille)
-from PyInstaller.utils.hooks import collect_submodules, collect_data_files
+# bidul.spec — build GUI "bidul" (sans console) avec icône + version info + excludes
 import os
+from PyInstaller.building.build_main import Analysis, PYZ, EXE, COLLECT
 
-current_dir = os.getcwd()
-main_script = os.path.join(current_dir, 'biduleur', 'main.py')
-if not os.path.exists(main_script):
-    raise FileNotFoundError(f"Le fichier {main_script} est introuvable")
+BASE_DIR = os.getcwd()
+entry_script = os.path.join('', 'gui.py')
 
-# Hidden imports : NE PAS inclure pkg_resources
-hidden_imports = [
-    'biduleur.csv_utils',
-    'biduleur.format_utils',
-    'biduleur.constants',
-    'biduleur.event_utils',
+# Icône (mets le bon chemin vers TON .ico)
+ICON_PATH = os.path.join(BASE_DIR, '', '', 'biduleur.ico')
+# Version file (si absent, enlève l’argument 'version=' plus bas)
+VERSION_FILE = os.path.join(BASE_DIR, 'bidul_version_info.txt')
+
+datas = []
+
+# misenpageur config/layout
+for rel in ('misenpageur/config.yml', 'misenpageur/layout.yml'):
+    absf = os.path.join(BASE_DIR, rel)
+    if os.path.isfile(absf):
+        datas.append((absf, 'misenpageur'))
+
+# misenpageur assets (ours, cover, logos, etc.)
+assets_abs = os.path.join(BASE_DIR, 'misenpageur', 'assets')
+if os.path.isdir(assets_abs):
+    datas.append((assets_abs, 'misenpageur/assets'))
+
+# biduleur templates (CSV / XLSX)
+templates_abs = os.path.join(BASE_DIR, 'biduleur', 'templates')
+if os.path.isdir(templates_abs):
+    datas.append((templates_abs, 'biduleur/templates'))
+
+# Optionnel : exclure les paquets lourds non utilisés (réduit taille et temps de build)
+EXCLUDES = [
+    'torch', 'torchvision', 'torchaudio',
+    'tensorflow', 'tensorboard',
+    'transformers',
+    'scipy',            # si tu n'en as pas besoin
+    'matplotlib',       # GUI Tk suffit
+    'nltk',
+    'cv2', 'opencv-python',
 ]
-
-# Si tu forces pandas/numpy (recommandé en CI) :
-from PyInstaller.utils.hooks import collect_submodules
-hidden_imports += collect_submodules('pandas')
-hidden_imports += collect_submodules('numpy')
-hidden_imports += collect_submodules('openpyxl')
-
-# Exclusions (pas d'exclusion agressive de la stdlib comme urllib/inspect/pydoc)
-excludes = [
-    'Tkconstants','tcl','tk','Tix','sqlite3',
-    'unittest','pytest','doctest','pdb',
-    'matplotlib','scipy','sklearn','tensorflow',
-    'torch','torchvision','torchaudio',
-    'IPython','jupyter','sphinx','setuptools','pip','wheel',
-    'pkg_resources'
-]
-
-# Datas : uniquement les fichiers non-Python nécessaires
-datas = collect_data_files('tkinter')  # nécessaire pour tkinter
-
-templates_dir = os.path.join(current_dir, 'biduleur', 'templates')
-datas += [
-    (os.path.join(templates_dir, 'tapage_template.csv'), 'biduleur/templates'),
-    (os.path.join(templates_dir, 'tapage_template.xlsx'), 'biduleur/templates'),
-]
-
-# Inclure uniquement les fichiers Python du package biduleur, sans __pycache__
-for root, dirs, files in os.walk(os.path.join(current_dir, 'biduleur')):
-    files = [f for f in files if f.endswith('.py')]  # inclure seulement les .py
-    for f in files:
-        src = os.path.join(root, f)
-        dest = os.path.relpath(root, current_dir)
-        datas.append((src, dest))
 
 a = Analysis(
-    [main_script],
-    pathex=[current_dir],
+    [entry_script],
+    pathex=[BASE_DIR],
     binaries=[],
     datas=datas,
-    hiddenimports=hidden_imports,
+    hiddenimports=[],
     hookspath=[],
+    hooksconfig={},
     runtime_hooks=[],
-    excludes=excludes,
-    win_no_prefer_redirects=False,
-    win_private_assemblies=False,
-    cipher=None,
-    noarchive=False
+    excludes=EXCLUDES,
+    noarchive=False,
 )
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=None)
@@ -68,16 +57,16 @@ pyz = PYZ(a.pure, a.zipped_data, cipher=None)
 exe = EXE(
     pyz,
     a.scripts,
-    [],
-    exclude_binaries=True,
-    name='biduleur',
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    name='bidul',
     debug=False,
-    bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    runtime_tmpdir=None,
-    console=True,
-    icon=os.path.join(current_dir, 'biduleur.ico') if os.path.exists(os.path.join(current_dir, 'biduleur.ico')) else None
+    console=False,            # GUI
+    icon=ICON_PATH,           # icône
+    version=VERSION_FILE,     # infos version / propriétés
 )
 
 coll = COLLECT(
@@ -88,5 +77,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='biduleur'
+    name='bidul'
 )
