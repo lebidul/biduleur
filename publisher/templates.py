@@ -144,7 +144,7 @@ HTML_TEMPLATE_GREEN_GREY_ORANGE = """
 
 
 
-# Function to render a template with variables
+# Function to render a templates with variables
 def render_template(template_str, **kwargs):
     template = Template(template_str)
     return template.render(**kwargs)

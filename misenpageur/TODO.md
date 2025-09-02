@@ -11,7 +11,7 @@
 - [ ] Config cucaracha
 - [ ] Config qr code
 - [ ] Poster (page 3).
-- [x] Qualité pdf.
+- [ ] Qualité pdf.
 - [ ] Unit tests.
 
 ## Priorité Moyenne

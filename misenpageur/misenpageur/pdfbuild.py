@@ -9,7 +9,6 @@ from reportlab.pdfgen import canvas
 from .config import Config
 from .layout import Layout
 from .html_utils import extract_paragraphs_from_html
-# ⬇️ Adaptation : on n'importe plus draw_s1_rich, et list_images n'a plus d'argument max_images
 from .drawing import draw_s1, draw_s2_cover, list_images, paragraph_style
 from .fonts import register_arial_narrow, register_dejavu_sans
 from .spacing import SpacingConfig, SpacingPolicy
@@ -28,15 +27,6 @@ from PIL import Image  # Pillow
 
 PT_PER_INCH = 72.0
 MM_PER_INCH = 25.4
-
-def _sec_get(sec, key):
-    v = getattr(sec, key, None)
-    if v is None:
-        try:
-            return sec[key]
-        except Exception:
-            return None
-    return v
 
 def mm_to_pt(mm: float) -> float:
     return mm * PT_PER_INCH / MM_PER_INCH
@@ -233,6 +223,8 @@ def _inject_auteur_in_ours(ours_text: str, auteur: str, url: str, max_len: int =
             return "\n".join(lines)
 
     # 2) sinon, si l’ours contient explicitement "@Steph", on remplace ce token
+    #    par le segment auteur (sans dupliquer 'Visuel : ') si la ligne ne commence pas déjà par 'Visuel :'.
+    #    (Cas de compat rétro si le fichier n’a pas la ligne normalisée.)
     if "@Steph" in ours_text:
         repl = _xml_escape(auteur) if not url else f'<a href="{_xml_escape(url)}">{_xml_escape(auteur)}</a>'
         return ours_text.replace("@Steph", repl)
@@ -361,10 +353,7 @@ def build_pdf(project_root: str, cfg: Config, layout: Layout, out_path: str) -> 
         # On ne casse pas la génération PDF si l’injection échoue
         print(f"[WARN] Échec injection auteur dans l’ours: {type(_e).__name__}: {_e}")
 
-    # --- LOGOS : on récupère les fichiers du dossier déclaré ---
-    logos_dir = os.path.join(project_root, cfg.logos_dir) if getattr(cfg, "logos_dir", "") else ""
-    logos = list_images(logos_dir) if logos_dir and os.path.isdir(logos_dir) else []
-
+    logos = list_images(os.path.join(project_root, cfg.logos_dir), max_images=10)
     cover_path = os.path.join(project_root, cfg.cover_image) if cfg.cover_image else ""
 
     S = layout.sections
@@ -436,46 +425,17 @@ def build_pdf(project_root: str, cfg: Config, layout: Layout, out_path: str) -> 
         print(f"[WARN] {len(rest_after_p1)} paragraphes non placés (réduire font_size_max ou ajuster layout).")
 
     # --- RENDU : PAGE 1 ---
-    ours_mode = getattr(cfg, "ours_mode", "simple")
-    ours_cfg = getattr(cfg, "ours_rich", {}) or {}
-
-    # Prépare la conf pour le nouveau drawing (logos + ours rich dans un seul dict)
-    draw_conf = {
-        "ours_mode": ours_mode,
-        "ours_rich": dict(ours_cfg),
-        # injecte les métadonnées auteur de couv pour l'ours
-        "auteur_couv": getattr(cfg, "auteur_couv", None),
-        "auteur_couv_url": getattr(cfg, "auteur_couv_url", None),
-        # colonne logos (liste de chemins d’images)
-        "s1_logos": {
-            "items": logos,
-            "padding": getattr(getattr(cfg, "s1_logos", {}), "padding", 6) if hasattr(cfg, "s1_logos") else 6,
-            "gap": getattr(getattr(cfg, "s1_logos", {}), "gap", 8) if hasattr(cfg, "s1_logos") else 8,
-            "fit": getattr(getattr(cfg, "s1_logos", {}), "fit", "width") if hasattr(cfg, "s1_logos") else "width",
-        },
-        # polices utilisées par l’ours (sinon Helvetica)
-        "fonts": {
-            "regular": cfg.font_name or "Helvetica",
-            "bold": (cfg.font_name + "-Bold") if cfg.font_name else "Helvetica-Bold"
-        },
-        # debug optionnel
-        "debug_boxes": getattr(cfg, "debug_boxes", False),
-    }
-
-    # logos + ours (mode rich recommandé)
-    draw_s1(c, S["S1"], draw_conf, project_root)
+    draw_s1(c, S["S1"], ours_text, logos, cfg.font_name, cfg.leading_ratio, cfg.inner_padding, layout.s1_split)
 
     # Couverture prétraitée (CMYK + JPEG qualité) selon config prepress
     prepped_cover = cover_path
     if cover_path and os.path.exists(cover_path):
         # Taille de la zone S2 (pour calcul du DPI effectif)
-        s2 = S["S2"]
-        s2w = _sec_get(s2, "w")
-        s2h = _sec_get(s2, "h")
+        s2w = getattr(S["S2"], "w", None) or S["S2"]["w"]
+        s2h = getattr(S["S2"], "h", None) or S["S2"]["h"]
         prepped_cover = _prepare_cover_for_print(cover_path, s2w, s2h, cfg)
 
-    # Adaptation : on passe un petit dict conf avec l’image finale + racine projet
-    draw_s2_cover(c, S["S2"], {"cover_image": prepped_cover}, project_root)
+    draw_s2_cover(c, S["S2"], prepped_cover, cfg.inner_padding)
 
     draw_section_fixed_fs_with_tail(
         c, S["S3"], s3_full, s3_tail, cfg.font_name, best_fs, cfg.leading_ratio, cfg.inner_padding,
