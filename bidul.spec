@@ -1,36 +1,40 @@
-# bidul.spec — build GUI "bidul" (sans console)
+# bidul.spec — build GUI "bidul" (sans console) avec icône
+
 import os
 from PyInstaller.building.build_main import Analysis, PYZ, EXE, COLLECT
 
 BASE_DIR = os.getcwd()
-
-# >>> adapte si besoin : chemin réel de ta GUI
 entry_script = os.path.join('', 'gui.py')
+
+# >>> ADAPTE ICI le chemin de l'icône (même que biduleur) :
+ICON_PATH = os.path.join(BASE_DIR, 'biduleur.ico')
+# Par ex. si tu l’as ailleurs :
+# ICON_PATH = os.path.join(BASE_DIR, 'assets', 'biduleur.ico')
 
 datas = []
 
-# Inclure config & layout si présents
-cfg_rel = os.path.join('misenpageur', 'config.yml')
-lay_rel = os.path.join('misenpageur', 'layout.yml')
-cfg_abs = os.path.join(BASE_DIR, cfg_rel)
-lay_abs = os.path.join(BASE_DIR, lay_rel)
-if os.path.isfile(cfg_abs):
-    datas.append((cfg_abs, 'misenpageur'))
-if os.path.isfile(lay_abs):
-    datas.append((lay_abs, 'misenpageur'))
+# misenpageur config/layout
+for rel in ('misenpageur/config.yml', 'misenpageur/layout.yml'):
+    absf = os.path.join(BASE_DIR, rel)
+    if os.path.isfile(absf):
+        datas.append((absf, 'misenpageur'))
 
-# Inclure le dossier d'assets (ours, logos, cover, etc.)
+# misenpageur assets
 assets_abs = os.path.join(BASE_DIR, 'misenpageur', 'assets')
 if os.path.isdir(assets_abs):
-    # ✅ PyInstaller accepte un dossier en src : il sera copié tel quel sous dest
     datas.append((assets_abs, 'misenpageur/assets'))
+
+# biduleur templates (CSV / XLSX)
+templates_abs = os.path.join(BASE_DIR, 'biduleur', 'templates')
+if os.path.isdir(templates_abs):
+    datas.append((templates_abs, 'biduleur/templates'))
 
 a = Analysis(
     [entry_script],
     pathex=[BASE_DIR],
     binaries=[],
-    datas=datas,          # <- uniquement des (src, dest)
-    hiddenimports=[],     # PyInstaller suivra les imports à partir de gui.py
+    datas=datas,
+    hiddenimports=[],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -50,7 +54,8 @@ exe = EXE(
     debug=False,
     strip=False,
     upx=True,
-    console=False,  # GUI
+    console=False,         # GUI
+    icon=ICON_PATH,        # <<—— Icône
 )
 
 coll = COLLECT(
