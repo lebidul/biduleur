@@ -2,15 +2,16 @@
 
 ## Priorité Élevée
 - [x] Workflow global. csv/xls/xlsx (biduleur) -> pdf (misenpageur)
+- [ ] Infos couv (flag couv/no couv, nom dessinat.eur.rice + hyperlink) (cli)
 - [x] Intégration Scribus
 - [ ] Fichier .sla comme argument dans cli
 - [ ] Config ours, logos, cucaracha
-- [ ] Poster (page 3)
-- [ ] Qualité pdf
+- [ ] Poster (page 3).
+- [ ] Qualité pdf.
 - [ ] Unit tests
 
 ## Priorité Moyenne
-- [ ] Amélioration lisibilité finale (ex. caractère de bullet point comme paramètre, cadre pour date)
+- [x] Amélioration lisibilité finale (ex. caractère de bullet point comme paramètre, cadre pour date)
 - [ ] Options d’hyphénation pour rendre des strings insécables
 
 
