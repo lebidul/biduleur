@@ -12,6 +12,7 @@
 
 ## Priorité Moyenne
 - [x] Amélioration lisibilité finale (ex. caractère de bullet point comme paramètre, cadre pour date)
+- [x] Amélioration lisibilité v2 (ex. ligne pour dates)
 - [ ] Options d’hyphénation pour rendre des strings insécables
 
 

@@ -5,19 +5,20 @@
 - [ ] Améliorer la gestion des erreurs pour les dates mal formatées (ex: "Mardi 1er").
 - [ ] Corriger le tri des événements lorsque la colonne `DATE` est vide ou invalide.
 - [x] Rendre le Biduleur comme un éxécutable.
+- [ ] Erreur avec fichier csv créé depuis excel (ex. C:\Users\thiba\Desktop\test.bidul\tapage.mardi.matin.2.csv)
 - [ ] Unit tests
 
 ## Priorité Moyenne
 - [ ] Optimiser les performances du tri pour les fichiers CSV volumineux.
-- [ ] Ajouter fichiers templates au gui
-- [ ] Ajouter des logs pour faciliter le débogage.
+- [x] Ajouter fichiers templates au gui.
+- [x] Ajouter des logs pour faciliter le débogage.
 - [ ] Documenter les cas d'erreur possibles dans la docstring de `parse_bidul`.
 - [ ] Ajouter une interface en ligne de commande (CLI) pour le traitement par lots.
 
 ## Priorité Faible
 - [x] Prendre en charge les fichiers Excel en plus des CSV.
 - [ ] Prendre en charge google sheet
-- [ ] Ajouter une interface en ligne de commande (CLI) pour le traitement par lots.
+- [x] Ajouter une interface en ligne de commande (CLI) pour le traitement par lots.
 
 ## Fonctionnalités Futures
 - [ ] Permettre la personnalisation des formats de date (ex: "1er mai" au lieu de "Mardi 1").

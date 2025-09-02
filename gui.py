@@ -5,6 +5,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox
 from tkinter import ttk
 from pathlib import Path
+import importlib.resources as res  # <-- pour lire les modèles embarqués
 
 # --- import biduleur (HTML) ---
 from biduleur.csv_utils import parse_bidul
@@ -42,7 +43,6 @@ def _project_defaults() -> dict:
 
 
 def _load_cfg_defaults() -> dict:
-    """Charge config.yml (si possible) pour pré-remplir cover / ours / logos."""
     out = {"cover": "", "ours_md": "", "logos_dir": ""}
     if _IMPORT_ERR:
         return out
@@ -70,17 +70,10 @@ def run_pipeline(input_file: str,
                  out_agenda_html: str,
                  out_pdf: str,
                  out_scribus_py: str) -> tuple[bool, str]:
-    """
-    Workflow :
-      1) biduleur : XLS/CSV → HTML + HTML agenda
-      2) misenpageur : HTML → PDF (avec cover / ours / logos passés)
-      3) misenpageur : HTML → script Scribus (.py) + .sla (idem)
-    """
     if _IMPORT_ERR:
         return False, f"Imports misenpageur impossibles : {repr(_IMPORT_ERR)}"
 
     try:
-        # Crée les dossiers de sortie si besoin
         for p in (out_html, out_agenda_html, out_pdf, out_scribus_py):
             _ensure_parent_dir(p)
 
@@ -98,12 +91,9 @@ def run_pipeline(input_file: str,
         cfg = Config.from_yaml(cfg_path)
         lay = Layout.from_yaml(lay_path)
 
-        # Forçages depuis la GUI
         cfg.input_html = out_html
         if out_pdf:
             cfg.output_pdf = out_pdf
-
-        # Surcouches assets (si champs non vides)
         if (cover_image or "").strip():
             cfg.cover_image = cover_image.strip()
         if (ours_md or "").strip():
@@ -111,14 +101,12 @@ def run_pipeline(input_file: str,
         if (logos_dir or "").strip():
             cfg.logos_dir = logos_dir.strip()
 
-        # Génération du PDF
         build_pdf(project_root, cfg, lay, cfg.output_pdf)
 
-        # 3) Scribus : script + .sla (enregistre au même endroit que .py)
+        # 3) Scribus : script + .sla
         scribus_sla = os.path.splitext(out_scribus_py)[0] + ".sla"
         write_scribus_script(project_root, cfg, lay, out_scribus_py, scribus_sla)
 
-        # Résumé
         summary = (
             f"HTML            : {out_html}\n"
             f"HTML (agenda)   : {out_agenda_html}\n"
@@ -137,15 +125,14 @@ def run_pipeline(input_file: str,
 
 
 def main():
-    # GUI
     root = tk.Tk()
     root.title("Bidul – Pipeline XLS/CSV → HTMLs → PDF + Script Scribus")
-    root.minsize(820, 540)
+    root.minsize(860, 600)
 
     root.columnconfigure(1, weight=1)
-    for r in range(0, 15):
+    for r in range(0, 18):
         root.rowconfigure(r, weight=0)
-    root.rowconfigure(14, weight=1)
+    root.rowconfigure(17, weight=1)
 
     # Préremplissages depuis config.yml
     cfg_defaults = _load_cfg_defaults()
@@ -160,7 +147,7 @@ def main():
     pdf_var = tk.StringVar()
     scribus_py_var = tk.StringVar()
 
-    # Helpers
+    # Helpers: choix de fichiers/dossiers
     def pick_input():
         file_path = filedialog.askopenfilename(
             title="Sélectionner l’entrée (CSV / XLS / XLSX)",
@@ -201,7 +188,35 @@ def main():
         if path:
             entry_var.set(path)
 
-    # UI
+    # ⬇️ Téléchargement des modèles (comme biduleur.main)
+    def save_embedded_template(package: str, filename: str, title: str):
+        try:
+            initial_ext = os.path.splitext(filename)[1].lower()
+            if initial_ext == '.csv':
+                ftypes = [("CSV", "*.csv")]
+            elif initial_ext == '.xlsx':
+                ftypes = [("Excel (XLSX)", "*.xlsx")]
+            else:
+                ftypes = [("Tous les fichiers", "*.*")]
+
+            target = filedialog.asksaveasfilename(
+                title=title,
+                defaultextension=initial_ext,
+                filetypes=ftypes,
+                initialfile=filename
+            )
+            if not target:
+                return
+
+            data = res.files(package).joinpath(filename).read_bytes()
+            with open(target, "wb") as f:
+                f.write(data)
+            messagebox.showinfo("Modèle enregistré", f"Fichier enregistré ici :\n{target}")
+        except Exception as e:
+            messagebox.showerror("Erreur", f"Impossible d'enregistrer le modèle : {e}")
+
+    # --- UI ---
+
     r = 0
     tk.Label(root, text="Fichier d’entrée (CSV / XLS / XLSX) :").grid(row=r, column=0, sticky="e", padx=8, pady=6)
     tk.Entry(root, textvariable=input_var).grid(row=r, column=1, sticky="ew", padx=8, pady=6)
@@ -257,15 +272,30 @@ def main():
                                         [("Script Python", "*.py"), ("Tous les fichiers", "*.*")])
               ).grid(row=r, column=2, padx=8, pady=6)
 
+    # --- Bandeau modèles à télécharger ---
     r += 1
-    ttk.Separator(root, orient='horizontal').grid(row=r, column=0, columnspan=3, sticky="ew", padx=8, pady=4)
+    ttk.Separator(root, orient='horizontal').grid(row=r, column=0, columnspan=3, sticky="ew", padx=8, pady=(10, 6))
 
-    # Status
+    r += 1
+    models = tk.Frame(root)
+    models.grid(row=r, column=0, columnspan=3, sticky="ew", padx=8, pady=(0, 10))
+    tk.Label(models, text="Télécharger un modèle de fichier (tapageur) :", font=("Arial", 9, "bold")).grid(row=0, column=0, sticky="w", pady=(0, 6))
+
+    tk.Button(
+        models, text="Modèle CSV",
+        command=lambda: save_embedded_template('biduleur.templates', 'tapage_template.csv', "Enregistrer le modèle CSV")
+    ).grid(row=1, column=0, padx=(0, 8))
+
+    tk.Button(
+        models, text="Modèle XLSX",
+        command=lambda: save_embedded_template('biduleur.templates', 'tapage_template.xlsx', "Enregistrer le modèle XLSX")
+    ).grid(row=1, column=1, padx=(0, 8))
+
+    # --- Status & action ---
     status = tk.StringVar(value="Prêt.")
     r += 1
     tk.Label(root, textvariable=status, bd=1, relief=tk.SUNKEN, anchor=tk.W).grid(row=r, column=0, columnspan=3, sticky="ew", padx=6, pady=6)
 
-    # Action
     def run_now():
         inp = input_var.get().strip()
         cov = cover_var.get().strip()
