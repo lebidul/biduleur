@@ -9,7 +9,7 @@ from reportlab.pdfgen import canvas
 from .config import Config
 from .layout import Layout
 from .html_utils import extract_paragraphs_from_html
-from .drawing import draw_s1, draw_s2_cover, list_images, paragraph_style
+from .drawing import draw_s1, draw_s1_rich, draw_s2_cover, list_images, paragraph_style
 from .fonts import register_arial_narrow, register_dejavu_sans
 from .spacing import SpacingConfig, SpacingPolicy
 from .textflow import (
@@ -27,6 +27,15 @@ from PIL import Image  # Pillow
 
 PT_PER_INCH = 72.0
 MM_PER_INCH = 25.4
+
+def _sec_get(sec, key):
+    v = getattr(sec, key, None)
+    if v is None:
+        try:
+            return sec[key]
+        except Exception:
+            return None
+    return v
 
 def mm_to_pt(mm: float) -> float:
     return mm * PT_PER_INCH / MM_PER_INCH
@@ -425,14 +434,29 @@ def build_pdf(project_root: str, cfg: Config, layout: Layout, out_path: str) -> 
         print(f"[WARN] {len(rest_after_p1)} paragraphes non placés (réduire font_size_max ou ajuster layout).")
 
     # --- RENDU : PAGE 1 ---
-    draw_s1(c, S["S1"], ours_text, logos, cfg.font_name, cfg.leading_ratio, cfg.inner_padding, layout.s1_split)
+    ours_mode = getattr(cfg, "ours_mode", "simple")
+    ours_cfg = getattr(cfg, "ours_rich", {}) or {}
+
+    if ours_mode == "rich":
+        # logos + ours riche
+        draw_s1_rich(
+            c, S["S1"], cfg, ours_cfg, logos,
+            cfg.font_name, cfg.leading_ratio
+        )
+    else:
+        # rendu existant (logos à gauche + ours .md à droite)
+        draw_s1(
+            c, S["S1"], ours_text, logos,
+            cfg.font_name, cfg.leading_ratio, cfg.inner_padding, layout.s1_split
+        )
 
     # Couverture prétraitée (CMYK + JPEG qualité) selon config prepress
     prepped_cover = cover_path
     if cover_path and os.path.exists(cover_path):
         # Taille de la zone S2 (pour calcul du DPI effectif)
-        s2w = getattr(S["S2"], "w", None) or S["S2"]["w"]
-        s2h = getattr(S["S2"], "h", None) or S["S2"]["h"]
+        s2 = S["S2"]
+        s2w = _sec_get(s2, "w")
+        s2h = _sec_get(s2, "h")
         prepped_cover = _prepare_cover_for_print(cover_path, s2w, s2h, cfg)
 
     draw_s2_cover(c, S["S2"], prepped_cover, cfg.inner_padding)
