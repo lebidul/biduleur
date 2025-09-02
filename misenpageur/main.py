@@ -70,6 +70,10 @@ def make_parser() -> argparse.ArgumentParser:
     p.add_argument("--html",   help="Forcer le chemin du HTML d'entrée (sinon cfg.input_html)")
     p.add_argument("--cover",  help="Surcharger l'image de couverture (sinon cfg.cover_image)")
 
+    # Paramètres ours
+    p.add_argument("--auteur-couv", default="", help="Crédit visuel de couverture (remplace @Steph dans l’ours)")
+    p.add_argument("--auteur-couv-url", default="", help="URL associée au crédit visuel (hyperlien)")
+
     # Export Scribus (pas de défaut => opt-in)
     p.add_argument("--scribus-script", default="bidul/bidul.scribus.py", help="Chemin du script Scribus .py à générer")
     p.add_argument("--scribus-sla", default="bidul/bidul.sla", help="Chemin du .sla que le script enregistrera")
@@ -111,6 +115,9 @@ def main(argv: list[str] | None = None) -> int:
             print("[WARN] --cover fourni mais introuvable :", cover_path)
         else:
             cfg.cover_image = str(cover_path)
+
+    if args.auteur_couv != "":     cfg.auteur_couv = args.auteur_couv
+    if args.auteur_couv_url != "": cfg.auteur_couv_url = args.auteur_couv_url
 
     # Sanity : que doit-on générer ?
     want_pdf = not args.scribus_only

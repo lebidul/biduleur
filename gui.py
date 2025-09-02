@@ -1,11 +1,12 @@
 # bidul/gui.py
+# -*- coding: utf-8 -*-
 import os
 import sys
 import tkinter as tk
 from tkinter import filedialog, messagebox
 from tkinter import ttk
 from pathlib import Path
-import importlib.resources as res  # <-- pour lire les modèles embarqués
+import importlib.resources as res
 
 # --- import biduleur (HTML) ---
 from biduleur.csv_utils import parse_bidul
@@ -36,6 +37,7 @@ def _default_paths_from_input(input_file: str) -> dict:
 
 
 def _project_defaults() -> dict:
+    # racine = dossier parent de ce gui.py (repo root si tu gardes la structure)
     repo_root = Path(__file__).resolve().parent
     cfg = repo_root / "misenpageur" / "config.yml"
     lay = repo_root / "misenpageur" / "layout.yml"
@@ -43,7 +45,14 @@ def _project_defaults() -> dict:
 
 
 def _load_cfg_defaults() -> dict:
-    out = {"cover": "", "ours_md": "", "logos_dir": ""}
+    """Lit quelques valeurs par défaut depuis config.yml (si possible)."""
+    out = {
+        "cover": "",
+        "ours_md": "",
+        "logos_dir": "",
+        "auteur_couv": "",
+        "auteur_couv_url": "",
+    }
     if _IMPORT_ERR:
         return out
     try:
@@ -52,6 +61,8 @@ def _load_cfg_defaults() -> dict:
         out["cover"] = cfg.cover_image or ""
         out["ours_md"] = cfg.ours_md or ""
         out["logos_dir"] = cfg.logos_dir or ""
+        out["auteur_couv"] = getattr(cfg, "auteur_couv", "") or ""
+        out["auteur_couv_url"] = getattr(cfg, "auteur_couv_url", "") or ""
     except Exception:
         pass
     return out
@@ -69,13 +80,20 @@ def run_pipeline(input_file: str,
                  out_html: str,
                  out_agenda_html: str,
                  out_pdf: str,
-                 out_scribus_py: str) -> tuple[bool, str]:
+                 out_scribus_py: str,
+                 auteur_couv: str,
+                 auteur_couv_url: str) -> tuple[bool, str]:
+    """
+    Enchaîne : XLS/CSV -> (biduleur) -> 2 HTML -> (misenpageur) -> PDF (+ Scribus optionnel)
+    """
     if _IMPORT_ERR:
         return False, f"Imports misenpageur impossibles : {repr(_IMPORT_ERR)}"
 
     try:
+        # créer les dossiers de sortie
         for p in (out_html, out_agenda_html, out_pdf, out_scribus_py):
-            _ensure_parent_dir(p)
+            if p:
+                _ensure_parent_dir(p)
 
         # 1) biduleur : produits HTMLs
         html_body_bidul, html_body_agenda, number_of_lines = parse_bidul(input_file)
@@ -94,6 +112,7 @@ def run_pipeline(input_file: str,
         cfg.input_html = out_html
         if out_pdf:
             cfg.output_pdf = out_pdf
+
         if (cover_image or "").strip():
             cfg.cover_image = cover_image.strip()
         if (ours_md or "").strip():
@@ -101,24 +120,40 @@ def run_pipeline(input_file: str,
         if (logos_dir or "").strip():
             cfg.logos_dir = logos_dir.strip()
 
+        # Paramètres ours (nouveaux)
+        if (auteur_couv or "").strip():
+            cfg.auteur_couv = auteur_couv.strip()
+        if (auteur_couv_url or "").strip():
+            cfg.auteur_couv_url = auteur_couv_url.strip()
+
         build_pdf(project_root, cfg, lay, cfg.output_pdf)
 
-        # 3) Scribus : script + .sla
-        scribus_sla = os.path.splitext(out_scribus_py)[0] + ".sla"
-        write_scribus_script(project_root, cfg, lay, out_scribus_py, scribus_sla)
+        # 3) Scribus : script + .sla (OPTIONNEL)
+        scribus_sla = ""
+        if (out_scribus_py or "").strip():
+            scribus_sla = os.path.splitext(out_scribus_py)[0] + ".sla"
+            write_scribus_script(project_root, cfg, lay, out_scribus_py, scribus_sla)
 
-        summary = (
-            f"HTML            : {out_html}\n"
-            f"HTML (agenda)   : {out_agenda_html}\n"
-            f"PDF             : {cfg.output_pdf}\n"
-            f"Scribus script  : {out_scribus_py}\n"
-            f"SLA Scribus     : {scribus_sla}\n"
-            f"Couverture      : {cfg.cover_image or '(cfg)'}\n"
-            f"Ours (Markdown) : {cfg.ours_md or '(cfg)'}\n"
-            f"Logos (dossier) : {cfg.logos_dir or '(cfg)'}\n"
-            f"\nÉvénements : {number_of_lines}"
-        )
-        return True, summary
+        # résumé
+        summary_lines = [
+            f"HTML            : {out_html}",
+            f"HTML (agenda)   : {out_agenda_html}",
+            f"PDF             : {cfg.output_pdf}",
+        ]
+        if scribus_sla:
+            summary_lines += [
+                f"Scribus script  : {out_scribus_py}",
+                f"SLA Scribus     : {scribus_sla}",
+            ]
+        summary_lines += [
+            f"Couverture      : {cfg.cover_image or '(cfg)'}",
+            f"Ours (Markdown) : {cfg.ours_md or '(cfg)'}",
+            f"Logos (dossier) : {cfg.logos_dir or '(cfg)'}",
+            f"Auteur couv     : {getattr(cfg, 'auteur_couv', '') or '(cfg)'}",
+            f"URL auteur couv : {getattr(cfg, 'auteur_couv_url', '') or '(cfg)'}",
+            f"\nÉvénements : {number_of_lines}",
+        ]
+        return True, "\n".join(summary_lines)
 
     except Exception as e:
         return False, f"{type(e).__name__}: {e}"
@@ -126,13 +161,13 @@ def run_pipeline(input_file: str,
 
 def main():
     root = tk.Tk()
-    root.title("Bidul – Pipeline XLS/CSV → HTMLs → PDF + Script Scribus")
-    root.minsize(860, 600)
+    root.title("Bidul – Pipeline XLS/CSV → HTMLs → PDF (+ Scribus)")
+    root.minsize(900, 640)
 
     root.columnconfigure(1, weight=1)
-    for r in range(0, 18):
+    for r in range(0, 24):
         root.rowconfigure(r, weight=0)
-    root.rowconfigure(17, weight=1)
+    root.rowconfigure(23, weight=1)
 
     # Préremplissages depuis config.yml
     cfg_defaults = _load_cfg_defaults()
@@ -142,6 +177,8 @@ def main():
     cover_var = tk.StringVar(value=cfg_defaults.get("cover", ""))
     ours_var = tk.StringVar(value=cfg_defaults.get("ours_md", ""))
     logos_var = tk.StringVar(value=cfg_defaults.get("logos_dir", ""))
+    auteur_var = tk.StringVar(value=cfg_defaults.get("auteur_couv", ""))
+    auteur_url_var = tk.StringVar(value=cfg_defaults.get("auteur_couv_url", ""))
     html_var = tk.StringVar()
     agenda_var = tk.StringVar()
     pdf_var = tk.StringVar()
@@ -188,7 +225,7 @@ def main():
         if path:
             entry_var.set(path)
 
-    # ⬇️ Téléchargement des modèles (comme biduleur.main)
+    # Téléchargement des modèles (CSV / XLSX)
     def save_embedded_template(package: str, filename: str, title: str):
         try:
             initial_ext = os.path.splitext(filename)[1].lower()
@@ -208,7 +245,13 @@ def main():
             if not target:
                 return
 
-            data = res.files(package).joinpath(filename).read_bytes()
+            try:
+                data = res.files('biduleur.templates').joinpath(filename).read_bytes()
+            except Exception:
+                # Fallback dev : lire depuis le repo si le package n'est pas importable
+                pkg_root = Path(__file__).resolve().parent / 'biduleur' / 'templates'
+                data = (pkg_root / filename).read_bytes()
+
             with open(target, "wb") as f:
                 f.write(data)
             messagebox.showinfo("Modèle enregistré", f"Fichier enregistré ici :\n{target}")
@@ -216,7 +259,6 @@ def main():
             messagebox.showerror("Erreur", f"Impossible d'enregistrer le modèle : {e}")
 
     # --- UI ---
-
     r = 0
     tk.Label(root, text="Fichier d’entrée (CSV / XLS / XLSX) :").grid(row=r, column=0, sticky="e", padx=8, pady=6)
     tk.Entry(root, textvariable=input_var).grid(row=r, column=1, sticky="ew", padx=8, pady=6)
@@ -236,6 +278,14 @@ def main():
     tk.Label(root, text="Dossier logos :").grid(row=r, column=0, sticky="e", padx=8, pady=6)
     tk.Entry(root, textvariable=logos_var).grid(row=r, column=1, sticky="ew", padx=8, pady=6)
     tk.Button(root, text="Parcourir…", command=pick_logos).grid(row=r, column=2, padx=8, pady=6)
+
+    r += 1
+    tk.Label(root, text="Auteur couverture :").grid(row=r, column=0, sticky="e", padx=8, pady=6)
+    tk.Entry(root, textvariable=auteur_var).grid(row=r, column=1, sticky="ew", padx=8, pady=6)
+
+    r += 1
+    tk.Label(root, text="URL auteur couverture :").grid(row=r, column=0, sticky="e", padx=8, pady=6)
+    tk.Entry(root, textvariable=auteur_url_var).grid(row=r, column=1, sticky="ew", padx=8, pady=6)
 
     r += 1
     ttk.Separator(root, orient='horizontal').grid(row=r, column=0, columnspan=3, sticky="ew", padx=8, pady=4)
@@ -293,6 +343,7 @@ def main():
 
     # --- Status & action ---
     status = tk.StringVar(value="Prêt.")
+
     r += 1
     tk.Label(root, textvariable=status, bd=1, relief=tk.SUNKEN, anchor=tk.W).grid(row=r, column=0, columnspan=3, sticky="ew", padx=6, pady=6)
 
@@ -305,6 +356,8 @@ def main():
         h2 = agenda_var.get().strip()
         p1 = pdf_var.get().strip()
         sp = scribus_py_var.get().strip()
+        auteur = auteur_var.get().strip()
+        auteur_url = auteur_url_var.get().strip()
 
         if not inp:
             messagebox.showerror("Erreur", "Veuillez sélectionner un fichier d’entrée.")
@@ -313,7 +366,11 @@ def main():
         status.set("Traitement en cours…")
         root.update_idletasks()
 
-        ok, msg = run_pipeline(inp, cov, ours, logos, h1, h2, p1, sp)
+        ok, msg = run_pipeline(
+            inp, cov, ours, logos,
+            h1, h2, p1, sp,
+            auteur, auteur_url
+        )
         if ok:
             messagebox.showinfo("Succès", msg)
             status.set("Terminé.")

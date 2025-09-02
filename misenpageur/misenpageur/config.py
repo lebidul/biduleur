@@ -40,6 +40,8 @@ class Config:
     logos_dir: str = "assets/logos"
     cover_image: str = ""
     ours_md: str = "assets/ours.md"
+    auteur_couv: str = ""
+    auteur_couv_url: str = ""
 
     # --- typo ---
     font_name: str = "Helvetica"
@@ -102,6 +104,10 @@ class Config:
         setv("cover_image", "cover_image", str)
         setv("ours_md", "ours_md", str)
 
+        # >>> AJOUTS : lecture des paramètres ours
+        setv("auteur_couv", "auteur_couv", str)
+        setv("auteur_couv_url", "auteur_couv_url", str)
+
         setv("font_name", "font_name", str)
         setv("leading_ratio", "leading_ratio", float)
         setv("font_size_min", "font_size_min", float)
@@ -161,7 +167,7 @@ class Config:
                 "back_color": flat_bg,
             }
 
-        # normaliser/expanduser certains chemins
+        # normaliser/expanduser certains chemins (uniquement les chemins de fichiers)
         for attr in ("input_html", "template_pdf", "output_pdf", "logos_dir", "cover_image", "ours_md"):
             val = getattr(cfg, attr, "")
             if isinstance(val, str):

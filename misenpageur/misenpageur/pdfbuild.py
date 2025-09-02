@@ -29,6 +29,67 @@ def read_text(path: str) -> str:
         return f.read()
 
 
+# ---------- AJOUT : helpers injection auteur dans l'ours ----------
+
+def _xml_escape(s: str) -> str:
+    return (s.replace("&", "&amp;")
+             .replace("<", "&lt;")
+             .replace(">", "&gt;")
+             .replace('"', "&quot;")
+             .replace("'", "&#39;"))
+
+def _inject_auteur_in_ours(ours_text: str, auteur: str, url: str, max_len: int = 47) -> str:
+    """
+    Met à jour la ligne 'Visuel : ...' dans l’ours :
+      - Incruste 'auteur' (optionnellement cliquable) en respectant une longueur
+        visible max (prefixe 'Visuel : ' + auteur ≤ max_len).
+      - Si la ligne 'Visuel :' n’existe pas, on l’ajoute en fin d’ours.
+      - Si 'auteur' est vide, on garde simplement 'Visuel :' (sans nom).
+    Remarque : on ne touche qu’à la *première* ligne commençant par 'Visuel :'.
+    """
+    prefix = "Visuel : "
+    auteur = (auteur or "").strip()
+    url = (url or "").strip()
+
+    # borner la longueur visible (prefix + auteur)
+    if auteur:
+        visible_total = len(prefix) + len(auteur)
+        if visible_total > max_len:
+            cutoff = max_len - len(prefix)
+            auteur = auteur[:max(0, cutoff)]
+
+    # fabriquer le segment auteur (avec lien si fourni)
+    if not auteur:
+        replacement = prefix.strip()
+    else:
+        if url:
+            # ReportLab comprend <a href="...">...</a> dans Paragraph
+            replacement = f'{prefix}<a href="{_xml_escape(url)}">{_xml_escape(auteur)}</a>'
+        else:
+            replacement = prefix + _xml_escape(auteur)
+
+    lines = ours_text.splitlines()
+
+    # 1) si on trouve une ligne 'Visuel : ...', on remplace
+    for i, ln in enumerate(lines):
+        if ln.strip().startswith("Visuel :"):
+            lines[i] = replacement
+            return "\n".join(lines)
+
+    # 2) sinon, si l’ours contient explicitement "@Steph", on remplace ce token
+    #    par le segment auteur (sans dupliquer 'Visuel : ') si la ligne ne commence pas déjà par 'Visuel :'.
+    #    (Cas de compat rétro si le fichier n’a pas la ligne normalisée.)
+    if "@Steph" in ours_text:
+        repl = _xml_escape(auteur) if not url else f'<a href="{_xml_escape(url)}">{_xml_escape(auteur)}</a>'
+        return ours_text.replace("@Steph", repl)
+
+    # 3) à défaut, on ajoute une ligne à la fin
+    lines.append(replacement)
+    return "\n".join(lines)
+
+# -----------------------------------------------------------------
+
+
 def _simulate_allocation_at_fs(
     c: canvas.Canvas, S, order: List[str], paras: List[str],
     font_name: str, font_size: float, leading_ratio: float, inner_pad: float,
@@ -133,6 +194,18 @@ def build_pdf(project_root: str, cfg: Config, layout: Layout, out_path: str) -> 
         if not ours_text.strip():
             print(f"[WARN] ours_md vide: {ours_path}")
             ours_text = "(Ours vide — remplissez le fichier indiqué dans config.yml)"
+
+    # >>> Injection auteur_couv (+ URL) dans l’ours, borne 47
+    try:
+        ours_text = _inject_auteur_in_ours(
+            ours_text,
+            getattr(cfg, "auteur_couv", "") or "",
+            getattr(cfg, "auteur_couv_url", "") or "",
+            max_len=47
+        )
+    except Exception as _e:
+        # On ne casse pas la génération PDF si l’injection échoue
+        print(f"[WARN] Échec injection auteur dans l’ours: {type(_e).__name__}: {_e}")
 
     logos = list_images(os.path.join(project_root, cfg.logos_dir), max_images=10)
     cover_path = os.path.join(project_root, cfg.cover_image) if cfg.cover_image else ""

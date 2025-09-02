@@ -22,7 +22,7 @@ Nous attendons vos dessins
 pour nos couvertures de l’an
 de grâce 2025 !
 * * * * * * * * * * * * * * * * * * * * * * * *
-Visuel : @Steph
+Visuel : 
 * * * * * * * * * * * * * * * * * * * * * * * *
 Ne pas jeter sur la voie publique
 * * * * * * * * * * * * * * * * * * * * *
