@@ -8,7 +8,7 @@
 - [ ] Config ours, logos, cucaracha
 - [ ] Poster (page 3).
 - [ ] Qualité pdf.
-- [ ] Unit tests
+- [ ] Unit tests.
 
 ## Priorité Moyenne
 - [x] Amélioration lisibilité finale (ex. caractère de bullet point comme paramètre, cadre pour date)
