@@ -1,4 +1,4 @@
-# Liste des TODOs et Améliorations Futures
+# Liste des TODOs et Améliorations Futures [pir le misenpageur]
 
 ## Priorité Élevée
 - [x] Workflow global. csv/xls/xlsx (biduleur) -> pdf (misenpageur)
@@ -13,6 +13,8 @@
 - [ ] Poster (page 3).
 - [ ] Qualité pdf.
 - [ ] Unit tests.
+- [ ] Intégrer logos de Gaelle. 
+- [ ] ours rich as only solution.
 
 ## Priorité Moyenne
 - [x] Amélioration lisibilité finale (ex. caractère de bullet point comme paramètre, cadre pour date)

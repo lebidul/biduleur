@@ -1,154 +1,215 @@
-# -*- coding: utf-8 -*-
-from __future__ import annotations
+# misenpageur/misenpageur/drawing.py
 
 import os
-import re
 from typing import List
 
 from reportlab.pdfgen import canvas
-from reportlab.platypus import Paragraph, KeepInFrame
-from reportlab.lib.styles import ParagraphStyle
-from reportlab.lib.enums import TA_JUSTIFY, TA_CENTER
+from reportlab.lib.units import mm
+from reportlab.lib.enums import TA_CENTER
+from reportlab.platypus import Paragraph, Frame
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.graphics.barcode import qr
 from reportlab.lib.utils import ImageReader
+from reportlab.lib.colors import grey
+from .fonts import register_arial
+from .layout import Layout
+from .config import Config
 
-from .layout import Section
+
+# --- Fonctions existantes (à conserver si vous en avez d'autres) ---
+
+def list_images(path: str, max_images: int = 100) -> List[str]:
+    """Liste les chemins complets des images dans un dossier."""
+    if not os.path.isdir(path):
+        return []
+    res = []
+    for f in sorted(os.listdir(path)):
+        if f.lower().endswith((".png", ".jpg", ".jpeg")):
+            res.append(os.path.join(path, f))
+            if len(res) >= max_images:
+                break
+    return res
 
 
 def paragraph_style(font_name: str, font_size: float, leading_ratio: float) -> ParagraphStyle:
+    """Crée un style de paragraphe de base."""
     return ParagraphStyle(
-        name=f"Body_{font_size:.2f}",
+        "base",
         fontName=font_name,
         fontSize=font_size,
-        leading=max(1.0, font_size * leading_ratio),
-        alignment=TA_JUSTIFY,
-        spaceBefore=0.0,
-        spaceAfter=1.0,
+        leading=font_size * leading_ratio,
     )
 
 
-def list_images(dir_path: str, max_images: int = 10) -> List[str]:
-    if not os.path.isdir(dir_path):
-        return []
-    imgs = [
-        os.path.join(dir_path, p)
-        for p in os.listdir(dir_path)
-        if p.lower().endswith((".png", ".jpg", ".jpeg", ".tif", ".tiff", ".webp"))
-    ]
-    imgs.sort()
-    return imgs[:max_images]
+# --- NOUVELLES FONCTIONS DÉDIÉES À LA SECTION 1 ---
+
+def _draw_ours_column(c: canvas.Canvas, col_coords: tuple, ours_text: str, cfg):
+    """Dessine la colonne de droite de S1 (Ours + QR code)."""
+    x, y, w, h = col_coords
+    s1_cfg = cfg.section_1
+
+    border_width = s1_cfg.get('ours_border_width', 0.5) # Nouvelle config
+    if border_width > 0:
+        c.setLineWidth(border_width)
+        c.setStrokeColor(grey) # Ou une couleur de config
+        c.rect(x, y, w, h)
+
+    # Style du paragraphe, centré
+    styles = getSampleStyleSheet()
+    ours_style = ParagraphStyle(
+        'OursText',
+        parent=styles['Normal'],
+        fontName=s1_cfg['ours_font_name'],
+        fontSize=s1_cfg['ours_font_size'],
+        leading=s1_cfg['ours_font_size'] * s1_cfg['ours_line_spacing'],
+        alignment=TA_CENTER,
+    )
+
+    # QR Code en bas de la colonne
+    qr_code_size = s1_cfg['qr_code_height_mm'] * mm
+    padding = 2 * mm
+    max_qr_size = w - (2 * padding)
+    if qr_code_size > max_qr_size:
+        qr_code_size = max_qr_size
+
+    if qr_code_size > w:
+        qr_code_size = w
+
+    qr_x_pos = x + (w - qr_code_size) / 2
+    qr_y_pos = y + padding
+    qr.QrCode(s1_cfg['qr_code_value'], border=0).drawOn(c, qr_x_pos, qr_y_pos, qr_code_size)
+
+    # Texte de l'ours dans un Frame au-dessus du QR code
+    story = [Paragraph(line.strip(), ours_style) for line in ours_text.split('\n') if line.strip()]
+
+    frame_x = x
+    frame_y = y + qr_code_size
+    frame_w = w
+    frame_h = h - qr_code_size
+    frame = Frame(frame_x, frame_y, frame_w, frame_h, topPadding=5 * mm, showBoundary=0)
+    frame.addFromList(story, c)
 
 
-def draw_s1(
-    c: canvas.Canvas,
-    s1: Section,
-    ours_text: str,
-    logos: List[str],
-    font_name: str,
-    leading_ratio: float,
-    inner_pad: float,
-    s1_split: dict,
-) -> None:
-    # Clip exact de la zone S1 (aucun débordement possible)
+def _draw_logos_column(c: canvas.Canvas, col_coords: tuple, logos: List[str], cfg):
+    """Dessine la colonne de gauche de S1 (Logos + boîte additionnelle)."""
+    x, y, w, h = col_coords
+    s1_cfg = cfg.section_1
+
+    # Calcul des hauteurs des zones
+    additional_box_h = s1_cfg['additional_box_height_mm'] * mm
+    logo_margin = s1_cfg['logo_box_bottom_margin_mm'] * mm
+    logos_h = h - additional_box_h - logo_margin
+
+    # Zone de la boîte additionnelle (en bas)
+    additional_box_coords = (x, y, w, additional_box_h)
+
+    # Zone des logos (au-dessus)
+    logo_zone_coords = (x, y + additional_box_h + logo_margin, w, logos_h)
+
+    # Debug: Dessiner les cadres des zones
     c.saveState()
-    clip = c.beginPath()
-    clip.rect(s1.x, s1.y, s1.w, s1.h)
-    c.clipPath(clip, stroke=0, fill=0)
+    c.setStrokeColor(grey)
+    c.setLineWidth(0.5)
+    c.rect(*additional_box_coords)
+    c.rect(*logo_zone_coords)
+    c.restoreState()
 
-    logos_ratio = s1_split.get("logos_ratio", 0.60)
-    logos_w = s1.w * logos_ratio
-    ours_w = s1.w - logos_w
+    # --- Algorithme de disposition des logos (VERSION SIMPLIFIÉE) ---
+    # NOTE: Ceci est une ébauche qui empile les logos. L'algorithme de packing
+    # optimisé pour remplir l'espace avec des surfaces égales est une étape suivante.
 
-    # --- Zone logos (grille top-align) ---
-    lg_x = s1.x + inner_pad
-    lg_y = s1.y + inner_pad
-    lg_w = max(1.0, logos_w - 2 * inner_pad)
-    lg_h = max(1.0, s1.h - 2 * inner_pad)
-
-    cols = 2
-    rows = max(1, (len(logos) + cols - 1) // cols)
-    cell_w = lg_w / cols
-    cell_h = lg_h / rows
-
-    idx = 0
-    for r in range(rows):
-        for col in range(cols):
-            if idx >= len(logos):
-                break
-            path = logos[idx]
-            idx += 1
-            if not os.path.exists(path):
-                continue
-            cx = lg_x + col * cell_w
-            cy = lg_y + (rows - 1 - r) * cell_h  # ligne 0 en haut
-            img = ImageReader(path)
-            iw, ih = img.getSize()
-            scale = min(cell_w / iw, cell_h / ih)
-            dw, dh = iw * scale, ih * scale
-            dx = cx + (cell_w - dw) / 2.0
-            dy = cy + (cell_h - dh)  # TOP-align dans la cellule
-            c.drawImage(img, dx, dy, dw, dh, preserveAspectRatio=True, mask="auto")
-
-    # --- Zone ours (TOP manuel + centré horizontalement) ---
-    ours_x = s1.x + logos_w + inner_pad
-    ours_y = s1.y + inner_pad
-    ours_wi = max(1.0, ours_w - 2 * inner_pad)
-    ours_hi = max(1.0, s1.h - 2 * inner_pad)
-
-    base = paragraph_style(font_name, 8.5, leading_ratio)
-    style_ours = ParagraphStyle(
-        name="Ours",
-        parent=base,
-        alignment=TA_CENTER,  # centré horizontalement
-        spaceBefore=0.0,
-        spaceAfter=0.0,
-    )
-
-    # Nettoyage minimal (trim + normalisation des retours)
-    ours_txt = (ours_text or "").strip().replace("\r\n", "\n").replace("\r", "\n")
-    ours_txt = re.sub(r"\n{3,}", "\n\n", ours_txt).replace("\n", "<br/>")
-    # Retirer <br/> de tête/queue s'il y en a
-    ours_txt = re.sub(r"^(?:\s*<br/>\s*)+", "", ours_txt)
-    ours_txt = re.sub(r"(?:\s*<br/>\s*)+$", "", ours_txt)
-
-    p = Paragraph(ours_txt, style_ours)
-
-    # Mesure pour top-align manuel
-    _w, ph = p.wrap(ours_wi, ours_hi)
-    offset_y = max(0.0, ours_hi - ph)
-
-    kif = KeepInFrame(
-        maxWidth=ours_wi,
-        maxHeight=ours_hi,
-        content=[p],
-        hAlign="LEFT",
-        vAlign="BOTTOM",  # avec offset -> haut du texte au sommet de la zone
-        mode="shrink",
-    )
-
-    c.translate(ours_x, ours_y + offset_y)
-    kif.wrapOn(c, ours_wi, ours_hi)
-    kif.drawOn(c, 0, 0)
-
-    c.restoreState()  # fin S1
-
-
-def draw_s2_cover(c: canvas.Canvas, s2: Section, cover_path: str, inner_pad: float) -> None:
-    if not (cover_path and os.path.exists(cover_path)):
+    zone_x, zone_y, zone_w, zone_h = logo_zone_coords
+    if not logos or zone_h <= 0:
         return
 
-    # Clip exact au rectangle S2 (sans padding)
-    x, y, w, h = s2.x, s2.y, s2.w, s2.h
+    num_logos = len(logos)
+    cols = 2
+    # Calculer le nombre de lignes nécessaires (arrondi au supérieur)
+    rows = (num_logos + cols - 1) // cols
 
-    img = ImageReader(cover_path)
-    iw, ih = img.getSize()
-    scale = max(w / iw, h / ih)  # "cover" intégral
-    dw, dh = iw * scale, ih * scale
-    dx = x + (w - dw) / 2.0
-    dy = y + (h - dh) / 2.0
+    if rows == 0: return
 
-    c.saveState()
-    p = c.beginPath()
-    p.rect(x, y, w, h)
-    c.clipPath(p, stroke=0, fill=0)
-    c.drawImage(img, dx, dy, dw, dh, preserveAspectRatio=True, mask="auto")
-    c.restoreState()
+    cell_w = zone_w / cols
+    cell_h = zone_h / rows
+    padding = 1 * mm  # Petit espace autour de chaque logo dans sa cellule
+
+    for i, logo_path in enumerate(logos):
+        row = rows - 1 - (i // cols)  # On commence par le haut (ligne 0 = en haut)
+        col = i % cols
+
+        # Calculer les coordonnées de la cellule
+        cell_x = zone_x + col * cell_w
+        cell_y = zone_y + row * cell_h
+
+        try:
+            img = ImageReader(logo_path)
+            img_w, img_h = img.getSize()
+            aspect = img_h / img_w if img_w > 0 else 1
+
+            # Redimensionner pour tenir dans la cellule (en gardant les proportions)
+            # D'abord, on ajuste à la largeur de la cellule
+            w_fit = cell_w - (2 * padding)
+            h_fit = w_fit * aspect
+
+            # Si ça dépasse en hauteur, on ajuste à la hauteur
+            if h_fit > cell_h - (2 * padding):
+                h_fit = cell_h - (2 * padding)
+                w_fit = h_fit / aspect
+
+            # Centrer l'image dans sa cellule
+            logo_x = cell_x + (cell_w - w_fit) / 2
+            logo_y = cell_y + (cell_h - h_fit) / 2
+
+            c.drawImage(logo_path, logo_x, logo_y, width=w_fit, height=h_fit, mask='auto')
+
+        except Exception as e:
+            print(f"[WARN] Erreur avec le logo {os.path.basename(logo_path)}: {e}")
+
+
+def draw_s1(c: canvas.Canvas, S1_coords, ours_text: str, logos: List[str], cfg: Config, lay: Layout):
+    """
+    Fonction principale pour dessiner toute la Section 1.
+    Divise S1 en deux colonnes et appelle les fonctions de dessin dédiées.
+    """
+    # Enregistrer la police Arial avant de l'utiliser.
+    register_arial() # <<< AJOUTER CETTE LIGNE
+
+    # S1_coords peut être un dict ou un objet, on accède aux clés
+    try:
+        x, y, w, h = S1_coords.x, S1_coords.y, S1_coords.w, S1_coords.h
+    except AttributeError:
+        x, y, w, h = S1_coords['x'], S1_coords['y'], S1_coords['w'], S1_coords['h']
+
+    # On utilise le ratio du VRAI layout.yml
+    split_ratio = lay.s1_split.get('logos_ratio', 0.5)
+
+    logos_col_width = w * split_ratio
+    ours_col_width = w - logos_col_width
+
+    logos_col_coords = (x, y, logos_col_width, h)
+    ours_col_coords = (x + logos_col_width, y, ours_col_width, h)
+
+    _draw_logos_column(c, logos_col_coords, logos, cfg)
+    _draw_ours_column(c, ours_col_coords, ours_text, cfg)
+
+
+def draw_s2_cover(c: canvas.Canvas, S2_coords, image_path: str, inner_pad: float):
+    """Dessine l'image de couverture dans la Section 2."""
+    try:
+        x, y, w, h = S2_coords['x'], S2_coords['y'], S2_coords['w'], S2_coords['h']
+    except TypeError:
+        x, y, w, h = S2_coords.x, S2_coords.y, S2_coords.w, S2_coords.h
+
+    if not image_path or not os.path.exists(image_path):
+        # Fallback si pas d'image : dessine un cadre et un texte
+        c.saveState()
+        c.setStrokeColor(grey)
+        c.rect(x, y, w, h, stroke=1, fill=0)
+        c.setFillColor(grey)
+        c.setFont("Helvetica", 12)
+        c.drawCentredString(x + w / 2, y + h / 2, "(Image de couverture absente)")
+        c.restoreState()
+        return
+
+    # Dessine l'image en la faisant remplir la section (preserveAspectRatio='xMidYMid slice')
+    c.drawImage(image_path, x, y, w, h, preserveAspectRatio=True, anchor='c')

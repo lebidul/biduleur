@@ -6,10 +6,11 @@ from typing import List, Tuple
 
 from reportlab.pdfgen import canvas
 
+# Ces imports sont conservés car ils sont utilisés par le reste de la fonction
 from .config import Config
 from .layout import Layout
 from .html_utils import extract_paragraphs_from_html
-from .drawing import draw_s1, draw_s2_cover, list_images, paragraph_style
+from .drawing import draw_s1, draw_s2_cover, list_images, paragraph_style  # draw_s1 sera la nouvelle fonction
 from .fonts import register_arial_narrow, register_dejavu_sans
 from .spacing import SpacingConfig, SpacingPolicy
 from .textflow import (
@@ -28,12 +29,15 @@ from PIL import Image  # Pillow
 PT_PER_INCH = 72.0
 MM_PER_INCH = 25.4
 
+
 def mm_to_pt(mm: float) -> float:
     return mm * PT_PER_INCH / MM_PER_INCH
+
 
 def _pp_get(cfg, key, default=None):
     pp = getattr(cfg, "prepress", {}) or {}
     return pp.get(key, default)
+
 
 def _effective_dpi(img_px_w: int, img_px_h: int, placed_w_pt: float, placed_h_pt: float) -> float:
     # DPI = pixels / pouces ; pouces = points / 72
@@ -42,6 +46,7 @@ def _effective_dpi(img_px_w: int, img_px_h: int, placed_w_pt: float, placed_h_pt
     dpi_w = img_px_w / (placed_w_pt / PT_PER_INCH)
     dpi_h = img_px_h / (placed_h_pt / PT_PER_INCH)
     return min(dpi_w, dpi_h)
+
 
 def _prepare_cover_for_print(src_path: str, target_w_pt: float, target_h_pt: float, cfg: Config) -> str:
     """
@@ -74,7 +79,8 @@ def _prepare_cover_for_print(src_path: str, target_w_pt: float, target_h_pt: flo
 
     # Conversion CMYK (avec ou sans profil)
     try:
-        img2 = img.convert("CMYK")  # conversion basique ; pour gestion ICC complète, utiliser LittleCMS via Pillow (ImageCms)
+        img2 = img.convert(
+            "CMYK")  # conversion basique ; pour gestion ICC complète, utiliser LittleCMS via Pillow (ImageCms)
     except Exception:
         img2 = img
 
@@ -102,6 +108,7 @@ def _prepare_cover_for_print(src_path: str, target_w_pt: float, target_h_pt: flo
 
     return str(out_path)
 
+
 def _draw_crop_marks(c, page_w_pt: float, page_h_pt: float, bleed_mm: float = 0.0):
     """
     Trace des repères de coupe simples aux quatre coins.
@@ -112,8 +119,8 @@ def _draw_crop_marks(c, page_w_pt: float, page_h_pt: float, bleed_mm: float = 0.
     else:
         bleed_pt = mm_to_pt(bleed_mm)
 
-    mark_len = mm_to_pt(5)      # longueur du trait ~5mm
-    offset   = mm_to_pt(3)      # écart par rapport au bord
+    mark_len = mm_to_pt(5)  # longueur du trait ~5mm
+    offset = mm_to_pt(3)  # écart par rapport au bord
 
     c.saveState()
     c.setStrokeColorRGB(0, 0, 0)
@@ -121,8 +128,8 @@ def _draw_crop_marks(c, page_w_pt: float, page_h_pt: float, bleed_mm: float = 0.
 
     # coin bas-gauche
     x0, y0 = offset, offset
-    c.line(x0, y0, x0 + mark_len, y0)           # horizontal
-    c.line(x0, y0, x0, y0 + mark_len)           # vertical
+    c.line(x0, y0, x0 + mark_len, y0)  # horizontal
+    c.line(x0, y0, x0, y0 + mark_len)  # vertical
 
     # coin bas-droit
     x1, y1 = page_w_pt - offset, offset
@@ -140,6 +147,7 @@ def _draw_crop_marks(c, page_w_pt: float, page_h_pt: float, bleed_mm: float = 0.
     c.line(x3, y3 - mark_len, x3, y3)
 
     c.restoreState()
+
 
 def _ghostscript_pdfx(input_pdf: str, output_pdf: str, icc: str, gs: str = "gswin64c") -> bool:
     """
@@ -168,6 +176,7 @@ def _ghostscript_pdfx(input_pdf: str, output_pdf: str, icc: str, gs: str = "gswi
         print(f"[ERR] Ghostscript non disponible: {e}")
         return False
 
+
 def read_text(path: str) -> str:
     if not os.path.exists(path):
         return ""
@@ -179,10 +188,11 @@ def read_text(path: str) -> str:
 
 def _xml_escape(s: str) -> str:
     return (s.replace("&", "&amp;")
-             .replace("<", "&lt;")
-             .replace(">", "&gt;")
-             .replace('"', "&quot;")
-             .replace("'", "&#39;"))
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace('"', "&quot;")
+            .replace("'", "&#39;"))
+
 
 def _inject_auteur_in_ours(ours_text: str, auteur: str, url: str, max_len: int = 47) -> str:
     """
@@ -233,15 +243,16 @@ def _inject_auteur_in_ours(ours_text: str, auteur: str, url: str, max_len: int =
     lines.append(replacement)
     return "\n".join(lines)
 
+
 # -----------------------------------------------------------------
 
 
 def _simulate_allocation_at_fs(
-    c: canvas.Canvas, S, order: List[str], paras: List[str],
-    font_name: str, font_size: float, leading_ratio: float, inner_pad: float,
-    spacing_policy: SpacingPolicy,
-    bullet_cfg: BulletConfig,
-    date_box: DateBoxConfig,
+        c: canvas.Canvas, S, order: List[str], paras: List[str],
+        font_name: str, font_size: float, leading_ratio: float, inner_pad: float,
+        spacing_policy: SpacingPolicy,
+        bullet_cfg: BulletConfig,
+        date_box: DateBoxConfig,
 ) -> Tuple[dict, int]:
     remaining = list(paras)
     used_by = {}
@@ -260,9 +271,11 @@ def _simulate_allocation_at_fs(
 
 from collections.abc import Mapping
 
+
 def _read_date_box_config(cfg: Config) -> DateBoxConfig:
     """Lit date_box depuis cfg, qu'il soit un dict, un Mapping (OmegaConf, etc.)
     ou un objet-namespace avec attributs. Fallback sur les clés à plat."""
+
     def as_bool(v, default=False):
         if v is None: return default
         if isinstance(v, bool): return v
@@ -303,7 +316,6 @@ def _read_date_box_config(cfg: Config) -> DateBoxConfig:
         border_color=getattr(cfg, "date_box_border_color", "#000000"),
         back_color=getattr(cfg, "date_box_back_color", None),
     )
-
 
 
 def build_pdf(project_root: str, cfg: Config, layout: Layout, out_path: str) -> dict:
@@ -353,7 +365,7 @@ def build_pdf(project_root: str, cfg: Config, layout: Layout, out_path: str) -> 
         # On ne casse pas la génération PDF si l’injection échoue
         print(f"[WARN] Échec injection auteur dans l’ours: {type(_e).__name__}: {_e}")
 
-    logos = list_images(os.path.join(project_root, cfg.logos_dir), max_images=10)
+    logos = list_images(os.path.join(project_root, cfg.logos_dir), max_images=16)  # Augmentation à 16 logos max
     cover_path = os.path.join(project_root, cfg.cover_image) if cfg.cover_image else ""
 
     S = layout.sections
@@ -425,7 +437,12 @@ def build_pdf(project_root: str, cfg: Config, layout: Layout, out_path: str) -> 
         print(f"[WARN] {len(rest_after_p1)} paragraphes non placés (réduire font_size_max ou ajuster layout).")
 
     # --- RENDU : PAGE 1 ---
-    draw_s1(c, S["S1"], ours_text, logos, cfg.font_name, cfg.leading_ratio, cfg.inner_padding, layout.s1_split)
+
+    # ==================== MODIFICATION CI-DESSOUS ====================
+    # On passe l'objet de configuration 'cfg' complet à la nouvelle fonction draw_s1.
+    # L'ancienne fonction prenait plein de paramètres individuels.
+    draw_s1(c, S["S1"], ours_text, logos, cfg, layout)
+    # ====================== FIN DE LA MODIFICATION ======================
 
     # Couverture prétraitée (CMYK + JPEG qualité) selon config prepress
     prepped_cover = cover_path

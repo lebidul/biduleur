@@ -114,6 +114,56 @@ def register_arial_narrow() -> bool:
     ok = _register_family_partial("ArialNarrow", reg, b, i, bi)
     return ok
 
+
+
+def register_arial() -> bool:
+    """
+    Tente d'enregistrer la famille Arial standard (nommée 'Arial' dans ReportLab).
+    Cherche dans C:\\Windows\\Fonts et dans les répertoires de polices du projet/système.
+    Tolère l'absence de certaines variantes (mappées vers Regular).
+    """
+    # Noms Windows typiques
+    win = os.path.join(os.environ.get("WINDIR", "C:\\Windows"), "Fonts")
+    win_candidates = {
+        "regular": [os.path.join(win, "arial.ttf")],
+        "bold": [os.path.join(win, "arialbd.ttf")],
+        "italic": [os.path.join(win, "ariali.ttf")],
+        "bolditalic": [os.path.join(win, "arialbi.ttf")],
+    }
+
+    # Dossiers projet/système
+    roots = _fonts_roots()
+    proj_candidates = {"regular": [], "bold": [], "italic": [], "bolditalic": []}
+    for r in roots:
+        for sub in ("Arial", "arial"): # On cherche dans des sous-dossiers nommés 'Arial'
+            base = os.path.join(r, sub)
+            proj_candidates["regular"]    += [os.path.join(base, "arial.ttf"), os.path.join(r, "arial.ttf")]
+            proj_candidates["bold"]       += [os.path.join(base, "arialbd.ttf"), os.path.join(r, "arialbd.ttf")]
+            proj_candidates["italic"]     += [os.path.join(base, "ariali.ttf"), os.path.join(r, "ariali.ttf")]
+            proj_candidates["bolditalic"] += [os.path.join(base, "arialbi.ttf"), os.path.join(r, "arialbi.ttf")]
+
+    def find_one(kind: str) -> Optional[str]:
+        # Priorité à Windows
+        p = _first_existing(win_candidates[kind])
+        if p:
+            return p
+        # Puis les autres chemins
+        return _first_existing(proj_candidates[kind])
+
+    reg = find_one("regular")
+    b   = find_one("bold")
+    i   = find_one("italic")
+    bi  = find_one("bolditalic")
+
+    if not reg:
+        # Si même la police de base n'est pas trouvée, on abandonne.
+        print("[WARN] Police Arial (regular) introuvable.")
+        return False
+
+    # Enregistre la famille sous le nom 'Arial'
+    ok = _register_family_partial("Arial", reg, b, i, bi)
+    return ok
+
 # -------------------- DejaVu Sans (fallback glyphes: €, ❑) --------------------
 
 def register_dejavu_sans() -> bool:

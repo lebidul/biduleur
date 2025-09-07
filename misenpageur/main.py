@@ -114,88 +114,102 @@ def main(argv: list[str] | None = None) -> int:
 
     root = Path(args.root).resolve()
     cfg_path = Path(args.config).resolve()
-    layout_path = Path(args.layout).resolve()
+    base_layout_path = Path(args.layout).resolve()
 
     if not cfg_path.exists():
         print("[ERR] config.yml introuvable:", cfg_path)
         return 2
-    if not layout_path.exists():
-        print("[ERR] layout.yml introuvable:", layout_path)
+    if not base_layout_path.exists():
+        print("[ERR] layout.yml introuvable:", base_layout_path)
         return 2
 
     from misenpageur.misenpageur.config import Config
     from misenpageur.misenpageur.pdfbuild import build_pdf
     from misenpageur.misenpageur.layout import Layout  # si tu as un loader de layout
+    from misenpageur.misenpageur.layout_builder import build_layout_with_margins
 
     # Charger configuration + layout
     try:
         cfg = Config.from_yaml(str(cfg_path))
-        lay = Layout.from_yaml(str(layout_path))
+        # Construire le layout final avec les marges de la config
+        final_layout_path = build_layout_with_margins(str(base_layout_path), cfg)
+        # Charger le layout depuis ce nouveau fichier temporaire
+        lay = Layout.from_yaml(final_layout_path)
         project_root = str(cfg_path.parent)  # <-- racine des chemins relatifs
     except Exception as e:
         print("[ERR] Lecture config/layout :", e)
         return 2
 
-    # Overrides
-    if args.html:
-        cfg.input_html = str(Path(args.html).resolve())
-    if args.cover:
-        cover_path = Path(args.cover).resolve()
-        if not cover_path.exists():
-            print("[WARN] --cover fourni mais introuvable :", cover_path)
-        else:
-            cfg.cover_image = str(cover_path)
+    try:
+        # Overrides
+        if args.html:
+            cfg.input_html = str(Path(args.html).resolve())
+        if args.cover:
+            cover_path = Path(args.cover).resolve()
+            if not cover_path.exists():
+                print("[WARN] --cover fourni mais introuvable :", cover_path)
+            else:
+                cfg.cover_image = str(cover_path)
 
-    if args.auteur_couv != "":     cfg.auteur_couv = args.auteur_couv
-    if args.auteur_couv_url != "": cfg.auteur_couv_url = args.auteur_couv_url
+        if args.auteur_couv != "":     cfg.auteur_couv = args.auteur_couv
+        if args.auteur_couv_url != "": cfg.auteur_couv_url = args.auteur_couv_url
 
-    # Sanity : que doit-on générer ?
-    want_pdf = not args.scribus_only
-    want_scribus = not args.pdf_only and (args.scribus_script and args.scribus_sla)
+        # Sanity : que doit-on générer ?
+        want_pdf = not args.scribus_only
+        want_scribus = not args.pdf_only and (args.scribus_script and args.scribus_sla)
 
-    if want_pdf and not args.out:
-        print("[ERR] --out est requis pour générer le PDF (ou passe --scribus-only).")
-        return 2
+        if want_pdf and not args.out:
+            print("[ERR] --out est requis pour générer le PDF (ou passe --scribus-only).")
+            return 2
 
-    # Générer le PDF si demandé
-    if want_pdf:
-        out_pdf = Path(args.out).resolve()
-        out_pdf.parent.mkdir(parents=True, exist_ok=True)
+        # Générer le PDF si demandé
+        if want_pdf:
+            out_pdf = Path(args.out).resolve()
+            out_pdf.parent.mkdir(parents=True, exist_ok=True)
 
-        # La config peut aussi spécifier output_pdf ; on favorise l'argument CLI
-        cfg.output_pdf = str(out_pdf)
+            # La config peut aussi spécifier output_pdf ; on favorise l'argument CLI
+            cfg.output_pdf = str(out_pdf)
 
-        try:
-            report = build_pdf(str(root), cfg, lay, str(out_pdf))
-            print("[OK] PDF généré :", out_pdf)
-            if isinstance(report, dict) and report.get("unused_paragraphs"):
-                print("[WARN]", report["unused_paragraphs"], "paragraphes non placés")
-        except Exception as e:
-            print("[ERR] Échec build PDF :", e)
-            # on n'arrête pas si l'utilisateur veut quand même Scribus derrière
-            if not want_scribus:
+            import traceback
+
+            try:
+                report = build_pdf(str(root), cfg, lay, str(out_pdf))
+                print("[OK] PDF généré :", out_pdf)
+                if isinstance(report, dict) and report.get("unused_paragraphs"):
+                    print("[WARN]", report["unused_paragraphs"], "paragraphes non placés")
+            except Exception as e:
+                print("[ERR] Échec build PDF :", e)
+                traceback.print_exc()
+                # on n'arrête pas si l'utilisateur veut quand même Scribus derrière
+                if not want_scribus:
+                    return 2
+
+        # Générer script Scribus + .sla si demandé
+        if want_scribus:
+            if not _HAS_SCRIBUS_EXPORT:
+                print("[ERR] L'export Scribus n'est pas disponible (module scribus_export manquant).")
                 return 2
 
-    # Générer script Scribus + .sla si demandé
-    if want_scribus:
-        if not _HAS_SCRIBUS_EXPORT:
-            print("[ERR] L'export Scribus n'est pas disponible (module scribus_export manquant).")
-            return 2
+            script_path = Path(args.scribus_script).resolve()
+            sla_path = Path(args.scribus_sla).resolve()
+            script_path.parent.mkdir(parents=True, exist_ok=True)
+            sla_path.parent.mkdir(parents=True, exist_ok=True)
 
-        script_path = Path(args.scribus_script).resolve()
-        sla_path = Path(args.scribus_sla).resolve()
-        script_path.parent.mkdir(parents=True, exist_ok=True)
-        sla_path.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                write_scribus_script(str(root), cfg, lay, str(script_path), str(sla_path))
+                print("[OK] Script Scribus généré :", script_path)
+                print("     Ouvre Scribus puis : Script → Exécuter un script… →", script_path.name)
+                print("     Le script crée les cadres S1..S6 et enregistre :", sla_path)
+                print("     Astuce (GUI silencieux) :", "scribus -g -py", script_path)
+            except Exception as e:
+                print("[ERR] Échec génération script Scribus :", e)
+                return 2
 
-        try:
-            write_scribus_script(str(root), cfg, lay, str(script_path), str(sla_path))
-            print("[OK] Script Scribus généré :", script_path)
-            print("     Ouvre Scribus puis : Script → Exécuter un script… →", script_path.name)
-            print("     Le script crée les cadres S1..S6 et enregistre :", sla_path)
-            print("     Astuce (GUI silencieux) :", "scribus -g -py", script_path)
-        except Exception as e:
-            print("[ERR] Échec génération script Scribus :", e)
-            return 2
+    finally:
+        # --- Ce bloc s'exécute toujours, même en cas d'erreur ---
+        if os.path.exists(final_layout_path):
+            os.remove(final_layout_path)
+            print(f"[INFO] Fichier de layout temporaire supprimé : {final_layout_path}")
 
     return 0
 
