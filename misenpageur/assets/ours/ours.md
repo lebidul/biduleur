@@ -1,8 +1,7 @@
-Le Le Bidul, agenda culturel, mensuel et
-0€ depuis février 1997, édité par
-l'association, loi de 1901, ayant pour but
-la promotion du spectacle vivant.
+Le Bidul, agenda culturel, mensuel et 0€ depuis février 1997, édité par l'association, loi de 1901, ayant pour but la promotion du spectacle vivant.
+
 Les Arts Services
+
 16, rue Guillaume Apollinaire
 72000 LE MANS
 Courriel : lebidul@live.fr
@@ -25,4 +24,4 @@ de grâce 2025 !
 Visuel : 
 * * * * * * * * * * * * * * * * * * * * * * * *
 Ne pas jeter sur la voie publique
-* * * * * * * * * * * * * * * * * * * * *
+* * * * * * * * * * * * * * * * * * * * * * * *

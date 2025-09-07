@@ -80,7 +80,7 @@ auteur_couv_url: ""
 
 # Qualité impression / prépresse
 prepress:
-  convert_images: true          # Convertir les images en CMYK avant insertion
+  convert_images: false          # Convertir les images en CMYK avant insertion
   jpeg_quality: 95              # Qualité JPEG lors de la conversion (85–100)
   min_effective_dpi: 300        # Alerte si l'image descend sous ce DPI
   max_effective_dpi: 450        # (optionnel) Surdimension > ce DPI -> on peut réduire (pour le poids)
@@ -99,19 +99,23 @@ s1_split:
   gutter: 6            # (optionnel) gouttière verticale entre logos et ours
 
 pdf_layout:
-  page_margin_mm: 2 # Marge globale sur la page A4, en millimètres
+  page_margin_mm: 1 # Marge globale sur la page A4, en millimètres
   section_spacing_mm: 2 # Espacement entre les sections A5, si désiré
 
 section_1:
   # Configuration de la colonne "Ours"
   ours_font_name: "Arial"      # Police de l'ours
-  ours_font_size: 8            # Taille de la police de l'ours
-  ours_line_spacing: 1.8       # Interlignage (ex: 1.2 = 120%)
+  ours_font_size: 7            # Taille de la police de l'ours
+  ours_line_spacing: 1.4       # Interlignage (ex: 1.2 = 120%)
+  # Configuration titre du QR code
+  qr_code_title: "Agenda culturel"
+  qr_code_title_font_name: "Arial-Bold"
+  qr_code_title_font_size: 9
 
   # Configuration du QR Code
   qr_code_value: "https://www.lebidul.com" # L'URL ou le texte du QR code
-  qr_code_height_mm: 50        # Hauteur (et largeur) du QR code en mm
+  qr_code_height_mm: 30        # Hauteur (et largeur) du QR code en mm
 
   # Configuration de la colonne "Logos"
-  additional_box_height_mm: 20 # Hauteur de la "boîte additionnelle" sous les logos
+  additional_box_height_mm: 0 # Hauteur de la "boîte additionnelle" sous les logos
   logo_box_bottom_margin_mm: 0 # Marge entre la zone des logos et la boîte additionnelle
