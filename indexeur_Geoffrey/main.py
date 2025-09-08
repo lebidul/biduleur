@@ -32,7 +32,7 @@ def convertir_pdf_en_images(chemin_pdf, dossier_sortie):
     noms_images = []
     for i, page in enumerate(doc):
         pix = page.get_pixmap(dpi=200)
-        nom_image = f"{os.path.splitext(os.path.basename(chemin_pdf))[0]}_page{i+1}.png"
+        nom_image = f"{i+1}-{os.path.splitext(os.path.basename(chemin_pdf))[0]}.png"
         chemin_image = os.path.join(dossier_sortie, nom_image)
         pix.save(chemin_image)
         noms_images.append(chemin_image)
@@ -59,58 +59,41 @@ def traiter_un_pdf(chemin_pdf, dossier_sortie_temporaire):
     
     return dossier_images_temporaire
 
-
-
-
 def decoupe_selon_date(images_pages):
+    # regex pour extraire le numéro XXX dans "AAAA-MM Bidul XXX.ext"
+    pattern = re.compile(r".*(\d{3})(?=\.\w+$)")
+    
+    fichiers_valides = []  # on stockera ici les fichiers qui passent la condition
+    
     for image_path in images_pages:
-        fichier = os.path.basename(image_path)
-        try:
-            # Récupère la date au format YYYY-MM
-            date_str = fichier[:7]
-            annee = int(fichier[:4])
-            mois = int(fichier[5:7])
-            date_pdf = datetime(annee, mois, 1)
+        fichier = os.path.basename(image_path)  # nom sans le chemin complet
+        
+        match = pattern.match(fichier)
+        page = fichier[0]  # extrait le premier caractère (numéro de page)
+        
+        
+        if match:
+            numero = int(match.group(1))
+            page = int(page)
+            
+            
+            # condition sur le numéro
+            if 1990 < numero:
+                decoupe_apres_2000(image_path)
+                print("ahhhhhhhhh")
+            else :
 
-            # Vérifie si c'est un "_page3.png"
-            est_page3 = re.search(r'_page3\.png$', fichier) is not None
-
-            # Vérifie si c'est une première page
-            est_page1 = re.search(r'_page1\.png$', fichier) is not None
-
-            # Vérifie la règle spéciale "Bidul après mars 2019"
-            est_bidul_apres_2019_03 = ("Bidul" in fichier) and (date_pdf >= datetime(2019, 3, 1))
-
-            # Vérifie la règle spéciale "Bidul numéro 174–227"
-            match_numero = re.search(r'Bidul-(\d+)', fichier)
-            numero = int(match_numero.group(1)) if match_numero else None
-            est_bidul_numero_174_227 = ("Bidul" in fichier) and numero and 174 <= numero <= 227
-
-            # === Nouvelle priorité : découpe horizontale pour page1 ===
-            if est_page1 and est_bidul_numero_174_227:
-                print(f"✂️ Découpe horizontale spéciale (Bidul 174–227, page1) pour {image_path}")
-                decoupe_horizontal(image_path)
-                continue
-
-            # === Règles existantes ===
-            if annee < 2000:
-                if est_page3:
-                    print(f"✂️ Découpe spéciale en 3 (avant 2000) pour {image_path}")
+                if numero >= 242 and page == 3: #page 3 a découper en 3 colonnes
                     decoupe_en_3(image_path)
-                else:
-                    decoupe_avant_2000(image_path)
-            else:
-                if est_page3 and est_bidul_apres_2019_03:
-                    print(f"✂️ Découpe spéciale en 3 (après 2019-03 Bidul) pour {image_path}")
-                    decoupe_en_3(image_path)
+
+                elif 174 <= numero <= 227 and page == 1: #première page de Bidul avec un texte horizontal
+                    decoupe_horizontal(image_path)
                 else:
                     decoupe_apres_2000(image_path)
-
-        except ValueError:
-            print(f"⚠️ Impossible de déterminer l'année pour {fichier}, découpe par défaut (après 2000).")
-            decoupe_apres_2000(image_path)
-
-
+                    
+                    
+        else:
+            print(f"⚠️ Nomenclature incorrecte : {fichier}")
 
 
 
