@@ -35,3 +35,32 @@ def decoupe_apres_2000(image_path):
     gauche.save(gauche_path)
     droite.save(droite_path)
     print(f"✂️ Découpe >=2000 : {gauche_path} + {droite_path}")
+    
+    
+
+
+# Découpe spéciale en 3 colonnes égales
+def decoupe_en_3(image_path):
+    img = Image.open(image_path)
+    largeur, hauteur = img.size
+    tiers = largeur // 3  # largeur d'une colonne
+
+    # Découpage en 3 parties
+    col1 = img.crop((0, 0, tiers, hauteur))
+    col2 = img.crop((tiers, 0, 2 * tiers, hauteur))
+    col3 = img.crop((2 * tiers, 0, largeur, hauteur))
+
+    base = image_path.rsplit(".", 1)[0]
+    dossier = os.path.join(os.path.dirname(image_path), "découpé")
+    os.makedirs(dossier, exist_ok=True)
+
+    col1_path = os.path.join(dossier, f"{os.path.basename(base)}_col1.png")
+    col2_path = os.path.join(dossier, f"{os.path.basename(base)}_col2.png")
+    col3_path = os.path.join(dossier, f"{os.path.basename(base)}_col3.png")
+
+    col1.save(col1_path)
+    col2.save(col2_path)
+    col3.save(col3_path)
+
+    print(f"✂️ Découpe en 3 colonnes : {col1_path} + {col2_path} + {col3_path}")
+

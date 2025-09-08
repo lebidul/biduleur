@@ -1,7 +1,10 @@
 import os
 import fitz  # PyMuPDF
 import shutil
-from DecoupePages import decoupe_avant_2000, decoupe_apres_2000
+from datetime import datetime
+import time
+
+from DecoupePages import decoupe_avant_2000, decoupe_apres_2000, decoupe_en_3
 from Tesseract import traiter_images_decoupees_via_tesseract
 from Misatral import traiter_images_decoupees_via_mistral
 
@@ -56,21 +59,45 @@ def traiter_un_pdf(chemin_pdf, dossier_sortie_temporaire):
     return dossier_images_temporaire
 
 
+import re
+
+
+
 def decoupe_selon_date(images_pages):
-    # Découpe selon la date
     for image_path in images_pages:
         fichier = os.path.basename(image_path)
         try:
+            # On récupère l'année et le mois (ex: "2019-03")
+            date_str = fichier[:7]  # "YYYY-MM"
             annee = int(fichier[:4])
+            mois = int(fichier[5:7])
+            date_pdf = datetime(annee, mois, 1)
+
+            # Condition : le fichier est "_page3.png"
+            est_page3 = re.search(r'_page3\.png$', fichier) is not None
+
+            # Condition : date >= mars 2019 et "Bidul" présent dans le nom
+            est_bidul_apres_2019_03 = ("Bidul" in fichier) and (date_pdf >= datetime(2019, 3, 1))
+
+            # Cas des PDF avant 2000
             if annee < 2000:
                 print(f"✂️ Découpe pour PDF avant 2000 : {image_path}")
-                decoupe_avant_2000(image_path)
-            else:
-                print(f"✂️ Découpe pour PDF après 2000 : {image_path}")
                 decoupe_apres_2000(image_path)
+
+            else:
+                # Cas des PDF après 2000
+                if est_page3 and est_bidul_apres_2019_03:
+                    print(f"✂️ Découpe spéciale en 3 (après 2019-03 Bidul) pour {image_path}")
+                    decoupe_en_3(image_path)
+                else:
+                    print(f"✂️ Découpe pour PDF après 2000 : {image_path}")
+                    decoupe_apres_2000(image_path)
+
         except ValueError:
-            print(f"⚠️  Impossible de déterminer l'année pour {fichier}, découpe par défaut (après 2000).")
+            print(f"⚠️ Impossible de déterminer l'année pour {fichier}, découpe par défaut (après 2000).")
             decoupe_apres_2000(image_path)
+
+
 
 
 def convertir_csv_en_bdd(chemin_csv):
@@ -106,7 +133,7 @@ if __name__ == "__main__":
     
     # Choix de l'OCR
     #i_orc = choix_de_ORC()
-    i_orc = 1  # Pour le test, on force l'utilisation de Mistral
+    i_orc = 3  # Pour le test, on force l'utilisation de Mistral
 
     # 1. Lister tous les fichiers PDF dans le dossier source
     fichiers_pdf_a_traiter = []
@@ -133,6 +160,8 @@ if __name__ == "__main__":
                 continue
 
             # Appliquer le traitement OCR choisi
+            input("Appuyez sur Entrée pour continuer...")
+
             if i_orc == 1:
                 print(f"🔍 Traitement de '{os.path.basename(chemin_pdf)}' avec Mistral OCR...")
                 texte_resultat = traiter_images_decoupees_via_mistral(dossier_images_decoupees, prompt_filepath)
@@ -148,6 +177,9 @@ if __name__ == "__main__":
             elif i_orc == 2:
                 print(f"🔍 Traitement de '{os.path.basename(chemin_pdf)}' avec Tesseract OCR...")
                 traiter_images_decoupees_via_tesseract(dossier_images_decoupees)
+            elif i_orc == 3:
+                #nothing for now
+                print("🔍 OCR non implémenté pour le moment.")
             else:
                 print("❌ Aucune OCR sélectionnée, arrêt du traitement.")
                 break 
