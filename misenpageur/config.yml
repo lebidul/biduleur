@@ -108,7 +108,7 @@ s1_split:
   gutter: 6            # (optionnel) gouttière verticale entre logos et ours
 
 pdf_layout:
-  page_margin_mm: 1 # Marge globale sur la page A4, en millimètres
+  page_margin_mm: 5 # Marge globale sur la page A4, en millimètres
   section_spacing_mm: 1 # Espacement entre les sections A5, si désiré
 
 section_1:

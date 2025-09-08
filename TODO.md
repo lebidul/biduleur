@@ -1,7 +1,7 @@
 # Liste des TODOs et Améliorations Futures pour le bidul GUI et CLI
 
 ## Priorité Élevée
-- [ ] Infos couv (flag couv/no couv, nom dessinat.eur.rice + hyperlink) (gui + cli)
+- [x] Infos couv (flag couv/no couv, nom dessinat.eur.rice + hyperlink) (gui + cli)
 - [ ] Fichier .scribus.py comme argument dans cli.
 - [x] Ajouter fichiers templates csv et xlsx.
 - [x] Fichier release notes

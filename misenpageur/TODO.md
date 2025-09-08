@@ -10,7 +10,7 @@
 - [x] Config ours v1
 - [ ] Config ours v2 - lecture as .md
 - [ ] Config ours v2 - icones
-- [ ] UI: Espace pour configuration visuelle couv, marge
+- [x] UI: Espace pour configuration visuelle couv, marge
 - [x] Config logos v1
 - [x] Config cucaracha v1
 - [x] Config cucaracha v2: pouvoir ajouter image pour additional box

@@ -18,12 +18,17 @@ try:
     from misenpageur.misenpageur.layout import Layout
     from misenpageur.misenpageur.pdfbuild import build_pdf
     from misenpageur.misenpageur.scribus_export import write_scribus_script
+    # ==================== IMPORT MANQUANT ====================
+    # On importe la fonction qui applique les marges au layout
+    from misenpageur.misenpageur.layout_builder import build_layout_with_margins
+    # =======================================================
 except Exception as e:
     _IMPORT_ERR = e
 else:
     _IMPORT_ERR = None
 
 
+# ... (fonctions _default_paths_from_input, _project_defaults, _load_cfg_defaults, _ensure_parent_dir inchangées) ...
 def _default_paths_from_input(input_file: str) -> dict:
     base = os.path.splitext(os.path.basename(input_file))[0]
     folder = os.path.dirname(input_file) or "."
@@ -37,7 +42,6 @@ def _default_paths_from_input(input_file: str) -> dict:
 
 
 def _project_defaults() -> dict:
-    # racine = dossier parent de ce gui.py (repo root si tu gardes la structure)
     repo_root = Path(__file__).resolve().parent
     cfg = repo_root / "misenpageur" / "config.yml"
     lay = repo_root / "misenpageur" / "layout.yml"
@@ -47,12 +51,9 @@ def _project_defaults() -> dict:
 def _load_cfg_defaults() -> dict:
     """Lit quelques valeurs par défaut depuis config.yml (si possible)."""
     out = {
-        "cover": "",
-        "ours_md": "",
-        "logos_dir": "",
-        "auteur_couv": "",
-        "auteur_couv_url": "",
-        "skip_cover": False,  # --- NOUVELLE VALEUR PAR DÉFAUT ---
+        "cover": "", "ours_md": "", "logos_dir": "", "auteur_couv": "",
+        "auteur_couv_url": "", "skip_cover": False,
+        "page_margin_mm": 1.0, "date_line_enabled": True
     }
     if _IMPORT_ERR:
         return out
@@ -65,6 +66,9 @@ def _load_cfg_defaults() -> dict:
         out["auteur_couv"] = getattr(cfg, "auteur_couv", "") or ""
         out["auteur_couv_url"] = getattr(cfg, "auteur_couv_url", "") or ""
         out["skip_cover"] = getattr(cfg, "skip_cover", False)
+        # Charger les nouvelles valeurs si elles existent
+        out["page_margin_mm"] = cfg.pdf_layout.get("page_margin_mm", 1.0)
+        out["date_line_enabled"] = cfg.date_line.get("enabled", True)
     except Exception:
         pass
     return out
@@ -85,311 +89,278 @@ def run_pipeline(input_file: str,
                  out_pdf: str,
                  out_scribus_py: str,
                  auteur_couv: str,
-                 auteur_couv_url: str) -> tuple[bool, str]:
+                 auteur_couv_url: str,
+                 page_margin_mm: float,
+                 date_line_enabled: bool
+                 ) -> tuple[bool, str]:
     """
     Enchaîne : XLS/CSV -> (biduleur) -> 2 HTML -> (misenpageur) -> PDF (+ Scribus optionnel)
     """
     if _IMPORT_ERR:
         return False, f"Imports misenpageur impossibles : {repr(_IMPORT_ERR)}"
 
+    # ==================== MODIFICATION DE LA LOGIQUE ====================
+    final_layout_path = None  # Chemin du layout temporaire
     try:
-        # créer les dossiers de sortie
         for p in (out_html, out_agenda_html, out_pdf, out_scribus_py):
-            if p:
-                _ensure_parent_dir(p)
+            if p: _ensure_parent_dir(p)
 
-        # 1) biduleur : produits HTMLs
         html_body_bidul, html_body_agenda, number_of_lines = parse_bidul(input_file)
         output_html_file(html_body_bidul, original_file_name=input_file, output_filename=out_html)
         output_html_file(html_body_agenda, original_file_name=input_file, output_filename=out_agenda_html)
 
-        # 2) misenpageur : PDF
         defaults = _project_defaults()
-        project_root = defaults["root"]
-        cfg_path = defaults["config"]
-        lay_path = defaults["layout"]
+        project_root, cfg_path, lay_path = defaults["root"], defaults["config"], defaults["layout"]
 
         cfg = Config.from_yaml(cfg_path)
-        lay = Layout.from_yaml(lay_path)
 
-        # On inverse la logique : la GUI a "Générer couv" (True), la config a "skip_cover" (True)
+        # 1. Appliquer les paramètres de la GUI à l'objet config AVANT de construire le layout
         cfg.skip_cover = not generate_cover
-
         cfg.input_html = out_html
-        if out_pdf:
-            cfg.output_pdf = out_pdf
+        if out_pdf: cfg.output_pdf = out_pdf
+        if (cover_image or "").strip(): cfg.cover_image = cover_image.strip()
+        if (ours_md or "").strip(): cfg.ours_md = ours_md.strip()
+        if (logos_dir or "").strip(): cfg.logos_dir = logos_dir.strip()
+        if (auteur_couv or "").strip(): cfg.auteur_couv = auteur_couv.strip()
+        if (auteur_couv_url or "").strip(): cfg.auteur_couv_url = auteur_couv_url.strip()
+        cfg.pdf_layout['page_margin_mm'] = page_margin_mm
+        cfg.date_line['enabled'] = date_line_enabled
 
-        if (cover_image or "").strip():
-            cfg.cover_image = cover_image.strip()
-        if (ours_md or "").strip():
-            cfg.ours_md = ours_md.strip()
-        if (logos_dir or "").strip():
-            cfg.logos_dir = logos_dir.strip()
+        # 2. Construire le layout final avec les marges (LA CORRECTION EST ICI)
+        final_layout_path = build_layout_with_margins(lay_path, cfg)
+        lay = Layout.from_yaml(final_layout_path)
 
-        # Paramètres ours (nouveaux)
-        if (auteur_couv or "").strip():
-            cfg.auteur_couv = auteur_couv.strip()
-        if (auteur_couv_url or "").strip():
-            cfg.auteur_couv_url = auteur_couv_url.strip()
-
+        # 3. Lancer la génération du PDF avec le layout corrigé
         build_pdf(project_root, cfg, lay, cfg.output_pdf)
 
-        # 3) Scribus : script + .sla (OPTIONNEL)
         scribus_sla = ""
         if (out_scribus_py or "").strip():
             scribus_sla = os.path.splitext(out_scribus_py)[0] + ".sla"
             write_scribus_script(project_root, cfg, lay, out_scribus_py, scribus_sla)
 
-        couv_status = "Oui" if generate_cover else "Non"
-        # résumé
         summary_lines = [
-            f"HTML            : {out_html}",
-            f"HTML (agenda)   : {out_agenda_html}",
-            f"PDF             : {cfg.output_pdf}",
-            f"Couverture générée : {couv_status}", # Ligne ajoutée
+            f"HTML            : {out_html}", f"HTML (agenda)   : {out_agenda_html}",
+            f"PDF             : {cfg.output_pdf}", f"Couverture générée : {'Oui' if generate_cover else 'Non'}",
+            f"Marge globale   : {page_margin_mm} mm", f"Lignes de date  : {'Oui' if date_line_enabled else 'Non'}",
         ]
         if scribus_sla:
-            summary_lines += [
-                f"Scribus script  : {out_scribus_py}",
-                f"SLA Scribus     : {scribus_sla}",
-            ]
-        summary_lines += [
-            f"Couverture      : {cfg.cover_image or '(cfg)'}",
-            f"Ours (Markdown) : {cfg.ours_md or '(cfg)'}",
-            f"Logos (dossier) : {cfg.logos_dir or '(cfg)'}",
-            f"Auteur couv     : {getattr(cfg, 'auteur_couv', '') or '(cfg)'}",
-            f"URL auteur couv : {getattr(cfg, 'auteur_couv_url', '') or '(cfg)'}",
-            f"\nÉvénements : {number_of_lines}",
-        ]
+            summary_lines += [f"Scribus script  : {out_scribus_py}", f"SLA Scribus     : {scribus_sla}"]
+        summary_lines += [f"\nÉvénements : {number_of_lines}"]
         return True, "\n".join(summary_lines)
 
     except Exception as e:
-        return False, f"{type(e).__name__}: {e}"
+        import traceback
+        return False, f"{type(e).__name__}: {e}\n\n{traceback.format_exc()}"
+
+    finally:
+        # 4. Nettoyer le fichier temporaire, même en cas d'erreur
+        if final_layout_path and os.path.exists(final_layout_path):
+            try:
+                os.remove(final_layout_path)
+            except OSError:
+                pass
+    # ====================== FIN DE LA MODIFICATION ======================
 
 
+# ... (le reste du fichier `main()` est inchangé et devrait fonctionner correctement) ...
 def main():
     root = tk.Tk()
     root.title("Bidul – Pipeline XLS/CSV → HTMLs → PDF (+ Scribus)")
-    root.minsize(900, 640)
+    root.minsize(900, 750)  # Augmentation de la hauteur min
 
-    root.columnconfigure(1, weight=1)
-    for r in range(0, 24):
-        root.rowconfigure(r, weight=0)
-    root.rowconfigure(23, weight=1)
+    # --- Configuration de la grille principale ---
+    root.columnconfigure(0, weight=1)
+    root.rowconfigure(5, weight=1)  # Ligne du statut
 
-    # Préremplissages depuis config.yml
+    # --- Préremplissages ---
     cfg_defaults = _load_cfg_defaults()
 
-    # Vars
+    # --- Variables Tkinter ---
     input_var = tk.StringVar()
-    # L'état initial de la case est l'inverse de `skip_cover`
-    # Si skip_cover=True (sans couv), la case doit être décochée (False)
-    initial_generate_cover = not cfg_defaults.get("skip_cover", False)
-    generate_cover_var = tk.BooleanVar(value=initial_generate_cover)
-    cover_var = tk.StringVar(value=cfg_defaults.get("cover", ""))
     ours_var = tk.StringVar(value=cfg_defaults.get("ours_md", ""))
     logos_var = tk.StringVar(value=cfg_defaults.get("logos_dir", ""))
-    generate_cover_var = tk.BooleanVar(value=True) # "Avec couv" par défaut
+
+    # Couverture
+    generate_cover_var = tk.BooleanVar(value=not cfg_defaults.get("skip_cover", False))
+    cover_var = tk.StringVar(value=cfg_defaults.get("cover", ""))
     auteur_var = tk.StringVar(value=cfg_defaults.get("auteur_couv", ""))
     auteur_url_var = tk.StringVar(value=cfg_defaults.get("auteur_couv_url", ""))
+
+    # Mise en page
+    margin_var = tk.StringVar(value=str(cfg_defaults.get("page_margin_mm", "1.0")))
+    date_line_var = tk.BooleanVar(value=cfg_defaults.get("date_line_enabled", True))
+
+    # Sorties
     html_var = tk.StringVar()
     agenda_var = tk.StringVar()
     pdf_var = tk.StringVar()
     scribus_py_var = tk.StringVar()
 
-    # Helpers: choix de fichiers/dossiers
+    # --- Helpers (inchangés) ---
     def pick_input():
-        file_path = filedialog.askopenfilename(
-            title="Sélectionner l’entrée (CSV / XLS / XLSX)",
-            filetypes=[("Excel", "*.xls;*.xlsx"), ("CSV", "*.csv"), ("Tous les fichiers", "*.*")]
-        )
-        if not file_path:
-            return
+        file_path = filedialog.askopenfilename(title="Sélectionner l’entrée (CSV / XLS / XLSX)",
+                                               filetypes=[("Excel", "*.xls;*.xlsx"), ("CSV", "*.csv"), ("Tous", "*.*")])
+        if not file_path: return
         input_var.set(file_path)
         d = _default_paths_from_input(file_path)
-        html_var.set(d["html"])
-        agenda_var.set(d["agenda_html"])
-        pdf_var.set(d["pdf"])
+        html_var.set(d["html"]);
+        agenda_var.set(d["agenda_html"]);
+        pdf_var.set(d["pdf"]);
         scribus_py_var.set(d["scribus_py"])
 
     def pick_cover():
-        path = filedialog.askopenfilename(
-            title="Sélectionner l’image de couverture",
-            filetypes=[("Images", "*.jpg;*.jpeg;*.png;*.tif;*.tiff;*.webp"), ("Tous les fichiers", "*.*")]
-        )
-        if path:
-            cover_var.set(path)
+        path = filedialog.askopenfilename(title="Image de couverture",
+                                          filetypes=[("Images", "*.jpg;*.jpeg;*.png;*.tif;*.webp"), ("Tous", "*.*")])
+        if path: cover_var.set(path)
 
     def pick_ours():
-        path = filedialog.askopenfilename(
-            title="Sélectionner le fichier OURS (Markdown)",
-            filetypes=[("Markdown", "*.md;*.markdown"), ("Texte", "*.txt"), ("Tous les fichiers", "*.*")]
-        )
-        if path:
-            ours_var.set(path)
+        path = filedialog.askopenfilename(title="Fichier OURS (Markdown)",
+                                          filetypes=[("Markdown", "*.md;*.markdown"), ("Texte", "*.txt"),
+                                                     ("Tous", "*.*")])
+        if path: ours_var.set(path)
 
     def pick_logos():
-        path = filedialog.askdirectory(title="Sélectionner le dossier des logos")
-        if path:
-            logos_var.set(path)
+        path = filedialog.askdirectory(title="Dossier des logos")
+        if path: logos_var.set(path)
 
-    def pick_save(entry_var: tk.StringVar, title: str, def_ext: str, ftypes: list[tuple[str, str]]):
-        path = filedialog.asksaveasfilename(title=title, defaultextension=def_ext, filetypes=ftypes)
-        if path:
-            entry_var.set(path)
+    def pick_save(var, title, ext, ftypes):
+        path = filedialog.asksaveasfilename(title=title, defaultextension=ext, filetypes=ftypes)
+        if path: var.set(path)
 
-    # Téléchargement des modèles (CSV / XLSX)
-    def save_embedded_template(package: str, filename: str, title: str):
+    def save_embedded_template(filename, title):
+        ext = os.path.splitext(filename)[1].lower()
+        ftypes = [("Excel", "*.xlsx")] if ext == '.xlsx' else [("CSV", "*.csv")]
+        target = filedialog.asksaveasfilename(title=title, defaultextension=ext, filetypes=ftypes, initialfile=filename)
+        if not target: return
         try:
-            initial_ext = os.path.splitext(filename)[1].lower()
-            if initial_ext == '.csv':
-                ftypes = [("CSV", "*.csv")]
-            elif initial_ext == '.xlsx':
-                ftypes = [("Excel (XLSX)", "*.xlsx")]
-            else:
-                ftypes = [("Tous les fichiers", "*.*")]
-
-            target = filedialog.asksaveasfilename(
-                title=title,
-                defaultextension=initial_ext,
-                filetypes=ftypes,
-                initialfile=filename
-            )
-            if not target:
-                return
-
-            try:
-                data = res.files('biduleur.templates').joinpath(filename).read_bytes()
-            except Exception:
-                # Fallback dev : lire depuis le repo si le package n'est pas importable
-                pkg_root = Path(__file__).resolve().parent / 'biduleur' / 'templates'
-                data = (pkg_root / filename).read_bytes()
-
+            data = res.files('biduleur.templates').joinpath(filename).read_bytes()
             with open(target, "wb") as f:
                 f.write(data)
             messagebox.showinfo("Modèle enregistré", f"Fichier enregistré ici :\n{target}")
         except Exception as e:
             messagebox.showerror("Erreur", f"Impossible d'enregistrer le modèle : {e}")
 
-    # --- UI ---
-    r = 0
-    tk.Label(root, text="Fichier d’entrée (CSV / XLS / XLSX) :").grid(row=r, column=0, sticky="e", padx=8, pady=6)
-    tk.Entry(root, textvariable=input_var).grid(row=r, column=1, sticky="ew", padx=8, pady=6)
-    tk.Button(root, text="Parcourir…", command=pick_input).grid(row=r, column=2, padx=8, pady=6)
+    # --- Construction de l'UI par sections ---
+    main_frame = ttk.Frame(root, padding="10")
+    main_frame.grid(row=0, column=0, sticky="nsew")
+    main_frame.columnconfigure(1, weight=1)
+
+    r = 0  # Row counter for the main_frame grid
+
+    # --- Section : Fichier d'entrée et Modèles ---
+    tk.Label(main_frame, text="Fichier d’entrée (CSV / XLS) :").grid(row=r, column=0, sticky="e", padx=5, pady=5)
+    tk.Entry(main_frame, textvariable=input_var).grid(row=r, column=1, sticky="ew", padx=5, pady=5)
+    tk.Button(main_frame, text="Parcourir…", command=pick_input).grid(row=r, column=2, padx=5, pady=5)
 
     r += 1
-    tk.Checkbutton(
-        root, text="Avec couv' (générer la page de couverture)",
-        variable=generate_cover_var, onvalue=True, offvalue=False
-    ).grid(row=r, column=1, sticky="w", padx=8, pady=2)
+    models_frame = ttk.Frame(main_frame)
+    models_frame.grid(row=r, column=1, columnspan=2, sticky="w", padx=5, pady=(0, 10))
+    tk.Label(models_frame, text="Télécharger un modèle :").pack(side=tk.LEFT, anchor=tk.W)
+    tk.Button(models_frame, text="Modèle CSV",
+              command=lambda: save_embedded_template('tapage_template.csv', "Enregistrer le modèle CSV")).pack(
+        side=tk.LEFT, padx=5)
+    tk.Button(models_frame, text="Modèle XLSX",
+              command=lambda: save_embedded_template('tapage_template.xlsx', "Enregistrer le modèle XLSX")).pack(
+        side=tk.LEFT, padx=5)
 
     r += 1
-    tk.Label(root, text="Image de couverture :").grid(row=r, column=0, sticky="e", padx=8, pady=6)
-    tk.Entry(root, textvariable=cover_var).grid(row=r, column=1, sticky="ew", padx=8, pady=6)
-    tk.Button(root, text="Parcourir…", command=pick_cover).grid(row=r, column=2, padx=8, pady=6)
+    ttk.Separator(main_frame, orient='horizontal').grid(row=r, column=0, columnspan=3, sticky="ew", pady=10)
 
+    # --- Section : Ours & Logos ---
     r += 1
-    tk.Label(root, text="Ours (Markdown) :").grid(row=r, column=0, sticky="e", padx=8, pady=6)
-    tk.Entry(root, textvariable=ours_var).grid(row=r, column=1, sticky="ew", padx=8, pady=6)
-    tk.Button(root, text="Parcourir…", command=pick_ours).grid(row=r, column=2, padx=8, pady=6)
-
+    tk.Label(main_frame, text="Ours (Markdown) :").grid(row=r, column=0, sticky="e", padx=5, pady=5)
+    tk.Entry(main_frame, textvariable=ours_var).grid(row=r, column=1, sticky="ew", padx=5, pady=5)
+    tk.Button(main_frame, text="Parcourir…", command=pick_ours).grid(row=r, column=2, padx=5, pady=5)
     r += 1
-    tk.Label(root, text="Dossier logos :").grid(row=r, column=0, sticky="e", padx=8, pady=6)
-    tk.Entry(root, textvariable=logos_var).grid(row=r, column=1, sticky="ew", padx=8, pady=6)
-    tk.Button(root, text="Parcourir…", command=pick_logos).grid(row=r, column=2, padx=8, pady=6)
+    tk.Label(main_frame, text="Dossier logos :").grid(row=r, column=0, sticky="e", padx=5, pady=5)
+    tk.Entry(main_frame, textvariable=logos_var).grid(row=r, column=1, sticky="ew", padx=5, pady=5)
+    tk.Button(main_frame, text="Parcourir…", command=pick_logos).grid(row=r, column=2, padx=5, pady=5)
 
+    # --- Section : Informations de couverture ---
     r += 1
-    tk.Label(root, text="Auteur couverture :").grid(row=r, column=0, sticky="e", padx=8, pady=6)
-    tk.Entry(root, textvariable=auteur_var).grid(row=r, column=1, sticky="ew", padx=8, pady=6)
+    cover_frame = ttk.LabelFrame(main_frame, text="Informations de couverture", padding="10")
+    cover_frame.grid(row=r, column=0, columnspan=3, sticky="ew", pady=10)
+    cover_frame.columnconfigure(1, weight=1)
 
+    tk.Checkbutton(cover_frame, text="Avec couv' (générer la page de couverture)", variable=generate_cover_var).grid(
+        row=0, column=0, columnspan=3, sticky="w", pady=2)
+    tk.Label(cover_frame, text="Image de Couverture :").grid(row=1, column=0, sticky="e", padx=5, pady=5)
+    tk.Entry(cover_frame, textvariable=cover_var).grid(row=1, column=1, sticky="ew", padx=5, pady=5)
+    tk.Button(cover_frame, text="Parcourir…", command=pick_cover).grid(row=1, column=2, padx=5, pady=5)
+    tk.Label(cover_frame, text="Auteur Couverture :").grid(row=2, column=0, sticky="e", padx=5, pady=5)
+    tk.Entry(cover_frame, textvariable=auteur_var).grid(row=2, column=1, columnspan=2, sticky="ew", padx=5, pady=5)
+    tk.Label(cover_frame, text="URL auteur couverture :").grid(row=3, column=0, sticky="e", padx=5, pady=5)
+    tk.Entry(cover_frame, textvariable=auteur_url_var).grid(row=3, column=1, columnspan=2, sticky="ew", padx=5, pady=5)
+
+    # --- Section : Paramètres de mise en page ---
     r += 1
-    tk.Label(root, text="URL auteur couverture :").grid(row=r, column=0, sticky="e", padx=8, pady=6)
-    tk.Entry(root, textvariable=auteur_url_var).grid(row=r, column=1, sticky="ew", padx=8, pady=6)
+    layout_frame = ttk.LabelFrame(main_frame, text="Paramètres de mise en page", padding="10")
+    layout_frame.grid(row=r, column=0, columnspan=3, sticky="ew", pady=10)
+    layout_frame.columnconfigure(1, weight=1)
 
+    tk.Label(layout_frame, text="Marge globale (mm) :").grid(row=0, column=0, sticky="e", padx=5, pady=5)
+    tk.Entry(layout_frame, textvariable=margin_var, width=10).grid(row=0, column=1, sticky="w", padx=5, pady=5)
+    tk.Checkbutton(layout_frame, text="Dessiner lignes de séparation de dates", variable=date_line_var).grid(row=1,
+                                                                                                             column=0,
+                                                                                                             columnspan=2,
+                                                                                                             sticky="w",
+                                                                                                             padx=5,
+                                                                                                             pady=5)
+
+    # --- Section : Fichiers de sortie ---
     r += 1
-    ttk.Separator(root, orient='horizontal').grid(row=r, column=0, columnspan=3, sticky="ew", padx=8, pady=4)
+    output_frame = ttk.LabelFrame(main_frame, text="Fichiers de sortie", padding="10")
+    output_frame.grid(row=r, column=0, columnspan=3, sticky="ew", pady=10)
+    output_frame.columnconfigure(1, weight=1)
 
-    r += 1
-    tk.Label(root, text="Sortie HTML (biduleur) :").grid(row=r, column=0, sticky="e", padx=8, pady=6)
-    tk.Entry(root, textvariable=html_var).grid(row=r, column=1, sticky="ew", padx=8, pady=6)
-    tk.Button(root, text="…", width=3,
-              command=lambda: pick_save(html_var, "Enregistrer le HTML", ".html",
-                                        [("HTML", "*.html"), ("Tous les fichiers", "*.*")])
-              ).grid(row=r, column=2, padx=8, pady=6)
-
-    r += 1
-    tk.Label(root, text="Sortie HTML Agenda :").grid(row=r, column=0, sticky="e", padx=8, pady=6)
-    tk.Entry(root, textvariable=agenda_var).grid(row=r, column=1, sticky="ew", padx=8, pady=6)
-    tk.Button(root, text="…", width=3,
-              command=lambda: pick_save(agenda_var, "Enregistrer le HTML Agenda", ".html",
-                                        [("HTML", "*.html"), ("Tous les fichiers", "*.*")])
-              ).grid(row=r, column=2, padx=8, pady=6)
-
-    r += 1
-    tk.Label(root, text="Sortie PDF (misenpageur) :").grid(row=r, column=0, sticky="e", padx=8, pady=6)
-    tk.Entry(root, textvariable=pdf_var).grid(row=r, column=1, sticky="ew", padx=8, pady=6)
-    tk.Button(root, text="…", width=3,
-              command=lambda: pick_save(pdf_var, "Enregistrer le PDF", ".pdf",
-                                        [("PDF", "*.pdf"), ("Tous les fichiers", "*.*")])
-              ).grid(row=r, column=2, padx=8, pady=6)
-
-    r += 1
-    tk.Label(root, text="Script Scribus (.py) :").grid(row=r, column=0, sticky="e", padx=8, pady=6)
-    tk.Entry(root, textvariable=scribus_py_var).grid(row=r, column=1, sticky="ew", padx=8, pady=6)
-    tk.Button(root, text="…", width=3,
-              command=lambda: pick_save(scribus_py_var, "Enregistrer le script Scribus", ".py",
-                                        [("Script Python", "*.py"), ("Tous les fichiers", "*.*")])
-              ).grid(row=r, column=2, padx=8, pady=6)
-
-    # --- Bandeau modèles à télécharger ---
-    r += 1
-    ttk.Separator(root, orient='horizontal').grid(row=r, column=0, columnspan=3, sticky="ew", padx=8, pady=(10, 6))
-
-    r += 1
-    models = tk.Frame(root)
-    models.grid(row=r, column=0, columnspan=3, sticky="ew", padx=8, pady=(0, 10))
-    tk.Label(models, text="Télécharger un modèle de fichier (tapageur) :", font=("Arial", 9, "bold")).grid(row=0, column=0, sticky="w", pady=(0, 6))
-
-    tk.Button(
-        models, text="Modèle CSV",
-        command=lambda: save_embedded_template('biduleur.templates', 'tapage_template.csv', "Enregistrer le modèle CSV")
-    ).grid(row=1, column=0, padx=(0, 8))
-
-    tk.Button(
-        models, text="Modèle XLSX",
-        command=lambda: save_embedded_template('biduleur.templates', 'tapage_template.xlsx', "Enregistrer le modèle XLSX")
-    ).grid(row=1, column=1, padx=(0, 8))
+    tk.Label(output_frame, text="HTML (biduleur) :").grid(row=0, column=0, sticky="e", padx=5, pady=5)
+    tk.Entry(output_frame, textvariable=html_var).grid(row=0, column=1, sticky="ew", padx=5, pady=5)
+    tk.Button(output_frame, text="…", width=3,
+              command=lambda: pick_save(html_var, "HTML", ".html", [("HTML", "*.html")])).grid(row=0, column=2, padx=5,
+                                                                                               pady=5)
+    tk.Label(output_frame, text="HTML Agenda :").grid(row=1, column=0, sticky="e", padx=5, pady=5)
+    tk.Entry(output_frame, textvariable=agenda_var).grid(row=1, column=1, sticky="ew", padx=5, pady=5)
+    tk.Button(output_frame, text="…", width=3,
+              command=lambda: pick_save(agenda_var, "HTML Agenda", ".html", [("HTML", "*.html")])).grid(row=1, column=2,
+                                                                                                        padx=5, pady=5)
+    tk.Label(output_frame, text="PDF (misenpageur) :").grid(row=2, column=0, sticky="e", padx=5, pady=5)
+    tk.Entry(output_frame, textvariable=pdf_var).grid(row=2, column=1, sticky="ew", padx=5, pady=5)
+    tk.Button(output_frame, text="…", width=3,
+              command=lambda: pick_save(pdf_var, "PDF", ".pdf", [("PDF", "*.pdf")])).grid(row=2, column=2, padx=5,
+                                                                                          pady=5)
+    tk.Label(output_frame, text="Script Scribus (.py) :").grid(row=3, column=0, sticky="e", padx=5, pady=5)
+    tk.Entry(output_frame, textvariable=scribus_py_var).grid(row=3, column=1, sticky="ew", padx=5, pady=5)
+    tk.Button(output_frame, text="…", width=3,
+              command=lambda: pick_save(scribus_py_var, "Script Scribus", ".py", [("Python", "*.py")])).grid(row=3,
+                                                                                                             column=2,
+                                                                                                             padx=5,
+                                                                                                             pady=5)
 
     # --- Status & action ---
     status = tk.StringVar(value="Prêt.")
 
-    r += 1
-    tk.Label(root, textvariable=status, bd=1, relief=tk.SUNKEN, anchor=tk.W).grid(row=r, column=0, columnspan=3, sticky="ew", padx=6, pady=6)
-
     def run_now():
         inp = input_var.get().strip()
-        gen_cover = generate_cover_var.get()
-        cov = cover_var.get().strip()
-        ours = ours_var.get().strip()
-        logos = logos_var.get().strip()
-        h1 = html_var.get().strip()
-        h2 = agenda_var.get().strip()
-        p1 = pdf_var.get().strip()
-        sp = scribus_py_var.get().strip()
-        auteur = auteur_var.get().strip()
-        auteur_url = auteur_url_var.get().strip()
-
         if not inp:
             messagebox.showerror("Erreur", "Veuillez sélectionner un fichier d’entrée.")
+            return
+
+        try:
+            margin_val = float(margin_var.get().strip().replace(',', '.'))
+        except ValueError:
+            messagebox.showerror("Erreur", "La marge globale doit être un nombre valide (ex: 1.0).")
             return
 
         status.set("Traitement en cours…")
         root.update_idletasks()
 
         ok, msg = run_pipeline(
-            inp, gen_cover, cov, ours, logos,
-            h1, h2, p1, sp,
-            auteur, auteur_url
+            inp, generate_cover_var.get(), cover_var.get().strip(),
+            ours_var.get().strip(), logos_var.get().strip(),
+            html_var.get().strip(), agenda_var.get().strip(),
+            pdf_var.get().strip(), scribus_py_var.get().strip(),
+            auteur_var.get().strip(), auteur_url_var.get().strip(),
+            margin_val, date_line_var.get()
         )
         if ok:
             messagebox.showinfo("Succès", msg)
@@ -398,11 +369,16 @@ def main():
             messagebox.showerror("Erreur", msg)
             status.set("Échec.")
 
-    r += 1
-    tk.Button(
-        root, text="Lancer (HTMLs + PDF + Script)", command=run_now,
-        bg="#4CAF50", fg="white", font=("Arial", 10, "bold")
-    ).grid(row=r, column=1, pady=14)
+    # --- Positionnement final du bouton et du statut ---
+    action_frame = ttk.Frame(root, padding="10")
+    action_frame.grid(row=1, column=0, sticky="ew")
+    action_frame.columnconfigure(0, weight=1)
+
+    tk.Button(action_frame, text="Lancer (HTMLs + PDF + Script)", command=run_now, bg="#4CAF50", fg="white",
+              font=("Arial", 10, "bold")).pack(pady=5)
+
+    status_bar = tk.Label(root, textvariable=status, bd=1, relief=tk.SUNKEN, anchor=tk.W, padx=5)
+    status_bar.grid(row=2, column=0, sticky="ew")
 
     root.mainloop()
 
