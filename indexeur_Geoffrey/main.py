@@ -173,8 +173,7 @@ if __name__ == "__main__":
                 print(f"⚠️  Le dossier 'découpé' n'a pas été trouvé pour {chemin_pdf}. Passage au suivant.")
                 continue
 
-            # Appliquer le traitement OCR choisi
-            input("Appuyez sur Entrée pour continuer...")
+
 
             if i_orc == 1:
                 print(f"🔍 Traitement de '{os.path.basename(chemin_pdf)}' avec Mistral OCR...")
@@ -192,8 +191,8 @@ if __name__ == "__main__":
                 print(f"🔍 Traitement de '{os.path.basename(chemin_pdf)}' avec Tesseract OCR...")
                 traiter_images_decoupees_via_tesseract(dossier_images_decoupees)
             elif i_orc == 3:
-                #nothing for now
-                print("🔍 OCR non implémenté pour le moment.")
+                # fonctionnalité de test
+                input("Appuyez sur Entrée pour continuer...")               
             else:
                 print("❌ Aucune OCR sélectionnée, arrêt du traitement.")
                 break 
