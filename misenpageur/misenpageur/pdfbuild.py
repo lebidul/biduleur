@@ -14,9 +14,9 @@ from .drawing import draw_s1, draw_s2_cover, list_images, paragraph_style  # dra
 from .fonts import register_arial_narrow, register_dejavu_sans
 from .spacing import SpacingConfig, SpacingPolicy
 from .textflow import (
-    BulletConfig, DateBoxConfig,
+    BulletConfig, DateBoxConfig, DateLineConfig, # <<< AJOUTER DateLineConfig
     measure_fit_at_fs,
-    draw_section_fixed_fs,
+    # draw_section_fixed_fs, # Si vous l'utilisez
     draw_section_fixed_fs_with_prelude,
     draw_section_fixed_fs_with_tail,
     plan_pair_with_split,
@@ -318,6 +318,31 @@ def _read_date_box_config(cfg: Config) -> DateBoxConfig:
     )
 
 
+def _read_date_line_config(cfg: Config) -> DateLineConfig:
+    """Lit date_line depuis cfg et retourne un objet DateLineConfig."""
+
+    def as_bool(v, default=False):
+        if v is None: return default
+        if isinstance(v, str): return v.strip().lower() in ("1", "true", "yes", "y", "on")
+        return bool(v)
+
+    def as_float(v, default):
+        try:
+            return float(v)
+        except:
+            return default
+
+    block = getattr(cfg, "date_line", {}) or {}
+    if isinstance(block, Mapping):
+        return DateLineConfig(
+            enabled=as_bool(block.get("enabled"), False),
+            width=as_float(block.get("width"), 0.5),
+            color=block.get("color", "#000000"),
+            gap_after_text_mm=as_float(block.get("gap_after_text_mm"), 3.0),
+        )
+    return DateLineConfig()  # Fallback
+
+
 def build_pdf(project_root: str, cfg: Config, layout: Layout, out_path: str) -> dict:
     report = {"unused_paragraphs": 0}
 
@@ -386,7 +411,8 @@ def build_pdf(project_root: str, cfg: Config, layout: Layout, out_path: str) -> 
         event_hanging_indent=getattr(cfg, "event_hanging_indent", 10.0),
     )
     date_box = _read_date_box_config(cfg)
-    print("[INFO] DateBoxConfig:", date_box, "type(cfg.date_box)=", type(getattr(cfg, "date_box", None)))
+    date_line = _read_date_line_config(cfg)
+    # print("[INFO] DateBoxConfig:", date_box, "type(cfg.date_box)=", type(getattr(cfg, "date_box", None)))
 
     # --- Chercher la plus grande taille commune fs (mesure AVEC spacing + indent + box) ---
     order_fs = ["S5", "S6", "S3", "S4"]
@@ -457,11 +483,13 @@ def build_pdf(project_root: str, cfg: Config, layout: Layout, out_path: str) -> 
 
     draw_section_fixed_fs_with_tail(
         c, S["S3"], s3_full, s3_tail, cfg.font_name, best_fs, cfg.leading_ratio, cfg.inner_padding,
-        section_name="S3", spacing_policy=spacing_policy, bullet_cfg=bullet_cfg, date_box=date_box
+        section_name="S3", spacing_policy=spacing_policy, bullet_cfg=bullet_cfg, date_box=date_box,
+        date_line=date_line
     )
     draw_section_fixed_fs_with_prelude(
         c, S["S4"], s4_prelude, s4_full, cfg.font_name, best_fs, cfg.leading_ratio, cfg.inner_padding,
-        section_name="S4", spacing_policy=spacing_policy, bullet_cfg=bullet_cfg, date_box=date_box
+        section_name="S4", spacing_policy=spacing_policy, bullet_cfg=bullet_cfg, date_box=date_box,
+        date_line=date_line
     )
 
     # Repères de coupe (page 1)
@@ -473,11 +501,13 @@ def build_pdf(project_root: str, cfg: Config, layout: Layout, out_path: str) -> 
     # --- RENDU : PAGE 2 ---
     draw_section_fixed_fs_with_tail(
         c, S["S5"], s5_full, s5_tail, cfg.font_name, best_fs, cfg.leading_ratio, cfg.inner_padding,
-        section_name="S5", spacing_policy=spacing_policy, bullet_cfg=bullet_cfg, date_box=date_box
+        section_name="S5", spacing_policy=spacing_policy, bullet_cfg=bullet_cfg, date_box=date_box,
+        date_line=date_line
     )
     draw_section_fixed_fs_with_prelude(
         c, S["S6"], s6_prelude, s6_full, cfg.font_name, best_fs, cfg.leading_ratio, cfg.inner_padding,
-        section_name="S6", spacing_policy=spacing_policy, bullet_cfg=bullet_cfg, date_box=date_box
+        section_name="S6", spacing_policy=spacing_policy, bullet_cfg=bullet_cfg, date_box=date_box,
+        date_line=date_line
     )
 
     # Repères de coupe (page 2)

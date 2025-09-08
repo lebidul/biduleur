@@ -16,6 +16,12 @@ from .html_utils import sanitize_inline_markup
 from .glyphs import apply_glyph_fallbacks
 from .spacing import SpacingPolicy
 
+# Ajout d'un convertisseur mm -> points, car nous en avons besoin ici pour l'affichage des lignes de dates.
+PT_PER_INCH = 72.0
+MM_PER_INCH = 25.4
+def mm_to_pt(mm: float) -> float:
+    return mm * PT_PER_INCH / MM_PER_INCH
+
 
 # ---------- Classification "date" vs "événement" ----------
 # Événements = lignes qui DÉBUTENT par ❑ (standard workflow).
@@ -46,6 +52,14 @@ class DateBoxConfig:
     border_color: str | None = "#000000"
     back_color: str | None = None
 
+# ---------- Ligne de séparation les "DATE" ----------
+@dataclass
+class DateLineConfig:
+    """Configuration pour la ligne horizontale sur les dates."""
+    enabled: bool = False
+    width: float = 0.5  # Épaisseur en points
+    color: str = "#000000"
+    gap_after_text_mm: float = 3.0 # Espace entre le texte et le début de la ligne
 
 # ---------- Helpers communs ----------
 def _strip_head_tail_breaks(s: str) -> str:
@@ -206,6 +220,7 @@ def draw_section_fixed_fs_with_prelude(
     spacing_policy: SpacingPolicy,
     bullet_cfg: BulletConfig,
     date_box: DateBoxConfig,
+    date_line: DateLineConfig,
 ) -> None:
     """Dessine une préface (suite césurée) PUIS des paragraphes entiers, avec espacement & styles."""
     x0 = section.x + inner_pad
@@ -250,6 +265,27 @@ def draw_section_fixed_fs_with_prelude(
         if (y - need) < y0:
             break
         y -= sb
+        # ==================== DESSIN DE LA LIGNE ====================
+        if kind == "DATE" and date_line.enabled:
+            # 1. Obtenir le texte brut (sans balises HTML) pour la mesure
+            plain_text = re.sub(r'<[^>]+>', '', txt)
+            # 2. Mesurer la largeur du texte
+            text_width = c.stringWidth(plain_text, st.fontName, st.fontSize)
+            # 3. Calculer le point de départ de la ligne
+            gap_pt = mm_to_pt(date_line.gap_after_text_mm)
+            line_x_start = x0 + text_width + gap_pt
+            line_x_end = x0 + w
+
+            # 4. S'assurer qu'il y a de la place pour dessiner la ligne
+            if line_x_start < line_x_end:
+                y_line = (y - ph) + (st.leading / 2)
+                c.saveState()
+                c.setStrokeColor(HexColor(date_line.color))
+                c.setLineWidth(date_line.width)
+                c.line(line_x_start, y_line, line_x_end, y_line)
+                c.restoreState()
+        # ===========================================================
+
         p.drawOn(c, x0, y - ph)
         y -= ph + sa
 
@@ -266,6 +302,7 @@ def draw_section_fixed_fs_with_tail(
     spacing_policy: SpacingPolicy,
     bullet_cfg: BulletConfig,
     date_box: DateBoxConfig,
+    date_line: DateLineConfig,
 ) -> None:
     """Dessine des paragraphes entiers PUIS une 'tail' (fin césurée), avec espacement & styles."""
     x0 = section.x + inner_pad
@@ -300,6 +337,23 @@ def draw_section_fixed_fs_with_tail(
             c.restoreState()
             return
         y -= sb
+        # ==================== DESSIN DE LA LIGNE ====================
+        if kind == "DATE" and date_line.enabled:
+            plain_text = re.sub(r'<[^>]+>', '', txt)
+            text_width = c.stringWidth(plain_text, st.fontName, st.fontSize)
+            gap_pt = mm_to_pt(date_line.gap_after_text_mm)
+            line_x_start = x0 + text_width + gap_pt
+            line_x_end = x0 + w
+
+            if line_x_start < line_x_end:
+                y_line = (y - ph) + (st.leading / 2)
+                c.saveState()
+                c.setStrokeColor(HexColor(date_line.color))
+                c.setLineWidth(date_line.width)
+                c.line(line_x_start, y_line, line_x_end, y_line)
+                c.restoreState()
+        # ===========================================================
+
         p.drawOn(c, x0, y - ph)
         y -= ph + sa
 

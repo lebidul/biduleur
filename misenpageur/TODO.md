@@ -5,6 +5,7 @@
 - [x] Infos couv (flag couv/no couv, nom dessinat.eur.rice + hyperlink) (cli)
 - [x] Redimensionnement éventuel de l'image de couv.
 - [x] Intégration Scribus
+- [x] Amélioration display dates
 - [ ] Fichier .sla comme argument dans cli
 - [x] Config ours v1
 - [ ] Config ours v2 - lecture as .md

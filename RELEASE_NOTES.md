@@ -1,5 +1,9 @@
 # Release Notes - Biduleur
 
+## v1.3.1
+### 🌟 Nouvelles fonctionnalités
+- Possibilité de dessiner une ligne de séparation pour les dates (true par défaut dans gui)
+
 ## v1.3.0
 ### 🌟 Nouvelles fonctionnalités
 - Flag pour imprimer couverture ou non

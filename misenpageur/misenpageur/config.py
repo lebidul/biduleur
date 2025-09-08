@@ -42,6 +42,11 @@ class Config:
     # --- DateBox (dict for flexibility) ---
     date_box: Dict[str, Any] = field(default_factory=dict)
 
+    # ==================== NOUVELLE SECTION ====================
+    # --- Ligne Horizontale pour les Dates ---
+    date_line: Dict[str, Any] = field(default_factory=dict)
+    # ==========================================================
+
     # --- Prepress ---
     prepress: Dict[str, Any] = field(default_factory=dict)
 
@@ -51,29 +56,21 @@ class Config:
     # --- pdf layout (marge globale)
     pdf_layout: Dict[str, Any] = field(default_factory=dict)
 
-    skip_cover: bool = False  # Par défaut, on génère la couverture
+    skip_cover: bool = False
 
-    # ==================== MODIFICATION CI-DESSOUS ====================
-    # On ajoute la méthode `from_yaml` qui était manquante.
-    # C'est cette méthode que votre `main.py` appelle pour charger la configuration.
     @classmethod
     def from_yaml(cls, path: str) -> "Config":
         """Charge la configuration depuis un fichier YAML."""
         try:
             with open(path, 'r', encoding='utf-8') as f:
                 data = yaml.safe_load(f) or {}
-
-            # Utilise la méthode from_dict pour créer l'objet
             return cls.from_dict(data)
-
         except FileNotFoundError:
             print(f"[WARN] Fichier de configuration introuvable : {path}. Utilisation des valeurs par défaut.")
-            return cls()  # Retourne une config avec les valeurs par défaut
+            return cls()
         except Exception as e:
             print(f"[ERR] Erreur de lecture du fichier de configuration YAML ({path}): {e}")
-            raise  # Arrête l'exécution car la config est invalide
-
-    # ====================== FIN DE LA MODIFICATION ======================
+            raise
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "Config":
