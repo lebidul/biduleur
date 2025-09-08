@@ -119,3 +119,6 @@ section_1:
   # Configuration de la colonne "Logos"
   additional_box_height_mm: 0 # Hauteur de la "boîte additionnelle" sous les logos
   logo_box_bottom_margin_mm: 0 # Marge entre la zone des logos et la boîte additionnelle
+
+# Impression facultative de la section de couverture
+skip_cover: false

@@ -452,7 +452,8 @@ def build_pdf(project_root: str, cfg: Config, layout: Layout, out_path: str) -> 
         s2h = getattr(S["S2"], "h", None) or S["S2"]["h"]
         prepped_cover = _prepare_cover_for_print(cover_path, s2w, s2h, cfg)
 
-    draw_s2_cover(c, S["S2"], prepped_cover, cfg.inner_padding)
+    if not cfg.skip_cover:
+        draw_s2_cover(c, S["S2"], prepped_cover, cfg.inner_padding)
 
     draw_section_fixed_fs_with_tail(
         c, S["S3"], s3_full, s3_tail, cfg.font_name, best_fs, cfg.leading_ratio, cfg.inner_padding,

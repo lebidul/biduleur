@@ -2,13 +2,14 @@
 
 ## Priorité Élevée
 - [x] Workflow global. csv/xls/xlsx (biduleur) -> pdf (misenpageur)
-- [ ] Infos couv (flag couv/no couv, nom dessinat.eur.rice + hyperlink) (cli)
+- [x] Infos couv (flag couv/no couv, nom dessinat.eur.rice + hyperlink) (cli)
 - [x] Redimensionnement éventuel de l'image de couv.
 - [x] Intégration Scribus
 - [ ] Fichier .sla comme argument dans cli
 - [x] Config ours v1
 - [ ] Config ours v2 - lecture as .md
 - [ ] Config ours v2 - icones
+- [ ] UI: Espace pour configuration visuelle couv, marge
 - [x] Config logos v1
 - [x] Config cucaracha v1
 - [x] Config cucaracha v2: pouvoir ajouter image pour additional box

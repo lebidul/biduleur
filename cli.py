@@ -44,6 +44,7 @@ def make_parser() -> argparse.ArgumentParser:
                    default="data/output/bidul.cli.pdf")
     p.add_argument("--project-root", help="Racine projet pour misenpageur (def: dossier de la config)")
     p.add_argument("--cover", help="Chemin image de couverture (override cover_image du config.yml)")
+    p.add_argument("--no-cover", action="store_true", help="Génère un PDF sans page de couverture.")
     p.add_argument("--scribus-script", help="Chemin du script Scribus (.py) à générer")
     p.add_argument("--scribus-sla", help="Chemin du .sla cible que le script enregistrera (ex: data/output/bidul.sla)")
     return p

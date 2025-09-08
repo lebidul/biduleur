@@ -52,6 +52,7 @@ def _load_cfg_defaults() -> dict:
         "logos_dir": "",
         "auteur_couv": "",
         "auteur_couv_url": "",
+        "skip_cover": False,  # --- NOUVELLE VALEUR PAR DÉFAUT ---
     }
     if _IMPORT_ERR:
         return out
@@ -63,6 +64,7 @@ def _load_cfg_defaults() -> dict:
         out["logos_dir"] = cfg.logos_dir or ""
         out["auteur_couv"] = getattr(cfg, "auteur_couv", "") or ""
         out["auteur_couv_url"] = getattr(cfg, "auteur_couv_url", "") or ""
+        out["skip_cover"] = getattr(cfg, "skip_cover", False)
     except Exception:
         pass
     return out
@@ -74,6 +76,7 @@ def _ensure_parent_dir(path: str):
 
 
 def run_pipeline(input_file: str,
+                 generate_cover: bool,
                  cover_image: str,
                  ours_md: str,
                  logos_dir: str,
@@ -109,6 +112,9 @@ def run_pipeline(input_file: str,
         cfg = Config.from_yaml(cfg_path)
         lay = Layout.from_yaml(lay_path)
 
+        # On inverse la logique : la GUI a "Générer couv" (True), la config a "skip_cover" (True)
+        cfg.skip_cover = not generate_cover
+
         cfg.input_html = out_html
         if out_pdf:
             cfg.output_pdf = out_pdf
@@ -134,11 +140,13 @@ def run_pipeline(input_file: str,
             scribus_sla = os.path.splitext(out_scribus_py)[0] + ".sla"
             write_scribus_script(project_root, cfg, lay, out_scribus_py, scribus_sla)
 
+        couv_status = "Oui" if generate_cover else "Non"
         # résumé
         summary_lines = [
             f"HTML            : {out_html}",
             f"HTML (agenda)   : {out_agenda_html}",
             f"PDF             : {cfg.output_pdf}",
+            f"Couverture générée : {couv_status}", # Ligne ajoutée
         ]
         if scribus_sla:
             summary_lines += [
@@ -174,9 +182,14 @@ def main():
 
     # Vars
     input_var = tk.StringVar()
+    # L'état initial de la case est l'inverse de `skip_cover`
+    # Si skip_cover=True (sans couv), la case doit être décochée (False)
+    initial_generate_cover = not cfg_defaults.get("skip_cover", False)
+    generate_cover_var = tk.BooleanVar(value=initial_generate_cover)
     cover_var = tk.StringVar(value=cfg_defaults.get("cover", ""))
     ours_var = tk.StringVar(value=cfg_defaults.get("ours_md", ""))
     logos_var = tk.StringVar(value=cfg_defaults.get("logos_dir", ""))
+    generate_cover_var = tk.BooleanVar(value=True) # "Avec couv" par défaut
     auteur_var = tk.StringVar(value=cfg_defaults.get("auteur_couv", ""))
     auteur_url_var = tk.StringVar(value=cfg_defaults.get("auteur_couv_url", ""))
     html_var = tk.StringVar()
@@ -265,6 +278,12 @@ def main():
     tk.Button(root, text="Parcourir…", command=pick_input).grid(row=r, column=2, padx=8, pady=6)
 
     r += 1
+    tk.Checkbutton(
+        root, text="Avec couv' (générer la page de couverture)",
+        variable=generate_cover_var, onvalue=True, offvalue=False
+    ).grid(row=r, column=1, sticky="w", padx=8, pady=2)
+
+    r += 1
     tk.Label(root, text="Image de couverture :").grid(row=r, column=0, sticky="e", padx=8, pady=6)
     tk.Entry(root, textvariable=cover_var).grid(row=r, column=1, sticky="ew", padx=8, pady=6)
     tk.Button(root, text="Parcourir…", command=pick_cover).grid(row=r, column=2, padx=8, pady=6)
@@ -349,6 +368,7 @@ def main():
 
     def run_now():
         inp = input_var.get().strip()
+        gen_cover = generate_cover_var.get()
         cov = cover_var.get().strip()
         ours = ours_var.get().strip()
         logos = logos_var.get().strip()
@@ -367,7 +387,7 @@ def main():
         root.update_idletasks()
 
         ok, msg = run_pipeline(
-            inp, cov, ours, logos,
+            inp, gen_cover, cov, ours, logos,
             h1, h2, p1, sp,
             auteur, auteur_url
         )

@@ -51,6 +51,8 @@ class Config:
     # --- pdf layout (marge globale)
     pdf_layout: Dict[str, Any] = field(default_factory=dict)
 
+    skip_cover: bool = False  # Par défaut, on génère la couverture
+
     # ==================== MODIFICATION CI-DESSOUS ====================
     # On ajoute la méthode `from_yaml` qui était manquante.
     # C'est cette méthode que votre `main.py` appelle pour charger la configuration.
