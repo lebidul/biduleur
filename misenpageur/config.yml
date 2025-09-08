@@ -50,8 +50,8 @@ text_sections_order:
   - "S4"
 
 # Espacement (pt)
-date_spaceBefore: 3
-date_spaceAfter: 3
+date_spaceBefore: 4
+date_spaceAfter: 4
 event_spaceBefore: 1
 event_spaceAfter: 1
 event_spaceAfter_perLine: 0.4

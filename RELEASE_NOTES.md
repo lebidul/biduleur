@@ -1,5 +1,16 @@
 # Release Notes - Biduleur
 
+## v1.3.0
+### 🌟 Nouvelles fonctionnalités
+- Flag pour imprimer couverture ou non
+- Ajout d'une marge globale définie page_margin_mm
+- Ajout d'une éventuelle additional_box sous les logos
+
+### 🔧 Améliorations
+- Développement transféré à Google AI Studio
+- Rendu de l'ours, du qr code et des logos
+- Plus de paramètres d'affichages fournis dans la config
+
 ## v1.1.2
 ### 🌟 Nouvelles fonctionnalités
 - Template de fichiers tapageurs .csv et .xlsx disponibles pour les utilisateurs du gui.
@@ -42,7 +53,8 @@
 
 | Version | Date       | Description                                           |
 |---------|------------|-------------------------------------------------------|
-| v1.2.0  | 31/08/2025  | Ajout de tapageurs templates sur le gui               |
+| v1.2.0  | 08/09/2025 | Amélioration ours et logos                            |
+| v1.1.2  | 31/08/2025 | Ajout de tapageurs templates sur le gui               |
 | v1.1.0  | 30/08/2025 | Ajout du support des fichiers Excel (.xls, .xlsx)     |
 | v1.0.0  | 29/8/2025  | Première version stable avec support des fichiers CSV |
 
