@@ -3,8 +3,9 @@ import fitz  # PyMuPDF
 import shutil
 from datetime import datetime
 import time
+import re
 
-from DecoupePages import decoupe_avant_2000, decoupe_apres_2000, decoupe_en_3
+from DecoupePages import decoupe_avant_2000, decoupe_apres_2000, decoupe_en_3, decoupe_horizontal
 from Tesseract import traiter_images_decoupees_via_tesseract
 from Misatral import traiter_images_decoupees_via_mistral
 
@@ -59,43 +60,56 @@ def traiter_un_pdf(chemin_pdf, dossier_sortie_temporaire):
     return dossier_images_temporaire
 
 
-import re
-
 
 
 def decoupe_selon_date(images_pages):
     for image_path in images_pages:
         fichier = os.path.basename(image_path)
         try:
-            # On récupère l'année et le mois (ex: "2019-03")
-            date_str = fichier[:7]  # "YYYY-MM"
+            # Récupère la date au format YYYY-MM
+            date_str = fichier[:7]
             annee = int(fichier[:4])
             mois = int(fichier[5:7])
             date_pdf = datetime(annee, mois, 1)
 
-            # Condition : le fichier est "_page3.png"
+            # Vérifie si c'est un "_page3.png"
             est_page3 = re.search(r'_page3\.png$', fichier) is not None
 
-            # Condition : date >= mars 2019 et "Bidul" présent dans le nom
+            # Vérifie si c'est une première page
+            est_page1 = re.search(r'_page1\.png$', fichier) is not None
+
+            # Vérifie la règle spéciale "Bidul après mars 2019"
             est_bidul_apres_2019_03 = ("Bidul" in fichier) and (date_pdf >= datetime(2019, 3, 1))
 
-            # Cas des PDF avant 2000
-            if annee < 2000:
-                print(f"✂️ Découpe pour PDF avant 2000 : {image_path}")
-                decoupe_apres_2000(image_path)
+            # Vérifie la règle spéciale "Bidul numéro 174–227"
+            match_numero = re.search(r'Bidul-(\d+)', fichier)
+            numero = int(match_numero.group(1)) if match_numero else None
+            est_bidul_numero_174_227 = ("Bidul" in fichier) and numero and 174 <= numero <= 227
 
+            # === Nouvelle priorité : découpe horizontale pour page1 ===
+            if est_page1 and est_bidul_numero_174_227:
+                print(f"✂️ Découpe horizontale spéciale (Bidul 174–227, page1) pour {image_path}")
+                decoupe_horizontal(image_path)
+                continue
+
+            # === Règles existantes ===
+            if annee < 2000:
+                if est_page3:
+                    print(f"✂️ Découpe spéciale en 3 (avant 2000) pour {image_path}")
+                    decoupe_en_3(image_path)
+                else:
+                    decoupe_avant_2000(image_path)
             else:
-                # Cas des PDF après 2000
                 if est_page3 and est_bidul_apres_2019_03:
                     print(f"✂️ Découpe spéciale en 3 (après 2019-03 Bidul) pour {image_path}")
                     decoupe_en_3(image_path)
                 else:
-                    print(f"✂️ Découpe pour PDF après 2000 : {image_path}")
                     decoupe_apres_2000(image_path)
 
         except ValueError:
             print(f"⚠️ Impossible de déterminer l'année pour {fichier}, découpe par défaut (après 2000).")
             decoupe_apres_2000(image_path)
+
 
 
 
