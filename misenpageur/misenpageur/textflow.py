@@ -491,23 +491,42 @@ def measure_poster_fit_at_fs(
         font_name: str, font_size: float, leading_ratio: float,
         bullet_cfg: BulletConfig
 ) -> bool:
-    """Simule le remplissage de plusieurs cadres et retourne True si tout le texte rentre."""
+    """
+    Simule le remplissage des cadres en calculant la hauteur de chaque paragraphe
+    et retourne True si tout le texte rentre.
+    """
     base_style = paragraph_style(font_name, font_size, leading_ratio)
-    story = []
-    for raw in paras_text:
-        kind = "EVENT" if _is_event(raw) else "DATE"
-        st = _mk_style_for_kind(base_style, "EVENT", bullet_cfg, DateBoxConfig())
-        txt = _mk_text_for_kind(raw, kind, bullet_cfg)
-        story.append(Paragraph(txt, st))
 
-    remaining_story = list(story)
+    # On garde une trace de l'index du paragraphe en cours
+    para_idx = 0
+    num_paras = len(paras_text)
 
     for section in frames:
-        if not remaining_story: break
-        frame = Frame(section.x, section.y, section.w, section.h, showBoundary=0)
-        frame.addFromList(remaining_story, c)
+        if para_idx >= num_paras:
+            break  # Tout le texte est placé
 
-    return not remaining_story
+        remaining_height = section.h
+
+        while remaining_height > 0 and para_idx < num_paras:
+            raw = paras_text[para_idx]
+            kind = "EVENT" if _is_event(raw) else "DATE"
+            st = _mk_style_for_kind(base_style, "EVENT", bullet_cfg, DateBoxConfig())
+            txt = _mk_text_for_kind(raw, kind, bullet_cfg)
+            p = Paragraph(txt, st)
+
+            # On mesure la hauteur que prend le paragraphe dans ce cadre
+            _w, p_h = p.wrapOn(c, section.w, section.h)
+
+            # Est-ce que ça rentre ?
+            if p_h < remaining_height:
+                remaining_height -= p_h
+                para_idx += 1  # On passe au paragraphe suivant
+            else:
+                # Le paragraphe ne rentre pas, on arrête de remplir ce cadre
+                remaining_height = 0
+
+    # Si on a réussi à placer tous les paragraphes, on retourne True
+    return para_idx >= num_paras
 
 
 def draw_poster_text_in_frames(
@@ -519,6 +538,7 @@ def draw_poster_text_in_frames(
 ):
     """Dessine le texte dans une série de cadres."""
     base_style = paragraph_style(font_name, font_size, leading_ratio)
+
     story = []
     for raw in paras_text:
         kind = "EVENT" if _is_event(raw) else "DATE"

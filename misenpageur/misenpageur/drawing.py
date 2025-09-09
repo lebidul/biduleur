@@ -14,7 +14,7 @@ from reportlab.lib.utils import ImageReader  # <--- CET IMPORT EST CRUCIAL
 from reportlab.lib.colors import grey
 
 from .fonts import register_arial
-from .layout import Layout
+from .layout import Layout, Section
 from .config import Config  # Importer Config pour l'autocomplétion
 
 
@@ -279,13 +279,11 @@ def draw_s2_cover(c: canvas.Canvas, S2_coords, image_path: str, inner_pad: float
     c.drawImage(image_path, x, y, w, h, preserveAspectRatio=True, anchor='c')
 
 
-def draw_poster_logos(c: canvas.Canvas, s_coords, logos: List[str]):
-    """Dessine une ligne de logos pour le poster."""
+def draw_poster_logos(c: canvas.Canvas, s_coords: Section, logos: List[str]):
     x, y, w, h = s_coords.x, s_coords.y, s_coords.w, s_coords.h
     if not logos or not w > 0 or not h > 0: return
 
     num_logos = len(logos)
-    padding = 1 * mm
     cell_w = w / num_logos
 
     for i, logo_path in enumerate(logos):
@@ -295,13 +293,14 @@ def draw_poster_logos(c: canvas.Canvas, s_coords, logos: List[str]):
             img_w, img_h = img.getSize()
             aspect = img_h / img_w if img_w > 0 else 1
 
-            h_fit = h - (2 * padding)
-            w_fit = h_fit / aspect
-
-            if w_fit > cell_w - (2 * padding):
-                w_fit = cell_w - (2 * padding)
+            # Adapter à la hauteur de la cellule, puis vérifier la largeur
+            h_fit = h
+            w_fit = h_fit / aspect if aspect > 0 else 0
+            if w_fit > cell_w:
+                w_fit = cell_w
                 h_fit = w_fit * aspect
 
+            # Centrer
             logo_x = cell_x + (cell_w - w_fit) / 2
             logo_y = y + (h - h_fit) / 2
 

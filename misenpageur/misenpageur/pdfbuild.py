@@ -1,21 +1,25 @@
+# misenpageur/misenpageur/pdfbuild.py
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
 import os
-from typing import List, Tuple
-from dataclasses import dataclass
-from collections.abc import Mapping
 import io
 import subprocess
 from pathlib import Path
+from dataclasses import dataclass
+from typing import List, Tuple
+from collections.abc import Mapping
 
+# --- Imports des bibliothèques externes ---
 from PIL import Image
 from reportlab.pdfgen import canvas
 import qrcode
 from reportlab.lib.utils import ImageReader
+from reportlab.platypus import Paragraph
 
+# --- Imports des modules internes du projet ---
 from .config import Config
-from .layout import Layout
+from .layout import Layout, Section
 from .html_utils import extract_paragraphs_from_html
 from .drawing import draw_s1, draw_s2_cover, list_images, paragraph_style, draw_poster_logos
 from .fonts import register_arial_narrow, register_dejavu_sans
@@ -23,10 +27,11 @@ from .spacing import SpacingConfig, SpacingPolicy
 from .textflow import (
     BulletConfig, DateBoxConfig, DateLineConfig,
     measure_fit_at_fs, draw_section_fixed_fs_with_prelude, draw_section_fixed_fs_with_tail,
-    plan_pair_with_split, measure_poster_fit_at_fs, draw_poster_text_in_frames
+    plan_pair_with_split, measure_poster_fit_at_fs, draw_poster_text_in_frames,
+    _is_event, _mk_style_for_kind, _mk_text_for_kind
 )
 
-# ... (les helpers de mm_to_pt à _inject_auteur_in_ours sont identiques à votre version) ...
+# ... (toutes les fonctions helper de mm_to_pt à _read_poster_config sont correctes et inchangées) ...
 PT_PER_INCH = 72.0
 MM_PER_INCH = 25.4
 
@@ -363,11 +368,26 @@ def _read_poster_config(cfg: Config) -> PosterConfig:
     )
 
 
+def _create_poster_story(
+        paras_text: List[str], font_name: str, font_size: float,
+        leading_ratio: float, bullet_cfg: BulletConfig
+) -> List[Paragraph]:
+    """Crée la liste d'objets Paragraph pour le poster."""
+    base_style = paragraph_style(font_name, font_size, leading_ratio)
+    story = []
+    for raw in paras_text:
+        kind = "EVENT" if _is_event(raw) else "DATE"
+        st = _mk_style_for_kind(base_style, "EVENT", bullet_cfg, DateBoxConfig())
+        txt = _mk_text_for_kind(raw, kind, bullet_cfg)
+        story.append(Paragraph(txt, st))
+    return story
+
+
 def build_pdf(project_root: str, cfg: Config, layout: Layout, out_path: str) -> dict:
     report = {"unused_paragraphs": 0}
     c = canvas.Canvas(out_path, pagesize=(layout.page.width, layout.page.height))
 
-    # Polices
+    # --- Polices ---
     if register_arial_narrow():
         cfg.font_name = "ArialNarrow"
     else:
@@ -375,7 +395,7 @@ def build_pdf(project_root: str, cfg: Config, layout: Layout, out_path: str) -> 
         cfg.font_name = "Helvetica"
     register_dejavu_sans()
 
-    # Inputs et contenus
+    # --- Inputs et contenus ---
     html_text = read_text(os.path.join(project_root, cfg.input_html))
     paras = extract_paragraphs_from_html(html_text)
     ours_text = read_text(os.path.join(project_root, cfg.ours_md))
@@ -385,13 +405,13 @@ def build_pdf(project_root: str, cfg: Config, layout: Layout, out_path: str) -> 
 
     S = layout.sections
 
-    # Configurations
+    # --- Configurations ---
     spacing_cfg = SpacingConfig()
     bullet_cfg = BulletConfig()
     date_box = _read_date_box_config(cfg)
     date_line = _read_date_line_config(cfg)
 
-    # Calcul taille de police pour pages 1 & 2
+    # --- Calcul taille de police pour pages 1 & 2 ---
     order_fs = ["S5", "S6", "S3", "S4"]
     lo, hi = cfg.font_size_min, cfg.font_size_max
     best_fs = lo
@@ -409,7 +429,7 @@ def build_pdf(project_root: str, cfg: Config, layout: Layout, out_path: str) -> 
 
     spacing_policy = SpacingPolicy(spacing_cfg, paragraph_style(cfg.font_name, best_fs, cfg.leading_ratio).leading)
 
-    # Planification du texte
+    # --- Planification du texte ---
     s5_full, s5_tail, s6_prelude, s6_full, rest_after_p2 = plan_pair_with_split(
         c, S["S5"], S["S6"], "S5", "S6", paras, cfg.font_name, best_fs, cfg.leading_ratio, cfg.inner_padding,
         cfg.split_min_gain_ratio, spacing_policy, bullet_cfg, date_box
@@ -443,13 +463,16 @@ def build_pdf(project_root: str, cfg: Config, layout: Layout, out_path: str) -> 
     if poster_cfg.enabled:
         c.showPage()
 
-        s_title = S["S7_Title"]
+        S7 = {name: sec for name, sec in S.items() if sec.page == 3}
+
+        # Dessin des éléments statiques
+        s_title = S7["S7_Title"]
         c.setFont(poster_cfg.font_name_title, poster_cfg.font_size_title)
         c.drawCentredString(s_title.x + s_title.w / 2, s_title.y + (s_title.h - poster_cfg.font_size_title) / 2,
                             poster_cfg.title)
 
-        if cover_path: c.drawImage(cover_path, S["S7_CoverImage"].x, S["S7_CoverImage"].y, S["S7_CoverImage"].w,
-                                   S["S7_CoverImage"].h, preserveAspectRatio=True, anchor='c')
+        if cover_path: c.drawImage(cover_path, S7["S7_CoverImage"].x, S7["S7_CoverImage"].y, S7["S7_CoverImage"].w,
+                                   S7["S7_CoverImage"].h, preserveAspectRatio=True, anchor='c')
 
         qr_gen = qrcode.QRCode(version=1, border=1)
         qr_gen.add_data(cfg.section_1.get('qr_code_value', ''))
@@ -457,19 +480,23 @@ def build_pdf(project_root: str, cfg: Config, layout: Layout, out_path: str) -> 
         buffer = io.BytesIO()
         qr_gen.make_image().save(buffer, format='PNG')
         buffer.seek(0)
-        c.drawImage(ImageReader(buffer), S["S7_QRCode"].x, S["S7_QRCode"].y, S["S7_QRCode"].w, S["S7_QRCode"].h,
+        c.drawImage(ImageReader(buffer), S7["S7_QRCode"].x, S7["S7_QRCode"].y, S7["S7_QRCode"].w, S7["S7_QRCode"].h,
                     mask='auto')
 
-        draw_poster_logos(c, S["S7_Logos"], logos)
+        draw_poster_logos(c, S7["S7_Logos"], logos)
 
+        # Préparation du texte et des cadres
         poster_paras = s5_full + s6_full + s3_full + s4_full
-        poster_frames = [S[name] for name in
+        poster_frames = [S7[name] for name in
                          ["S7_Col1", "S7_Col2_Top", "S7_Col2_Bottom", "S7_Col3_Top", "S7_Col3_BesideQR"]]
 
+        # ==================== CORRECTION DE L'APPEL ====================
         lo, hi = poster_cfg.font_size_min, poster_cfg.font_size_max
         for _ in range(10):
             mid = (lo + hi) / 2.0
             if mid <= lo or mid >= hi: break
+
+            # On passe les arguments nécessaires à la fonction de mesure
             if measure_poster_fit_at_fs(c, poster_frames, poster_paras, cfg.font_name, mid, cfg.leading_ratio,
                                         bullet_cfg):
                 best_fs_poster, lo = mid, mid
@@ -477,11 +504,15 @@ def build_pdf(project_root: str, cfg: Config, layout: Layout, out_path: str) -> 
                 hi = mid
             if abs(hi - lo) < 0.1: break
 
+        # Dessin du texte
+        # On passe les arguments nécessaires à la fonction de dessin
         draw_poster_text_in_frames(c, poster_frames, poster_paras, cfg.font_name, best_fs_poster, cfg.leading_ratio,
                                    bullet_cfg)
+        # ===============================================================
 
     c.save()
 
+    # Affichage final
     print("-" * 20)
     print(f"Taille de police (pages 1-2): {best_fs:.2f} pt")
     if poster_cfg.enabled:
