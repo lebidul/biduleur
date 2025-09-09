@@ -4,6 +4,8 @@ import tkinter as tk
 from tkinter import filedialog, messagebox
 from biduleur.csv_utils import parse_bidul
 from biduleur.format_utils import output_html_file
+import importlib.resources as res
+from tkinter import ttk
 
 def run_biduleur(input_file, bidul_output_file=None, agenda_output_file=None):
     """
@@ -52,6 +54,34 @@ def gui_mode():
             input_entry.delete(0, tk.END)
             input_entry.insert(0, file_path)
             update_default_output_paths(file_path)
+
+    def save_embedded_template(package, filename, title):
+        try:
+            # Demande où enregistrer
+            initial_ext = os.path.splitext(filename)[1].lower()
+            if initial_ext == '.csv':
+                ftypes = [("CSV", "*.csv")]
+            elif initial_ext == '.xlsx':
+                ftypes = [("Excel (XLSX)", "*.xlsx")]
+            else:
+                ftypes = [("Tous les fichiers", "*.*")]
+
+            target = filedialog.asksaveasfilename(
+                title=title,
+                defaultextension=initial_ext,
+                filetypes=ftypes,
+                initialfile=filename
+            )
+            if not target:
+                return
+
+            # Lit les octets du fichier embarqué et écrit sur disque
+            data = res.files(package).joinpath(filename).read_bytes()
+            with open(target, "wb") as f:
+                f.write(data)
+            messagebox.showinfo("Modèle enregistré", f"Fichier enregistré ici :\n{target}")
+        except Exception as e:
+            messagebox.showerror("Erreur", f"Impossible d'enregistrer le modèle : {e}")
 
     def update_default_output_paths(input_file):
         base_name = os.path.splitext(os.path.basename(input_file))[0]
@@ -134,6 +164,26 @@ def gui_mode():
     # Barre de statut
     status_bar = tk.Label(root, text="Prêt", bd=1, relief=tk.SUNKEN, anchor=tk.W)
     status_bar.grid(row=4, column=0, columnspan=3, sticky="ew", padx=5, pady=5)
+
+    # --- Bandeau modèles à télécharger ---
+    sep = ttk.Separator(root, orient='horizontal')
+    sep.grid(row=5, column=0, columnspan=3, sticky="ew", padx=5, pady=(10, 5))
+
+    models_frame = tk.Frame(root)
+    models_frame.grid(row=6, column=0, columnspan=3, sticky="ew", padx=5, pady=(0,10))
+    tk.Label(models_frame, text="Télécharger un modèle de fichier :", font=("Arial", 9, "bold")).grid(row=0, column=0, sticky="w", pady=(0,6))
+
+    tk.Button(
+        models_frame,
+        text="Modèle CSV",
+        command=lambda: save_embedded_template('biduleur.templates', 'tapage_template.csv', "Enregistrer le modèle CSV")
+    ).grid(row=1, column=0, padx=(0,8))
+
+    tk.Button(
+        models_frame,
+        text="Modèle XLSX",
+        command=lambda: save_embedded_template('biduleur.templates', 'tapage_template.xlsx', "Enregistrer le modèle XLSX")
+    ).grid(row=1, column=1, padx=(0,8))
 
     root.mainloop()
 

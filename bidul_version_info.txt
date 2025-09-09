@@ -1,0 +1,32 @@
+# bidul_version_info.txt (UTF-8)
+
+VSVersionInfo(
+  ffi=FixedFileInfo(
+    filevers=(1, 0, 0, 0),
+    prodvers=(1, 0, 0, 0),
+    mask=0x3f,
+    flags=0x0,
+    OS=0x40004,
+    fileType=0x1,    # VFT_APP
+    subtype=0x0,
+    date=(0, 0)
+  ),
+  kids=[
+    StringFileInfo([
+      StringTable(
+        '040C04B0',  # 040C = fr-FR ; 04B0 = Unicode
+        [
+          StringStruct('CompanyName', 'Le Bidul'),
+          StringStruct('FileDescription', 'Bidul – Générateur HTML/PDF/Scribus'),
+          StringStruct('FileVersion', '1.3.0'),
+          StringStruct('InternalName', 'bidul'),
+          StringStruct('LegalCopyright', '© 2025 Le Bidul'),
+          StringStruct('OriginalFilename', 'bidul.exe'),
+          StringStruct('ProductName', 'the Bidul'),
+          StringStruct('ProductVersion', '1.3.0'),
+        ]
+      )
+    ]),
+    VarFileInfo([VarStruct('Translation', [0x040C, 1200])])  # fr-FR, Unicode
+  ]
+)

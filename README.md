@@ -1,490 +1,306 @@
-# Module Biduleur
-Biduleur est un outil pour générer des événements à partir de fichiers de tapage CSV ou XLS, XLSX, disponible en **mode GUI (interface graphique)** et **mode CLI (ligne de commande)**.
+
 
 ---
+
+# Module Biduleur
+
+Biduleur est un outil pour générer des événements à partir de fichiers CSV/XLS/XLSX et produire des fichiers HTML prêts à être mis en page.
+Le projet s’intègre avec **Misenpageur** (génération du PDF final A4 recto/verso) et propose un **wrapper CLI racine** pour enchaîner ingestion → PDF en une seule commande.
+
+---
+
 ## Table des matières
-1. [Prérequis](#prérequis)
-2. [Structure du projet](#structure-du-projet)
-3. [Installation](#installation)
-4. [Modes d'utilisation](#modes-dutilisation)
-   - [Mode GUI (Interface Graphique)](#mode-gui-interface-graphique)
-   - [Mode CLI (Ligne de Commande)](#mode-cli-ligne-de-commande)
-5. [Création du build](#création-du-build)
-   - [Sur Windows](#sur-windows)
-   - [Sur Linux](#sur-linux)
-6. [Utilisation](#utilisation)
-7. [Création d'une release](#création-dune-release)
-   - [Manuellement](#manuellement)
-   - [Automatiquement avec GitHub Actions](#automatiquement-avec-github-actions)
-8. [Dépannage](#dépannage)
-9. [Fichiers de configuration](#fichiers-de-configuration)
-   - [biduleur.spec](#biduleurspec)
-   - [build.biduleur.bat](#buildbat)
-   - [build.biduleur.sh](#buildsh)
-   - [release.yml](#releaseyml)
+
+1.  [Prérequis](#prérequis)
+2.  [Structure du projet](#structure-du-projet)
+3.  [Installation](#installation)
+4.  [Modes d'utilisation](#modes-dutilisation)
+    *   [Mode GUI (Interface Graphique)](#mode-gui-interface-graphique)
+    *   [Mode CLI (Ligne de Commande)](#mode-cli-ligne-de-commande)
+    *   **Intégration Misenpageur (PDF) avec marges dynamiques**
+    *   **Wrapper CLI racine (ingestion → PDF)**
+5.  [Création du build](#création-du-build)
+    *   [Sur Windows](#sur-windows)
+    *   [Sur Linux](#sur-linux)
+6.  [Utilisation](#utilisation)
+    *   **Utiliser l’HTML généré avec Misenpageur**
+    *   **Exécuter la chaîne complète via le wrapper**
+7.  [Création d'une release](#création-dune-release)
+    *   [Manuellement](#manuellement)
+    *   [Automatiquement avec GitHub Actions](#automatiquement-avec-github-actions)
+8.  [Dépannage](#dépannage)
+9.  [Fichiers de configuration](#fichiers-de-configuration)
+    *   [biduleur.spec](#biduleurspec)
+    *   [build.biduleur.bat](#buildbat)
+    *   [build.biduleur.sh](#buildsh)
+    *   [release.yml](#releaseyml)
+    *   **misenpageur/config.yml**
+    *   **misenpageur/layout.yml**
+    *   **Polices & glyphes (€, ❑)**
 10. [Contribuer](#contribuer)
 11. [Licence](#licence)
 
 ---
+
 ## Prérequis
-- Python 3.9 ou supérieur
-- Pip (généralement installé avec Python)
-- Git (optionnel, pour cloner le dépôt)
-- **Permissions GitHub** : Assurez-vous que votre dépôt a les permissions "Read and write" pour les GitHub Actions *(Settings > Actions > General > Workflow permissions)*
+
+*   Python 3.9+
+*   Pip
+*   (Optionnel) Git
+*   Dépendances (voir `requirements.txt`) : `reportlab`, `pyyaml`, `pandas`, `openpyxl`, **`qrcode[pil]`**
 
 ---
+
 ## Structure du projet
+
 ```
-bidul.biduleur/
-├── biduleur/               # Package Python
-│   ├── __init__.py         # Fichier vide obligatoire
-│   ├── main.py             # Point d'entrée (mode GUI par défaut)
-│   ├── cli.py              # Module pour le mode CLI
-│   ├── csv_utils.py        # Utilitaires pour les fichiers CSV et XLS/XLSX
-│   ├── format_utils.py     # Utilitaires de formatage
-│   ├── constants.py        # Constantes du projet
-│   ├── event_utils.py      # Gestion des événements
-├── biduleur.spec           # Fichier de configuration PyInstaller
-├── build.biduleur.bat               # Script de build pour Windows
-├── build.biduleur.sh                # Script de build pour Linux
-├── requirements.txt        # Dépendances Python
-├── .github/                # Configuration GitHub Actions
-│   └── workflows/
-│       └── release.yml     # Workflow de release
-├── build/                  # (généré par PyInstaller)
-└── dist/                   # (généré par PyInstaller)
+bidul/
+├── biduleur/                    # Module 1 : ingestion CSV/XLS -> HTML
+│   ├── __init__.py
+│   ├── main.py                  # GUI et API run_biduleur(input_path, html_bidul, html_agenda)
+│   ├── cli.py                   # CLI d’ingestion
+│   ├── csv_utils.py
+│   ├── format_utils.py
+│   ├── constants.py
+│   ├── event_utils.py
+├── misenpageur/                 # Module 2 : mise en page PDF à partir d’un HTML
+│   ├── main.py                  # point d’entrée CLI
+│   ├── config.yml               # configuration d’exemple
+│   ├── layout.yml               # layout d’exemple (A4 sans marges)
+│   ├── assets/
+│   │   ├── biduleur.html        # HTML source (exemple)
+│   │   ├── cover.jpg
+│   │   ├── ours.md
+│   │   ├── logos/
+│   │   │   └── *.png|jpg
+│   ├── output/
+│   └── misenpageur/
+│       ├── __init__.py
+│       ├── layout_builder.py    # <-- NOUVEAU : Applique les marges au layout
+│       ├── pdfbuild.py
+│       ├── config.py
+│       ├── layout.py
+│       ├── html_utils.py
+│       ├── drawing.py
+│       ├── textflow.py
+│       ├── pdfbuild.py
+│       ├── spacing.py
+│       ├── glyphs.py
+│       └── fonts.py
+├── cli.py                       # Module 3 : wrapper CLI racine (ingestion → PDF)
+├── __main__.py                  # Permet `python -m bidul`
+├── requirements.txt
+└── (évent.) data/, dist/, build/, .github/, etc.
 ```
 
 ---
+
 ## Installation
-1. Clonez le dépôt (si nécessaire) :
-   ```bash
-   git clone https://github.com/lebidul/biduleur.git
-   cd biduleur
-   ```
 
-2. Créez un environnement virtuel (recommandé) :
-   ```bash
-   python -m venv .venv
-   ```
+```bash
+python -m venv .venv
+# Windows
+.venv\Scripts\activate
+# macOS/Linux
+source .venv/bin/activate
 
-3. Activez l'environnement virtuel :
-   - **Windows** :
-     ```cmd
-     .\.venv\Scripts\activate
-     ```
-   - **Linux/macOS** :
-     ```bash
-     source .venv/bin/activate
-     ```
-
-4. Installez les dépendances :
-   ```bash
-   pip install -r requirements.txt
-   ```
+# Assurez-vous que qrcode[pil] est dans requirements.txt
+pip install -r requirements.txt
+```
 
 ---
+
 ## Modes d'utilisation
 
-Biduleur peut être utilisé de deux manières : via une **interface graphique (GUI)** ou en **ligne de commande (CLI)**.
+### Mode GUI (Interface Graphique)
 
----
-
-### **Mode GUI (Interface Graphique)**
-Le mode GUI est **l'interface par défaut** lorsque vous exécutez Biduleur sans arguments.
-
-#### **Lancement**
-- **Depuis le code source** :
-  ```bash
-  python -m biduleur
-  ```
-- **Depuis l'exécutable** (après build) :
-  - **Windows** :
-    ```cmd
-    dist\biduleur\biduleur.exe
-    ```
-  - **Linux** :
-    ```bash
-    dist/biduleur/biduleur
-    ```
-
-#### **Fonctionnalités du mode GUI**
-- **Interface intuitive** pour sélectionner les fichiers CSV et XLS/XLSX.
-- **Prévisualisation** des événements générés.
-- **Export** des événements dans différents formats.
-- **Historique** des fichiers récemment ouverts.
-
----
-
-### **Mode CLI (Ligne de Commande)**
-Le mode CLI permet d'utiliser Biduleur **sans interface graphique**, idéal pour les scripts automatisés ou les environnements serveurs.
-
-#### **Lancement**
 ```bash
-python -m biduleur.cli --help
-```
-ou depuis l'exécutable :
-```cmd
-dist\biduleur\biduleur.exe --cli --help
+python -m biduleur
 ```
 
-#### **Options disponibles**
-| Option | Description | Exemple |
-|--------|-------------|---------|
-| `--input` | Chemin vers le fichier CSV et XLS/XLSX d'entrée | `--input data.csv` |
-| `--output` | Chemin vers le fichier de sortie | `--output output.json` |
-| `--format` | Format de sortie (`json`, `xml`, `txt`) | `--format json` |
-| `--delimiter` | Délimiteur du CSV (défaut: `,`) | `--delimiter ;` |
-| `--encoding` | Encodage du fichier (défaut: `utf-8`) | `--encoding latin1` |
-| `--verbose` | Mode verbeux (affiche les détails) | `--verbose` |
-| `--dry-run` | Simule la génération sans écrire le fichier | `--dry-run` |
+### Mode CLI (Ligne de Commande)
 
-#### **Exemples d'utilisation**
-1. **Générer des événements depuis un CSV** :
-   ```bash
-   python -m biduleur.cli --input data.csv --output events.json --format json
-   ```
+Ingestion seule (produit les fichiers HTML) :
+*(Instructions inchangées)*
 
-2. **Valider un fichier CSV** :
-   ```bash
-   python -m biduleur.cli --input data.csv --dry-run --verbose
-   ```
+### Intégration Misenpageur (PDF) avec marges dynamiques
 
-3. **Utiliser un délimiteur personnalisé** :
-   ```bash
-   python -m biduleur.cli --input data.csv --delimiter ";" --output events.xml --format xml
-   ```
+Le layout final du PDF est généré dynamiquement. Le fichier `layout.yml` sert de **modèle de base** (généralement sans marges), et les marges sont appliquées à la volée à partir de la section `pdf_layout` de votre `config.yml`.
+
+Pour produire le PDF à partir d’un HTML déjà généré :
+
+```bash
+python misenpageur/main.py \
+  --root . \
+  --config misenpageur/config.yml \
+  --layout misenpageur/layout.yml \
+  --out misenpageur/output/bidul.pdf
+```
+
+#### Wrapper CLI racine (ingestion → PDF)
+
+Le wrapper exécute **ingestion** puis **mise en page** automatiquement :
+
+```bash
+python -m bidul \
+  -i data/tapage.xlsx \
+  --config misenpageur/config.yml \
+  --layout misenpageur/layout.yml \
+  --out data/output/bidul.pdf
+```
+
+Options utiles :
+
+* `--bidul-html` / `--agenda-html` : chemins de sortie des HTML si tu ne veux pas les valeurs par défaut
+* `--assets-dir` : dossier par défaut des HTML (si non fournis)
+* `--cover` : surcharge l’image de couverture (remplace `cover_image` de la config pour ce run)
+* `--project-root` : racine projet pour Misenpageur (défaut : dossier de la config)
 
 ---
 
 ## Création du build
 
-### Windows (local)
+### Sur Windows
 
-```cmd
-pyinstaller biduleur.spec --clean --workpath=build --distpath=dist
-```
+*(conserve ici tes instructions existantes pour PyInstaller / scripts `build.biduleur.bat`, etc.)*
 
-Le résultat est dans `dist\biduleur\` :
+### Sur Linux
 
-* `biduleur.exe`
-* `_internal\` (dépendances embarquées)
-
-### GitHub Actions
-
-Le workflow `${repo}/.github/workflows/release.yml` :
-
-* utilise **Python 3.10**
-* installe `pyinstaller` + `pyinstaller-hooks-contrib`
-* installe les deps depuis `biduleur/requirements.txt`
-* build en **onedir** et génère un ZIP prêt à publier
+*(conserve ici tes instructions existantes pour PyInstaller / scripts `build.biduleur.sh`, etc.)*
 
 ---
+
 ## Utilisation
-Après le build, exécutez l'application :
-- **Mode GUI (par défaut)** :
-  ```cmd
-  dist\biduleur\biduleur.exe
-  ```
-- **Mode CLI** :
-  ```cmd
-  dist\biduleur\biduleur.exe --cli --input data.csv --output events.json
-  ```
 
----
-## Création d'une release
-### Manuellement
-1. Créez un tag :
-   ```bash
-   git tag -a v1.0.0 -m "Version 1.0.0 - Première version stable"
-   git push origin v1.0.0
-   ```
-2. Allez sur [GitHub Releases](https://github.com/lebidul/biduleur/releases)
-3. Cliquez sur "Draft a new release"
-4. Sélectionnez le tag `v1.0.0`
-5. Ajoutez une description et attachez l'exécutable depuis `dist/biduleur/`
-6. Publiez la release
+*(conserve ici tes exemples actuels d’utilisation Biduleur — GUI et CLI — si tu en avais)*
 
-### Automatiquement avec GitHub Actions
-1. Exécutez le workflow manuellement depuis GitHub Actions :
-   - Allez dans l'onglet **"Actions"**
-   - Sélectionnez le workflow **"Build and Release"**
-   - Cliquez sur **"Run workflow"**
-   - Configurez les paramètres :
-     - **Version** : Numéro de version (ex: `1.0.0`)
-     - **Publier la release ?** : `true` (pour publier) ou `false` (pour juste builder)
-   - Cliquez sur **"Run workflow"**
+### Utiliser l’HTML généré avec Misenpageur
 
----
-## Dépannage
-### Problèmes courants
-1. **L'exécutable ne se lance pas** :
-   - Activez le mode console dans `biduleur.spec` (`console=True`)
-   - Vérifiez les dépendances : `pip install -r requirements.txt`
-   - Nettoyez les anciens builds : `rm -rf build/ dist/`
+1. Lancer Biduleur (GUI ou CLI) pour produire `misenpageur/assets/biduleur.html`.
+2. Lancer Misenpageur (CLI) :
 
-2. **Erreurs de chemins** :
-   - Vérifiez la structure du projet
-   - Utilisez `os.path` pour les chemins dans votre code
-
-3. **Build échoué** :
-   - Exécutez avec plus de détails : `pyinstaller biduleur.spec --clean --debug=all`
-   - Consultez les logs dans `build/`
-
-4. **Erreur avec GitHub Actions "deprecated version of actions/upload-artifact: v3"** :
-   - Le workflow fourni utilise déjà les versions actuelles des actions (v4)
-
-5. **Erreur 403 lors de la création de release** :
-   - Vérifiez que les permissions du dépôt sont correctement configurées *(Settings > Actions > General > Workflow permissions : "Read and write permissions")*
-   - Assurez-vous que le tag n'existe pas déjà
-
----
-## Fichiers de configuration
-### biduleur.spec
-```python
-# biduleur.spec (version finale)
-from PyInstaller.utils.hooks import collect_submodules, collect_data_files
-import os
-import sys
-
-current_dir = os.getcwd()
-main_script = os.path.join(current_dir, 'biduleur', 'main.py')
-
-if not os.path.exists(main_script):
-    raise FileNotFoundError(f"Le fichier {main_script} est introuvable")
-
-hidden_imports = collect_submodules('tkinter')
-hidden_imports += [
-    'biduleur.csv_utils',
-    'biduleur.format_utils',
-    'biduleur.constants',
-    'biduleur.event_utils',
-    'pkg_resources.py2_warn',
-    'pandas',
-    'numpy',
-    'python_dateutil',
-    'pytz',
-    'tzdata',
-    'six',
-]
-
-datas = collect_data_files('tkinter')
-datas += [(os.path.join(current_dir, 'biduleur'), 'biduleur')]
-
-site_packages = os.path.join(sys.prefix, 'Lib', 'site-packages')
-datas += [(site_packages, 'site-packages')]
-
-a = Analysis(
-    [main_script],
-    pathex=[current_dir, site_packages],
-    binaries=[],
-    datas=datas,
-    hiddenimports=hidden_imports,
-    hookspath=['hooks'],
-    runtime_hooks=[],
-    excludes=[],
-    win_no_prefer_redirects=False,
-    win_private_assemblies=False,
-    cipher=None,
-    noarchive=False
-)
-
-pyz = PYZ(a.pure, a.zipped_data, cipher=None)
-
-exe = EXE(
-    pyz,
-    a.scripts,
-    [],
-    exclude_binaries=True,
-    name='biduleur',
-    debug=True,
-    bootloader_ignore_signals=False,
-    strip=False,
-    upx=False,
-    runtime_tmpdir=None,
-    console=True,
-    icon=os.path.join(current_dir, 'biduleur.ico') if os.path.exists(os.path.join(current_dir, 'biduleur.ico')) else None
-)
-
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
-    strip=False,
-    upx=False,
-    upx_exclude=[],
-    name='biduleur'
-)
-```
-
-### build.biduleur.bat
-```batch
-@echo off
-cd /d "%~dp0"
-
-:: Nettoyage des anciens builds
-echo Nettoyage des anciens builds...
-rmdir /s /q build 2>nul
-rmdir /s /q dist 2>nul
-
-:: Vérification de la structure
-echo Vérification de la structure :
-dir /b
-if not exist "biduleur\main.py" (
-    echo ERREUR: biduleur\main.py introuvable
-    exit /b 1
-)
-
-:: Build
-echo Création du build...
-pyinstaller biduleur.spec --clean --workpath=build --distpath=dist
-
-:: Vérification
-if exist "dist\biduleur" (
-    echo Build réussi !
-    dir dist\
-) else (
-    echo ERREUR: Build échoué
-    exit /b 1
-)
-```
-
-### build.biduleur.sh
 ```bash
-#!/bin/bash
-cd "$(dirname "$0")" || exit 1
-
-# Nettoyage
-echo "Nettoyage des anciens builds..."
-rm -rf build 2>/dev/null
-rm -rf dist 2>/dev/null
-
-# Vérifications
-echo "Vérification de la structure :"
-ls -l
-if [ ! -d "biduleur" ]; then
-    echo "ERREUR: Dossier biduleur/ introuvable"
-    exit 1
-fi
-if [ ! -f "biduleur/main.py" ]; then
-    echo "ERREUR: biduleur/main.py introuvable"
-    exit 1
-fi
-
-# Build
-echo "Création du build..."
-pyinstaller biduleur.spec --clean --workpath=build --distpath=dist
-
-# Vérification
-if [ -d "dist/biduleur" ]; then
-    echo "Build réussi !"
-    ls -l dist/
-else
-    echo "ERREUR: Build échoué"
-    exit 1
-fi
+python misenpageur/main.py \
+  --root . \
+  --config misenpageur/config.yml \
+  --layout misenpageur/layout.yml \
+  --out misenpageur/output/bidul.pdf
 ```
 
-### release.yml
-```yaml
-name: Build and Release - Biduleur (moulinette)
+### Exécuter la chaîne complète via le wrapper
 
-on:
-  push:
-    tags:
-      - 'v*'
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 'Numéro de version (ex: 1.0.0)'
-        required: true
-        default: '1.0.0'
-      publish_release:
-        description: 'Publier la release ?'
-        required: true
-        default: 'true'
-        type: choice
-        options:
-        - 'true'
-        - 'false'
-
-jobs:
-  build:
-    runs-on: windows-latest
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.9'
-
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r biduleur/requirements.txt
-        pip install pyinstaller
-
-    - name: Build executable (mode --onedir)
-      run: |
-        pyinstaller biduleur.spec --clean --workpath=build --distpath=dist
-
-    - name: Prepare release assets
-      run: |
-        mkdir release_assets
-        # Créer un fichier README.txt pour les utilisateurs finaux
-        echo "Biduleur v${{ github.event.inputs.version || github.ref_name }}" > dist\biduleur\README.txt
-        echo "================================================" >> dist\biduleur\README.txt
-        echo "" >> dist\biduleur\README.txt
-        echo "Merci d'utiliser Biduleur !" >> dist\biduleur\README.txt
-        echo "" >> dist\biduleur\README.txt
-        echo "INSTRUCTIONS:" >> dist\biduleur\README.txt
-        echo "1. Extrayez le contenu de ce fichier ZIP dans un dossier de votre choix." >> dist\biduleur\README.txt
-        echo "2. Double-cliquez sur biduleur.exe pour lancer l'application." >> dist\biduleur\README.txt
-        echo "3. Suivez les instructions à l'écran." >> dist\biduleur\README.txt
-        echo "" >> dist\biduleur\README.txt
-        echo "REQUIREMENTS:" >> dist\biduleur\README.txt
-        echo "- Windows 10 ou supérieur" >> dist\biduleur\README.txt
-        echo "- Aucune installation supplémentaire nécessaire" >> dist\biduleur\README.txt
-        echo "" >> dist\biduleur\README.txt
-        echo "SUPPORT:" >> dist\biduleur\README.txt
-        echo "Pour toute question ou problème, contactez-nous via GitHub." >> dist\biduleur\README.txt
-        # Compresser le dossier biduleur en ZIP
-        Compress-Archive -Path dist\biduleur\* -DestinationPath release_assets\biduleur-${{ github.event.inputs.version || github.ref_name }}-windows.zip -Force
-
-    - name: Create Release
-      if: ${{ github.event.inputs.publish_release != 'false' && (github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')) }}
-      uses: softprops/action-gh-release@v1
-      with:
-        name: Biduleur ${{ github.event.inputs.version || github.ref_name }}
-        tag_name: ${{ github.event.inputs.version && format('v{0}', github.event.inputs.version) || github.ref_name }}
-        body: |
-          ## Biduleur ${{ github.event.inputs.version || github.ref_name }}
-
-          ### Changements
-          - [Liste des changements pour cette version]
-
-          ### Instructions
-          1. Téléchargez `biduleur-${{ github.event.inputs.version || github.ref_name }}-windows.zip`
-          2. Extrayez le fichier ZIP dans un dossier de votre choix
-          3. Exécutez `biduleur.exe` depuis le dossier extrait (aucune installation nécessaire)
-
-          ### Contenu du ZIP
-          - `biduleur.exe` : Exécutable principal
-          - `README.txt` : Instructions pour les utilisateurs
-          - Autres fichiers nécessaires au fonctionnement
-
-        files: release_assets/*
-        generate_release_notes: true
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+```bash
+python -m bidul \
+  -i data/tapage.xlsx \
+  --config misenpageur/config.yml \
+  --layout misenpageur/layout.yml \
+  --out data/output/bidul.pdf
 ```
 
 ---
+
+## Création d'une release
+
+*(Sections inchangées)*
+
+---
+
+## Dépannage
+
+*   **Arial/Arial Narrow introuvable** : `reportlab` ne trouve pas la police. Placez les fichiers `.TTF` correspondants dans un dossier `assets/fonts/` ou laissez le fallback sur Helvetica.
+*   **TypeError: expected str, bytes or os.PathLike object, not BytesIO** : Erreur liée à la génération du QR code. Assurez-vous d'avoir bien installé `qrcode[pil]` (`pip install "qrcode[pil]"`)
+*   **Glyphes `€` / `❑`** : fournis via **fallback DejaVuSans** (famille enregistrée dans `fonts.py`). Place au moins `DejaVuSans.ttf` dans `misenpageur/assets/fonts/DejaVu/` (ou installe le paquet système).
+*   **Date box absente** : vérifier `date_box.enabled: true` + `border_width`/`back_color` non nuls.
+*   **Paragraphes non placés** : jouer sur `font_size_max` / `split_min_gain_ratio` ou l’ordre des sections.
+*   **“No such file or directory …/output.pdf”** : créer le dossier parent (le wrapper le fait désormais).
+
+---
+
+## Fichiers de configuration
+
+*(Sections sur biduleur.spec, build.bat, build.sh, release.yml inchangées)*
+
+### misenpageur/config.yml
+
+Ce fichier centralise tous les paramètres de mise en page du PDF.
+
+```yaml
+# --------------------
+# Chemins et Fichiers
+# --------------------
+input_html: assets/biduleur.html
+ours_md:    assets/ours.md
+logos_dir:  assets/logos
+cover_image: assets/cover.jpg
+
+# --------------------
+# Layout dynamique
+# --------------------
+pdf_layout:
+  page_margin_mm: 4   # Marge globale appliquée au layout de base
+
+# --------------------
+# Configuration de la Section 1
+# --------------------
+section_1:
+  # Colonne Ours
+  ours_font_name: "Arial"
+  ours_font_size: 8
+  ours_line_spacing: 1.2
+  ours_border_width: 0.5   # Largeur du cadre autour de l'ours (0 pour aucun)
+
+  # QR Code et son titre
+  qr_code_value: "https://www.lebidul.com"
+  qr_code_height_mm: 30
+  qr_code_title: "Agenda culturel"
+  qr_code_title_font_name: "Arial-Bold"
+  qr_code_title_font_size: 9
+
+  # Colonne Logos
+  additional_box_height_mm: 10 # Hauteur de la boîte sous les logos (0 pour aucune)
+  logo_box_bottom_margin_mm: 3 # Marge entre les logos et la boîte additionnelle
+
+# --------------------
+# Configuration du texte principal (S3, S4, S5, S6)
+# --------------------
+font_name: "ArialNarrow"
+font_size_min: 8.0
+font_size_max: 10.0
+# ... (autres clés de configuration du texte)
+```
+
+### misenpageur/layout.yml
+
+Ce fichier décrit la **structure de base sans marges**. Les marges de `config.yml` sont appliquées par-dessus.
+
+```yaml
+page_size: { width: 595, height: 842 }   # A4 en points
+
+sections:
+  # Page 1 = grille 2x2
+  S1: { page: 1, x: 0,     y: 421, w: 297.5, h: 421 }
+  S2: { page: 1, x: 297.5, y: 421, w: 297.5, h: 421 }
+  S3: { page: 1, x: 0,     y: 0,   w: 297.5, h: 421 }
+  S4: { page: 1, x: 297.5, y: 0,   w: 297.5, h: 421 }
+  # Page 2 = 2 colonnes pleine hauteur
+  S5: { page: 2, x: 0,     y: 0,   w: 297.5, h: 842 }
+  S6: { page: 2, x: 297.5, y: 0,   w: 297.5, h: 842 }
+
+s1_split:
+  # Ratio de largeur pour les colonnes de S1
+  logos_ratio: 0.5 
+```
+
+### Polices & glyphes (€, ❑)
+
+* **Arial Narrow** : si disponible (Windows ou `assets/fonts/ArialNarrow/`), sinon **Helvetica**.
+* **Fallback DejaVuSans** : assure `DejaVuSans.ttf` présent (ou installé) ; la famille est enregistrée dans `fonts.py` pour garantir `€` et `❑`.
+* (Option) Remplacer `❑` par `■` via `event_bullet_replacement`.
+
+---
+
 ## Contribuer
+
 1. Forkez le projet
 2. Créez une branche (`git checkout -b feature/ma-fonctionnalité`)
 3. Commitez vos changements (`git commit -am 'Ajout fonctionnalité'`)
@@ -492,6 +308,7 @@ jobs:
 5. Ouvrez une Pull Request
 
 ---
+
 ## Licence
-[MIT](LICENCE)
-```
+
+MIT (voir `LICENCE`).

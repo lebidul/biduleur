@@ -1,0 +1,42 @@
+je vais le aire en francais car les futurs collaborateurs et utilisateurs seront francais.
+
+Le projet est de faciliter la création d'un fanzine mensuel, un agenda culturel,  au format A4 (recto verso)
+
+Il s'agit donc de créer un pdf à partir d'un fichier d'entrée au format prédiini en xls, xlsx ou csv
+
+De formater les lignes du fichier d'entrée selon les conventions de mise formattage du fanzine. Cette tâche est remplie par le moduleur biduleur du projet qui prend en entrée un fichier xls, xlsx ou csv et crée plusieurs fichiers html formattés selon la convention typographique du fanzine.
+
+Ce fichier html est ensuite utilisé comme entrée du module misenpageur avec d'autres paramètres d'entrée afin de créer un fichier pdf de sortie ainsi qu'un fichier .py destiné à la création et à l'édition de l information contenue dans le pdf de sortie dans scribus.
+
+2 UIs ont éte créés dans ce projet. L'une qui contient le process du biduleur mais surtout bidul.biduleur/gui.py qui permet la réalisation du wokflow dans sa globalité. de .xls/.xlsx/.xsv -> .pdf (biduleur | misenpageur)
+
+Strucuture du document pdf final. Il s'agit d'un document A4 de 1 page recto-verso divisé en 8 sections équivalentes, chacune faisaint une taille A5)
+
+
+
+* nom des sections:
+	page 1: 
+		moitié haute: 
+			partie gauche: S1 
+			partie droite: S2 
+		moitié basse: 
+			partie gauche: S3 
+			partie droite: S4 
+	page 2: 
+		moitié haute: 
+			partie gauche: S5 
+			partie droite: S6 
+		moitié basse: 
+			partie gauche: S7 
+			partie droite: S8 
+
+* Contenu des sections:
+	S1: images des logos (10) (partie gauche) + texte constant (appelé ours) (partie droite) 
+	S2: image de couverture 
+	Sections 3,4,5,6,7,8: contient les lignes d'un fichier html d'entrée réparties sur ces 6 sections, dans l'ordre suivant 5,7,6,8,3,4, c'est à dire que: 
+		- la section 5 contient les lignes [1 ; a] du fichier html - la section 7 contient les lignes [a+1; b] du fichier html 
+		- la section 6 contient les lignes [b+1; c] du fichier html La taille de police doit donc être adaptée pour pouvoir faire rentrer toutes les lignes du fichier html en alignement justifié au sein de chaque section en font "Arial Narrow"
+
+Les sections 2 à 8 en l'état actuel du code sont remplies "as expected"il me reste maintenant à affiner la création de la section `divisée en 2 colonnes de largeur égale:
+	- colonne de gauche: les logos
+	- colonne de droite: l'ours
