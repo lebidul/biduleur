@@ -4,6 +4,7 @@ page_size:
   height: 842
 
 sections:
+  # --- Sections des pages 1 & 2 (existantes) ---
   S1: { page: 1, x: 0,     y: 421, w: 297.5, h: 421 }
   S2: { page: 1, x: 297.5, y: 421, w: 297.5, h: 421 }
   S3: { page: 1, x: 0,     y: 0,   w: 297.5, h: 421 }
@@ -11,6 +12,22 @@ sections:
   S5: { page: 2, x: 0,     y: 0,   w: 297.5, h: 842 }
   S6: { page: 2, x: 297.5, y: 0,   w: 297.5, h: 842 }
 
+  S7_Title: { page: 3, x: 20, y: 800, w: 555, h: 30 }
+
+  # --- Cadres pour les images ---
+  S7_CoverImage: { page: 3, x: 215, y: 350, w: 165, h: 230 }
+  S7_QRCode:     { page: 3, x: 505, y: 30, w: 70, h: 70 }
+
+  # --- Cadres pour le flux de texte (découpés pour contourner les images) ---
+  S7_Col1: { page: 3, x: 20, y: 20, w: 190, h: 775 }
+  S7_Col2_Top:    { page: 3, x: 215, y: 585, w: 170, h: 210 }
+  S7_Col2_Bottom: { page: 3, x: 215, y: 20,  w: 170, h: 325 }
+  S7_Col3_Top:    { page: 3, x: 390, y: 105, w: 185, h: 690 }
+  S7_Col3_BesideQR: { page: 3, x: 390, y: 30,  w: 110, h: 70 }
+
+  # --- Cadre pour les logos en bas ---
+  S7_Logos: { page: 3, x: 20, y: 5, w: 480, h: 20 }
+
 s1_split:
-  logos_ratio: 0.5 # Mettez 0.5/0.5 comme nous l'avons implémenté
+  logos_ratio: 0.5
   ours_ratio: 0.5

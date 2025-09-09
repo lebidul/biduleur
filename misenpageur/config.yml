@@ -108,7 +108,7 @@ s1_split:
   gutter: 6            # (optionnel) gouttière verticale entre logos et ours
 
 pdf_layout:
-  page_margin_mm: 5 # Marge globale sur la page A4, en millimètres
+  page_margin_mm: 1 # Marge globale sur la page A4, en millimètres
   section_spacing_mm: 1 # Espacement entre les sections A5, si désiré
 
 section_1:
@@ -131,3 +131,12 @@ section_1:
 
 # Impression facultative de la section de couverture
 skip_cover: false
+
+poster:
+  enabled: true
+  title: "L'AGENDA COMPLET"
+  font_name_title: "Helvetica-Bold"
+  font_size_title: 32.0
+  # Tailles de police pour le corps du texte du poster
+  font_size_min: 6.0
+  font_size_max: 10.0

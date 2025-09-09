@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import List, Tuple
 
 from reportlab.pdfgen import canvas
-from reportlab.platypus import Paragraph
+from reportlab.platypus import Paragraph, Frame
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.colors import HexColor
 
@@ -482,3 +482,51 @@ def plan_pair_with_split(
 
     remaining = paras_text[i:]
     return A_full, A_tail, B_prelude, B_full, remaining
+
+
+def measure_poster_fit_at_fs(
+        c: canvas.Canvas,
+        frames: List[Section],
+        paras_text: List[str],
+        font_name: str, font_size: float, leading_ratio: float,
+        bullet_cfg: BulletConfig
+) -> bool:
+    """Simule le remplissage de plusieurs cadres et retourne True si tout le texte rentre."""
+    base_style = paragraph_style(font_name, font_size, leading_ratio)
+    story = []
+    for raw in paras_text:
+        kind = "EVENT" if _is_event(raw) else "DATE"
+        st = _mk_style_for_kind(base_style, "EVENT", bullet_cfg, DateBoxConfig())
+        txt = _mk_text_for_kind(raw, kind, bullet_cfg)
+        story.append(Paragraph(txt, st))
+
+    remaining_story = list(story)
+
+    for section in frames:
+        if not remaining_story: break
+        frame = Frame(section.x, section.y, section.w, section.h, showBoundary=0)
+        frame.addFromList(remaining_story, c)
+
+    return not remaining_story
+
+
+def draw_poster_text_in_frames(
+        c: canvas.Canvas,
+        frames: List[Section],
+        paras_text: List[str],
+        font_name: str, font_size: float, leading_ratio: float,
+        bullet_cfg: BulletConfig
+):
+    """Dessine le texte dans une série de cadres."""
+    base_style = paragraph_style(font_name, font_size, leading_ratio)
+    story = []
+    for raw in paras_text:
+        kind = "EVENT" if _is_event(raw) else "DATE"
+        st = _mk_style_for_kind(base_style, "EVENT", bullet_cfg, DateBoxConfig())
+        txt = _mk_text_for_kind(raw, kind, bullet_cfg)
+        story.append(Paragraph(txt, st))
+
+    for section in frames:
+        if not story: break
+        frame = Frame(section.x, section.y, section.w, section.h, showBoundary=0)
+        frame.addFromList(story, c)

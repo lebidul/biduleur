@@ -277,3 +277,34 @@ def draw_s2_cover(c: canvas.Canvas, S2_coords, image_path: str, inner_pad: float
         return
 
     c.drawImage(image_path, x, y, w, h, preserveAspectRatio=True, anchor='c')
+
+
+def draw_poster_logos(c: canvas.Canvas, s_coords, logos: List[str]):
+    """Dessine une ligne de logos pour le poster."""
+    x, y, w, h = s_coords.x, s_coords.y, s_coords.w, s_coords.h
+    if not logos or not w > 0 or not h > 0: return
+
+    num_logos = len(logos)
+    padding = 1 * mm
+    cell_w = w / num_logos
+
+    for i, logo_path in enumerate(logos):
+        cell_x = x + i * cell_w
+        try:
+            img = ImageReader(logo_path)
+            img_w, img_h = img.getSize()
+            aspect = img_h / img_w if img_w > 0 else 1
+
+            h_fit = h - (2 * padding)
+            w_fit = h_fit / aspect
+
+            if w_fit > cell_w - (2 * padding):
+                w_fit = cell_w - (2 * padding)
+                h_fit = w_fit * aspect
+
+            logo_x = cell_x + (cell_w - w_fit) / 2
+            logo_y = y + (h - h_fit) / 2
+
+            c.drawImage(logo_path, logo_x, logo_y, width=w_fit, height=h_fit, mask='auto')
+        except Exception as e:
+            print(f"[WARN] Impossible de dessiner le logo du poster {os.path.basename(logo_path)}: {e}")

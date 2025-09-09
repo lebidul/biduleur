@@ -3,29 +3,30 @@ from __future__ import annotations
 
 import os
 from typing import List, Tuple
-
-from reportlab.pdfgen import canvas
-
-# Ces imports sont conservés car ils sont utilisés par le reste de la fonction
-from .config import Config
-from .layout import Layout
-from .html_utils import extract_paragraphs_from_html
-from .drawing import draw_s1, draw_s2_cover, list_images, paragraph_style  # draw_s1 sera la nouvelle fonction
-from .fonts import register_arial_narrow, register_dejavu_sans
-from .spacing import SpacingConfig, SpacingPolicy
-from .textflow import (
-    BulletConfig, DateBoxConfig, DateLineConfig, # <<< AJOUTER DateLineConfig
-    measure_fit_at_fs,
-    # draw_section_fixed_fs, # Si vous l'utilisez
-    draw_section_fixed_fs_with_prelude,
-    draw_section_fixed_fs_with_tail,
-    plan_pair_with_split,
-)
+from dataclasses import dataclass
+from collections.abc import Mapping
 import io
 import subprocess
 from pathlib import Path
-from PIL import Image  # Pillow
 
+from PIL import Image
+from reportlab.pdfgen import canvas
+import qrcode
+from reportlab.lib.utils import ImageReader
+
+from .config import Config
+from .layout import Layout
+from .html_utils import extract_paragraphs_from_html
+from .drawing import draw_s1, draw_s2_cover, list_images, paragraph_style, draw_poster_logos
+from .fonts import register_arial_narrow, register_dejavu_sans
+from .spacing import SpacingConfig, SpacingPolicy
+from .textflow import (
+    BulletConfig, DateBoxConfig, DateLineConfig,
+    measure_fit_at_fs, draw_section_fixed_fs_with_prelude, draw_section_fixed_fs_with_tail,
+    plan_pair_with_split, measure_poster_fit_at_fs, draw_poster_text_in_frames
+)
+
+# ... (les helpers de mm_to_pt à _inject_auteur_in_ours sont identiques à votre version) ...
 PT_PER_INCH = 72.0
 MM_PER_INCH = 25.4
 
@@ -269,9 +270,6 @@ def _simulate_allocation_at_fs(
     return used_by, total
 
 
-from collections.abc import Mapping
-
-
 def _read_date_box_config(cfg: Config) -> DateBoxConfig:
     """Lit date_box depuis cfg, qu'il soit un dict, un Mapping (OmegaConf, etc.)
     ou un objet-namespace avec attributs. Fallback sur les clés à plat."""
@@ -343,193 +341,152 @@ def _read_date_line_config(cfg: Config) -> DateLineConfig:
     return DateLineConfig()  # Fallback
 
 
+@dataclass
+class PosterConfig:
+    enabled: bool = False
+    title: str = "L'AGENDA COMPLET"
+    font_name_title: str = "Helvetica-Bold"
+    font_size_title: float = 24.0
+    font_size_min: float = 6.0
+    font_size_max: float = 10.0
+
+
+def _read_poster_config(cfg: Config) -> PosterConfig:
+    block = getattr(cfg, "poster", {}) or {}
+    return PosterConfig(
+        enabled=block.get("enabled", False),
+        title=block.get("title", "L'AGENDA COMPLET"),
+        font_name_title=block.get("font_name_title", "Helvetica-Bold"),
+        font_size_title=float(block.get("font_size_title", 24.0)),
+        font_size_min=float(block.get("font_size_min", 6.0)),
+        font_size_max=float(block.get("font_size_max", 10.0)),
+    )
+
+
 def build_pdf(project_root: str, cfg: Config, layout: Layout, out_path: str) -> dict:
     report = {"unused_paragraphs": 0}
-
     c = canvas.Canvas(out_path, pagesize=(layout.page.width, layout.page.height))
 
-    # Polices (Arial Narrow + fallback glyphes)
-    req = (cfg.font_name or "").strip().lower().replace(" ", "")
-    if req in ("arialnarrow", "arialnarrowmt", "arial", "arialmt"):
-        if register_arial_narrow():
-            cfg.font_name = "ArialNarrow"
-        else:
-            print("[WARN] Arial Narrow introuvable - fallback Helvetica.")
-            cfg.font_name = "Helvetica"
+    # Polices
+    if register_arial_narrow():
+        cfg.font_name = "ArialNarrow"
+    else:
+        print("[WARN] Police Arial Narrow introuvable - fallback sur Helvetica.")
+        cfg.font_name = "Helvetica"
     register_dejavu_sans()
 
-    # Inputs
-    html_path = cfg.input_html if os.path.isabs(cfg.input_html) else os.path.join(project_root, cfg.input_html)
-    if not os.path.exists(html_path):
-        raise FileNotFoundError(f"Fichier HTML introuvable: {html_path} (root={project_root})")
-    html_text = read_text(html_path)
-    paras: List[str] = extract_paragraphs_from_html(html_text)
-    print("Paragraphes HTML:", len(paras))
-
-    # Ours
-    ours_path = cfg.ours_md if os.path.isabs(cfg.ours_md) else os.path.join(project_root, cfg.ours_md)
-    if not os.path.exists(ours_path):
-        print(f"[WARN] ours_md introuvable: {ours_path}")
-        ours_text = "(Ours manquant — vérifiez config.yml: ours_md)"
-    else:
-        ours_text = read_text(ours_path)
-        print(f"[INFO] ours_md: {ours_path} ({len(ours_text.encode('utf-8'))} bytes)")
-        if not ours_text.strip():
-            print(f"[WARN] ours_md vide: {ours_path}")
-            ours_text = "(Ours vide — remplissez le fichier indiqué dans config.yml)"
-
-    # >>> Injection auteur_couv (+ URL) dans l’ours, borne 47
-    try:
-        ours_text = _inject_auteur_in_ours(
-            ours_text,
-            getattr(cfg, "auteur_couv", "") or "",
-            getattr(cfg, "auteur_couv_url", "") or "",
-            max_len=47
-        )
-    except Exception as _e:
-        # On ne casse pas la génération PDF si l’injection échoue
-        print(f"[WARN] Échec injection auteur dans l’ours: {type(_e).__name__}: {_e}")
-
-    logos = list_images(os.path.join(project_root, cfg.logos_dir), max_images=16)  # Augmentation à 16 logos max
+    # Inputs et contenus
+    html_text = read_text(os.path.join(project_root, cfg.input_html))
+    paras = extract_paragraphs_from_html(html_text)
+    ours_text = read_text(os.path.join(project_root, cfg.ours_md))
+    ours_text = _inject_auteur_in_ours(ours_text, cfg.auteur_couv, cfg.auteur_couv_url)
+    logos = list_images(os.path.join(project_root, cfg.logos_dir))
     cover_path = os.path.join(project_root, cfg.cover_image) if cfg.cover_image else ""
 
     S = layout.sections
 
-    # --- Spacing Policy & Bullet/DateBox ---
-    spacing_cfg = SpacingConfig(
-        date_spaceBefore=getattr(cfg, "date_spaceBefore", 6.0),
-        date_spaceAfter=getattr(cfg, "date_spaceAfter", 3.0),
-        event_spaceBefore=getattr(cfg, "event_spaceBefore", 1.0),
-        event_spaceAfter=getattr(cfg, "event_spaceAfter", 1.0),
-        event_spaceAfter_perLine=getattr(cfg, "event_spaceAfter_perLine", 0.4),
-        min_event_spaceAfter=getattr(cfg, "min_event_spaceAfter", 1.0),
-        first_non_event_spaceBefore_in_S5=getattr(cfg, "first_non_event_spaceBefore_in_S5", 0.0),
-    )
-    bullet_cfg = BulletConfig(
-        show_event_bullet=getattr(cfg, "show_event_bullet", True),
-        event_bullet_replacement=getattr(cfg, "event_bullet_replacement", None),
-        event_hanging_indent=getattr(cfg, "event_hanging_indent", 10.0),
-    )
+    # Configurations
+    spacing_cfg = SpacingConfig()
+    bullet_cfg = BulletConfig()
     date_box = _read_date_box_config(cfg)
     date_line = _read_date_line_config(cfg)
-    # print("[INFO] DateBoxConfig:", date_box, "type(cfg.date_box)=", type(getattr(cfg, "date_box", None)))
 
-    # --- Chercher la plus grande taille commune fs (mesure AVEC spacing + indent + box) ---
+    # Calcul taille de police pour pages 1 & 2
     order_fs = ["S5", "S6", "S3", "S4"]
     lo, hi = cfg.font_size_min, cfg.font_size_max
     best_fs = lo
-    for _ in range(24):  # binaire
+    for _ in range(10):
         mid = (lo + hi) / 2.0
         style_mid = paragraph_style(cfg.font_name, mid, cfg.leading_ratio)
         spacing_mid = SpacingPolicy(spacing_cfg, style_mid.leading)
-
-        _alloc, tot = _simulate_allocation_at_fs(
-            c, S, order_fs, paras, cfg.font_name, mid, cfg.leading_ratio, cfg.inner_padding,
-            spacing_policy=spacing_mid, bullet_cfg=bullet_cfg, date_box=date_box
-        )
+        _, tot = _simulate_allocation_at_fs(c, S, order_fs, paras, cfg.font_name, mid, cfg.leading_ratio,
+                                            cfg.inner_padding, spacing_mid, bullet_cfg, date_box)
         if tot >= len(paras):
-            best_fs = mid
-            lo = mid
+            best_fs, lo = mid, mid
         else:
             hi = mid
-        if abs(hi - lo) < 0.05:
-            break
+        if abs(hi - lo) < 0.1: break
 
-    # Policies finales (à best_fs)
-    final_style = paragraph_style(cfg.font_name, best_fs, cfg.leading_ratio)
-    spacing_policy = SpacingPolicy(spacing_cfg, final_style.leading)
+    spacing_policy = SpacingPolicy(spacing_cfg, paragraph_style(cfg.font_name, best_fs, cfg.leading_ratio).leading)
 
-    # Seuil de césure "utile"
-    split_min_gain_ratio = getattr(cfg, "split_min_gain_ratio", 0.10)
-
-    # --- PREPRESS : paramètres ---
-    add_crop = bool(_pp_get(cfg, "add_crop_marks", False))
-    bleed_mm = float(_pp_get(cfg, "bleed_mm", 0.0))
-
-    # --- PLANIFICATION par paires avec césure contrôlée ---
-    # Paire page 2 : S5 -> S6
+    # Planification du texte
     s5_full, s5_tail, s6_prelude, s6_full, rest_after_p2 = plan_pair_with_split(
         c, S["S5"], S["S6"], "S5", "S6", paras, cfg.font_name, best_fs, cfg.leading_ratio, cfg.inner_padding,
-        split_min_gain_ratio=split_min_gain_ratio, spacing_policy=spacing_policy,
-        bullet_cfg=bullet_cfg, date_box=date_box
+        cfg.split_min_gain_ratio, spacing_policy, bullet_cfg, date_box
     )
-    # Paire page 1 (bas) : S3 -> S4
     s3_full, s3_tail, s4_prelude, s4_full, rest_after_p1 = plan_pair_with_split(
         c, S["S3"], S["S4"], "S3", "S4", rest_after_p2, cfg.font_name, best_fs, cfg.leading_ratio, cfg.inner_padding,
-        split_min_gain_ratio=split_min_gain_ratio, spacing_policy=spacing_policy,
-        bullet_cfg=bullet_cfg, date_box=date_box
+        cfg.split_min_gain_ratio, spacing_policy, bullet_cfg, date_box
     )
-    if rest_after_p1:
-        print(f"[WARN] {len(rest_after_p1)} paragraphes non placés (réduire font_size_max ou ajuster layout).")
+    report["unused_paragraphs"] = len(rest_after_p1)
 
-    # --- RENDU : PAGE 1 ---
-
-    # ==================== MODIFICATION CI-DESSOUS ====================
-    # On passe l'objet de configuration 'cfg' complet à la nouvelle fonction draw_s1.
-    # L'ancienne fonction prenait plein de paramètres individuels.
+    # --- RENDU PAGE 1 ---
     draw_s1(c, S["S1"], ours_text, logos, cfg, layout)
-    # ====================== FIN DE LA MODIFICATION ======================
-
-    # Couverture prétraitée (CMYK + JPEG qualité) selon config prepress
-    prepped_cover = cover_path
-    if cover_path and os.path.exists(cover_path):
-        # Taille de la zone S2 (pour calcul du DPI effectif)
-        s2w = getattr(S["S2"], "w", None) or S["S2"]["w"]
-        s2h = getattr(S["S2"], "h", None) or S["S2"]["h"]
-        prepped_cover = _prepare_cover_for_print(cover_path, s2w, s2h, cfg)
-
     if not cfg.skip_cover:
+        prepped_cover = _prepare_cover_for_print(cover_path, S["S2"].w, S["S2"].h, cfg)
         draw_s2_cover(c, S["S2"], prepped_cover, cfg.inner_padding)
-
-    draw_section_fixed_fs_with_tail(
-        c, S["S3"], s3_full, s3_tail, cfg.font_name, best_fs, cfg.leading_ratio, cfg.inner_padding,
-        section_name="S3", spacing_policy=spacing_policy, bullet_cfg=bullet_cfg, date_box=date_box,
-        date_line=date_line
-    )
-    draw_section_fixed_fs_with_prelude(
-        c, S["S4"], s4_prelude, s4_full, cfg.font_name, best_fs, cfg.leading_ratio, cfg.inner_padding,
-        section_name="S4", spacing_policy=spacing_policy, bullet_cfg=bullet_cfg, date_box=date_box,
-        date_line=date_line
-    )
-
-    # Repères de coupe (page 1)
-    if add_crop:
-        _draw_crop_marks(c, layout.page.width, layout.page.height, bleed_mm)
-
+    draw_section_fixed_fs_with_tail(c, S["S3"], s3_full, s3_tail, cfg.font_name, best_fs, cfg.leading_ratio,
+                                    cfg.inner_padding, "S3", spacing_policy, bullet_cfg, date_box, date_line)
+    draw_section_fixed_fs_with_prelude(c, S["S4"], s4_prelude, s4_full, cfg.font_name, best_fs, cfg.leading_ratio,
+                                       cfg.inner_padding, "S4", spacing_policy, bullet_cfg, date_box, date_line)
     c.showPage()
 
-    # --- RENDU : PAGE 2 ---
-    draw_section_fixed_fs_with_tail(
-        c, S["S5"], s5_full, s5_tail, cfg.font_name, best_fs, cfg.leading_ratio, cfg.inner_padding,
-        section_name="S5", spacing_policy=spacing_policy, bullet_cfg=bullet_cfg, date_box=date_box,
-        date_line=date_line
-    )
-    draw_section_fixed_fs_with_prelude(
-        c, S["S6"], s6_prelude, s6_full, cfg.font_name, best_fs, cfg.leading_ratio, cfg.inner_padding,
-        section_name="S6", spacing_policy=spacing_policy, bullet_cfg=bullet_cfg, date_box=date_box,
-        date_line=date_line
-    )
+    # --- RENDU PAGE 2 ---
+    draw_section_fixed_fs_with_tail(c, S["S5"], s5_full, s5_tail, cfg.font_name, best_fs, cfg.leading_ratio,
+                                    cfg.inner_padding, "S5", spacing_policy, bullet_cfg, date_box, date_line)
+    draw_section_fixed_fs_with_prelude(c, S["S6"], s6_prelude, s6_full, cfg.font_name, best_fs, cfg.leading_ratio,
+                                       cfg.inner_padding, "S6", spacing_policy, bullet_cfg, date_box, date_line)
 
-    # Repères de coupe (page 2)
-    if add_crop:
-        _draw_crop_marks(c, layout.page.width, layout.page.height, bleed_mm)
+    # --- RENDU PAGE 3 (POSTER) ---
+    poster_cfg = _read_poster_config(cfg)
+    best_fs_poster = poster_cfg.font_size_min
+    if poster_cfg.enabled:
+        c.showPage()
 
-    # Finaliser PDF
+        s_title = S["S7_Title"]
+        c.setFont(poster_cfg.font_name_title, poster_cfg.font_size_title)
+        c.drawCentredString(s_title.x + s_title.w / 2, s_title.y + (s_title.h - poster_cfg.font_size_title) / 2,
+                            poster_cfg.title)
+
+        if cover_path: c.drawImage(cover_path, S["S7_CoverImage"].x, S["S7_CoverImage"].y, S["S7_CoverImage"].w,
+                                   S["S7_CoverImage"].h, preserveAspectRatio=True, anchor='c')
+
+        qr_gen = qrcode.QRCode(version=1, border=1)
+        qr_gen.add_data(cfg.section_1.get('qr_code_value', ''))
+        qr_gen.make(fit=True)
+        buffer = io.BytesIO()
+        qr_gen.make_image().save(buffer, format='PNG')
+        buffer.seek(0)
+        c.drawImage(ImageReader(buffer), S["S7_QRCode"].x, S["S7_QRCode"].y, S["S7_QRCode"].w, S["S7_QRCode"].h,
+                    mask='auto')
+
+        draw_poster_logos(c, S["S7_Logos"], logos)
+
+        poster_paras = s5_full + s6_full + s3_full + s4_full
+        poster_frames = [S[name] for name in
+                         ["S7_Col1", "S7_Col2_Top", "S7_Col2_Bottom", "S7_Col3_Top", "S7_Col3_BesideQR"]]
+
+        lo, hi = poster_cfg.font_size_min, poster_cfg.font_size_max
+        for _ in range(10):
+            mid = (lo + hi) / 2.0
+            if mid <= lo or mid >= hi: break
+            if measure_poster_fit_at_fs(c, poster_frames, poster_paras, cfg.font_name, mid, cfg.leading_ratio,
+                                        bullet_cfg):
+                best_fs_poster, lo = mid, mid
+            else:
+                hi = mid
+            if abs(hi - lo) < 0.1: break
+
+        draw_poster_text_in_frames(c, poster_frames, poster_paras, cfg.font_name, best_fs_poster, cfg.leading_ratio,
+                                   bullet_cfg)
+
     c.save()
 
-    # (Option) Post-traitement PDF/X via Ghostscript
-    if bool(_pp_get(cfg, "pdfx", False)):
-        gs = _pp_get(cfg, "ghostscript_path", "gswin64c")
-        icc = _pp_get(cfg, "pdfx_icc", "")
-        out_pdfx = os.path.splitext(out_path)[0] + ".pdfx.pdf"
-        ok = _ghostscript_pdfx(out_path, out_pdfx, icc, gs=gs)
-        if ok:
-            try:
-                os.replace(out_pdfx, out_path)
-                print("[INFO] PDF/X-1a généré avec succès.")
-            except Exception as e:
-                print(f"[WARN] Impossible d’écraser le PDF par la version PDF/X: {e}")
+    print("-" * 20)
+    print(f"Taille de police (pages 1-2): {best_fs:.2f} pt")
+    if poster_cfg.enabled:
+        print(f"Taille de police (poster)    : {best_fs_poster:.2f} pt")
+    print(f"Paragraphes non placés      : {len(rest_after_p1)}")
+    print("-" * 20)
 
-    report["unused_paragraphs"] = len(rest_after_p1)
-    print("fs_common:", round(best_fs, 2), "split_min_gain_ratio:", split_min_gain_ratio)
     return report
