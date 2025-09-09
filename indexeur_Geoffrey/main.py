@@ -5,7 +5,7 @@ from datetime import datetime
 import time
 import re
 
-from DecoupePages import decoupe_avant_2000, decoupe_apres_2000, decoupe_en_3, decoupe_horizontal
+from DecoupePages import decoupe_avant_2000, decoupe_vertical, decoupe_en_3, decoupe_horizontal
 from Tesseract import traiter_images_decoupees_via_tesseract
 from Misatral import traiter_images_decoupees_via_mistral
 
@@ -77,10 +77,8 @@ def decoupe_selon_date(images_pages):
             page = int(page)
             
             
-            # condition sur le numéro
-            if 1990 < numero:
-                decoupe_apres_2000(image_path)
-                print("ahhhhhhhhh")
+            if 31 > numero: #vieux format avant 2000-01 
+                decoupe_avant_2000(image_path)
             else :
 
                 if numero >= 242 and page == 3: #page 3 a découper en 3 colonnes
@@ -89,7 +87,7 @@ def decoupe_selon_date(images_pages):
                 elif 174 <= numero <= 227 and page == 1: #première page de Bidul avec un texte horizontal
                     decoupe_horizontal(image_path)
                 else:
-                    decoupe_apres_2000(image_path)
+                    decoupe_vertical(image_path)
                     
                     
         else:

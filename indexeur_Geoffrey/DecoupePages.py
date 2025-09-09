@@ -63,7 +63,7 @@ def decoupe_avant_2000(image_path):
 
 
 # Découpe alternative pour les PDF >= 2000 (verticalement en deux colonnes)
-def decoupe_apres_2000(image_path):
+def decoupe_vertical(image_path):
     img = deskew_image(Image.open(image_path))
     largeur, hauteur = img.size
     moitié = largeur // 2

@@ -1,7 +1,9 @@
 
 
 version modèrne 
-if (avant 1990)
+if (avant le 12)
+
+1998 - 5 a l'envers
 
 else if (du numéro 23 au 2137)
 
