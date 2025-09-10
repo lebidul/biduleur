@@ -80,7 +80,7 @@ date_box:
 # Configuration de la ligne horizontale pour les dates (Jeudi 25, etc.)
 date_line:
   enabled: true       # Mettre à true pour afficher la ligne, false pour la cacher
-  width: 1.3         # Épaisseur de la ligne en points (0.5 est fin)
+  width: 1.5         # Épaisseur de la ligne en points (0.5 est fin)
   color: "#000000"    # Couleur de la ligne au format hexadécimal
   gap_after_text_mm: 3.0
 
@@ -129,13 +129,35 @@ section_1:
   additional_box_height_mm: 35 # Hauteur de la "boîte additionnelle" sous les logos
   logo_box_bottom_margin_mm: 0 # Marge entre la zone des logos et la boîte additionnelle
 
+
+# Configuration de la boîte "Cucaracha" (anciennement additional_box)
+cucaracha_box:
+  # Type de contenu: "none", "text", ou "image"
+  content_type: "none"
+
+  # Valeur du contenu (chemin de l'image ou texte brut)
+  content_value: ""
+
+  # Paramètres du titre
+  title: "Cucaracha"
+  title_font_name: "Arial-BoldItalic"
+  title_font_size: 8
+
+  text_font_name: "Arial"
+  text_font_size: 10
+  text_style: "italic" # "normal" ou "italic"
+  text_align: "center"   # "left", "center", ou "right"
+
+  # Hauteur de la boîte en mm (si le contenu n'est pas "none")
+  height_mm: 35
+
 # Impression facultative de la section de couverture
 skip_cover: false
 
 poster:
   enabled: true
   # 0: image au centre, 1: image en fond
-  design: 1
+  design: 0
   background_image_alpha: 0.75
   title: "le bidul - octobre 2025" # Sera surchargé par la GUI
   font_name_title: "DSNetStamped" # Le nom qu'on a enregistré dans fonts.py

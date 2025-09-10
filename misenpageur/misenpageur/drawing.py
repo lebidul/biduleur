@@ -7,11 +7,12 @@ from typing import List
 
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
-from reportlab.lib.enums import TA_CENTER
+from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 from reportlab.platypus import Paragraph, Frame
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.utils import ImageReader  # <--- CET IMPORT EST CRUCIAL
+from reportlab.lib.utils import ImageReader
 from reportlab.lib.colors import grey
+from reportlab.pdfbase import pdfmetrics
 
 from .fonts import register_arial
 from .layout import Layout, Section
@@ -157,45 +158,44 @@ def _draw_ours_column(c: canvas.Canvas, col_coords: tuple, ours_text: str, cfg: 
 
 
 # =====================================================================
-# Section 1 : Colonne LOGOS (non modifiée)
+# Section 1 : Colonne LOGOS
 # =====================================================================
 
 def _draw_logos_column(c: canvas.Canvas, col_coords: tuple, logos: List[str], cfg: Config):
-    """Dessine la colonne de gauche de S1 (Logos + boîte additionnelle)."""
+    """Dessine la colonne de gauche de S1 (Logos + boîte Cucaracha)."""
     x, y, w, h = col_coords
-    s1_cfg = cfg.section_1
 
-    additional_box_h = s1_cfg['additional_box_height_mm'] * mm
-    logo_margin = s1_cfg['logo_box_bottom_margin_mm'] * mm
-    logos_h = h - additional_box_h - logo_margin
+    # --- Logique de hauteur modifiée ---
+    c_cfg = cfg.cucaracha_box
+    content_type = c_cfg.get("content_type", "none")
 
-    # --- LECTURE SÉCURISÉE DE LA CONFIGURATION ---
-    # On utilise .get(key, 0) pour s'assurer que si la clé n'est pas dans conf.yml,
-    # la valeur par défaut est 0, ce qui supprime la boîte et la marge.
-    additional_box_h = s1_cfg.get('additional_box_height_mm', 0) * mm
-    logo_margin = s1_cfg.get('logo_box_bottom_margin_mm', 0) * mm
+    if content_type != "none":
+        # S'il y a du contenu, la boîte a une hauteur définie
+        cucaracha_h = c_cfg.get("height_mm", 35) * mm
+    else:
+        # Sinon, la boîte n'a pas de hauteur
+        cucaracha_h = 0
 
-    # --- CALCUL CORRECT DES HAUTEURS ---
-    # La hauteur de la zone des logos est bien la hauteur totale de la colonne
-    # moins la boîte additionnelle et sa marge.
-    logos_h = h - additional_box_h - logo_margin
+    logo_margin = 2 * mm  # Petit espace entre les deux zones
+    logos_h = h - cucaracha_h - logo_margin if cucaracha_h > 0 else h
 
     # --- Définition des zones ---
-    additional_box_coords = (x, y, w, additional_box_h)
-    logo_zone_coords = (x, y + additional_box_h + logo_margin, w, logos_h)
+    cucaracha_box_coords = (x, y, w, cucaracha_h)
+    logo_zone_coords = (x, y + cucaracha_h + logo_margin if cucaracha_h > 0 else y, w, logos_h)
 
-    # --- Dessin des cadres de debug ---
+    # --- Dessin ---
+    if cucaracha_h > 0:
+        # On appelle la fonction de dessin, mais on ne dessine plus le cadre ici
+        _draw_cucaracha_box(c, cucaracha_box_coords, cfg)
+
+    # Dessin des logos (le cadre autour des logos est conservé pour le debug)
+    zone_x, zone_y, zone_w, zone_h = logo_zone_coords
     c.saveState()
     c.setStrokeColor(grey)
     c.setLineWidth(0.5)
-    # On ne dessine le cadre de la boîte que si sa hauteur est supérieure à zéro
-    if additional_box_h > 0:
-        c.rect(*additional_box_coords)
-    c.rect(*logo_zone_coords)
+    # c.rect(*logo_zone_coords)  # Cadre de debug
     c.restoreState()
 
-    # --- Disposition des logos (inchangé) ---
-    zone_x, zone_y, zone_w, zone_h = logo_zone_coords
     if not logos or zone_h <= 0: return
 
     num_logos = len(logos)
@@ -323,3 +323,92 @@ def draw_poster_logos(c: canvas.Canvas, s_coords: Section, logos: List[str]):
             c.drawImage(logo_path, logo_x, logo_y, width=w_fit, height=h_fit, mask='auto')
         except Exception as e:
             print(f"[WARN] Impossible de dessiner le logo du poster {os.path.basename(logo_path)}: {e}")
+
+
+def _draw_cucaracha_box(c: canvas.Canvas, box_coords: tuple, cfg: Config):
+    """
+    Dessine la boîte "Cucaracha" en fonction de la configuration.
+    """
+    x, y, w, h = box_coords
+    c_cfg = cfg.cucaracha_box
+    content_type = c_cfg.get("content_type", "none")
+    content_value = c_cfg.get("content_value", "")
+
+    if content_type == "none" or not content_value.strip():
+        return
+
+    # --- Titre (avec nouveau style) ---
+    c.saveState()
+    title = c_cfg.get("title", "Cucaracha")
+
+    # ==================== MODIFICATION DU STYLE DU TITRE ====================
+    # On ajoute underline=1 pour le soulignement
+    title_style = ParagraphStyle(
+        'CucarachaTitle',
+        fontName=c_cfg.get("title_font_name", "Arial-Italic"),  # Police italique
+        fontSize=c_cfg.get("title_font_size", 8),
+        leading=c_cfg.get("title_font_size", 8) * 1.2,
+        underline=1,  # Ajout du soulignement
+    )
+    # =======================================================================
+
+    title_p = Paragraph(title, title_style)
+    title_w, title_h = title_p.wrapOn(c, w - 4, h)
+    title_p.drawOn(c, x + 2, y + h - title_h - 2)
+    c.restoreState()
+
+    # --- Contenu (Texte ou Image) ---
+    padding = 2 * mm
+    content_x = x + padding
+    content_y = y + padding
+    content_w = w - (2 * padding)
+    content_h = h - title_h - (2 * padding)
+
+    if content_type == "text":
+        # ==================== MODIFICATION DU STYLE DU TEXTE ====================
+        font_name = c_cfg.get("text_font_name", "Arial")
+        if c_cfg.get("text_style", "normal") == "italic":
+            # On essaie de trouver la variante italique
+            try:
+                # Ceci fonctionne pour les polices standard (Arial -> Arial-Italic)
+                pdfmetrics.getFont(font_name + "-Italic")
+                font_name += "-Italic"
+            except:
+                pass  # Si la variante n'existe pas, on garde la normale
+
+        align_map = {"left": TA_LEFT, "center": TA_CENTER, "right": TA_RIGHT}
+        alignment = align_map.get(c_cfg.get("text_align", "center"), TA_CENTER)
+
+        text_style = ParagraphStyle(
+            'CucarachaText',
+            fontName=font_name,
+            fontSize=c_cfg.get("text_font_size", 10),
+            leading=c_cfg.get("text_font_size", 10) * 1.3,
+            alignment=alignment,
+        )
+        # =======================================================================
+
+        # On utilise un Frame pour gérer le centrage vertical
+        story = [Paragraph(content_value.replace('\n', '<br/>'), text_style)]
+        frame = Frame(content_x, content_y, content_w, content_h, showBoundary=0)
+        frame.addFromList(story, c)
+
+    elif content_type == "image":
+        # On suppose que content_value est un chemin d'accès
+        if os.path.exists(content_value):
+            try:
+                img = ImageReader(content_value)
+                img_w, img_h = img.getSize()
+                aspect = img_h / img_w if img_w > 0 else 1
+
+                w_fit = content_w
+                h_fit = w_fit * aspect
+                if h_fit > content_h:
+                    h_fit = content_h
+                    w_fit = h_fit / aspect
+
+                logo_x = content_x + (content_w - w_fit) / 2
+                logo_y = content_y + (content_h - h_fit) / 2
+                c.drawImage(img, logo_x, logo_y, width=w_fit, height=h_fit, mask='auto')
+            except Exception as e:
+                print(f"[WARN] Erreur avec l'image de la Cucaracha Box : {e}")

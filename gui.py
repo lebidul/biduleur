@@ -55,7 +55,9 @@ def _load_cfg_defaults() -> dict:
         "date_line_enabled": True,  # Valeur par défaut
         "poster_design": 0,
         "font_size_safety_factor": 0.98,
-        "background_alpha": 0.85
+        "background_alpha": 0.85,
+        "cucaracha_type": "none",
+        "cucaracha_value": ""
     }
 
     if _IMPORT_ERR:
@@ -85,7 +87,11 @@ def _load_cfg_defaults() -> dict:
             out["font_size_safety_factor"] = cfg.poster.get("font_size_safety_factor", 0.98)
             out["background_alpha"] = cfg.poster.get("background_image_alpha", 0.85)
             # out["poster_title"] = cfg.poster.get("title", "") # Charger le titre
-        # ===============================================================
+
+        if isinstance(cfg.cucaracha_box, dict):
+            out["cucaracha_type"] = cfg.cucaracha_box.get("content_type", "none")
+            out["cucaracha_value"] = cfg.cucaracha_box.get("content_value", "")
+            out["cucaracha_text_font"] = cfg.cucaracha_box.get("text_font_name", "Arial")
 
     except Exception as e:
         # En cas d'erreur de lecture, on utilise les valeurs par défaut
@@ -101,23 +107,26 @@ def _ensure_parent_dir(path: str):
 
 
 def run_pipeline(input_file: str,
-                 generate_cover: bool,
-                 cover_image: str,
-                 ours_md: str,
-                 logos_dir: str,
-                 out_html: str,
-                 out_agenda_html: str,
-                 out_pdf: str,
-                 out_scribus_py: str,
-                 auteur_couv: str,
-                 auteur_couv_url: str,
-                 page_margin_mm: float,
-                 date_line_enabled: bool,
-                 poster_design: int,
-                 font_size_safety_factor: float,
-                 background_alpha: float,
-                poster_title: str
-                 ) -> tuple[bool, str]:
+                generate_cover: bool,
+                cover_image: str,
+                ours_md: str,
+                logos_dir: str,
+                out_html: str,
+                out_agenda_html: str,
+                out_pdf: str,
+                out_scribus_py: str,
+                auteur_couv: str,
+                auteur_couv_url: str,
+                page_margin_mm: float,
+                date_line_enabled: bool,
+                poster_design: int,
+                font_size_safety_factor: float,
+                background_alpha: float,
+                poster_title: str,
+                cucaracha_type: str, # Nouvel argument
+                cucaracha_value: str,
+                cucaracha_text_font: str
+                ) -> tuple[bool, str]:
     """
     Enchaîne : XLS/CSV -> (biduleur) -> 2 HTML -> (misenpageur) -> PDF (+ Scribus optionnel)
     """
@@ -157,6 +166,9 @@ def run_pipeline(input_file: str,
         cfg.poster['font_size_safety_factor'] = font_size_safety_factor
         cfg.poster['background_image_alpha'] = background_alpha
         cfg.poster['title'] = poster_title
+        cfg.cucaracha_box['content_type'] = cucaracha_type
+        cfg.cucaracha_box['content_value'] = cucaracha_value
+        cfg.cucaracha_box['text_font_name'] = cucaracha_text_font
 
         # On utilise le layout_builder pour les pages 1 & 2
         final_layout_path = build_layout_with_margins(lay_path, cfg)
@@ -219,11 +231,14 @@ def main():
 
     # Design du poster
     poster_design_var = tk.IntVar(value=cfg_defaults.get("poster", {}).get("design", 0))  # 0 ou 1
-    # Facteur de sécurité
     safety_factor_var = tk.StringVar(value=str(cfg_defaults.get("font_size_safety_factor", "0.98")))
-    # transparence cover page 3
     alpha_var = tk.DoubleVar(value=cfg_defaults.get("background_alpha", 0.85))
     poster_title_var = tk.StringVar(value=cfg_defaults.get("poster_title", ""))
+
+    # Design de la cucaracha
+    cucaracha_type_var = tk.StringVar(value=cfg_defaults.get("cucaracha_type", "none"))
+    cucaracha_value_var = tk.StringVar(value=cfg_defaults.get("cucaracha_value", ""))
+    cucaracha_font_var = tk.StringVar(value=cfg_defaults.get("cucaracha_text_font", "Arial"))
 
     # Sorties
     html_var = tk.StringVar()
@@ -310,6 +325,57 @@ def main():
     tk.Label(main_frame, text="Dossier logos :").grid(row=r, column=0, sticky="e", padx=5, pady=5)
     tk.Entry(main_frame, textvariable=logos_var).grid(row=r, column=1, sticky="ew", padx=5, pady=5)
     tk.Button(main_frame, text="Parcourir…", command=pick_logos).grid(row=r, column=2, padx=5, pady=5)
+
+    # --- Section : CUCARACHA BOX ---
+    r += 1
+    cucaracha_frame = ttk.LabelFrame(main_frame, text="Boîte 'Cucaracha'", padding="10")
+    cucaracha_frame.grid(row=r, column=0, columnspan=3, sticky="ew", pady=10)
+    cucaracha_frame.columnconfigure(1, weight=1)
+
+    # --- Widgets pour le contenu (placés sur la grille du cucaracha_frame) ---
+    cucaracha_text_entry = tk.Entry(cucaracha_frame, textvariable=cucaracha_value_var)
+    cucaracha_font_label = tk.Label(cucaracha_frame, text="Police :")
+    cucaracha_font_combo = ttk.Combobox(
+        cucaracha_frame,
+        textvariable=cucaracha_font_var,
+        values=["Arial", "Helvetica", "Times", "Courier"], # Polices standard
+        state="readonly"
+    )
+    cucaracha_image_entry = tk.Entry(cucaracha_frame, textvariable=cucaracha_value_var)
+    cucaracha_image_btn = tk.Button(cucaracha_frame, text="Parcourir…", command=lambda: pick_file(cucaracha_value_var))
+
+    def pick_file(entry_var):
+        path = filedialog.askopenfilename(title="Choisir une image", filetypes=[("Images", "*.jpg *.jpeg *.png")])
+        if path: entry_var.set(path)
+
+    def toggle_cucaracha_widgets(*args):
+        # Cache tous les widgets de contenu
+        cucaracha_text_entry.grid_remove()
+        cucaracha_font_label.grid_remove()
+        cucaracha_font_combo.grid_remove()
+        cucaracha_image_entry.grid_remove()
+        cucaracha_image_btn.grid_remove()
+
+        ctype = cucaracha_type_var.get()
+        if ctype == "text":
+            cucaracha_text_entry.grid(row=1, column=0, columnspan=3, sticky="ew", pady=(5,0))
+            cucaracha_font_label.grid(row=2, column=0, sticky="w", padx=5, pady=5)
+            cucaracha_font_combo.grid(row=2, column=1, sticky="w", padx=5)
+        elif ctype == "image":
+            cucaracha_image_entry.grid(row=1, column=0, columnspan=2, sticky="ew", pady=5)
+            cucaracha_image_btn.grid(row=1, column=2, padx=5)
+
+    # Boutons Radio pour choisir le type
+    radio_frame = ttk.Frame(cucaracha_frame)
+    radio_frame.grid(row=0, column=0, columnspan=3, sticky="w")
+    tk.Radiobutton(radio_frame, text="Rien", variable=cucaracha_type_var, value="none",
+                   command=toggle_cucaracha_widgets).pack(side=tk.LEFT)
+    tk.Radiobutton(radio_frame, text="Texte", variable=cucaracha_type_var, value="text",
+                   command=toggle_cucaracha_widgets).pack(side=tk.LEFT)
+    tk.Radiobutton(radio_frame, text="Image", variable=cucaracha_type_var, value="image",
+                   command=toggle_cucaracha_widgets).pack(side=tk.LEFT)
+
+    toggle_cucaracha_widgets()  # Appel initial pour afficher le bon widget
 
     # --- Section : Informations de couverture ---
     r += 1
@@ -438,6 +504,9 @@ def main():
             messagebox.showerror("Erreur", "Le titre du poster est obligatoire.")
             return
 
+        # Récupérer les valeurs de la Cucaracha box
+        cuca_value = cucaracha_value_var.get().strip()
+
         status.set("Traitement en cours…")
         root.update_idletasks()
 
@@ -458,7 +527,10 @@ def main():
             poster_design=poster_design_var.get(),
             font_size_safety_factor=safety_factor_val,
             background_alpha=alpha_var.get(),
-            poster_title=poster_title
+            poster_title=poster_title,
+            cucaracha_type=cucaracha_type_var.get(),
+            cucaracha_value=cuca_value,
+            cucaracha_text_font=cucaracha_font_var.get()
         )
         if ok:
             messagebox.showinfo("Succès", msg)

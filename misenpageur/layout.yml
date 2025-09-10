@@ -12,7 +12,7 @@ sections:
   S5: { page: 2, x: 0,     y: 0,   w: 297.5, h: 842 }
   S6: { page: 2, x: 297.5, y: 0,   w: 297.5, h: 842 }
 
-  S7_Title: { page: 3, x: 5, y: 800, w: 585, h: 32 }
+  S7_Title: { page: 3, x: 5, y: 800, w: 585, h: 36 }
 
   S7_CoverImage: { page: 3, x: 200.5, y: 285, w: 194, h: 252 }
 #  S7_QRCode:     { page: 3, x: 505, y: 30, w: 75, h: 75 }

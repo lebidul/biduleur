@@ -56,6 +56,9 @@ class Config:
     # --- pdf layout (marge globale)
     pdf_layout: Dict[str, Any] = field(default_factory=dict)
 
+    # --- config cucarcha
+    cucaracha_box: Dict[str, Any] = field(default_factory=dict)
+
     # --- config poster
     poster: Dict[str, Any] = field(default_factory=dict)
 
