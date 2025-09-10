@@ -9,6 +9,7 @@ from reportlab.pdfgen import canvas
 from reportlab.platypus import Paragraph, Frame
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.colors import HexColor
+from reportlab.lib.enums import TA_JUSTIFY
 
 from .layout import Section
 from .drawing import paragraph_style
@@ -81,6 +82,7 @@ def _mk_style_for_kind(base: ParagraphStyle, kind: str,
             parent=base,
             leftIndent=bullet_cfg.event_hanging_indent,
             firstLineIndent=-bullet_cfg.event_hanging_indent,
+            alignment=TA_JUSTIFY,
         )
     if kind == "DATE" and date_box.enabled:
         return ParagraphStyle(
