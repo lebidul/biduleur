@@ -84,6 +84,7 @@ def _load_cfg_defaults() -> dict:
             out["poster_design"] = cfg.poster.get("design", 0)
             out["font_size_safety_factor"] = cfg.poster.get("font_size_safety_factor", 0.98)
             out["background_alpha"] = cfg.poster.get("background_image_alpha", 0.85)
+            # out["poster_title"] = cfg.poster.get("title", "") # Charger le titre
         # ===============================================================
 
     except Exception as e:
@@ -114,7 +115,8 @@ def run_pipeline(input_file: str,
                  date_line_enabled: bool,
                  poster_design: int,
                  font_size_safety_factor: float,
-                 background_alpha: float
+                 background_alpha: float,
+                poster_title: str
                  ) -> tuple[bool, str]:
     """
     Enchaîne : XLS/CSV -> (biduleur) -> 2 HTML -> (misenpageur) -> PDF (+ Scribus optionnel)
@@ -154,7 +156,7 @@ def run_pipeline(input_file: str,
         cfg.poster['design'] = poster_design
         cfg.poster['font_size_safety_factor'] = font_size_safety_factor
         cfg.poster['background_image_alpha'] = background_alpha
-        # --- FIN APPLICATION ---
+        cfg.poster['title'] = poster_title
 
         # On utilise le layout_builder pour les pages 1 & 2
         final_layout_path = build_layout_with_margins(lay_path, cfg)
@@ -221,6 +223,7 @@ def main():
     safety_factor_var = tk.StringVar(value=str(cfg_defaults.get("font_size_safety_factor", "0.98")))
     # transparence cover page 3
     alpha_var = tk.DoubleVar(value=cfg_defaults.get("background_alpha", 0.85))
+    poster_title_var = tk.StringVar(value=cfg_defaults.get("poster_title", ""))
 
     # Sorties
     html_var = tk.StringVar()
@@ -328,13 +331,13 @@ def main():
     r += 1
     layout_frame = ttk.LabelFrame(main_frame, text="Paramètres de mise en page", padding="10")
     layout_frame.grid(row=r, column=0, columnspan=3, sticky="ew", pady=10)
-    layout_frame.columnconfigure(1, weight=1)  # Permet à la colonne 1 (widgets) de s'étirer
+    layout_frame.columnconfigure(1, weight=1)
 
-    # --- Marge globale ---
+    # --- Ligne 0 ---
     tk.Label(layout_frame, text="Marge globale (mm) :").grid(row=0, column=0, sticky="w", padx=5, pady=5)
     tk.Entry(layout_frame, textvariable=margin_var, width=10).grid(row=0, column=1, sticky="w", padx=5, pady=5)
 
-    # --- Lignes de date ---
+    # --- Ligne 1 ---
     tk.Checkbutton(layout_frame, text="Dessiner lignes de séparation de dates", variable=date_line_var).grid(row=1,
                                                                                                              column=0,
                                                                                                              columnspan=2,
@@ -342,34 +345,20 @@ def main():
                                                                                                              padx=5,
                                                                                                              pady=5)
 
-    # --- Design du Poster ---
-    tk.Label(layout_frame, text="Design du poster :").grid(row=2, column=0, sticky="w", padx=5, pady=5)
+    # --- Ligne 2 ---
+    tk.Label(layout_frame, text="Titre du poster :").grid(row=2, column=0, sticky="w", padx=5, pady=5)
+    tk.Entry(layout_frame, textvariable=poster_title_var).grid(row=2, column=1, sticky="ew", padx=5, pady=5)
+
+    # --- Ligne 3 ---
+    tk.Label(layout_frame, text="Design du poster :").grid(row=3, column=0, sticky="w", padx=5, pady=5)
     design_frame = ttk.Frame(layout_frame)
-    design_frame.grid(row=2, column=1, sticky="w", padx=5, pady=5)
+    design_frame.grid(row=3, column=1, sticky="w", padx=5, pady=5)
 
-    # La fonction qui sera appelée quand le design changera
-    def toggle_alpha_slider(*args):
-        if poster_design_var.get() == 1:
-            # Design "Image en fond" sélectionné : on affiche le curseur
-            alpha_label.grid(row=3, column=0, sticky="w", padx=5, pady=5)
-            alpha_scale_frame.grid(row=3, column=1, sticky="ew", padx=5, pady=5)
-        else:
-            # Design "Image au centre" : on cache le curseur
-            alpha_label.grid_remove()
-            alpha_scale_frame.grid_remove()
-
-    tk.Radiobutton(design_frame, text="Image au centre", variable=poster_design_var, value=0,
-                   command=toggle_alpha_slider).pack(side=tk.LEFT, padx=5)
-    tk.Radiobutton(design_frame, text="Image en fond", variable=poster_design_var, value=1,
-                   command=toggle_alpha_slider).pack(side=tk.LEFT, padx=5)
-
-    # --- Transparence (initialement caché ou affiché selon le défaut) ---
+    # --- Widgets à afficher/cacher ---
     alpha_label = tk.Label(layout_frame, text="Transparence du fond :")
     alpha_scale_frame = ttk.Frame(layout_frame)
-
     alpha_scale = ttk.Scale(alpha_scale_frame, from_=0.0, to=1.0, orient=tk.HORIZONTAL, variable=alpha_var)
     alpha_scale.pack(side=tk.LEFT, fill=tk.X, expand=True)
-
     alpha_value_label = ttk.Label(alpha_scale_frame, text=f"{int(alpha_var.get() * 100)}%")
     alpha_value_label.pack(side=tk.LEFT, padx=(5, 0))
 
@@ -378,11 +367,24 @@ def main():
 
     alpha_var.trace_add("write", update_alpha_label)
 
-    # --- Facteur de sécurité ---
-    tk.Label(layout_frame, text="Facteur de sécurité de la taille de police du poster :").grid(row=4, column=0, sticky="w", padx=5, pady=5)
-    tk.Entry(layout_frame, textvariable=safety_factor_var, width=10).grid(row=4, column=1, sticky="w", padx=5, pady=5)
+    def toggle_alpha_slider(*args):
+        if poster_design_var.get() == 1:
+            alpha_label.grid(row=4, column=0, sticky="w", padx=5, pady=5)
+            alpha_scale_frame.grid(row=4, column=1, sticky="ew", padx=5, pady=5)
+        else:
+            alpha_label.grid_remove()
+            alpha_scale_frame.grid_remove()
 
-    # Appel initial pour définir la visibilité du curseur au lancement
+    tk.Radiobutton(design_frame, text="Image au centre", variable=poster_design_var, value=0,
+                   command=toggle_alpha_slider).pack(side=tk.LEFT, padx=5)
+    tk.Radiobutton(design_frame, text="Image en fond", variable=poster_design_var, value=1,
+                   command=toggle_alpha_slider).pack(side=tk.LEFT, padx=5)
+
+    # --- Ligne 5 ---
+    tk.Label(layout_frame, text="Facteur de sécurité de la taille de police du poster :").grid(row=5, column=0, sticky="w", padx=5, pady=5)
+    tk.Entry(layout_frame, textvariable=safety_factor_var, width=10).grid(row=5, column=1, sticky="w", padx=5, pady=5)
+
+    # Appel initial pour définir la visibilité du curseur
     toggle_alpha_slider()
 
     # --- Section : Fichiers de sortie ---
@@ -431,6 +433,11 @@ def main():
                                  "La marge et le facteur de sécurité doivent être des nombres valides (ex: 1.0).")
             return
 
+        poster_title = poster_title_var.get().strip()
+        if not poster_title:
+            messagebox.showerror("Erreur", "Le titre du poster est obligatoire.")
+            return
+
         status.set("Traitement en cours…")
         root.update_idletasks()
 
@@ -450,7 +457,8 @@ def main():
             date_line_enabled=date_line_var.get(),
             poster_design=poster_design_var.get(),
             font_size_safety_factor=safety_factor_val,
-            background_alpha=alpha_var.get()
+            background_alpha=alpha_var.get(),
+            poster_title=poster_title
         )
         if ok:
             messagebox.showinfo("Succès", msg)

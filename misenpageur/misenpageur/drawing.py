@@ -280,11 +280,19 @@ def draw_s2_cover(c: canvas.Canvas, S2_coords, image_path: str, inner_pad: float
 
 
 def draw_poster_logos(c: canvas.Canvas, s_coords: Section, logos: List[str]):
+    """Dessine une ligne de logos pour le poster, en assurant un espacement équitable."""
     x, y, w, h = s_coords.x, s_coords.y, s_coords.w, s_coords.h
-    if not logos or not w > 0 or not h > 0: return
+    if not logos or not w > 0 or not h > 0:
+        return
 
     num_logos = len(logos)
     cell_w = w / num_logos
+
+    # ==================== CORRECTION : Ajout d'un padding interne ====================
+    # On définit un petit espace (en points) qui sera préservé de chaque côté du logo.
+    # 2 points est une bonne valeur de départ (environ 1.5 mm).
+    padding = 2
+    # ==============================================================================
 
     for i, logo_path in enumerate(logos):
         cell_x = x + i * cell_w
@@ -293,14 +301,22 @@ def draw_poster_logos(c: canvas.Canvas, s_coords: Section, logos: List[str]):
             img_w, img_h = img.getSize()
             aspect = img_h / img_w if img_w > 0 else 1
 
-            # Adapter à la hauteur de la cellule, puis vérifier la largeur
-            h_fit = h
-            w_fit = h_fit / aspect if aspect > 0 else 0
-            if w_fit > cell_w:
-                w_fit = cell_w
-                h_fit = w_fit * aspect
+            # ==================== CORRECTION : Logique de redimensionnement ====================
+            # On calcule la boîte disponible A L'INTÉRIEUR de la cellule.
+            box_w = cell_w - (2 * padding)
+            box_h = h - (2 * padding)
 
-            # Centrer
+            # On adapte d'abord à la largeur disponible
+            w_fit = box_w
+            h_fit = w_fit * aspect
+
+            # Si la hauteur dépasse, on adapte plutôt à la hauteur disponible
+            if h_fit > box_h:
+                h_fit = box_h
+                w_fit = h_fit / aspect
+            # ===================================================================================
+
+            # Centrer le logo redimensionné DANS la cellule complète
             logo_x = cell_x + (cell_w - w_fit) / 2
             logo_y = y + (h - h_fit) / 2
 

@@ -7,6 +7,7 @@
 - [x] Intégration Scribus
 - [x] Amélioration display dates
 - [ ] Fichier .sla comme argument dans cli
+- [ ] Config cucarcaha
 - [x] Config ours v1
 - [ ] Config ours v2 - lecture as .md
 - [ ] Config ours v2 - icones
@@ -16,7 +17,7 @@
 - [x] Config cucaracha v2: pouvoir ajouter image pour additional box
 - [x] Config qr code
 - [ ] Revoir création fichier scribus.py
-- [ ] Poster (page 3).
+- [x] Poster (page 3).
 - [ ] Qualité pdf. - convert_image affecte qualité ?
 - [ ] Unit tests.
 - [ ] Intégrer nouveaux logos de Gaelle.

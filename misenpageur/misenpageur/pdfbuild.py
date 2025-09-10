@@ -16,13 +16,15 @@ from reportlab.pdfgen import canvas
 import qrcode
 from reportlab.lib.utils import ImageReader
 from reportlab.platypus import Paragraph
+from reportlab.lib.colors import HexColor
+from reportlab.pdfbase.pdfmetrics import getFont
 
 # --- Imports des modules internes du projet ---
 from .config import Config
 from .layout import Layout, Section
 from .html_utils import extract_paragraphs_from_html
 from .drawing import draw_s1, draw_s2_cover, list_images, paragraph_style, draw_poster_logos
-from .fonts import register_arial_narrow, register_dejavu_sans
+from .fonts import register_arial_narrow, register_dejavu_sans, register_dsnet_stamped
 from .spacing import SpacingConfig, SpacingPolicy
 from .textflow import (
     BulletConfig, DateBoxConfig, DateLineConfig,
@@ -353,7 +355,9 @@ class PosterConfig:
     design: int = 0
     title: str = "L'AGENDA COMPLET"
     font_name_title: str = "Helvetica-Bold"
-    font_size_title: float = 24.0
+    title_logo_path: str = None
+    title_back_color: str = "#7F7F7F"
+    font_size_title: float = 36.0
     font_size_min: float = 6.0
     font_size_max: float = 10.0
     font_size_safety_factor: float = 0.98
@@ -368,7 +372,9 @@ def _read_poster_config(cfg: Config) -> PosterConfig:
         design=int(block.get("design", 0)),
         title=block.get("title", "L'AGENDA COMPLET"),
         font_name_title=block.get("font_name_title", "Helvetica-Bold"),
-        font_size_title=float(block.get("font_size_title", 24.0)),
+        title_logo_path=block.get("title_logo_path", ""),
+        title_back_color=block.get("title_back_color", "#7F7F7F"),
+        font_size_title=float(block.get("font_size_title", 36.0)),
         font_size_min=float(block.get("font_size_min", 6.0)),
         font_size_max=float(block.get("font_size_max", 10.0)),
         font_size_safety_factor=float(block.get("font_size_safety_factor", 0.98)),
@@ -398,6 +404,13 @@ def build_pdf(project_root: str, cfg: Config, layout: Layout, out_path: str) -> 
     c = canvas.Canvas(out_path, pagesize=(layout.page.width, layout.page.height))
 
     # --- Polices ---
+    if register_arial_narrow():
+        cfg.font_name = "ArialNarrow"
+    else:
+        print("[WARN] Police Arial Narrow introuvable - fallback sur Helvetica.")
+        cfg.font_name = "Helvetica"
+    register_dejavu_sans()
+    register_dsnet_stamped()
     if register_arial_narrow():
         cfg.font_name = "ArialNarrow"
     else:
@@ -500,9 +513,53 @@ def build_pdf(project_root: str, cfg: Config, layout: Layout, out_path: str) -> 
 
         # --- Éléments communs ---
         s_title = S7["S7_Title"]
+
+        # 1. Dessiner le rectangle de fond (inchangé)
+        c.saveState()
+        c.setFillColor(HexColor(poster_cfg.title_back_color))
+        c.rect(s_title.x, s_title.y, s_title.w, s_title.h, stroke=0, fill=1)
+
+        # 2. Dessiner le logo à gauche (inchangé)
+        logo_end_x = s_title.x
+        if poster_cfg.title_logo_path:
+            logo_path = os.path.join(project_root, poster_cfg.title_logo_path)
+            if os.path.exists(logo_path):
+                padding = 4
+                img = ImageReader(logo_path)
+                img_w, img_h = img.getSize()
+
+                logo_h = s_title.h - (2 * padding)
+                logo_w = logo_h * (img_w / img_h)
+                logo_x = s_title.x + padding
+                logo_y = s_title.y + padding
+
+                c.drawImage(img, logo_x, logo_y, width=logo_w, height=logo_h, mask='auto')
+                logo_end_x = logo_x + logo_w + padding
+
+        # 3. Dessiner le titre en blanc, parfaitement centré verticalement
+        c.setFillColorRGB(1, 1, 1)  # Blanc
         c.setFont(poster_cfg.font_name_title, poster_cfg.font_size_title)
-        c.drawCentredString(s_title.x + s_title.w / 2, s_title.y + (s_title.h - poster_cfg.font_size_title) / 2,
-                            poster_cfg.title)
+
+        # ==================== CORRECTION DU CENTRAGE VERTICAL ====================
+        # On récupère les informations de la police
+        font = getFont(poster_cfg.font_name_title)
+
+        # La hauteur de capitale est une bonne approximation de la hauteur visuelle des lettres.
+        cap_height = (font.face.capHeight / 1000) * poster_cfg.font_size_title
+
+        # Calcul du centre de la zone de texte restante (horizontal)
+        text_area_x = logo_end_x
+        text_area_w = (s_title.x + s_title.w) - text_area_x
+        center_x = text_area_x + (text_area_w / 2)
+
+        # Calcul de la position y pour un centrage visuel parfait
+        # On positionne la ligne de base pour que la hauteur de capitale soit centrée dans la hauteur du cadre.
+        center_y = s_title.y + (s_title.h / 2) - (cap_height / 2)
+        # =========================================================================
+
+        c.drawCentredString(center_x, center_y, poster_cfg.title)
+        c.restoreState()
+        # =================================================================
 
         s_qr = S7["S7_QRCode"]
         qr_gen = qrcode.QRCode(version=1, border=1)

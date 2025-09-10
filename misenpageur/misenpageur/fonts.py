@@ -203,3 +203,30 @@ def register_dejavu_sans() -> bool:
 
     ok = _register_family_partial("DejaVuSans", reg, b, i, bi)
     return ok
+
+
+# -------------------- DS-net Stamped --------------------
+
+def register_dsnet_stamped() -> bool:
+    """
+    Tente d'enregistrer la police DS-net Stamped (nommée 'DSNetStamped').
+    Cherche dans les dossiers de polices du projet.
+    """
+    roots = _fonts_roots()
+
+    # Noms de fichiers possibles pour la police
+    font_filenames = ["DS-NET-STAMPED.TTF", "DSNetStamped.ttf", "dsnetstamped.ttf", "DSnet Stamped.ttf"]
+
+    font_paths = []
+    for r in roots:
+        for fname in font_filenames:
+            font_paths.append(os.path.join(r, fname))
+
+    font_file = _first_existing(font_paths)
+
+    if not font_file:
+        print("[WARN] Police DS-net Stamped introuvable.")
+        return False
+
+    # On enregistre la police sous un nom simple que ReportLab utilisera
+    return _register_font("DSNetStamped", font_file)

@@ -137,9 +137,11 @@ poster:
   # 0: image au centre, 1: image en fond
   design: 1
   background_image_alpha: 0.75
-  title: "L'AGENDA COMPLET"
-  font_name_title: "Helvetica-Bold"
-  font_size_title: 32.0
+  title: "le bidul - octobre 2025" # Sera surchargé par la GUI
+  font_name_title: "DSNetStamped" # Le nom qu'on a enregistré dans fonts.py
+  title_logo_path: "misenpageur/assets/icons/logo-les-arts-services.png"
+  title_back_color: "#7F7F7F"
+  font_size_title: 34.0
   # Tailles de police pour le corps du texte du poster
   font_size_min: 6.0
   font_size_max: 10.0
