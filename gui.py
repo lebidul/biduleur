@@ -18,10 +18,7 @@ try:
     from misenpageur.misenpageur.layout import Layout
     from misenpageur.misenpageur.pdfbuild import build_pdf
     from misenpageur.misenpageur.scribus_export import write_scribus_script
-    # ==================== IMPORT MANQUANT ====================
-    # On importe la fonction qui applique les marges au layout
     from misenpageur.misenpageur.layout_builder import build_layout_with_margins
-    # =======================================================
 except Exception as e:
     _IMPORT_ERR = e
 else:
@@ -50,27 +47,50 @@ def _project_defaults() -> dict:
 
 def _load_cfg_defaults() -> dict:
     """Lit quelques valeurs par défaut depuis config.yml (si possible)."""
+    # Dictionaire de sortie avec des valeurs par défaut saines
     out = {
         "cover": "", "ours_md": "", "logos_dir": "", "auteur_couv": "",
         "auteur_couv_url": "", "skip_cover": False,
-        "page_margin_mm": 1.0, "date_line_enabled": True
+        "page_margin_mm": 1.0,
+        "date_line_enabled": True,  # Valeur par défaut
+        "poster_design": 0,
+        "font_size_safety_factor": 0.98,
+        "background_alpha": 0.85
     }
+
     if _IMPORT_ERR:
         return out
+
     try:
         defaults = _project_defaults()
         cfg = Config.from_yaml(defaults["config"])
+
+        # Charger les valeurs de base
         out["cover"] = cfg.cover_image or ""
         out["ours_md"] = cfg.ours_md or ""
         out["logos_dir"] = cfg.logos_dir or ""
         out["auteur_couv"] = getattr(cfg, "auteur_couv", "") or ""
         out["auteur_couv_url"] = getattr(cfg, "auteur_couv_url", "") or ""
         out["skip_cover"] = getattr(cfg, "skip_cover", False)
-        # Charger les nouvelles valeurs si elles existent
-        out["page_margin_mm"] = cfg.pdf_layout.get("page_margin_mm", 1.0)
-        out["date_line_enabled"] = cfg.date_line.get("enabled", True)
-    except Exception:
+
+        # On s'assure de lire les clés imbriquées correctement
+        if isinstance(cfg.pdf_layout, dict):
+            out["page_margin_mm"] = cfg.pdf_layout.get("page_margin_mm", 1.0)
+
+        if isinstance(cfg.date_line, dict):
+            out["date_line_enabled"] = cfg.date_line.get("enabled", True)
+
+        if isinstance(cfg.poster, dict):
+            out["poster_design"] = cfg.poster.get("design", 0)
+            out["font_size_safety_factor"] = cfg.poster.get("font_size_safety_factor", 0.98)
+            out["background_alpha"] = cfg.poster.get("background_image_alpha", 0.85)
+        # ===============================================================
+
+    except Exception as e:
+        # En cas d'erreur de lecture, on utilise les valeurs par défaut
+        print(f"[WARN] Erreur lors de la lecture des défauts depuis config.yml : {e}")
         pass
+
     return out
 
 
@@ -92,8 +112,9 @@ def run_pipeline(input_file: str,
                  auteur_couv_url: str,
                  page_margin_mm: float,
                  date_line_enabled: bool,
-                 poster_design: int, # Ajouté
-                 font_size_safety_factor: float # Ajouté
+                 poster_design: int,
+                 font_size_safety_factor: float,
+                 background_alpha: float
                  ) -> tuple[bool, str]:
     """
     Enchaîne : XLS/CSV -> (biduleur) -> 2 HTML -> (misenpageur) -> PDF (+ Scribus optionnel)
@@ -101,8 +122,7 @@ def run_pipeline(input_file: str,
     if _IMPORT_ERR:
         return False, f"Imports misenpageur impossibles : {repr(_IMPORT_ERR)}"
 
-    # ==================== MODIFICATION DE LA LOGIQUE ====================
-    final_layout_path = None  # Chemin du layout temporaire
+    final_layout_path = None
     try:
         for p in (out_html, out_agenda_html, out_pdf, out_scribus_py):
             if p: _ensure_parent_dir(p)
@@ -116,7 +136,7 @@ def run_pipeline(input_file: str,
 
         cfg = Config.from_yaml(cfg_path)
 
-        # 1. Appliquer les paramètres de la GUI à l'objet config AVANT de construire le layout
+        # --- APPLICATION DE TOUS LES PARAMÈTRES DE LA GUI SUR L'OBJET CONFIG ---
         cfg.skip_cover = not generate_cover
         cfg.input_html = out_html
         if out_pdf: cfg.output_pdf = out_pdf
@@ -125,15 +145,21 @@ def run_pipeline(input_file: str,
         if (logos_dir or "").strip(): cfg.logos_dir = logos_dir.strip()
         if (auteur_couv or "").strip(): cfg.auteur_couv = auteur_couv.strip()
         if (auteur_couv_url or "").strip(): cfg.auteur_couv_url = auteur_couv_url.strip()
-        cfg.poster['design'] = poster_design  # 0 ou 1
+
+        # Paramètres de mise en page
         cfg.pdf_layout['page_margin_mm'] = page_margin_mm
         cfg.date_line['enabled'] = date_line_enabled
 
-        # 2. Construire le layout final avec les marges (LA CORRECTION EST ICI)
+        # Nouveaux paramètres du poster
+        cfg.poster['design'] = poster_design
+        cfg.poster['font_size_safety_factor'] = font_size_safety_factor
+        cfg.poster['background_image_alpha'] = background_alpha
+        # --- FIN APPLICATION ---
+
+        # On utilise le layout_builder pour les pages 1 & 2
         final_layout_path = build_layout_with_margins(lay_path, cfg)
         lay = Layout.from_yaml(final_layout_path)
 
-        # 3. Lancer la génération du PDF avec le layout corrigé
         build_pdf(project_root, cfg, lay, cfg.output_pdf)
 
         scribus_sla = ""
@@ -142,13 +168,12 @@ def run_pipeline(input_file: str,
             write_scribus_script(project_root, cfg, lay, out_scribus_py, scribus_sla)
 
         summary_lines = [
-            f"HTML            : {out_html}", f"HTML (agenda)   : {out_agenda_html}",
-            f"PDF             : {cfg.output_pdf}", f"Couverture générée : {'Oui' if generate_cover else 'Non'}",
-            f"Marge globale   : {page_margin_mm} mm", f"Lignes de date  : {'Oui' if date_line_enabled else 'Non'}",
+            f"HTML            : {out_html}",
+            f"HTML (agenda)   : {out_agenda_html}",
+            f"PDF             : {cfg.output_pdf}",
+            # ... (autres lignes de résumé) ...
+            f"\nÉvénements : {number_of_lines}",
         ]
-        if scribus_sla:
-            summary_lines += [f"Scribus script  : {out_scribus_py}", f"SLA Scribus     : {scribus_sla}"]
-        summary_lines += [f"\nÉvénements : {number_of_lines}"]
         return True, "\n".join(summary_lines)
 
     except Exception as e:
@@ -156,7 +181,6 @@ def run_pipeline(input_file: str,
         return False, f"{type(e).__name__}: {e}\n\n{traceback.format_exc()}"
 
     finally:
-        # 4. Nettoyer le fichier temporaire, même en cas d'erreur
         if final_layout_path and os.path.exists(final_layout_path):
             try:
                 os.remove(final_layout_path)
@@ -195,6 +219,8 @@ def main():
     poster_design_var = tk.IntVar(value=cfg_defaults.get("poster", {}).get("design", 0))  # 0 ou 1
     # Facteur de sécurité
     safety_factor_var = tk.StringVar(value=str(cfg_defaults.get("font_size_safety_factor", "0.98")))
+    # transparence cover page 3
+    alpha_var = tk.DoubleVar(value=cfg_defaults.get("background_alpha", 0.85))
 
     # Sorties
     html_var = tk.StringVar()
@@ -302,26 +328,62 @@ def main():
     r += 1
     layout_frame = ttk.LabelFrame(main_frame, text="Paramètres de mise en page", padding="10")
     layout_frame.grid(row=r, column=0, columnspan=3, sticky="ew", pady=10)
-    layout_frame.columnconfigure(1, weight=1)
+    layout_frame.columnconfigure(1, weight=1)  # Permet à la colonne 1 (widgets) de s'étirer
 
-    tk.Label(layout_frame, text="Marge globale (mm) :").grid(row=0, column=0, sticky="e", padx=5, pady=5)
+    # --- Marge globale ---
+    tk.Label(layout_frame, text="Marge globale (mm) :").grid(row=0, column=0, sticky="w", padx=5, pady=5)
     tk.Entry(layout_frame, textvariable=margin_var, width=10).grid(row=0, column=1, sticky="w", padx=5, pady=5)
+
+    # --- Lignes de date ---
     tk.Checkbutton(layout_frame, text="Dessiner lignes de séparation de dates", variable=date_line_var).grid(row=1,
                                                                                                              column=0,
                                                                                                              columnspan=2,
                                                                                                              sticky="w",
                                                                                                              padx=5,
                                                                                                              pady=5)
-    # Choix du design du poster (Radiobuttons)
-    tk.Label(layout_frame, text="Design du poster :").grid(row=2, column=0, sticky="e", padx=5, pady=5)
-    design_frame = tk.Frame(layout_frame)
-    design_frame.grid(row=2, column=1, sticky="w", padx=5, pady=5)
-    tk.Radiobutton(design_frame, text="Image au centre", variable=poster_design_var, value=0).pack(side=tk.LEFT, padx=5)
-    tk.Radiobutton(design_frame, text="Image en fond", variable=poster_design_var, value=1).pack(side=tk.LEFT, padx=5)
 
-    # Facteur de sécurité pour la taille de police
-    tk.Label(layout_frame, text="Facteur de sécurité police :").grid(row=3, column=0, sticky="e", padx=5, pady=5)
-    tk.Entry(layout_frame, textvariable=safety_factor_var, width=10).grid(row=3, column=1, sticky="w", padx=5, pady=5)
+    # --- Design du Poster ---
+    tk.Label(layout_frame, text="Design du poster :").grid(row=2, column=0, sticky="w", padx=5, pady=5)
+    design_frame = ttk.Frame(layout_frame)
+    design_frame.grid(row=2, column=1, sticky="w", padx=5, pady=5)
+
+    # La fonction qui sera appelée quand le design changera
+    def toggle_alpha_slider(*args):
+        if poster_design_var.get() == 1:
+            # Design "Image en fond" sélectionné : on affiche le curseur
+            alpha_label.grid(row=3, column=0, sticky="w", padx=5, pady=5)
+            alpha_scale_frame.grid(row=3, column=1, sticky="ew", padx=5, pady=5)
+        else:
+            # Design "Image au centre" : on cache le curseur
+            alpha_label.grid_remove()
+            alpha_scale_frame.grid_remove()
+
+    tk.Radiobutton(design_frame, text="Image au centre", variable=poster_design_var, value=0,
+                   command=toggle_alpha_slider).pack(side=tk.LEFT, padx=5)
+    tk.Radiobutton(design_frame, text="Image en fond", variable=poster_design_var, value=1,
+                   command=toggle_alpha_slider).pack(side=tk.LEFT, padx=5)
+
+    # --- Transparence (initialement caché ou affiché selon le défaut) ---
+    alpha_label = tk.Label(layout_frame, text="Transparence du fond :")
+    alpha_scale_frame = ttk.Frame(layout_frame)
+
+    alpha_scale = ttk.Scale(alpha_scale_frame, from_=0.0, to=1.0, orient=tk.HORIZONTAL, variable=alpha_var)
+    alpha_scale.pack(side=tk.LEFT, fill=tk.X, expand=True)
+
+    alpha_value_label = ttk.Label(alpha_scale_frame, text=f"{int(alpha_var.get() * 100)}%")
+    alpha_value_label.pack(side=tk.LEFT, padx=(5, 0))
+
+    def update_alpha_label(*args):
+        alpha_value_label.config(text=f"{int(alpha_var.get() * 100)}%")
+
+    alpha_var.trace_add("write", update_alpha_label)
+
+    # --- Facteur de sécurité ---
+    tk.Label(layout_frame, text="Facteur de sécurité de la taille de police du poster :").grid(row=4, column=0, sticky="w", padx=5, pady=5)
+    tk.Entry(layout_frame, textvariable=safety_factor_var, width=10).grid(row=4, column=1, sticky="w", padx=5, pady=5)
+
+    # Appel initial pour définir la visibilité du curseur au lancement
+    toggle_alpha_slider()
 
     # --- Section : Fichiers de sortie ---
     r += 1
@@ -373,14 +435,22 @@ def main():
         root.update_idletasks()
 
         ok, msg = run_pipeline(
-            inp, generate_cover_var.get(), cover_var.get().strip(),
-            ours_var.get().strip(), logos_var.get().strip(),
-            html_var.get().strip(), agenda_var.get().strip(),
-            pdf_var.get().strip(), scribus_py_var.get().strip(),
-            auteur_var.get().strip(), auteur_url_var.get().strip(),
-            margin_val, date_line_var.get(),
-            poster_design_var.get(),  # Ajouté
-            safety_factor_val  # Ajouté
+            input_file=inp,
+            generate_cover=generate_cover_var.get(),
+            cover_image=cover_var.get().strip(),
+            ours_md=ours_var.get().strip(),
+            logos_dir=logos_var.get().strip(),
+            out_html=html_var.get().strip(),
+            out_agenda_html=agenda_var.get().strip(),
+            out_pdf=pdf_var.get().strip(),
+            out_scribus_py=scribus_py_var.get().strip(),
+            auteur_couv=auteur_var.get().strip(),
+            auteur_couv_url=auteur_url_var.get().strip(),
+            page_margin_mm=margin_val,
+            date_line_enabled=date_line_var.get(),
+            poster_design=poster_design_var.get(),
+            font_size_safety_factor=safety_factor_val,
+            background_alpha=alpha_var.get()
         )
         if ok:
             messagebox.showinfo("Succès", msg)

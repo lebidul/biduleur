@@ -357,6 +357,8 @@ class PosterConfig:
     font_size_min: float = 6.0
     font_size_max: float = 10.0
     font_size_safety_factor: float = 0.98
+    # Transparence du fond (0.0 = invisible, 1.0 = opaque)
+    background_image_alpha: float = 0.85
 
 
 def _read_poster_config(cfg: Config) -> PosterConfig:
@@ -369,7 +371,8 @@ def _read_poster_config(cfg: Config) -> PosterConfig:
         font_size_title=float(block.get("font_size_title", 24.0)),
         font_size_min=float(block.get("font_size_min", 6.0)),
         font_size_max=float(block.get("font_size_max", 10.0)),
-        font_size_safety_factor=float(block.get("font_size_safety_factor", 0.98))
+        font_size_safety_factor=float(block.get("font_size_safety_factor", 0.98)),
+        background_image_alpha = float(block.get("background_image_alpha", 0.85))
     )
 
 
@@ -475,8 +478,19 @@ def build_pdf(project_root: str, cfg: Config, layout: Layout, out_path: str) -> 
         # --- Logique de Design ---
         if poster_cfg.design == 1:
             if cover_path:
+                # 1. Dessiner l'image de fond
                 c.drawImage(cover_path, 0, 0, width=layout.page.width, height=layout.page.height,
                             preserveAspectRatio=True, anchor='c')
+
+                # ==================== DESSIN DU VOILE DE TRANSPARENCE ====================
+                # 2. Dessiner un rectangle blanc semi-transparent par-dessus
+                c.saveState()
+                # setFillColorRGB prend un 4ème argument pour l'alpha (transparence)
+                c.setFillColorRGB(1, 1, 1, alpha=poster_cfg.background_image_alpha)
+                # On dessine sur toute la page
+                c.rect(0, 0, layout.page.width, layout.page.height, stroke=0, fill=1)
+                c.restoreState()
+                # =========================================================================
             poster_frames = [S7["S7_Col1"], S7["S7_Col2_Full"], S7["S7_Col3"]]
         else:
             if cover_path:

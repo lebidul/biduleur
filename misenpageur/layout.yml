@@ -16,13 +16,13 @@ sections:
 
   S7_CoverImage: { page: 3, x: 200.5, y: 285, w: 194, h: 252 }
 #  S7_QRCode:     { page: 3, x: 505, y: 30, w: 75, h: 75 }
-  S7_QRCode:     { page: 3, x: 453, y: 38, w: 80, h: 80 }
+  S7_QRCode:     { page: 3, x: 453, y: 40, w: 80, h: 80 }
 
   S7_Col1: { page: 3, x: 5, y: 36, w: 194, h: 760 }
   S7_Col2_Top:    { page: 3, x: 200.5, y: 539, w: 194, h: 253 }
   S7_Col2_Bottom: { page: 3, x: 200.5, y: 36,  w: 194, h: 253 }
   S7_Col2_Full: { page: 3, x: 200.5, y: 36, w: 194, h: 760 }
-  S7_Col3:    { page: 3, x: 396, y: 116, w: 194, h: 680 }
+  S7_Col3:    { page: 3, x: 396, y: 120, w: 194, h: 674 }
 
   S7_Logos: { page: 3, x: 5, y: 5, w: 585, h: 31 }
 
