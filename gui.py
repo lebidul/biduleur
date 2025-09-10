@@ -91,7 +91,9 @@ def run_pipeline(input_file: str,
                  auteur_couv: str,
                  auteur_couv_url: str,
                  page_margin_mm: float,
-                 date_line_enabled: bool
+                 date_line_enabled: bool,
+                 poster_design: int, # Ajouté
+                 font_size_safety_factor: float # Ajouté
                  ) -> tuple[bool, str]:
     """
     Enchaîne : XLS/CSV -> (biduleur) -> 2 HTML -> (misenpageur) -> PDF (+ Scribus optionnel)
@@ -123,6 +125,7 @@ def run_pipeline(input_file: str,
         if (logos_dir or "").strip(): cfg.logos_dir = logos_dir.strip()
         if (auteur_couv or "").strip(): cfg.auteur_couv = auteur_couv.strip()
         if (auteur_couv_url or "").strip(): cfg.auteur_couv_url = auteur_couv_url.strip()
+        cfg.poster['design'] = poster_design  # 0 ou 1
         cfg.pdf_layout['page_margin_mm'] = page_margin_mm
         cfg.date_line['enabled'] = date_line_enabled
 
@@ -159,10 +162,8 @@ def run_pipeline(input_file: str,
                 os.remove(final_layout_path)
             except OSError:
                 pass
-    # ====================== FIN DE LA MODIFICATION ======================
 
 
-# ... (le reste du fichier `main()` est inchangé et devrait fonctionner correctement) ...
 def main():
     root = tk.Tk()
     root.title("Bidul – Pipeline XLS/CSV → HTMLs → PDF (+ Scribus)")
@@ -189,6 +190,11 @@ def main():
     # Mise en page
     margin_var = tk.StringVar(value=str(cfg_defaults.get("page_margin_mm", "1.0")))
     date_line_var = tk.BooleanVar(value=cfg_defaults.get("date_line_enabled", True))
+
+    # Design du poster
+    poster_design_var = tk.IntVar(value=cfg_defaults.get("poster", {}).get("design", 0))  # 0 ou 1
+    # Facteur de sécurité
+    safety_factor_var = tk.StringVar(value=str(cfg_defaults.get("font_size_safety_factor", "0.98")))
 
     # Sorties
     html_var = tk.StringVar()
@@ -306,6 +312,16 @@ def main():
                                                                                                              sticky="w",
                                                                                                              padx=5,
                                                                                                              pady=5)
+    # Choix du design du poster (Radiobuttons)
+    tk.Label(layout_frame, text="Design du poster :").grid(row=2, column=0, sticky="e", padx=5, pady=5)
+    design_frame = tk.Frame(layout_frame)
+    design_frame.grid(row=2, column=1, sticky="w", padx=5, pady=5)
+    tk.Radiobutton(design_frame, text="Image au centre", variable=poster_design_var, value=0).pack(side=tk.LEFT, padx=5)
+    tk.Radiobutton(design_frame, text="Image en fond", variable=poster_design_var, value=1).pack(side=tk.LEFT, padx=5)
+
+    # Facteur de sécurité pour la taille de police
+    tk.Label(layout_frame, text="Facteur de sécurité police :").grid(row=3, column=0, sticky="e", padx=5, pady=5)
+    tk.Entry(layout_frame, textvariable=safety_factor_var, width=10).grid(row=3, column=1, sticky="w", padx=5, pady=5)
 
     # --- Section : Fichiers de sortie ---
     r += 1
@@ -347,8 +363,10 @@ def main():
 
         try:
             margin_val = float(margin_var.get().strip().replace(',', '.'))
+            safety_factor_val = float(safety_factor_var.get().strip().replace(',', '.'))
         except ValueError:
-            messagebox.showerror("Erreur", "La marge globale doit être un nombre valide (ex: 1.0).")
+            messagebox.showerror("Erreur",
+                                 "La marge et le facteur de sécurité doivent être des nombres valides (ex: 1.0).")
             return
 
         status.set("Traitement en cours…")
@@ -360,7 +378,9 @@ def main():
             html_var.get().strip(), agenda_var.get().strip(),
             pdf_var.get().strip(), scribus_py_var.get().strip(),
             auteur_var.get().strip(), auteur_url_var.get().strip(),
-            margin_val, date_line_var.get()
+            margin_val, date_line_var.get(),
+            poster_design_var.get(),  # Ajouté
+            safety_factor_val  # Ajouté
         )
         if ok:
             messagebox.showinfo("Succès", msg)

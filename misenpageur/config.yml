@@ -134,6 +134,8 @@ skip_cover: false
 
 poster:
   enabled: true
+  # 0: image au centre, 1: image en fond
+  design: 0
   title: "L'AGENDA COMPLET"
   font_name_title: "Helvetica-Bold"
   font_size_title: 32.0

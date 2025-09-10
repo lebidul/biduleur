@@ -31,7 +31,7 @@ from .textflow import (
     _is_event, _mk_style_for_kind, _mk_text_for_kind
 )
 
-# ... (toutes les fonctions helper de mm_to_pt à _read_poster_config sont correctes et inchangées) ...
+# ... (toutes les fonctions helper de mm_to_pt à _inject_auteur_in_ours sont identiques à votre version) ...
 PT_PER_INCH = 72.0
 MM_PER_INCH = 25.4
 
@@ -346,33 +346,36 @@ def _read_date_line_config(cfg: Config) -> DateLineConfig:
     return DateLineConfig()  # Fallback
 
 
+# ==================== NOUVELLES FONCTIONS HELPER POUR LE POSTER ====================
 @dataclass
 class PosterConfig:
     enabled: bool = False
+    design: int = 0
     title: str = "L'AGENDA COMPLET"
     font_name_title: str = "Helvetica-Bold"
     font_size_title: float = 24.0
     font_size_min: float = 6.0
     font_size_max: float = 10.0
-    font_size_safety_factor: float = 0.98 # Réduit la taille de police finale de 2%
+    font_size_safety_factor: float = 0.98
 
 
 def _read_poster_config(cfg: Config) -> PosterConfig:
-    block = getattr(cfg, "poster", {}) or {}
+    block = cfg.poster
     return PosterConfig(
         enabled=block.get("enabled", False),
+        design=int(block.get("design", 0)),
         title=block.get("title", "L'AGENDA COMPLET"),
         font_name_title=block.get("font_name_title", "Helvetica-Bold"),
         font_size_title=float(block.get("font_size_title", 24.0)),
         font_size_min=float(block.get("font_size_min", 6.0)),
         font_size_max=float(block.get("font_size_max", 10.0)),
-        font_size_safety_factor=float(block.get("font_size_safety_factor", 0.98)),
+        font_size_safety_factor=float(block.get("font_size_safety_factor", 0.98))
     )
 
 
 def _create_poster_story(
-        paras_text: List[str], font_name: str, font_size: float,
-        leading_ratio: float, bullet_cfg: BulletConfig
+    paras_text: List[str], font_name: str, font_size: float,
+    leading_ratio: float, bullet_cfg: BulletConfig
 ) -> List[Paragraph]:
     """Crée la liste d'objets Paragraph pour le poster."""
     base_style = paragraph_style(font_name, font_size, leading_ratio)
@@ -384,6 +387,8 @@ def _create_poster_story(
         story.append(Paragraph(txt, st))
     return story
 
+
+# =================================================================================
 
 def build_pdf(project_root: str, cfg: Config, layout: Layout, out_path: str) -> dict:
     report = {"unused_paragraphs": 0}
@@ -467,61 +472,67 @@ def build_pdf(project_root: str, cfg: Config, layout: Layout, out_path: str) -> 
 
         S7 = {name: sec for name, sec in S.items() if sec.page == 3}
 
-        # Dessin des éléments statiques
+        # --- Logique de Design ---
+        if poster_cfg.design == 1:
+            if cover_path:
+                c.drawImage(cover_path, 0, 0, width=layout.page.width, height=layout.page.height,
+                            preserveAspectRatio=True, anchor='c')
+            poster_frames = [S7["S7_Col1"], S7["S7_Col2_Full"], S7["S7_Col3"]]
+        else:
+            if cover_path:
+                c.drawImage(cover_path, S7["S7_CoverImage"].x, S7["S7_CoverImage"].y, S7["S7_CoverImage"].w,
+                            S7["S7_CoverImage"].h, preserveAspectRatio=True, anchor='c')
+            poster_frames = [S7[name] for name in ["S7_Col1", "S7_Col2_Top", "S7_Col2_Bottom", "S7_Col3"]]
+
+        # --- Éléments communs ---
         s_title = S7["S7_Title"]
         c.setFont(poster_cfg.font_name_title, poster_cfg.font_size_title)
         c.drawCentredString(s_title.x + s_title.w / 2, s_title.y + (s_title.h - poster_cfg.font_size_title) / 2,
                             poster_cfg.title)
 
-        if cover_path: c.drawImage(cover_path, S7["S7_CoverImage"].x, S7["S7_CoverImage"].y, S7["S7_CoverImage"].w,
-                                   S7["S7_CoverImage"].h, preserveAspectRatio=True, anchor='c')
-
+        s_qr = S7["S7_QRCode"]
         qr_gen = qrcode.QRCode(version=1, border=1)
         qr_gen.add_data(cfg.section_1.get('qr_code_value', ''))
         qr_gen.make(fit=True)
         buffer = io.BytesIO()
         qr_gen.make_image().save(buffer, format='PNG')
         buffer.seek(0)
-        c.drawImage(ImageReader(buffer), S7["S7_QRCode"].x, S7["S7_QRCode"].y, S7["S7_QRCode"].w, S7["S7_QRCode"].h,
-                    mask='auto')
+        c.drawImage(ImageReader(buffer), s_qr.x, s_qr.y, s_qr.w, s_qr.h, mask='auto')
 
         draw_poster_logos(c, S7["S7_Logos"], logos)
 
-        # Préparation du texte et des cadres
+        # --- Calcul de la taille de police ---
         poster_paras = s5_full + s6_full + s3_full + s4_full
-        poster_frames = [S7[name] for name in
-                         # ["S7_Col1", "S7_Col2_Top", "S7_Col2_Bottom", "S7_Col3_Top", "S7_Col3_BesideQR"]]
-                        ["S7_Col1", "S7_Col2_Top", "S7_Col2_Bottom", "S7_Col3_Top"]]
-
         lo, hi = poster_cfg.font_size_min, poster_cfg.font_size_max
         for _ in range(10):
             mid = (lo + hi) / 2.0
             if mid <= lo or mid >= hi: break
 
-            # On passe les arguments nécessaires à la fonction de mesure
-            if measure_poster_fit_at_fs(c, poster_frames, poster_paras, cfg.font_name, mid, cfg.leading_ratio,
-                                        bullet_cfg):
+            # ==================== L'APPEL CORRIGÉ EST ICI ====================
+            if measure_poster_fit_at_fs(
+                    c, poster_frames, poster_paras,
+                    cfg.font_name, mid, cfg.leading_ratio, bullet_cfg
+            ):
                 best_fs_poster, lo = mid, mid
             else:
                 hi = mid
+            # ===============================================================
             if abs(hi - lo) < 0.1: break
 
+        # --- Dessin du texte ---
         final_fs_poster = best_fs_poster * poster_cfg.font_size_safety_factor
-
-        # Dessin du texte
-        # On passe les arguments nécessaires à la fonction de dessin
-        draw_poster_text_in_frames(c, poster_frames, poster_paras, cfg.font_name, final_fs_poster, cfg.leading_ratio,
-                                   bullet_cfg)
-
+        draw_poster_text_in_frames(
+            c, poster_frames, poster_paras,
+            cfg.font_name, final_fs_poster, cfg.leading_ratio, bullet_cfg
+        )
 
     c.save()
 
-    # Affichage final
+    # --- Affichage final ---
     print("-" * 20)
     print(f"Taille de police (pages 1-2): {best_fs:.2f} pt")
     if poster_cfg.enabled:
-        print(f"Taille de police (poster)    : {best_fs_poster:.2f} pt")
-        print(f"Taille de police (poster) avec marge de sécurité : {final_fs_poster:.2f} pt")
+        print(f"Taille de police (poster)    : {final_fs_poster:.2f} pt (optimale: {best_fs_poster:.2f})")
     print(f"Paragraphes non placés      : {len(rest_after_p1)}")
     print("-" * 20)
 
