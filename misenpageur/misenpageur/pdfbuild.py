@@ -354,6 +354,7 @@ class PosterConfig:
     font_size_title: float = 24.0
     font_size_min: float = 6.0
     font_size_max: float = 10.0
+    font_size_safety_factor: float = 0.98 # Réduit la taille de police finale de 2%
 
 
 def _read_poster_config(cfg: Config) -> PosterConfig:
@@ -365,6 +366,7 @@ def _read_poster_config(cfg: Config) -> PosterConfig:
         font_size_title=float(block.get("font_size_title", 24.0)),
         font_size_min=float(block.get("font_size_min", 6.0)),
         font_size_max=float(block.get("font_size_max", 10.0)),
+        font_size_safety_factor=float(block.get("font_size_safety_factor", 0.98)),
     )
 
 
@@ -488,9 +490,9 @@ def build_pdf(project_root: str, cfg: Config, layout: Layout, out_path: str) -> 
         # Préparation du texte et des cadres
         poster_paras = s5_full + s6_full + s3_full + s4_full
         poster_frames = [S7[name] for name in
-                         ["S7_Col1", "S7_Col2_Top", "S7_Col2_Bottom", "S7_Col3_Top", "S7_Col3_BesideQR"]]
+                         # ["S7_Col1", "S7_Col2_Top", "S7_Col2_Bottom", "S7_Col3_Top", "S7_Col3_BesideQR"]]
+                        ["S7_Col1", "S7_Col2_Top", "S7_Col2_Bottom", "S7_Col3_Top"]]
 
-        # ==================== CORRECTION DE L'APPEL ====================
         lo, hi = poster_cfg.font_size_min, poster_cfg.font_size_max
         for _ in range(10):
             mid = (lo + hi) / 2.0
@@ -504,11 +506,13 @@ def build_pdf(project_root: str, cfg: Config, layout: Layout, out_path: str) -> 
                 hi = mid
             if abs(hi - lo) < 0.1: break
 
+        final_fs_poster = best_fs_poster * poster_cfg.font_size_safety_factor
+
         # Dessin du texte
         # On passe les arguments nécessaires à la fonction de dessin
-        draw_poster_text_in_frames(c, poster_frames, poster_paras, cfg.font_name, best_fs_poster, cfg.leading_ratio,
+        draw_poster_text_in_frames(c, poster_frames, poster_paras, cfg.font_name, final_fs_poster, cfg.leading_ratio,
                                    bullet_cfg)
-        # ===============================================================
+
 
     c.save()
 
@@ -517,6 +521,7 @@ def build_pdf(project_root: str, cfg: Config, layout: Layout, out_path: str) -> 
     print(f"Taille de police (pages 1-2): {best_fs:.2f} pt")
     if poster_cfg.enabled:
         print(f"Taille de police (poster)    : {best_fs_poster:.2f} pt")
+        print(f"Taille de police (poster) avec marge de sécurité : {final_fs_poster:.2f} pt")
     print(f"Paragraphes non placés      : {len(rest_after_p1)}")
     print("-" * 20)
 

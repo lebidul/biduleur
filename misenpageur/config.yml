@@ -140,3 +140,4 @@ poster:
   # Tailles de police pour le corps du texte du poster
   font_size_min: 6.0
   font_size_max: 10.0
+  font_size_safety_factor: 0.965
