@@ -16,6 +16,7 @@ class Config:
     auteur_couv_url: Optional[str] = None
     logos_dir: str = "assets/logos"
     ours_md: str = "assets/ours/ours.md"
+    nobr_file: str = "assets/textes/nobr.txt"
 
     # --- Font & Layout ---
     font_name: str = "ArialNarrow"

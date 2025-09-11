@@ -13,6 +13,7 @@ output_pdf: "misenpageur/bidul/bidul_prototype.pdf"      # chemin du PDF génér
 logos_dir: "misenpageur/assets/logos"   # dossier contenant jusqu'à 10 logos
 cover_image: "misenpageur/assets/couv/couverture.png"  # image de couverture
 ours_md: "misenpageur/assets/ours/ours.md"   # fichier texte constant (ours)
+nobr_file: "misenpageur/assets/textes/nobr.txt" # fichier avec les strings insécables
 
 # =========================
 # Paramètres typographiques
@@ -71,7 +72,7 @@ event_hanging_indent: 10
 
 # Date box (bloc)
 date_box:
-  enabled: false
+  enabled: true
   padding: 3
   border_width: 0
   border_color: "#000000"

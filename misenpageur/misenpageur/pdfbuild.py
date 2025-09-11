@@ -30,7 +30,7 @@ from .textflow import (
     BulletConfig, DateBoxConfig, DateLineConfig,
     measure_fit_at_fs, draw_section_fixed_fs_with_prelude, draw_section_fixed_fs_with_tail,
     plan_pair_with_split, measure_poster_fit_at_fs, draw_poster_text_in_frames,
-    _is_event, _mk_style_for_kind, _mk_text_for_kind
+    _is_event, _mk_style_for_kind, _mk_text_for_kind, _apply_non_breaking_strings
 )
 
 # ... (toutes les fonctions helper de mm_to_pt à _inject_auteur_in_ours sont identiques à votre version) ...
@@ -54,6 +54,23 @@ def _effective_dpi(img_px_w: int, img_px_h: int, placed_w_pt: float, placed_h_pt
     dpi_w = img_px_w / (placed_w_pt / PT_PER_INCH)
     dpi_h = img_px_h / (placed_h_pt / PT_PER_INCH)
     return min(dpi_w, dpi_h)
+
+
+def _load_nobr_list_from_file(path: str) -> List[str]:
+    """
+    Charge une liste de termes depuis un fichier texte.
+    Ignore les lignes vides et les commentaires (commençant par #).
+    """
+    if not path or not os.path.exists(path):
+        return []
+
+    nobr_list = []
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith("#"):
+                nobr_list.append(line)
+    return nobr_list
 
 
 def _prepare_cover_for_print(src_path: str, target_w_pt: float, target_h_pt: float, cfg: Config) -> str:
@@ -421,8 +438,21 @@ def build_pdf(project_root: str, cfg: Config, layout: Layout, out_path: str) -> 
     # --- Inputs et contenus ---
     html_text = read_text(os.path.join(project_root, cfg.input_html))
     paras = extract_paragraphs_from_html(html_text)
+
+    # --- LECTURE ET APPLICATION DES TERMES INSÉCABLES ---
+    nobr_list = []
+    if cfg.nobr_file:
+        nobr_path = cfg.nobr_file if os.path.isabs(cfg.nobr_file) else os.path.join(project_root, cfg.nobr_file)
+        nobr_list = _load_nobr_list_from_file(nobr_path)
+
+    if nobr_list:
+        print(f"[INFO] Application de {len(nobr_list)} règles d'insécabilité depuis {os.path.basename(cfg.nobr_file)}.")
+        paras = [_apply_non_breaking_strings(p, nobr_list) for p in paras]
+
     ours_text = read_text(os.path.join(project_root, cfg.ours_md))
+    ours_text = _apply_non_breaking_strings(ours_text, nobr_list)
     ours_text = _inject_auteur_in_ours(ours_text, cfg.auteur_couv, cfg.auteur_couv_url)
+
     logos = list_images(os.path.join(project_root, cfg.logos_dir))
     cover_path = os.path.join(project_root, cfg.cover_image) if cfg.cover_image else ""
 

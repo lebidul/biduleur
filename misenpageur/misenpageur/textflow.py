@@ -95,29 +95,48 @@ def _mk_style_for_kind(base: ParagraphStyle, kind: str,
         )
     return base
 
-def _mk_text_for_kind(raw: str, kind: str, bullet_cfg: BulletConfig) -> str:
-    """Prépare le texte: nettoyage, bullet visible/masqué/remplacé, glyphes."""
+
+def _mk_text_for_kind(
+        raw: str, kind: str, bullet_cfg: BulletConfig
+) -> str:
+    """Prépare le texte: nettoyage, bullet, glyphes."""
     txt = _strip_head_tail_breaks(sanitize_inline_markup(raw))
+
     if kind == "EVENT":
         if bullet_cfg.event_bullet_replacement:
             if _is_event(txt):
                 txt = _BULLET_RE.sub(bullet_cfg.event_bullet_replacement + " ", txt, count=1)
         elif not bullet_cfg.show_event_bullet:
             txt = _strip_leading_bullet(txt)
+
     return apply_glyph_fallbacks(txt)
+
+
+def _apply_non_breaking_strings(text: str, non_breaking: List[str]) -> str:
+    """Remplace les espaces par des espaces insécables pour les chaînes spécifiées."""
+    if not non_breaking:
+        return text
+
+    # On trie par longueur (du plus long au plus court) pour éviter les remplacements partiels
+    # ex: remplacer "SAM SAUVAGE EXPERIENCE" avant "SAM SAUVAGE"
+    for phrase in sorted(non_breaking, key=len, reverse=True):
+        if phrase in text:
+            # Créer la version avec des espaces insécables
+            unbreakable_phrase = phrase.replace(" ", "\u00A0")
+            # Remplacer dans le texte principal
+            text = text.replace(phrase, unbreakable_phrase)
+
+    return text
 
 
 # ---------- Mesure pour la recherche de taille commune (avec espacement & styles) ----------
 def measure_fit_at_fs(
-    c: canvas.Canvas,
-    section: Section,
-    paras_text: List[str],
+    c: canvas.Canvas, section: Section, paras_text: List[str],
     font_name: str, font_size: float, leading_ratio: float, inner_pad: float,
-    section_name: str,
-    spacing_policy: SpacingPolicy,
-    bullet_cfg: BulletConfig,
-    date_box: DateBoxConfig,
+    section_name: str, spacing_policy: SpacingPolicy,
+    bullet_cfg: BulletConfig, date_box: DateBoxConfig
 ) -> int:
+    # ...
     """
     Compte combien de paragraphes ENTIERs tiennent dans 'section' à font_size,
     en intégrant spaceBefore/spaceAfter + hanging indent (EVENT) + cadre/fond (DATE).
@@ -136,7 +155,7 @@ def measure_fit_at_fs(
     for raw in paras_text:
         kind = "EVENT" if _is_event(raw) else "DATE"
         st   = _mk_style_for_kind(base, kind, bullet_cfg, date_box)
-        txt  = _mk_text_for_kind(raw, kind, bullet_cfg)
+        txt = _mk_text_for_kind(raw, kind, bullet_cfg)
 
         p = Paragraph(txt, st)
         _w, ph = p.wrap(w, 1e6)
@@ -222,7 +241,7 @@ def draw_section_fixed_fs_with_prelude(
     spacing_policy: SpacingPolicy,
     bullet_cfg: BulletConfig,
     date_box: DateBoxConfig,
-    date_line: DateLineConfig,
+    date_line: DateLineConfig
 ) -> None:
     """Dessine une préface (suite césurée) PUIS des paragraphes entiers, avec espacement & styles."""
     x0 = section.x + inner_pad
@@ -253,7 +272,7 @@ def draw_section_fixed_fs_with_prelude(
     for raw in (paras_text or []):
         kind = "EVENT" if _is_event(raw) else "DATE"
         st   = _mk_style_for_kind(base, kind, bullet_cfg, date_box)
-        txt  = _mk_text_for_kind(raw, kind, bullet_cfg)
+        txt = _mk_text_for_kind(raw, kind, bullet_cfg)
 
         p = Paragraph(txt, st)
         _w, ph = p.wrap(w, h)
@@ -304,7 +323,7 @@ def draw_section_fixed_fs_with_tail(
     spacing_policy: SpacingPolicy,
     bullet_cfg: BulletConfig,
     date_box: DateBoxConfig,
-    date_line: DateLineConfig,
+    date_line: DateLineConfig
 ) -> None:
     """Dessine des paragraphes entiers PUIS une 'tail' (fin césurée), avec espacement & styles."""
     x0 = section.x + inner_pad
@@ -324,7 +343,7 @@ def draw_section_fixed_fs_with_tail(
     for raw in (paras_text or []):
         kind = "EVENT" if _is_event(raw) else "DATE"
         st   = _mk_style_for_kind(base, kind, bullet_cfg, date_box)
-        txt  = _mk_text_for_kind(raw, kind, bullet_cfg)
+        txt = _mk_text_for_kind(raw, kind, bullet_cfg)
 
         p = Paragraph(txt, st)
         _w, ph = p.wrap(w, h)
@@ -381,7 +400,7 @@ def plan_pair_with_split(
     split_min_gain_ratio: float,
     spacing_policy: SpacingPolicy,
     bullet_cfg: BulletConfig,
-    date_box: DateBoxConfig,
+    date_box: DateBoxConfig
 ) -> Tuple[List[str], List[Paragraph], List[Paragraph], List[str], List[str]]:
     """
     Planifie (A puis B) avec UNE césure A→B possible (si gain significatif),
