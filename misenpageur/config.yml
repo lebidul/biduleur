@@ -68,7 +68,8 @@ split_min_gain_ratio: 0.10 # n’autoriser la césure A→B que si elle comble �
 # Bullets / hanging indent
 show_event_bullet: true
 event_bullet_replacement: null
-event_hanging_indent: 10
+event_hanging_indent: 13     # Marge gauche totale pour les lignes d'événement
+bullet_text_indent: 1       # Position de la puce par rapport au texte (négatif = à gauche)
 
 # Date box (bloc)
 date_box:
@@ -169,3 +170,5 @@ poster:
   font_size_min: 6.0
   font_size_max: 10.0
   font_size_safety_factor: 0.965
+  date_spaceBefore: 10
+  date_spaceAfter: 10

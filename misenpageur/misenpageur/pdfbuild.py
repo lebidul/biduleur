@@ -27,11 +27,12 @@ from .drawing import draw_s1, draw_s2_cover, list_images, paragraph_style, draw_
 from .fonts import register_arial_narrow, register_dejavu_sans, register_dsnet_stamped
 from .spacing import SpacingConfig, SpacingPolicy
 from .textflow import (
-    BulletConfig, DateBoxConfig, DateLineConfig,
     measure_fit_at_fs, draw_section_fixed_fs_with_prelude, draw_section_fixed_fs_with_tail,
     plan_pair_with_split, measure_poster_fit_at_fs, draw_poster_text_in_frames,
-    _is_event, _mk_style_for_kind, _mk_text_for_kind, _apply_non_breaking_strings
+    _is_event, _mk_style_for_kind, _mk_text_for_kind
 )
+
+from .config import Config, BulletConfig, PosterConfig, DateBoxConfig, DateLineConfig # Importer les configs
 
 # ... (toutes les fonctions helper de mm_to_pt à _inject_auteur_in_ours sont identiques à votre version) ...
 PT_PER_INCH = 72.0
@@ -71,6 +72,22 @@ def _load_nobr_list_from_file(path: str) -> List[str]:
             if line and not line.startswith("#"):
                 nobr_list.append(line)
     return nobr_list
+
+def _apply_non_breaking_strings(text: str, non_breaking: List[str]) -> str:
+    """Remplace les espaces par des espaces insécables pour les chaînes spécifiées."""
+    if not non_breaking:
+        return text
+
+    # On trie par longueur (du plus long au plus court) pour éviter les remplacements partiels
+    # ex: remplacer "SAM SAUVAGE EXPERIENCE" avant "SAM SAUVAGE"
+    for phrase in sorted(non_breaking, key=len, reverse=True):
+        if phrase in text:
+            # Créer la version avec des espaces insécables
+            unbreakable_phrase = phrase.replace(" ", "\u00A0")
+            # Remplacer dans le texte principal
+            text = text.replace(phrase, unbreakable_phrase)
+
+    return text
 
 
 def _prepare_cover_for_print(src_path: str, target_w_pt: float, target_h_pt: float, cfg: Config) -> str:
@@ -339,6 +356,32 @@ def _read_date_box_config(cfg: Config) -> DateBoxConfig:
         back_color=getattr(cfg, "date_box_back_color", None),
     )
 
+def _read_bullet_config(cfg: Config) -> BulletConfig:
+    """Crée un objet BulletConfig à partir de la config principale."""
+    return BulletConfig(
+        show_event_bullet=cfg.show_event_bullet,
+        event_bullet_replacement=cfg.event_bullet_replacement,
+        event_hanging_indent=cfg.event_hanging_indent,
+        bullet_text_indent=cfg.bullet_text_indent
+    )
+
+
+def _read_poster_config(cfg: Config) -> PosterConfig:
+    block = cfg.poster
+    return PosterConfig(
+        enabled=block.get("enabled", False),
+        design=int(block.get("design", 0)),
+        title=block.get("title", "L'AGENDA COMPLET"),
+        font_name_title=block.get("font_name_title", "Helvetica-Bold"),
+        title_logo_path=block.get("title_logo_path", ""),
+        title_back_color=block.get("title_back_color", "#7F7F7F"),
+        font_size_title=float(block.get("font_size_title", 36.0)),
+        font_size_min=float(block.get("font_size_min", 6.0)),
+        font_size_max=float(block.get("font_size_max", 10.0)),
+        font_size_safety_factor=float(block.get("font_size_safety_factor", 0.98)),
+        background_image_alpha = float(block.get("background_image_alpha", 0.85))
+    )
+
 
 def _read_date_line_config(cfg: Config) -> DateLineConfig:
     """Lit date_line depuis cfg et retourne un objet DateLineConfig."""
@@ -363,40 +406,6 @@ def _read_date_line_config(cfg: Config) -> DateLineConfig:
             gap_after_text_mm=as_float(block.get("gap_after_text_mm"), 3.0),
         )
     return DateLineConfig()  # Fallback
-
-
-# ==================== NOUVELLES FONCTIONS HELPER POUR LE POSTER ====================
-@dataclass
-class PosterConfig:
-    enabled: bool = False
-    design: int = 0
-    title: str = "L'AGENDA COMPLET"
-    font_name_title: str = "Helvetica-Bold"
-    title_logo_path: str = None
-    title_back_color: str = "#7F7F7F"
-    font_size_title: float = 36.0
-    font_size_min: float = 6.0
-    font_size_max: float = 10.0
-    font_size_safety_factor: float = 0.98
-    # Transparence du fond (0.0 = invisible, 1.0 = opaque)
-    background_image_alpha: float = 0.85
-
-
-def _read_poster_config(cfg: Config) -> PosterConfig:
-    block = cfg.poster
-    return PosterConfig(
-        enabled=block.get("enabled", False),
-        design=int(block.get("design", 0)),
-        title=block.get("title", "L'AGENDA COMPLET"),
-        font_name_title=block.get("font_name_title", "Helvetica-Bold"),
-        title_logo_path=block.get("title_logo_path", ""),
-        title_back_color=block.get("title_back_color", "#7F7F7F"),
-        font_size_title=float(block.get("font_size_title", 36.0)),
-        font_size_min=float(block.get("font_size_min", 6.0)),
-        font_size_max=float(block.get("font_size_max", 10.0)),
-        font_size_safety_factor=float(block.get("font_size_safety_factor", 0.98)),
-        background_image_alpha = float(block.get("background_image_alpha", 0.85))
-    )
 
 
 def _create_poster_story(
@@ -460,7 +469,7 @@ def build_pdf(project_root: str, cfg: Config, layout: Layout, out_path: str) -> 
 
     # --- Configurations ---
     spacing_cfg = SpacingConfig()
-    bullet_cfg = BulletConfig()
+    bullet_cfg = _read_bullet_config(cfg)
     date_box = _read_date_box_config(cfg)
     date_line = _read_date_line_config(cfg)
 
@@ -513,6 +522,7 @@ def build_pdf(project_root: str, cfg: Config, layout: Layout, out_path: str) -> 
     # --- RENDU PAGE 3 (POSTER) ---
     poster_cfg = _read_poster_config(cfg)
     best_fs_poster = poster_cfg.font_size_min
+
     if poster_cfg.enabled:
         c.showPage()
 
@@ -609,15 +619,14 @@ def build_pdf(project_root: str, cfg: Config, layout: Layout, out_path: str) -> 
             mid = (lo + hi) / 2.0
             if mid <= lo or mid >= hi: break
 
-            # ==================== L'APPEL CORRIGÉ EST ICI ====================
             if measure_poster_fit_at_fs(
-                    c, poster_frames, poster_paras,
-                    cfg.font_name, mid, cfg.leading_ratio, bullet_cfg
+                c, poster_frames, poster_paras,
+                cfg.font_name, mid, cfg.leading_ratio,
+                bullet_cfg, poster_cfg
             ):
                 best_fs_poster, lo = mid, mid
             else:
                 hi = mid
-            # ===============================================================
             if abs(hi - lo) < 0.1: break
 
         # --- Dessin du texte ---
