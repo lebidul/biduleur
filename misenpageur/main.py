@@ -4,23 +4,10 @@ misenpageur.main
 ----------------
 Entrée CLI pour :
 - Générer le PDF (ReportLab) à partir d'un HTML + config + layout
-- (Optionnel) Générer un script Scribus .py + un .sla éditable
 
 Exemples :
-    # PDF uniquement
-    python misenpageur/main.py --root . --config misenpageur/config.yml --layout misenpageur/layout.yml --out misenpageur/output/bidul.pdf
-
-    # PDF + export Scribus
     python misenpageur/main.py --root . --config misenpageur/config.yml --layout misenpageur/layout.yml \
         --out misenpageur/output/bidul.pdf \
-        --scribus-script misenpageur/output/bidul_scribus.py \
-        --scribus-sla misenpageur/output/bidul.sla
-
-    # Scribus uniquement (pas de PDF)
-    python misenpageur/main.py --root . --config misenpageur/config.yml --layout misenpageur/layout.yml \
-        --scribus-script misenpageur/output/bidul_scribus.py \
-        --scribus-sla misenpageur/output/bidul.sla \
-        --scribus-only
 """
 from __future__ import annotations
 
@@ -60,27 +47,17 @@ try:
     from misenpageur.misenpageur.config import Config
     from misenpageur.misenpageur.layout import Layout
     from misenpageur.misenpageur.pdfbuild import build_pdf
-    try:
-        from misenpageur.misenpageur.scribus_export import write_scribus_script
-        _HAS_SCRIBUS_EXPORT = True
-    except Exception:
-        _HAS_SCRIBUS_EXPORT = False
 except ModuleNotFoundError:
     # cas: exécuté depuis le dossier misenpageur/
     from misenpageur.config import Config
     from misenpageur.layout import Layout
     from misenpageur.pdfbuild import build_pdf
-    try:
-        from misenpageur.scribus_export import write_scribus_script
-        _HAS_SCRIBUS_EXPORT = True
-    except Exception:
-        _HAS_SCRIBUS_EXPORT = False
 
 
 def make_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="misenpageur",
-        description="Génère le PDF (ReportLab) et/ou un script Scribus + .sla à partir d'un HTML d'entrée."
+        description="Génère le PDF (ReportLab) à partir d'un HTML d'entrée."
     )
     # Defaults repris de parse_args() historique
     p.add_argument("--root",   default=".",            help="Racine du projet (contient config.yml, layout.yml)")
@@ -99,13 +76,6 @@ def make_parser() -> argparse.ArgumentParser:
     p.add_argument("--auteur-couv", default="", help="Crédit visuel de couverture (remplace @Steph dans l’ours)")
     p.add_argument("--auteur-couv-url", default="", help="URL associée au crédit visuel (hyperlien)")
 
-    # Export Scribus (pas de défaut => opt-in)
-    p.add_argument("--scribus-script", default="misenpageur/bidul/bidul.scribus.py", help="Chemin du script Scribus .py à générer")
-    p.add_argument("--scribus-sla", default="misenpageur/bidul/bidul.sla", help="Chemin du .sla que le script enregistrera")
-
-    # Modes
-    p.add_argument("--pdf-only",     action="store_true", help="Ne générer que le PDF (ignorer Scribus)")
-    p.add_argument("--scribus-only", action="store_true", help="Ne générer que le script Scribus + .sla (pas de PDF)")
     return p
 
 
@@ -154,56 +124,28 @@ def main(argv: list[str] | None = None) -> int:
         if args.auteur_couv != "":     cfg.auteur_couv = args.auteur_couv
         if args.auteur_couv_url != "": cfg.auteur_couv_url = args.auteur_couv_url
 
-        # Sanity : que doit-on générer ?
-        want_pdf = not args.scribus_only
-        want_scribus = not args.pdf_only and (args.scribus_script and args.scribus_sla)
-
-        if want_pdf and not args.out:
-            print("[ERR] --out est requis pour générer le PDF (ou passe --scribus-only).")
+        if not args.out:
+            print("[ERR] --out est requis pour générer le PDF.")
             return 2
 
-        # Générer le PDF si demandé
-        if want_pdf:
-            out_pdf = Path(args.out).resolve()
-            out_pdf.parent.mkdir(parents=True, exist_ok=True)
+        # Générer le PDF
+        out_pdf = Path(args.out).resolve()
+        out_pdf.parent.mkdir(parents=True, exist_ok=True)
 
-            # La config peut aussi spécifier output_pdf ; on favorise l'argument CLI
-            cfg.output_pdf = str(out_pdf)
+        # La config peut aussi spécifier output_pdf ; on favorise l'argument CLI
+        cfg.output_pdf = str(out_pdf)
 
-            import traceback
+        import traceback
 
-            try:
-                report = build_pdf(str(root), cfg, lay, str(out_pdf))
-                print("[OK] PDF généré :", out_pdf)
-                if isinstance(report, dict) and report.get("unused_paragraphs"):
-                    print("[WARN]", report["unused_paragraphs"], "paragraphes non placés")
-            except Exception as e:
-                print("[ERR] Échec build PDF :", e)
-                traceback.print_exc()
-                # on n'arrête pas si l'utilisateur veut quand même Scribus derrière
-                if not want_scribus:
-                    return 2
-
-        # Générer script Scribus + .sla si demandé
-        if want_scribus:
-            if not _HAS_SCRIBUS_EXPORT:
-                print("[ERR] L'export Scribus n'est pas disponible (module scribus_export manquant).")
-                return 2
-
-            script_path = Path(args.scribus_script).resolve()
-            sla_path = Path(args.scribus_sla).resolve()
-            script_path.parent.mkdir(parents=True, exist_ok=True)
-            sla_path.parent.mkdir(parents=True, exist_ok=True)
-
-            try:
-                write_scribus_script(str(root), cfg, lay, str(script_path), str(sla_path))
-                print("[OK] Script Scribus généré :", script_path)
-                print("     Ouvre Scribus puis : Script → Exécuter un script… →", script_path.name)
-                print("     Le script crée les cadres S1..S6 et enregistre :", sla_path)
-                print("     Astuce (GUI silencieux) :", "scribus -g -py", script_path)
-            except Exception as e:
-                print("[ERR] Échec génération script Scribus :", e)
-                return 2
+        try:
+            report = build_pdf(str(root), cfg, lay, str(out_pdf))
+            print("[OK] PDF généré :", out_pdf)
+            if isinstance(report, dict) and report.get("unused_paragraphs"):
+                print("[WARN]", report["unused_paragraphs"], "paragraphes non placés")
+        except Exception as e:
+            print("[ERR] Échec build PDF :", e)
+            traceback.print_exc()
+            return 2
 
     finally:
         # --- Ce bloc s'exécute toujours, même en cas d'erreur ---

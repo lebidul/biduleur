@@ -6,10 +6,9 @@
 - [x] Redimensionnement éventuel de l'image de couv.
 - [x] Intégration Scribus
 - [x] Amélioration display dates
-- [ ] Fichier .sla comme argument dans cli
 - [x] Config cucarcaha
 - [x] Config ours v1
-- [ ] Config ours v2 - lecture as .md
+- [ ] Config ours v2 - lecture as .md ou .html
 - [ ] Config ours v2 - icones
 - [x] UI: Espace pour configuration visuelle couv, marge
 - [x] Config logos v1
@@ -31,8 +30,9 @@
 - [ ] Générer 2 pdfs en sortie, un pour impression et un pdf pour version digitale (avec ou sans hyperlink) (ajouter à bidul.gui).
 - [ ] Intégration du workflow dans page admin de wordpress.
 - [x] Options d’hyphénation pour rendre des strings insécables
+- - [ ] Fichier .sla comme argument dans cli
 
 
 ## Documentation
 - [ ] Rédiger un guide utilisateur pour expliquer comment utiliser le module.
-- [ ] Ajouter des exemples d'utilisation dans la documentation.
+- [x] Ajouter des exemples d'utilisation dans la documentation.

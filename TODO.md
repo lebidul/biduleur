@@ -5,7 +5,7 @@
 - [ ] Fichier .scribus.py comme argument dans cli.
 - [x] Ajouter fichiers templates csv et xlsx.
 - [x] Fichier release notes
-- [ ] Release process.
+- [ ] Build release process.
 - [x] Icône.
 - [ ] Unit tests.
 

@@ -12,12 +12,11 @@ import importlib.resources as res
 from biduleur.csv_utils import parse_bidul
 from biduleur.format_utils import output_html_file
 
-# --- import misenpageur (PDF + Scribus) ---
+# --- import misenpageur (PDF) ---
 try:
     from misenpageur.misenpageur.config import Config
     from misenpageur.misenpageur.layout import Layout
     from misenpageur.misenpageur.pdfbuild import build_pdf
-    from misenpageur.misenpageur.scribus_export import write_scribus_script
     from misenpageur.misenpageur.layout_builder import build_layout_with_margins
 except Exception as e:
     _IMPORT_ERR = e
@@ -33,8 +32,6 @@ def _default_paths_from_input(input_file: str) -> dict:
         "html": os.path.join(folder, f"{base}.html"),
         "agenda_html": os.path.join(folder, f"{base}.agenda.html"),
         "pdf": os.path.join(folder, f"{base}.pdf"),
-        "scribus_py": os.path.join(folder, f"{base}.scribus.py"),
-        "scribus_sla": os.path.join(folder, f"{base}.sla"),
     }
 
 
@@ -117,7 +114,7 @@ def _ensure_parent_dir(path: str):
 
 def run_pipeline(input_file: str,
                  generate_cover: bool, cover_image: str, ours_md: str, logos_dir: str,
-                 out_html: str, out_agenda_html: str, out_pdf: str, out_scribus_py: str,
+                 out_html: str, out_agenda_html: str, out_pdf: str,
                  auteur_couv: str, auteur_couv_url: str, page_margin_mm: float,
                  date_separator_type: str, date_spacing: float,
                  poster_design: int, font_size_safety_factor: float,
@@ -125,14 +122,14 @@ def run_pipeline(input_file: str,
                  cucaracha_type: str, cucaracha_value: str, cucaracha_text_font: str
                  ) -> tuple[bool, str]:
     """
-    Enchaîne : XLS/CSV -> (biduleur) -> 2 HTML -> (misenpageur) -> PDF (+ Scribus optionnel)
+    Enchaîne : XLS/CSV -> (biduleur) -> 2 HTML -> (misenpageur) -> PDF
     """
     if _IMPORT_ERR:
         return False, f"Imports misenpageur impossibles : {repr(_IMPORT_ERR)}"
 
     final_layout_path = None
     try:
-        for p in (out_html, out_agenda_html, out_pdf, out_scribus_py):
+        for p in (out_html, out_agenda_html, out_pdf):
             if p: _ensure_parent_dir(p)
 
         html_body_bidul, html_body_agenda, number_of_lines = parse_bidul(input_file)
@@ -177,11 +174,6 @@ def run_pipeline(input_file: str,
 
         build_pdf(project_root, cfg, lay, cfg.output_pdf)
 
-        scribus_sla = ""
-        if (out_scribus_py or "").strip():
-            scribus_sla = os.path.splitext(out_scribus_py)[0] + ".sla"
-            write_scribus_script(project_root, cfg, lay, out_scribus_py, scribus_sla)
-
         summary_lines = [
             f"HTML            : {out_html}",
             f"HTML (agenda)   : {out_agenda_html}",
@@ -205,7 +197,7 @@ def run_pipeline(input_file: str,
 
 def main():
     root = tk.Tk()
-    root.title("Bidul – Pipeline XLS/CSV → HTMLs → PDF (+ Scribus)")
+    root.title("Bidul – Pipeline XLS/CSV → HTMLs → PDF")
     root.minsize(900, 750)  # Augmentation de la hauteur min
 
     # --- Configuration de la grille principale ---
@@ -248,7 +240,6 @@ def main():
     html_var = tk.StringVar()
     agenda_var = tk.StringVar()
     pdf_var = tk.StringVar()
-    scribus_py_var = tk.StringVar()
 
     # --- Helpers (inchangés) ---
     def pick_input():
@@ -260,7 +251,6 @@ def main():
         html_var.set(d["html"]);
         agenda_var.set(d["agenda_html"]);
         pdf_var.set(d["pdf"]);
-        scribus_py_var.set(d["scribus_py"])
 
     def pick_cover():
         path = filedialog.askopenfilename(title="Image de couverture",
@@ -496,13 +486,6 @@ def main():
     tk.Button(output_frame, text="…", width=3,
               command=lambda: pick_save(pdf_var, "PDF", ".pdf", [("PDF", "*.pdf")])).grid(row=2, column=2, padx=5,
                                                                                           pady=5)
-    tk.Label(output_frame, text="Script Scribus (.py) :").grid(row=3, column=0, sticky="e", padx=5, pady=5)
-    tk.Entry(output_frame, textvariable=scribus_py_var).grid(row=3, column=1, sticky="ew", padx=5, pady=5)
-    tk.Button(output_frame, text="…", width=3,
-              command=lambda: pick_save(scribus_py_var, "Script Scribus", ".py", [("Python", "*.py")])).grid(row=3,
-                                                                                                             column=2,
-                                                                                                             padx=5,
-                                                                                                             pady=5)
 
     # --- Status & action ---
     status = tk.StringVar(value="Prêt.")
@@ -542,7 +525,6 @@ def main():
             out_html=html_var.get().strip(),
             out_agenda_html=agenda_var.get().strip(),
             out_pdf=pdf_var.get().strip(),
-            out_scribus_py=scribus_py_var.get().strip(),
             auteur_couv=auteur_var.get().strip(),
             auteur_couv_url=auteur_url_var.get().strip(),
             page_margin_mm=margin_val,
