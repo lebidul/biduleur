@@ -422,7 +422,7 @@ def _create_poster_story(
     return story
 
 
-def draw_document(c, project_root: str, cfg: Config, layout: Layout) -> dict:
+def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path: str) -> dict:
     """
     Fonction de dessin principale, agnostique au format de sortie (PDF, SVG, etc.).
     Prend un 'canvas' ReportLab en entrée et y dessine toutes les pages.

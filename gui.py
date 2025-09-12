@@ -27,13 +27,16 @@ else:
 
 # ... (fonctions _default_paths_from_input, _project_defaults, _load_cfg_defaults, _ensure_parent_dir inchangées) ...
 def _default_paths_from_input(input_file: str) -> dict:
-    base = os.path.splitext(os.path.basename(input_file))[0]
-    folder = os.path.dirname(input_file) or "."
+    # On utilise pathlib pour une manipulation propre des chemins
+    input_path = Path(input_file)
+    base = input_path.stem # Nom du fichier sans extension (ex: "tapage")
+    folder = input_path.parent # Dossier parent (ex: "C:/Users/thiba/Desktop/test.bidul")
+
     return {
-        "html": os.path.join(folder, f"{base}.html"),
-        "agenda_html": os.path.join(folder, f"{base}.agenda.html"),
-        "pdf": os.path.join(folder, f"{base}.pdf"),
-        "svg": os.path.join(folder, f"{base}.svg"),
+        "html": str(folder / f"{base}.html"),
+        "agenda_html": str(folder / f"{base}.agenda.html"),
+        "pdf": str(folder / f"{base}.pdf"),
+        "svg": str(folder / f"{base}.svg"),
     }
 
 
@@ -175,7 +178,7 @@ def run_pipeline(input_file: str,
         final_layout_path = build_layout_with_margins(lay_path, cfg)
         lay = Layout.from_yaml(final_layout_path)
 
-        build_pdf(cfg, lay, out_pdf, cfg_path)
+        build_pdf(project_root, cfg, lay, out_pdf, cfg_path)
 
         summary_lines = [
             f"HTML            : {out_html}",
@@ -186,7 +189,7 @@ def run_pipeline(input_file: str,
         ]
 
         if generate_svg and out_svg:
-            build_svg(cfg, lay, out_svg, cfg_path)
+            build_svg(project_root, cfg, lay, out_svg, cfg_path)
             summary_lines.append(f"SVG (éditable) : {out_svg}")
 
         return True, "\n".join(summary_lines)
@@ -566,7 +569,7 @@ def main():
     action_frame.grid(row=1, column=0, sticky="ew")
     action_frame.columnconfigure(0, weight=1)
 
-    tk.Button(action_frame, text="Lancer (HTMLs + PDF + Script)", command=run_now, bg="#4CAF50", fg="white",
+    tk.Button(action_frame, text="Lancer (.HTMLs + .PDF + .SVG)", command=run_now, bg="#4CAF50", fg="white",
               font=("Arial", 10, "bold")).pack(pady=5)
 
     status_bar = tk.Label(root, textvariable=status, bd=1, relief=tk.SUNKEN, anchor=tk.W, padx=5)

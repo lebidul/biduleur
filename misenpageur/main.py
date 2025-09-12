@@ -115,14 +115,14 @@ def main(argv: list[str] | None = None) -> int:
             out_pdf.parent.mkdir(parents=True, exist_ok=True)
             cfg.output_pdf = str(out_pdf)
             # On passe le project_root
-            build_pdf(str(project_root), cfg, lay, str(out_pdf))
+            build_pdf(str(project_root), cfg, lay, str(out_pdf), cfg_path)
 
             # --- Générer le SVG (si demandé) ---
             if args.svg:
                 out_svg = Path(args.svg).resolve()
                 out_svg.parent.mkdir(parents=True, exist_ok=True)
                 # On passe le project_root
-                build_svg(str(project_root), cfg, lay, str(out_svg))
+                build_svg(str(project_root), cfg, lay, str(out_svg), cfg_path)
         except Exception as e:
             print("[ERR] Échec build PDF :", e)
             traceback.print_exc()

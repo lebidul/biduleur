@@ -12,7 +12,7 @@ from .layout import Layout
 from .pdfbuild import build_pdf  # On utilise le build_pdf existant
 
 
-def build_svg(project_root: str, cfg: Config, layout: Layout, out_path: str) -> dict:
+def build_svg(project_root: str, cfg: Config, layout: Layout, out_path: str, config_path: str) -> dict:
     """
     Génère un SVG éditable de la page 3 (le poster).
     - Crée un PDF temporaire contenant toutes les pages.
@@ -28,7 +28,7 @@ def build_svg(project_root: str, cfg: Config, layout: Layout, out_path: str) -> 
 
     try:
         # 1. Générer le PDF complet dans le fichier temporaire
-        report = build_pdf(project_root, cfg, layout, temp_pdf_path)
+        report = build_pdf(project_root, cfg, layout, temp_pdf_path, config_path)
 
         # 2. Préparer le dossier de sortie pour le SVG
         output_dir = Path(out_path).parent
@@ -45,7 +45,7 @@ def build_svg(project_root: str, cfg: Config, layout: Layout, out_path: str) -> 
             temp_pdf_path,
             "-o", str(output_dir),
             "--prefix", Path(out_path).stem,  # Nom du fichier sans extension
-            "-a", "3"  # On ne convertit que la page 3
+            "all"
         ]
 
         print(f"[INFO] Lancement de la conversion SVG avec la commande : {' '.join(command)}")
