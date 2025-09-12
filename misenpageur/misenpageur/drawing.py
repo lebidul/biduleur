@@ -1,10 +1,11 @@
 # misenpageur/misenpageur/drawing.py
-
+# -*- coding: utf-8 -*-
 import os
 import io
 import qrcode
 from typing import List
 
+from PIL import Image  # Assurez-vous que Pillow (PIL) est importé
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
@@ -13,18 +14,14 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.utils import ImageReader
 from reportlab.lib.colors import grey
 from reportlab.pdfbase import pdfmetrics
+from reportlab.graphics.renderSVG import SVGCanvas
 
 from .fonts import register_arial
 from .layout import Layout, Section
-from .config import Config  # Importer Config pour l'autocomplétion
+from .config import Config
 
-
-# =====================================================================
-# Fonctions de base (non modifiées)
-# =====================================================================
 
 def list_images(path: str, max_images: int = 100) -> List[str]:
-    """Liste les chemins complets des images dans un dossier."""
     if not os.path.isdir(path):
         return []
     res = []
@@ -37,7 +34,6 @@ def list_images(path: str, max_images: int = 100) -> List[str]:
 
 
 def paragraph_style(font_name: str, font_size: float, leading_ratio: float) -> ParagraphStyle:
-    """Crée un style de paragraphe de base."""
     return ParagraphStyle(
         "base",
         fontName=font_name,
@@ -45,24 +41,44 @@ def paragraph_style(font_name: str, font_size: float, leading_ratio: float) -> P
         leading=font_size * leading_ratio,
     )
 
+def draw_paragraph(c: canvas.Canvas, p: Paragraph, x: float, y: float):
+    """
+    Dessine un objet Paragraph sur le canvas, en s'adaptant s'il s'agit
+    d'un SVGCanvas (qui ne supporte pas drawOn).
+    """
+    if not isinstance(c, SVGCanvas):
+        # Méthode standard pour le PDF
+        p.drawOn(c, x, y)
+        return
 
-# =====================================================================
-# Section 1 : Colonne OURS (avec la correction ImageReader)
-# =====================================================================
+    # --- Logique de secours pour le SVGCanvas ---
+    # On dessine le texte ligne par ligne manuellement
+    c.saveState()
+    c.setFont(p.style.fontName, p.style.fontSize)
+    c.setFillColor(p.style.textColor)
+
+    y_pos = y + p.height # On commence par le haut du paragraphe
+    for line in p.blPara.lines:
+        y_pos -= p.style.leading
+        # Gérer l'alignement
+        if p.style.alignment == TA_CENTER:
+            c.drawCentredString(x + p.width / 2, y_pos, line.text)
+        elif p.style.alignment == TA_RIGHT:
+            c.drawRightString(x + p.width, y_pos, line.text)
+        else: # TA_LEFT
+            c.drawString(x, y_pos, line.text)
+    c.restoreState()
+
 
 def _draw_ours_column(c: canvas.Canvas, col_coords: tuple, ours_text: str, cfg: Config):
-    """Dessine la colonne de droite de S1 (Ours + QR code) en utilisant la bibliothèque 'qrcode'."""
     x, y, w, h = col_coords
     s1_cfg = cfg.section_1
-
-    # --- Cadre (inchangé) ---
     border_width = s1_cfg.get('ours_border_width', 0.5)
     if border_width > 0:
         c.setLineWidth(border_width)
         c.setStrokeColor(grey)
         c.rect(x, y, w, h)
 
-    # --- QR Code (avec la correction finale) ---
     qr_code_size = s1_cfg['qr_code_height_mm'] * mm
     padding = 2 * mm
     max_qr_size = w - (2 * padding)
@@ -72,155 +88,104 @@ def _draw_ours_column(c: canvas.Canvas, col_coords: tuple, ours_text: str, cfg: 
     qr_gen = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_L, box_size=10, border=0)
     qr_gen.add_data(s1_cfg['qr_code_value'])
     qr_gen.make(fit=True)
-    img = qr_gen.make_image(fill_color="black", back_color="white")
+    img_pillow = qr_gen.make_image(fill_color="black", back_color="white")
 
-    buffer = io.BytesIO()
-    img.save(buffer, format='PNG')
-    buffer.seek(0)
-
-    # === LA CORRECTION EST ICI ===
-    # On doit envelopper le buffer dans ImageReader avant de le passer à drawImage.
-    image_reader = ImageReader(buffer)
-    # =============================
+    # ==================== CORRECTION : GESTION DU TYPE DE CANVAS ====================
+    if isinstance(c, SVGCanvas):
+        image_to_draw = img_pillow  # Le SVGCanvas veut l'objet Pillow
+    else:
+        buffer = io.BytesIO()
+        img_pillow.save(buffer, format='PNG')
+        buffer.seek(0)
+        image_to_draw = ImageReader(buffer)  # Le canvas PDF veut un ImageReader
 
     qr_x_pos = x + (w - qr_code_size) / 2
     qr_y_pos = y + padding
 
-    # === ET ICI ===
-    # On passe bien l'objet 'image_reader' et non le 'buffer'.
-    c.drawImage(image_reader, qr_x_pos, qr_y_pos, width=qr_code_size, height=qr_code_size, mask='auto')
-    # =============================
+    kwargs = {'mask': 'auto'} if not isinstance(c, SVGCanvas) else {}
+    c.drawImage(image_to_draw, qr_x_pos, qr_y_pos, width=qr_code_size, height=qr_code_size, **kwargs)
+    # ==============================================================================
 
-    # --- Titre au-dessus du QR code ---
-
-    # 1. Définir le texte et le style du titre
-    title_text = s1_cfg.get('qr_code_title', "Agenda culturel")  # Paramétrable depuis conf.yml
+    title_text = s1_cfg.get('qr_code_title', "Agenda culturel")
     styles = getSampleStyleSheet()
-    title_style = ParagraphStyle(
-        'OursTitle',
-        parent=styles['Normal'],
-        fontName=s1_cfg.get('qr_code_title_font_name', 'Arial-Bold'),  # Police en gras
-        fontSize=s1_cfg.get('qr_code_title_font_size', 9),
-        leading=s1_cfg.get('qr_code_title_font_size', 9) * 1.2,
-        alignment=TA_CENTER,
-    )
-
-    # 2. Créer le paragraphe et calculer sa hauteur
+    title_style = ParagraphStyle('OursTitle', parent=styles['Normal'],
+                                 fontName=s1_cfg.get('qr_code_title_font_name', 'Arial-Bold'),
+                                 fontSize=s1_cfg.get('qr_code_title_font_size', 9),
+                                 leading=s1_cfg.get('qr_code_title_font_size', 9) * 1.2, alignment=TA_CENTER)
     title_p = Paragraph(title_text, title_style)
-    title_w, title_h = title_p.wrapOn(c, w - 2 * padding, h)  # Calculer la place qu'il prend
+    title_w, title_h = title_p.wrapOn(c, w - 2 * padding, h)
+    title_y_pos = y + qr_code_size + padding + (2 * mm)
 
-    # 3. Calculer sa position et le dessiner
-    title_y_pos = y + qr_code_size + padding + (2 * mm)  # Positionné au-dessus du QR code, avec un petit espace
-    title_p.drawOn(c, x + padding, title_y_pos)
-    # ====================== FIN DE LA MODIFICATION ======================
+    draw_paragraph(c, title_p, x + padding, title_y_pos)
 
-    # --- Texte de l'ours (avec ajustement de sa position) ---
-    styles = getSampleStyleSheet()
-    ours_style = ParagraphStyle(
-        'OursText',
-        parent=styles['Normal'],
-        fontName=s1_cfg['ours_font_name'],
-        fontSize=s1_cfg['ours_font_size'],
-        leading=s1_cfg['ours_font_size'] * s1_cfg['ours_line_spacing'],
-        alignment=TA_CENTER,
-    )
+    ours_style = ParagraphStyle('OursText', parent=styles['Normal'], fontName=s1_cfg['ours_font_name'],
+                                fontSize=s1_cfg['ours_font_size'],
+                                leading=s1_cfg['ours_font_size'] * s1_cfg['ours_line_spacing'], alignment=TA_CENTER)
 
-    story = [Paragraph(line.strip(), ours_style) for line in ours_text.split('\n') if line.strip()]
+    if isinstance(c, SVGCanvas):
+        # Logique simplifiée pour le SVG
+        y_pos = y + h - title_h - (7 * mm)
+        c.setFont(ours_style.fontName, ours_style.fontSize)
+        for line in ours_text.split('\n'):
+            if line.strip():
+                c.drawCentredString(x + w / 2, y_pos, line.strip())
+                y_pos -= ours_style.leading
+    else:
+        # Logique standard pour le PDF avec Frame
+        story = [Paragraph(line.strip(), ours_style) for line in ours_text.split('\n') if line.strip()]
+        frame_x, frame_y, frame_w, frame_h = x, title_y_pos + title_h, w, h - (title_y_pos + title_h - y)
+        frame = Frame(frame_x, frame_y, frame_w, frame_h, topPadding=5 * mm, showBoundary=0)
+        frame.addFromList(story, c)
 
-    # --- Ajustement de la zone du Frame ---
-    # Le Frame commence maintenant au-dessus du titre
-    frame_x = x
-    frame_y = title_y_pos + title_h
-    frame_w = w
-    frame_h = h - (frame_y - y)  # La hauteur restante
-    frame = Frame(frame_x, frame_y, frame_w, frame_h, topPadding=5 * mm, showBoundary=0)
-    frame.addFromList(story, c)
-
-    # --- Texte de l'ours (inchangé) ---
-    styles = getSampleStyleSheet()
-    ours_style = ParagraphStyle(
-        'OursText',
-        parent=styles['Normal'],
-        fontName=s1_cfg['ours_font_name'],
-        fontSize=s1_cfg['ours_font_size'],
-        leading=s1_cfg['ours_font_size'] * s1_cfg['ours_line_spacing'],
-        alignment=TA_CENTER,
-    )
-
-    story = [Paragraph(line.strip(), ours_style) for line in ours_text.split('\n') if line.strip()]
-
-    frame_x = x
-    frame_y = y + qr_code_size + padding
-    frame_w = w
-    frame_h = h - (qr_code_size + padding)
-    frame = Frame(frame_x, frame_y, frame_w, frame_h, topPadding=5 * mm, showBoundary=0)
-    frame.addFromList(story, c)
-
-
-# =====================================================================
-# Section 1 : Colonne LOGOS
-# =====================================================================
 
 def _draw_logos_column(c: canvas.Canvas, col_coords: tuple, logos: List[str], cfg: Config):
-    """Dessine la colonne de gauche de S1 (Logos + boîte Cucaracha)."""
     x, y, w, h = col_coords
-
-    # --- Logique de hauteur modifiée ---
     c_cfg = cfg.cucaracha_box
     content_type = c_cfg.get("content_type", "none")
 
     if content_type != "none":
-        # S'il y a du contenu, la boîte a une hauteur définie
         cucaracha_h = c_cfg.get("height_mm", 35) * mm
     else:
-        # Sinon, la boîte n'a pas de hauteur
         cucaracha_h = 0
 
-    logo_margin = 2 * mm  # Petit espace entre les deux zones
+    logo_margin = 2 * mm
     logos_h = h - cucaracha_h - logo_margin if cucaracha_h > 0 else h
 
-    # --- Définition des zones ---
     cucaracha_box_coords = (x, y, w, cucaracha_h)
     logo_zone_coords = (x, y + cucaracha_h + logo_margin if cucaracha_h > 0 else y, w, logos_h)
 
-    # --- Dessin ---
     if cucaracha_h > 0:
-        # On appelle la fonction de dessin, mais on ne dessine plus le cadre ici
         _draw_cucaracha_box(c, cucaracha_box_coords, cfg)
 
-    # Dessin des logos (le cadre autour des logos est conservé pour le debug)
     zone_x, zone_y, zone_w, zone_h = logo_zone_coords
-    c.saveState()
-    c.setStrokeColor(grey)
-    c.setLineWidth(0.5)
-    # c.rect(*logo_zone_coords)  # Cadre de debug
-    c.restoreState()
-
     if not logos or zone_h <= 0: return
 
     num_logos = len(logos)
-    cols = 2
-    rows = (num_logos + cols - 1) // cols
+    cols, rows = 2, (num_logos + 1) // 2
     if rows == 0: return
 
-    cell_w = zone_w / cols
-    cell_h = zone_h / rows
+    cell_w, cell_h = zone_w / cols, zone_h / rows
     padding = 1 * mm
 
     for i, logo_path in enumerate(logos):
         row = rows - 1 - (i // cols)
         col = i % cols
-        cell_x = zone_x + col * cell_w
-        cell_y = zone_y + row * cell_h
-
+        cell_x, cell_y = zone_x + col * cell_w, zone_y + row * cell_h
         try:
-            img = ImageReader(logo_path)
-            img_w, img_h = img.getSize()
+            # ==================== CORRECTION : GESTION DU TYPE DE CANVAS ====================
+            if isinstance(c, SVGCanvas):
+                image_to_draw = Image.open(logo_path)
+            else:
+                image_to_draw = logo_path  # Le canvas PDF gère les chemins
+
+            # On utilise ImageReader juste pour obtenir les dimensions
+            img_reader = ImageReader(logo_path)
+            img_w, img_h = img_reader.getSize()
             aspect = img_h / img_w if img_w > 0 else 1
+            # ==============================================================================
 
             w_fit = cell_w - (2 * padding)
             h_fit = w_fit * aspect
-
             if h_fit > cell_h - (2 * padding):
                 h_fit = cell_h - (2 * padding)
                 w_fit = h_fit / aspect
@@ -228,178 +193,133 @@ def _draw_logos_column(c: canvas.Canvas, col_coords: tuple, logos: List[str], cf
             logo_x = cell_x + (cell_w - w_fit) / 2
             logo_y = cell_y + (cell_h - h_fit) / 2
 
-            c.drawImage(logo_path, logo_x, logo_y, width=w_fit, height=h_fit, mask='auto')
-
+            kwargs = {'mask': 'auto'} if not isinstance(c, SVGCanvas) else {}
+            c.drawImage(image_to_draw, logo_x, logo_y, width=w_fit, height=h_fit, **kwargs)
         except Exception as e:
             print(f"[WARN] Erreur avec le logo {os.path.basename(logo_path)}: {e}")
 
 
-# =====================================================================
-# Fonctions principales de dessin (draw_s1, draw_s2_cover)
-# =====================================================================
-
 def draw_s1(c: canvas.Canvas, S1_coords, ours_text: str, logos: List[str], cfg: Config, lay: Layout):
-    """Fonction principale pour dessiner toute la Section 1."""
     register_arial()
-
-    try:
-        x, y, w, h = S1_coords.x, S1_coords.y, S1_coords.w, S1_coords.h
-    except AttributeError:
-        x, y, w, h = S1_coords['x'], S1_coords['y'], S1_coords['w'], S1_coords['h']
-
+    x, y, w, h = S1_coords.x, S1_coords.y, S1_coords.w, S1_coords.h
     split_ratio = lay.s1_split.get('logos_ratio', 0.5)
-
     logos_col_width = w * split_ratio
     ours_col_width = w - logos_col_width
-
     logos_col_coords = (x, y, logos_col_width, h)
     ours_col_coords = (x + logos_col_width, y, ours_col_width, h)
-
     _draw_logos_column(c, logos_col_coords, logos, cfg)
     _draw_ours_column(c, ours_col_coords, ours_text, cfg)
 
 
 def draw_s2_cover(c: canvas.Canvas, S2_coords, image_path: str, inner_pad: float):
-    """Dessine l'image de couverture dans la Section 2."""
-    try:
-        x, y, w, h = S2_coords.x, S2_coords.y, S2_coords.w, S2_coords.h
-    except AttributeError:
-        x, y, w, h = S2_coords['x'], S2_coords['y'], S2_coords['w'], S2_coords['h']
-
+    x, y, w, h = S2_coords.x, S2_coords.y, S2_coords.w, S2_coords.h
     if not image_path or not os.path.exists(image_path):
         c.saveState()
         c.setStrokeColor(grey)
         c.rect(x, y, w, h, stroke=1, fill=0)
-        c.setFillColor(grey)
         c.setFont("Helvetica", 12)
         c.drawCentredString(x + w / 2, y + h / 2, "(Image de couverture absente)")
         c.restoreState()
         return
 
-    c.drawImage(image_path, x, y, w, h, preserveAspectRatio=True, anchor='c')
+    # ==================== CORRECTION : GESTION DU TYPE DE CANVAS ====================
+    if isinstance(c, SVGCanvas):
+        image_to_draw = Image.open(image_path)
+    else:
+        image_to_draw = image_path
+    kwargs = {'mask': 'auto'} if not isinstance(c, SVGCanvas) else {}
+    c.drawImage(image_to_draw, x, y, w, h, preserveAspectRatio=True, anchor='c', **kwargs)
+    # ==============================================================================
 
 
 def draw_poster_logos(c: canvas.Canvas, s_coords: Section, logos: List[str]):
-    """Dessine une ligne de logos pour le poster, en assurant un espacement équitable."""
     x, y, w, h = s_coords.x, s_coords.y, s_coords.w, s_coords.h
-    if not logos or not w > 0 or not h > 0:
-        return
+    if not logos or not w > 0 or not h > 0: return
 
     num_logos = len(logos)
     cell_w = w / num_logos
-
-    # ==================== CORRECTION : Ajout d'un padding interne ====================
-    # On définit un petit espace (en points) qui sera préservé de chaque côté du logo.
-    # 2 points est une bonne valeur de départ (environ 1.5 mm).
     padding = 2
-    # ==============================================================================
 
     for i, logo_path in enumerate(logos):
         cell_x = x + i * cell_w
         try:
-            img = ImageReader(logo_path)
-            img_w, img_h = img.getSize()
-            aspect = img_h / img_w if img_w > 0 else 1
+            # ==================== CORRECTION : GESTION DU TYPE DE CANVAS ====================
+            if isinstance(c, SVGCanvas):
+                image_to_draw = Image.open(logo_path)
+            else:
+                image_to_draw = logo_path
 
-            # ==================== CORRECTION : Logique de redimensionnement ====================
-            # On calcule la boîte disponible A L'INTÉRIEUR de la cellule.
+            img_reader = ImageReader(logo_path)
+            img_w, img_h = img_reader.getSize()
+            aspect = img_h / img_w if img_w > 0 else 1
+            # ==============================================================================
+
             box_w = cell_w - (2 * padding)
             box_h = h - (2 * padding)
-
-            # On adapte d'abord à la largeur disponible
             w_fit = box_w
             h_fit = w_fit * aspect
-
-            # Si la hauteur dépasse, on adapte plutôt à la hauteur disponible
             if h_fit > box_h:
                 h_fit = box_h
                 w_fit = h_fit / aspect
-            # ===================================================================================
 
-            # Centrer le logo redimensionné DANS la cellule complète
             logo_x = cell_x + (cell_w - w_fit) / 2
             logo_y = y + (h - h_fit) / 2
 
-            c.drawImage(logo_path, logo_x, logo_y, width=w_fit, height=h_fit, mask='auto')
+            kwargs = {'mask': 'auto'} if not isinstance(c, SVGCanvas) else {}
+            c.drawImage(image_to_draw, logo_x, logo_y, width=w_fit, height=h_fit, **kwargs)
         except Exception as e:
             print(f"[WARN] Impossible de dessiner le logo du poster {os.path.basename(logo_path)}: {e}")
 
 
 def _draw_cucaracha_box(c: canvas.Canvas, box_coords: tuple, cfg: Config):
-    """
-    Dessine la boîte "Cucaracha" en fonction de la configuration.
-    """
     x, y, w, h = box_coords
     c_cfg = cfg.cucaracha_box
     content_type = c_cfg.get("content_type", "none")
     content_value = c_cfg.get("content_value", "")
+    if content_type == "none" or not content_value.strip(): return
 
-    if content_type == "none" or not content_value.strip():
-        return
-
-    # --- Titre (avec nouveau style) ---
     c.saveState()
     title = c_cfg.get("title", "Cucaracha")
-
-    # ==================== MODIFICATION DU STYLE DU TITRE ====================
-    # On ajoute underline=1 pour le soulignement
-    title_style = ParagraphStyle(
-        'CucarachaTitle',
-        fontName=c_cfg.get("title_font_name", "Arial-Italic"),  # Police italique
-        fontSize=c_cfg.get("title_font_size", 8),
-        leading=c_cfg.get("title_font_size", 8) * 1.2,
-        underline=1,  # Ajout du soulignement
-    )
-    # =======================================================================
-
+    title_style = ParagraphStyle('CucarachaTitle', fontName=c_cfg.get("title_font_name", "Arial-Italic"),
+                                 fontSize=c_cfg.get("title_font_size", 8),
+                                 leading=c_cfg.get("title_font_size", 8) * 1.2, underline=1)
     title_p = Paragraph(title, title_style)
     title_w, title_h = title_p.wrapOn(c, w - 4, h)
     title_p.drawOn(c, x + 2, y + h - title_h - 2)
     c.restoreState()
 
-    # --- Contenu (Texte ou Image) ---
     padding = 2 * mm
-    content_x = x + padding
-    content_y = y + padding
-    content_w = w - (2 * padding)
-    content_h = h - title_h - (2 * padding)
+    content_x, content_y = x + padding, y + padding
+    content_w, content_h = w - (2 * padding), h - title_h - (2 * padding)
 
     if content_type == "text":
-        # ==================== MODIFICATION DU STYLE DU TEXTE ====================
         font_name = c_cfg.get("text_font_name", "Arial")
         if c_cfg.get("text_style", "normal") == "italic":
-            # On essaie de trouver la variante italique
             try:
-                # Ceci fonctionne pour les polices standard (Arial -> Arial-Italic)
                 pdfmetrics.getFont(font_name + "-Italic")
                 font_name += "-Italic"
             except:
-                pass  # Si la variante n'existe pas, on garde la normale
-
+                pass
         align_map = {"left": TA_LEFT, "center": TA_CENTER, "right": TA_RIGHT}
         alignment = align_map.get(c_cfg.get("text_align", "center"), TA_CENTER)
-
-        text_style = ParagraphStyle(
-            'CucarachaText',
-            fontName=font_name,
-            fontSize=c_cfg.get("text_font_size", 10),
-            leading=c_cfg.get("text_font_size", 10) * 1.3,
-            alignment=alignment,
-        )
-        # =======================================================================
-
-        # On utilise un Frame pour gérer le centrage vertical
+        text_style = ParagraphStyle('CucarachaText', fontName=font_name, fontSize=c_cfg.get("text_font_size", 10),
+                                    leading=c_cfg.get("text_font_size", 10) * 1.3, alignment=alignment)
         story = [Paragraph(content_value.replace('\n', '<br/>'), text_style)]
         frame = Frame(content_x, content_y, content_w, content_h, showBoundary=0)
         frame.addFromList(story, c)
-
     elif content_type == "image":
-        # On suppose que content_value est un chemin d'accès
         if os.path.exists(content_value):
             try:
-                img = ImageReader(content_value)
-                img_w, img_h = img.getSize()
+                # ==================== CORRECTION : GESTION DU TYPE DE CANVAS ====================
+                if isinstance(c, SVGCanvas):
+                    image_to_draw = Image.open(content_value)
+                else:
+                    image_to_draw = ImageReader(content_value)
+
+                img_reader = ImageReader(content_value)
+                img_w, img_h = img_reader.getSize()
                 aspect = img_h / img_w if img_w > 0 else 1
+                # ==============================================================================
 
                 w_fit = content_w
                 h_fit = w_fit * aspect
@@ -409,6 +329,8 @@ def _draw_cucaracha_box(c: canvas.Canvas, box_coords: tuple, cfg: Config):
 
                 logo_x = content_x + (content_w - w_fit) / 2
                 logo_y = content_y + (content_h - h_fit) / 2
-                c.drawImage(img, logo_x, logo_y, width=w_fit, height=h_fit, mask='auto')
+
+                kwargs = {'mask': 'auto'} if not isinstance(c, SVGCanvas) else {}
+                c.drawImage(image_to_draw, logo_x, logo_y, width=w_fit, height=h_fit, **kwargs)
             except Exception as e:
                 print(f"[WARN] Erreur avec l'image de la Cucaracha Box : {e}")

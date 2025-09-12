@@ -73,7 +73,7 @@ bullet_text_indent: 1       # Position de la puce par rapport au texte (négatif
 
 # Date box (bloc)
 date_box:
-  enabled: true
+  enabled: false
   padding: 3
   border_width: 0
   border_color: "#000000"

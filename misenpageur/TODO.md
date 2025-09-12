@@ -4,7 +4,6 @@
 - [x] Workflow global. csv/xls/xlsx (biduleur) -> pdf (misenpageur)
 - [x] Infos couv (flag couv/no couv, nom dessinat.eur.rice + hyperlink) (cli)
 - [x] Redimensionnement éventuel de l'image de couv.
-- [x] Intégration Scribus
 - [x] Amélioration display dates
 - [x] Config cucarcaha
 - [x] Config ours v1
@@ -15,7 +14,6 @@
 - [x] Config cucaracha v1
 - [x] Config cucaracha v2: pouvoir ajouter image pour additional box
 - [x] Config qr code
-- [ ] Revoir création fichier scribus.py
 - [x] Poster (page 3).
 - [ ] Qualité pdf. - convert_image affecte qualité ?
 - [ ] Unit tests.
@@ -29,8 +27,9 @@
 - [ ] Solution algorithme de "packing" (ou "bin packing") pour une répartition plus fluide des logos.
 - [ ] Générer 2 pdfs en sortie, un pour impression et un pdf pour version digitale (avec ou sans hyperlink) (ajouter à bidul.gui).
 - [ ] Intégration du workflow dans page admin de wordpress.
-- [x] Options d’hyphénation pour rendre des strings insécables
-- - [ ] Fichier .sla comme argument dans cli
+- [x] Options d’hyphénation pour rendre des strings insécables.
+- [ ] Enlever toutes les références `SVGCanvas` dans `draw_logic` et `drawing`.
+
 
 
 ## Documentation

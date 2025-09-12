@@ -1,58 +1,27 @@
+# misenpageur/main.py
 # -*- coding: utf-8 -*-
-"""
-misenpageur.main
-----------------
-Entrée CLI pour :
-- Générer le PDF (ReportLab) à partir d'un HTML + config + layout
-
-Exemples :
-    python misenpageur/main.py --root . --config misenpageur/config.yml --layout misenpageur/layout.yml \
-        --out misenpageur/output/bidul.pdf \
-"""
 from __future__ import annotations
-
 import argparse
 from pathlib import Path
 import sys
+import os
 
-# --- bootstrap & config path ---
-import os, sys, argparse
-from pathlib import Path
-
-THIS_DIR = Path(__file__).resolve().parent      # .../bidul/misenpageur
-REPO_ROOT = THIS_DIR.parent                     # .../bidul
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
-
-parser = argparse.ArgumentParser()
-parser.add_argument("-c", "--config", default=None,
-                    help="Chemin vers config.yml (par défaut: misenpageur/config.yml)")
-args, _ = parser.parse_known_args()
-
-# Par défaut: config.yml au niveau du module misenpageur
-if args.config is None:
-    cfg_path = THIS_DIR / "config.yml"
-else:
-    p = Path(args.config)
-    cfg_path = p if p.is_absolute() else (Path.cwd() / p)
-
-if not cfg_path.exists():
-    sys.exit(f"[ERR] config.yml introuvable: {cfg_path}")
-# --- fin bootstrap & config path ---
 
 # API internes
 # Imports robustes (exécution depuis la racine OU depuis le dossier misenpageur)
 try:
-    # cas: exécuté depuis la racine du repo (bidul/)
     from misenpageur.misenpageur.config import Config
     from misenpageur.misenpageur.layout import Layout
     from misenpageur.misenpageur.pdfbuild import build_pdf
-except ModuleNotFoundError:
-    # cas: exécuté depuis le dossier misenpageur/
+    from misenpageur.misenpageur.svgbuild import build_svg
+    from misenpageur.misenpageur.layout_builder import build_layout_with_margins
+except (ModuleNotFoundError, ImportError):
+    # Fallback
     from misenpageur.config import Config
     from misenpageur.layout import Layout
     from misenpageur.pdfbuild import build_pdf
-
+    from misenpageur.svgbuild import build_svg
+    from misenpageur.layout_builder import build_layout_with_margins
 
 def make_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
@@ -65,8 +34,10 @@ def make_parser() -> argparse.ArgumentParser:
     p.add_argument("--layout", default="misenpageur/layout.yml",   help="Chemin du fichier de layout YAML")
 
     # Sortie PDF (défaut identique à l'ancien parse_args)
-    p.add_argument("--out",    default="misenpageur/bidul/bidul_cli.pdf",
+    p.add_argument("--out", default="misenpageur/bidul/bidul_cli.pdf",
                    help="Chemin de sortie PDF (écrase output_pdf du config si fourni)")
+    p.add_argument("--svg", default="misenpageur/bidul/bidul_cli.svg",
+                   help="Chemin de sortie pour un SVG éditable (optionnel)")
 
     # Overrides utiles (pas de défaut => opt-in)
     p.add_argument("--html",   help="Forcer le chemin du HTML d'entrée (sinon cfg.input_html)")
@@ -82,16 +53,14 @@ def make_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = make_parser().parse_args(argv)
 
-    root = Path(args.root).resolve()
-    cfg_path = Path(args.config).resolve()
-    base_layout_path = Path(args.layout).resolve()
+    # On utilise l'argument --root de la CLI comme base
+    project_root = Path(args.root).resolve()
 
-    if not cfg_path.exists():
-        print("[ERR] config.yml introuvable:", cfg_path)
-        return 2
-    if not base_layout_path.exists():
-        print("[ERR] layout.yml introuvable:", base_layout_path)
-        return 2
+    cfg_path = project_root / args.config
+    base_layout_path = project_root / args.layout
+
+    if not cfg_path.exists(): print(f"[ERR] config.yml introuvable: {cfg_path}"); return 2
+    if not base_layout_path.exists(): print(f"[ERR] layout.yml introuvable: {base_layout_path}"); return 2
 
     from misenpageur.misenpageur.config import Config
     from misenpageur.misenpageur.pdfbuild import build_pdf
@@ -99,15 +68,18 @@ def main(argv: list[str] | None = None) -> int:
     from misenpageur.misenpageur.layout_builder import build_layout_with_margins
 
     # Charger configuration + layout
+    final_layout_path = None
+
+    import traceback
+
+    final_layout_path = None
     try:
         cfg = Config.from_yaml(str(cfg_path))
-        # Construire le layout final avec les marges de la config
         final_layout_path = build_layout_with_margins(str(base_layout_path), cfg)
-        # Charger le layout depuis ce nouveau fichier temporaire
         lay = Layout.from_yaml(final_layout_path)
-        project_root = str(cfg_path.parent)  # <-- racine des chemins relatifs
     except Exception as e:
-        print("[ERR] Lecture config/layout :", e)
+        print(f"[ERR] Lecture config/layout : {e}")
+        traceback.print_exc()
         return 2
 
     try:
@@ -124,8 +96,8 @@ def main(argv: list[str] | None = None) -> int:
         if args.auteur_couv != "":     cfg.auteur_couv = args.auteur_couv
         if args.auteur_couv_url != "": cfg.auteur_couv_url = args.auteur_couv_url
 
-        if not args.out:
-            print("[ERR] --out est requis pour générer le PDF.")
+        if not args.out and not args.svg:
+            print("[ERR] Au moins une sortie (--out pour le PDF ou --svg) est requise.")
             return 2
 
         # Générer le PDF
@@ -138,10 +110,19 @@ def main(argv: list[str] | None = None) -> int:
         import traceback
 
         try:
-            report = build_pdf(str(root), cfg, lay, str(out_pdf))
-            print("[OK] PDF généré :", out_pdf)
-            if isinstance(report, dict) and report.get("unused_paragraphs"):
-                print("[WARN]", report["unused_paragraphs"], "paragraphes non placés")
+            # --- Générer le PDF ---
+            out_pdf = Path(args.out).resolve()
+            out_pdf.parent.mkdir(parents=True, exist_ok=True)
+            cfg.output_pdf = str(out_pdf)
+            # On passe le project_root
+            build_pdf(str(project_root), cfg, lay, str(out_pdf))
+
+            # --- Générer le SVG (si demandé) ---
+            if args.svg:
+                out_svg = Path(args.svg).resolve()
+                out_svg.parent.mkdir(parents=True, exist_ok=True)
+                # On passe le project_root
+                build_svg(str(project_root), cfg, lay, str(out_svg))
         except Exception as e:
             print("[ERR] Échec build PDF :", e)
             traceback.print_exc()
@@ -149,9 +130,11 @@ def main(argv: list[str] | None = None) -> int:
 
     finally:
         # --- Ce bloc s'exécute toujours, même en cas d'erreur ---
-        if os.path.exists(final_layout_path):
-            os.remove(final_layout_path)
-            print(f"[INFO] Fichier de layout temporaire supprimé : {final_layout_path}")
+        if final_layout_path and os.path.exists(final_layout_path):
+            try:
+                os.remove(final_layout_path)
+            except OSError:
+                pass
 
     return 0
 

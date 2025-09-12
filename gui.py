@@ -17,6 +17,7 @@ try:
     from misenpageur.misenpageur.config import Config
     from misenpageur.misenpageur.layout import Layout
     from misenpageur.misenpageur.pdfbuild import build_pdf
+    from misenpageur.misenpageur.svgbuild import build_svg
     from misenpageur.misenpageur.layout_builder import build_layout_with_margins
 except Exception as e:
     _IMPORT_ERR = e
@@ -32,6 +33,7 @@ def _default_paths_from_input(input_file: str) -> dict:
         "html": os.path.join(folder, f"{base}.html"),
         "agenda_html": os.path.join(folder, f"{base}.agenda.html"),
         "pdf": os.path.join(folder, f"{base}.pdf"),
+        "svg": os.path.join(folder, f"{base}.svg"),
     }
 
 
@@ -116,6 +118,7 @@ def run_pipeline(input_file: str,
                  generate_cover: bool, cover_image: str, ours_md: str, logos_dir: str,
                  out_html: str, out_agenda_html: str, out_pdf: str,
                  auteur_couv: str, auteur_couv_url: str, page_margin_mm: float,
+                 generate_svg: bool, out_svg: str,
                  date_separator_type: str, date_spacing: float,
                  poster_design: int, font_size_safety_factor: float,
                  background_alpha: float, poster_title: str,
@@ -172,7 +175,7 @@ def run_pipeline(input_file: str,
         final_layout_path = build_layout_with_margins(lay_path, cfg)
         lay = Layout.from_yaml(final_layout_path)
 
-        build_pdf(project_root, cfg, lay, cfg.output_pdf)
+        build_pdf(cfg, lay, out_pdf, cfg_path)
 
         summary_lines = [
             f"HTML            : {out_html}",
@@ -181,6 +184,11 @@ def run_pipeline(input_file: str,
             # ... (autres lignes de résumé) ...
             f"\nÉvénements : {number_of_lines}",
         ]
+
+        if generate_svg and out_svg:
+            build_svg(cfg, lay, out_svg, cfg_path)
+            summary_lines.append(f"SVG (éditable) : {out_svg}")
+
         return True, "\n".join(summary_lines)
 
     except Exception as e:
@@ -240,6 +248,8 @@ def main():
     html_var = tk.StringVar()
     agenda_var = tk.StringVar()
     pdf_var = tk.StringVar()
+    generate_svg_var = tk.BooleanVar(value=True)
+    svg_var = tk.StringVar()
 
     # --- Helpers (inchangés) ---
     def pick_input():
@@ -250,7 +260,8 @@ def main():
         d = _default_paths_from_input(file_path)
         html_var.set(d["html"]);
         agenda_var.set(d["agenda_html"]);
-        pdf_var.set(d["pdf"]);
+        pdf_var.set(d["pdf"])
+        svg_var.set(d["svg"])
 
     def pick_cover():
         path = filedialog.askopenfilename(title="Image de couverture",
@@ -413,21 +424,11 @@ def main():
     layout_frame.grid(row=r, column=0, columnspan=3, sticky="ew", pady=10)
     layout_frame.columnconfigure(1, weight=1)
 
-    # --- On retire les anciens widgets d'ici ---
-    # Ligne 0
-    tk.Label(layout_frame, text="Titre du poster :").grid(row=0, column=0, sticky="w", padx=5, pady=5)
-    tk.Entry(layout_frame, textvariable=poster_title_var).grid(row=0, column=1, sticky="ew", padx=5, pady=5)
-
-    # Ligne 1
-    tk.Label(layout_frame, text="Design du poster :").grid(row=1, column=0, sticky="w", padx=5, pady=5)
-    design_frame = ttk.Frame(layout_frame)
-    design_frame.grid(row=1, column=1, sticky="w", padx=5, pady=5)
-
-    # --- Ligne 2 ---
+    # --- Ligne 1 ---
     tk.Label(layout_frame, text="Titre du poster :").grid(row=2, column=0, sticky="w", padx=5, pady=5)
     tk.Entry(layout_frame, textvariable=poster_title_var).grid(row=2, column=1, sticky="ew", padx=5, pady=5)
 
-    # --- Ligne 3 ---
+    # --- Ligne 2 ---
     tk.Label(layout_frame, text="Design du poster :").grid(row=3, column=0, sticky="w", padx=5, pady=5)
     design_frame = ttk.Frame(layout_frame)
     design_frame.grid(row=3, column=1, sticky="w", padx=5, pady=5)
@@ -486,6 +487,19 @@ def main():
     tk.Button(output_frame, text="…", width=3,
               command=lambda: pick_save(pdf_var, "PDF", ".pdf", [("PDF", "*.pdf")])).grid(row=2, column=2, padx=5,
                                                                                           pady=5)
+    tk.Checkbutton(output_frame, text="Générer un SVG éditable (pour Inkscape)", variable=generate_svg_var).grid(row=3,
+                                                                                                                 column=0,
+                                                                                                                 columnspan=3,
+                                                                                                                 sticky="w",
+                                                                                                                 padx=5,
+                                                                                                                 pady=5)
+
+    tk.Label(output_frame, text="Sortie SVG :").grid(row=4, column=0, sticky="e", padx=5, pady=5)
+    tk.Entry(output_frame, textvariable=svg_var).grid(row=4, column=1, sticky="ew", padx=5, pady=5)
+    tk.Button(output_frame, text="…", width=3,
+              command=lambda: pick_save(svg_var, "Enregistrer le SVG", ".svg", [("SVG", "*.svg")])).grid(row=4,
+                                                                                                         column=2,
+                                                                                                         padx=5, pady=5)
 
     # --- Status & action ---
     status = tk.StringVar(value="Prêt.")
@@ -536,7 +550,9 @@ def main():
             poster_title=poster_title,
             cucaracha_type=cucaracha_type_var.get(),
             cucaracha_value=cuca_value,
-            cucaracha_text_font=cucaracha_font_var.get()
+            cucaracha_text_font=cucaracha_font_var.get(),
+            generate_svg=generate_svg_var.get(),
+            out_svg=svg_var.get().strip()
         )
         if ok:
             messagebox.showinfo("Succès", msg)
