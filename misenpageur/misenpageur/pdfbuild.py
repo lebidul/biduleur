@@ -365,7 +365,6 @@ def _read_bullet_config(cfg: Config) -> BulletConfig:
         bullet_text_indent=cfg.bullet_text_indent
     )
 
-
 def _read_poster_config(cfg: Config) -> PosterConfig:
     block = cfg.poster
     return PosterConfig(
@@ -379,7 +378,9 @@ def _read_poster_config(cfg: Config) -> PosterConfig:
         font_size_min=float(block.get("font_size_min", 6.0)),
         font_size_max=float(block.get("font_size_max", 10.0)),
         font_size_safety_factor=float(block.get("font_size_safety_factor", 0.98)),
-        background_image_alpha = float(block.get("background_image_alpha", 0.85))
+        background_image_alpha = float(block.get("background_image_alpha", 0.85)),
+        date_spaceBefore=float(block.get("date_spaceBefore", 2.0)),
+        date_spaceAfter=float(block.get("date_spaceAfter", 2.0))
     )
 
 
@@ -621,8 +622,8 @@ def build_pdf(project_root: str, cfg: Config, layout: Layout, out_path: str) -> 
 
             if measure_poster_fit_at_fs(
                 c, poster_frames, poster_paras,
-                cfg.font_name, mid, cfg.leading_ratio,
-                bullet_cfg, poster_cfg
+                cfg.font_name, mid, cfg.leading_ratio, bullet_cfg,
+                poster_cfg  # On passe la configuration du poster
             ):
                 best_fs_poster, lo = mid, mid
             else:
@@ -633,7 +634,8 @@ def build_pdf(project_root: str, cfg: Config, layout: Layout, out_path: str) -> 
         final_fs_poster = best_fs_poster * poster_cfg.font_size_safety_factor
         draw_poster_text_in_frames(
             c, poster_frames, poster_paras,
-            cfg.font_name, final_fs_poster, cfg.leading_ratio, bullet_cfg
+            cfg.font_name, final_fs_poster, cfg.leading_ratio, bullet_cfg,
+            poster_cfg  # On passe la configuration du poster
         )
 
     c.save()

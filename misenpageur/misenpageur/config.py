@@ -28,6 +28,8 @@ class PosterConfig:
     background_image_alpha: float = 0.85
     date_spaceBefore: float = 2.0
     date_spaceAfter: float = 2.0
+    date_spaceBefore: float = 2.0
+    date_spaceAfter: float = 2.0
 
 @dataclass
 class Config:

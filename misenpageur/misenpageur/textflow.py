@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import List, Tuple, Optional
 
 from reportlab.pdfgen import canvas
-from reportlab.platypus import Paragraph, Frame
+from reportlab.platypus import Paragraph, Frame, Spacer
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.colors import HexColor
 from reportlab.lib.enums import TA_JUSTIFY
@@ -280,8 +280,12 @@ def measure_poster_fit_at_fs(
         c: canvas.Canvas, frames: List[Section], paras_text: List[str],
         font_name: str, font_size: float, leading_ratio: float,
         bullet_cfg: BulletConfig,
-        poster_cfg: PosterConfig  # On importe PosterConfig
+        poster_cfg: PosterConfig  # Nouvel argument
 ) -> bool:
+    """
+    Simule le remplissage des cadres en calculant la hauteur de chaque paragraphe,
+    en incluant l'espacement spécifique du poster pour les dates.
+    """
     base_style = paragraph_style(font_name, font_size, leading_ratio)
     para_idx = 0
     num_paras = len(paras_text)
@@ -294,10 +298,14 @@ def measure_poster_fit_at_fs(
             st = _mk_style_for_kind(base_style, kind, bullet_cfg, DateBoxConfig())
             txt, bullet = _mk_text_for_kind(raw, kind, bullet_cfg)
             p = Paragraph(txt, st, bulletText=bullet)
+
             _w, p_h = p.wrapOn(c, section.w, section.h)
 
+            # ==================== LA CORRECTION EST ICI ====================
+            # Si c'est une date, on ajoute l'espacement du poster au calcul
             if kind == "DATE":
                 p_h += poster_cfg.date_spaceBefore + poster_cfg.date_spaceAfter
+            # =============================================================
 
             if p_h <= remaining_height:
                 remaining_height -= p_h
@@ -308,18 +316,33 @@ def measure_poster_fit_at_fs(
 
 
 def draw_poster_text_in_frames(
-    c: canvas.Canvas, frames: List[Section], paras_text: List[str],
-    font_name: str, font_size: float, leading_ratio: float,
-    bullet_cfg: BulletConfig
+        c: canvas.Canvas, frames: List[Section], paras_text: List[str],
+        font_name: str, font_size: float, leading_ratio: float,
+        bullet_cfg: BulletConfig,
+        poster_cfg: PosterConfig  # Nouvel argument
 ):
-    """Dessine le texte dans une série de cadres."""
+    """
+    Dessine le texte dans une série de cadres, en insérant des espaces
+    verticaux (Spacers) avant et après les dates.
+    """
     base_style = paragraph_style(font_name, font_size, leading_ratio)
     story = []
     for raw in paras_text:
         kind = "EVENT" if _is_event(raw) else "DATE"
         st = _mk_style_for_kind(base_style, kind, bullet_cfg, DateBoxConfig())
         txt, bullet = _mk_text_for_kind(raw, kind, bullet_cfg)
+
+        # ==================== LA CORRECTION EST ICI ====================
+        # Si c'est une date, on ajoute des objets Spacer à la story
+        if kind == "DATE":
+            story.append(Spacer(1, poster_cfg.date_spaceBefore))
+
         story.append(Paragraph(txt, st, bulletText=bullet))
+
+        if kind == "DATE":
+            story.append(Spacer(1, poster_cfg.date_spaceAfter))
+        # =============================================================
+
     for section in frames:
         if not story: break
         frame = Frame(section.x, section.y, section.w, section.h, showBoundary=0)
