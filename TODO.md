@@ -11,6 +11,7 @@
 
 ## Priorité Moyenne
 - [ ] Ajout helpers.
+- [ ] GUI qui génère une preview dynamiquement et ensuite propose de sauver le pdf (voir ).
 - [ ] Refactor dans dossier bidul.biduleur/bidul.
 - [ ] Effet succès solitaire.
 
