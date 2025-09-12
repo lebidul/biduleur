@@ -490,7 +490,7 @@ def main():
     tk.Button(output_frame, text="…", width=3,
               command=lambda: pick_save(pdf_var, "PDF", ".pdf", [("PDF", "*.pdf")])).grid(row=2, column=2, padx=5,
                                                                                           pady=5)
-    tk.Checkbutton(output_frame, text="Générer un SVG éditable (pour Inkscape)", variable=generate_svg_var).grid(row=3,
+    tk.Checkbutton(output_frame, text="GNom de base SVG (pour Inkscape) :", variable=generate_svg_var).grid(row=3,
                                                                                                                  column=0,
                                                                                                                  columnspan=3,
                                                                                                                  sticky="w",
