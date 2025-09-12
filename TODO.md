@@ -14,6 +14,7 @@
 - [ ] GUI qui génère une preview dynamiquement et ensuite propose de sauver le pdf (voir ).
 - [ ] Refactor dans dossier bidul.biduleur/bidul.
 - [ ] Effet succès solitaire.
+- [ ] Progress bar.
 
 ## Documentation
 - [ ] Rédiger un guide utilisateur pour expliquer comment utiliser le module.

@@ -38,13 +38,13 @@ def _embed_resources_in_svg(svg_path: Path):
         if href and not href.startswith('data:'):
             image_path = svg_path.parent / href
             if image_path.exists():
-                with open(image_path, "rb") as f:
-                    encoded = base64.b64encode(f.read()).decode('utf-8')
+                # with open(image_path, "rb") as f:
+                #     encoded = base64.b64encode(f.read()).decode('utf-8')
 
                 ext = image_path.suffix.lower().replace('.', '')
                 if ext == "jpg": ext = "jpeg"  # MIME type correct
 
-                image_tag.set('{http://www.w3.org/1999/xlink}href', f"data:image/{ext};base64,{encoded}")
+                # image_tag.set('{http://www.w3.org/1999/xlink}href', f"data:image/{ext};base64,{encoded}")
 
     # 2. Intégrer les polices (via les @font-face dans <style>)
     for style_tag in root.xpath('//svg:style', namespaces=ns):
@@ -91,7 +91,12 @@ def build_svg(project_root: str, cfg: Config, layout: Layout, out_path: str, con
         # pdf2svg_executable = "pdf2svg"
         pdf2svg_executable = r"C:\Program Files\pdf2svg\pdf2svg.exe"
 
-        command = [pdf2svg_executable, "-o", str(output_dir), "--prefix", output_prefix, temp_pdf_path]
+        command = [
+            pdf2svg_executable,
+            "-o", str(output_dir),
+            "--prefix", output_prefix,
+            "--preserve_fontnames",
+            temp_pdf_path]
 
         print(f"[INFO] Lancement de la conversion SVG avec la commande : {' '.join(command)}")
         result = subprocess.run(command, capture_output=True, text=True, check=True)
