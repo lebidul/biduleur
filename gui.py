@@ -46,18 +46,19 @@ def _project_defaults() -> dict:
 
 
 def _load_cfg_defaults() -> dict:
-    """Lit quelques valeurs par défaut depuis config.yml (si possible)."""
-    # Dictionaire de sortie avec des valeurs par défaut saines
     out = {
         "cover": "", "ours_md": "", "logos_dir": "", "auteur_couv": "",
         "auteur_couv_url": "", "skip_cover": False,
         "page_margin_mm": 1.0,
-        "date_line_enabled": True,  # Valeur par défaut
+        "date_separator_type": "ligne", # Nouveau : "aucun", "ligne", "box"
+        "date_spacing": "4", # Nouveau
         "poster_design": 0,
         "font_size_safety_factor": 0.98,
         "background_alpha": 0.85,
+        "poster_title": "",
         "cucaracha_type": "none",
-        "cucaracha_value": ""
+        "cucaracha_value": "",
+        "cucaracha_text_font": "Arial"
     }
 
     if _IMPORT_ERR:
@@ -74,6 +75,14 @@ def _load_cfg_defaults() -> dict:
         out["auteur_couv"] = getattr(cfg, "auteur_couv", "") or ""
         out["auteur_couv_url"] = getattr(cfg, "auteur_couv_url", "") or ""
         out["skip_cover"] = getattr(cfg, "skip_cover", False)
+
+        out["date_spacing"] = str(cfg.date_spaceBefore) # On suppose que Before et After sont identiques
+        if cfg.date_line.get("enabled", True):
+            out["date_separator_type"] = "ligne"
+        elif cfg.date_box.get("enabled", False):
+            out["date_separator_type"] = "box"
+        else:
+            out["date_separator_type"] = "aucun"
 
         # On s'assure de lire les clés imbriquées correctement
         if isinstance(cfg.pdf_layout, dict):
@@ -107,26 +116,14 @@ def _ensure_parent_dir(path: str):
 
 
 def run_pipeline(input_file: str,
-                generate_cover: bool,
-                cover_image: str,
-                ours_md: str,
-                logos_dir: str,
-                out_html: str,
-                out_agenda_html: str,
-                out_pdf: str,
-                out_scribus_py: str,
-                auteur_couv: str,
-                auteur_couv_url: str,
-                page_margin_mm: float,
-                date_line_enabled: bool,
-                poster_design: int,
-                font_size_safety_factor: float,
-                background_alpha: float,
-                poster_title: str,
-                cucaracha_type: str, # Nouvel argument
-                cucaracha_value: str,
-                cucaracha_text_font: str
-                ) -> tuple[bool, str]:
+                 generate_cover: bool, cover_image: str, ours_md: str, logos_dir: str,
+                 out_html: str, out_agenda_html: str, out_pdf: str, out_scribus_py: str,
+                 auteur_couv: str, auteur_couv_url: str, page_margin_mm: float,
+                 date_separator_type: str, date_spacing: float,
+                 poster_design: int, font_size_safety_factor: float,
+                 background_alpha: float, poster_title: str,
+                 cucaracha_type: str, cucaracha_value: str, cucaracha_text_font: str
+                 ) -> tuple[bool, str]:
     """
     Enchaîne : XLS/CSV -> (biduleur) -> 2 HTML -> (misenpageur) -> PDF (+ Scribus optionnel)
     """
@@ -159,7 +156,11 @@ def run_pipeline(input_file: str,
 
         # Paramètres de mise en page
         cfg.pdf_layout['page_margin_mm'] = page_margin_mm
-        cfg.date_line['enabled'] = date_line_enabled
+
+        # Paramètres de séparateurs de dates
+        cfg.date_box['enabled'] = (date_separator_type == "box")
+        cfg.date_spaceBefore = date_spacing
+        cfg.date_spaceAfter = date_spacing
 
         # Nouveaux paramètres du poster
         cfg.poster['design'] = poster_design
@@ -227,7 +228,10 @@ def main():
 
     # Mise en page
     margin_var = tk.StringVar(value=str(cfg_defaults.get("page_margin_mm", "1.0")))
-    date_line_var = tk.BooleanVar(value=cfg_defaults.get("date_line_enabled", True))
+
+    # Séaparateurs de dates
+    date_separator_var = tk.StringVar(value=cfg_defaults.get("date_separator_type", "ligne"))
+    date_spacing_var = tk.StringVar(value=cfg_defaults.get("date_spacing", "4"))
 
     # Design du poster
     poster_design_var = tk.IntVar(value=cfg_defaults.get("poster", {}).get("design", 0))  # 0 ou 1
@@ -393,23 +397,41 @@ def main():
     tk.Label(cover_frame, text="URL auteur couverture :").grid(row=3, column=0, sticky="e", padx=5, pady=5)
     tk.Entry(cover_frame, textvariable=auteur_url_var).grid(row=3, column=1, columnspan=2, sticky="ew", padx=5, pady=5)
 
-    # --- Section : Paramètres de mise en page ---
+    # ====================================================================================
+    #                  NOUVELLE SECTION : Séparateur de dates
+    # ====================================================================================
     r += 1
-    layout_frame = ttk.LabelFrame(main_frame, text="Paramètres de mise en page", padding="10")
+    date_sep_frame = ttk.LabelFrame(main_frame, text="Séparateur de dates", padding="10")
+    date_sep_frame.grid(row=r, column=0, columnspan=3, sticky="ew", pady=10)
+    date_sep_frame.columnconfigure(1, weight=1)
+
+    # --- Ligne 0 : Type de séparateur ---
+    tk.Label(date_sep_frame, text="Type de séparateur :").grid(row=0, column=0, sticky="w", padx=5, pady=5)
+    date_sep_radios = ttk.Frame(date_sep_frame)
+    date_sep_radios.grid(row=0, column=1, sticky="w", padx=5, pady=5)
+    tk.Radiobutton(date_sep_radios, text="Aucun", variable=date_separator_var, value="aucun").pack(side=tk.LEFT)
+    tk.Radiobutton(date_sep_radios, text="Ligne", variable=date_separator_var, value="ligne").pack(side=tk.LEFT, padx=10)
+    tk.Radiobutton(date_sep_radios, text="Box", variable=date_separator_var, value="box").pack(side=tk.LEFT)
+
+    # --- Ligne 1 : Espacement ---
+    tk.Label(date_sep_frame, text="Espace avant/après date (pt) :").grid(row=1, column=0, sticky="w", padx=5, pady=5)
+    tk.Entry(date_sep_frame, textvariable=date_spacing_var, width=10).grid(row=1, column=1, sticky="w", padx=5, pady=5)
+
+    # --- Section : Paramètres de mise en page du poster ---
+    r += 1
+    layout_frame = ttk.LabelFrame(main_frame, text="Paramètres de mise en page (Poster)", padding="10")
     layout_frame.grid(row=r, column=0, columnspan=3, sticky="ew", pady=10)
     layout_frame.columnconfigure(1, weight=1)
 
-    # --- Ligne 0 ---
-    tk.Label(layout_frame, text="Marge globale (mm) :").grid(row=0, column=0, sticky="w", padx=5, pady=5)
-    tk.Entry(layout_frame, textvariable=margin_var, width=10).grid(row=0, column=1, sticky="w", padx=5, pady=5)
+    # --- On retire les anciens widgets d'ici ---
+    # Ligne 0
+    tk.Label(layout_frame, text="Titre du poster :").grid(row=0, column=0, sticky="w", padx=5, pady=5)
+    tk.Entry(layout_frame, textvariable=poster_title_var).grid(row=0, column=1, sticky="ew", padx=5, pady=5)
 
-    # --- Ligne 1 ---
-    tk.Checkbutton(layout_frame, text="Dessiner lignes de séparation de dates", variable=date_line_var).grid(row=1,
-                                                                                                             column=0,
-                                                                                                             columnspan=2,
-                                                                                                             sticky="w",
-                                                                                                             padx=5,
-                                                                                                             pady=5)
+    # Ligne 1
+    tk.Label(layout_frame, text="Design du poster :").grid(row=1, column=0, sticky="w", padx=5, pady=5)
+    design_frame = ttk.Frame(layout_frame)
+    design_frame.grid(row=1, column=1, sticky="w", padx=5, pady=5)
 
     # --- Ligne 2 ---
     tk.Label(layout_frame, text="Titre du poster :").grid(row=2, column=0, sticky="w", padx=5, pady=5)
@@ -494,9 +516,10 @@ def main():
         try:
             margin_val = float(margin_var.get().strip().replace(',', '.'))
             safety_factor_val = float(safety_factor_var.get().strip().replace(',', '.'))
+            date_spacing_val = float(date_spacing_var.get().strip().replace(',', '.'))
         except ValueError:
             messagebox.showerror("Erreur",
-                                 "La marge et le facteur de sécurité doivent être des nombres valides (ex: 1.0).")
+                                 "La marge, l'espacement et le facteur de sécurité doivent être des nombres valides.")
             return
 
         poster_title = poster_title_var.get().strip()
@@ -523,7 +546,8 @@ def main():
             auteur_couv=auteur_var.get().strip(),
             auteur_couv_url=auteur_url_var.get().strip(),
             page_margin_mm=margin_val,
-            date_line_enabled=date_line_var.get(),
+            date_separator_type=date_separator_var.get(),
+            date_spacing=date_spacing_val,
             poster_design=poster_design_var.get(),
             font_size_safety_factor=safety_factor_val,
             background_alpha=alpha_var.get(),

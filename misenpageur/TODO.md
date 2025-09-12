@@ -7,7 +7,7 @@
 - [x] Intégration Scribus
 - [x] Amélioration display dates
 - [ ] Fichier .sla comme argument dans cli
-- [ ] Config cucarcaha
+- [x] Config cucarcaha
 - [x] Config ours v1
 - [ ] Config ours v2 - lecture as .md
 - [ ] Config ours v2 - icones
@@ -25,10 +25,12 @@
 ## Priorité Moyenne
 - [x] Amélioration lisibilité finale (ex. caractère de bullet point comme paramètre, cadre pour date)
 - [x] Amélioration lisibilité v2 (ex. ligne pour dates).
+- [ ] Réduire espace puce premier caractère event.
+- [ ] Réduire taille de la puce par rapport font-Size.
 - [ ] Solution algorithme de "packing" (ou "bin packing") pour une répartition plus fluide des logos.
 - [ ] Générer 2 pdfs en sortie, un pour impression et un pdf pour version digitale (avec ou sans hyperlink) (ajouter à bidul.gui).
 - [ ] Intégration du workflow dans page admin de wordpress.
-- [ ] Options d’hyphénation pour rendre des strings insécables
+- [x] Options d’hyphénation pour rendre des strings insécables
 
 
 ## Documentation
