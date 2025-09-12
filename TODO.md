@@ -7,11 +7,12 @@
 - [x] Fichier release notes
 - [ ] Build release process.
 - [x] Icône.
+- [ ] Tester svg outputs avec différents types de paramètres pour le bidul pour voir si on a besoin d'ajustement.
 - [ ] Unit tests.
 
 ## Priorité Moyenne
 - [ ] Ajout helpers.
-- [ ] GUI qui génère une preview dynamiquement et ensuite propose de sauver le pdf (voir ).
+- [ ] GUI qui génère une preview dynamiquement et ensuite propose de sauver le pdf (voir notes_ia/googleAIStudio.solutionGUIdynamique.md).
 - [ ] Refactor dans dossier bidul.biduleur/bidul.
 - [ ] Effet succès solitaire.
 - [ ] Progress bar.
