@@ -73,7 +73,7 @@ def _mk_text_for_kind(
             # On ajoute des espaces (insécables) APRÈS la puce.
             # C'est cela qui va créer la distance visuelle fixe.
             bullet_char = bullet_cfg.event_bullet_replacement or "❑"
-            bullet_char = bullet_cfg.event_bullet_replacement or "■"
+            # bullet_char = bullet_cfg.event_bullet_replacement or "■"
             bullet_text = f"{bullet_char}"  # Puce (possibilité d'ajouter des) espaces insécables)
             # bullet_text = f"{bullet_char}"
 
