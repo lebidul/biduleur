@@ -504,6 +504,19 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
     )
     report["unused_paragraphs"] = len(rest_after_p1)
 
+
+    def count_events(para_list: List[str]) -> int:
+        return sum(1 for p in para_list if _is_event(p))
+
+    # On compte les événements pour les pages 1 et 2
+    events_p1 = count_events(s3_full) + count_events(s4_full)
+    events_p2 = count_events(s5_full) + count_events(s6_full)
+
+    # Le poster (page 3) contient tous les événements
+    events_p3 = events_p1 + events_p2
+
+    report["event_counts_per_page"] = {1: events_p1, 2: events_p2, 3: events_p3}
+
     # --- RENDU PAGE 1 & 2 ---
     draw_s1(c, S["S1"], ours_text, logos, cfg, layout)
     if not cfg.skip_cover:

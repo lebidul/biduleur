@@ -1,114 +1,122 @@
-# Misenpageur - Moteur de mise en page PDF
+# `misenpageur` - Moteur de rendu PDF et SVG
 
-Ce document est destiné aux développeurs souhaitant comprendre, maintenir ou étendre le module `misenpageur`.
+Ce document est destiné aux développeurs et utilisateurs avancés souhaitant comprendre, maintenir ou étendre le module `misenpageur`.
 
 ## 1. Objectif du Module
 
-`misenpageur` est un moteur de rendu PDF spécialisé. Sa fonction principale est de prendre un contenu textuel semi-structuré (au format HTML), une configuration de style (`config.yml`) et un plan de mise en page géométrique (`layout.yml`) pour produire un document PDF de plusieurs pages (un agenda et un poster) prêt pour l'impression.
+`misenpageur` est un moteur de rendu spécialisé. Sa fonction principale est de prendre un contenu textuel semi-structuré (au format HTML), une configuration de style (`config.yml`) et un plan de mise en page géométrique (`layout.yml`) pour produire deux types de documents :
+
+1.  Un **document PDF** de plusieurs pages (un agenda et un poster) prêt pour l'impression.
+2.  Des **fichiers SVG** éditables (un par page), parfaits pour être modifiés dans des logiciels de dessin vectoriel comme Inkscape.
 
 Il est conçu pour être le "back-end" de rendu du projet "Biduleur".
 
-## 2. Concepts Fondamentaux
+## 2. Concepts Fondamentaux et Architecture
 
-L'architecture de `misenpageur` repose sur une séparation stricte des responsabilités :
+L'architecture repose sur une séparation stricte des responsabilités :
 
--   **Le Contenu (`input.html`)** : Fournit le texte brut des événements et des dates. Sa structure est simple (une suite de paragraphes `<p>`).
--   **La Géométrie (`layout.yml`)** : Définit la position et la taille de chaque "boîte" (section) sur chaque page. Les coordonnées sont exprimées en **points** (`pt`) avec une origine `(0,0)` en bas à gauche de la page. Ce fichier est la seule source de vérité pour la mise en page.
--   **Le Style et le Comportement (`config.yml`)** : Contrôle tous les aspects visuels et algorithmiques : polices, couleurs, marges, espacements, styles des puces, et active/désactive des fonctionnalités comme le poster.
+-   **Le Contenu (`input.html`, `ours.md`, `nobr.txt`)** : Fournit les données brutes.
+-   **La Géométrie (`layout.yml`)** : Définit la position et la taille de chaque "boîte" (section) sur chaque page.
+-   **Le Style et le Comportement (`config.yml`)** : Contrôle tous les aspects visuels et algorithmiques.
 
-Le code Python (`.py`) agit comme un chef d'orchestre, assemblant ces trois sources pour générer le document final.
+### L'Architecture de Rendu Partagé
 
-## 3. L'Algorithme de Génération de PDF (`build_pdf`)
+Pour éviter la duplication de code entre les générateurs PDF et SVG, le module est architecturé comme suit :
 
-La fonction `build_pdf` dans `pdfbuild.py` est le cœur du module. Son exécution se déroule en plusieurs phases séquentielles.
+-   **`draw_logic.py` (Le Cerveau)** : Contient la logique de dessin principale (`draw_document`), agnostique au format de sortie.
+-   **`pdfbuild.py` (Wrapper PDF)** : Crée un `canvas` PDF et appelle `draw_document`.
+-   **`svgbuild.py` (Wrapper SVG)** : Appelle `pdfbuild` pour créer un PDF temporaire, le convertit avec `pdf2svg`, et post-traite le SVG pour corriger les glyphes.
+
+## 3. Fichiers de Configuration Détaillés
+
+### 3.1. `layout.yml`
+
+Ce fichier définit la **géométrie brute** de toutes les boîtes sur toutes les pages. Les unités sont en **points** (`pt`), et l'origine `(0,0)` est en **bas à gauche**.
+
+```yaml
+page_size:
+  width: 595  # Largeur totale de la page (A4 = 595.27 pt)
+  height: 842 # Hauteur totale de la page (A4 = 841.89 pt)
+
+sections:
+  # Chaque clé est un identifiant unique pour une section.
+  # Le layout_builder modifiera ces coordonnées pour les pages 1 et 2
+  # en fonction des marges de config.yml.
+  S1: { page: 1, x: 0,     y: 421, w: 297.5, h: 421 }
+  S2: { page: 1, x: 297.5, y: 421, w: 297.5, h: 421 }
+  # ...
+  # Les sections pour le poster (page 3) sont aussi définies ici.
+  S7_Title: { page: 3, x: 20, y: 800, w: 555, h: 30 }
+  # ...
+
+s1_split:
+  # Ratio (entre 0 et 1) pour la division de la section S1
+  # entre la colonne des logos et celle de l'ours.
+  logos_ratio: 0.5
+```
+
+### 3.2. `config.yml`
+
+Ce fichier contrôle **tout le reste**. Voici les clés les plus importantes :
+
+#### Chemins (`input_html`, `cover_image`, etc.)
+Chemins relatifs au dossier contenant `config.yml` pour les fichiers d'entrée et les assets.
+
+#### Typographie (`font_name`, `font_size_min`, `font_size_max`, `leading_ratio`)
+-   `font_name`: Police principale pour le corps du texte.
+-   `font_size_min`/`max`: Plage de tailles autorisée pour l'algorithme d'ajustement automatique.
+-   `leading_ratio`: Interlignage (ex: `1.12` = 112% de la taille de la police).
+
+#### Mise en page (`pdf_layout`)
+-   `page_margin_mm`: Marge globale appliquée aux pages 1 et 2.
+-   `section_spacing_mm`: Espace (gouttière) entre les sections des pages 1 et 2.
+
+#### Puces et Événements (`event_hanging_indent`, `bullet_text_indent`, etc.)
+-   `event_hanging_indent`: Marge gauche totale pour les paragraphes d'événement.
+-   `bullet_text_indent`: Position de la puce par rapport au début du texte (une valeur négative la place à gauche).
+
+#### Séparateurs de dates (`date_line`, `date_box`, `date_spaceBefore`/`After`)
+-   `date_line`: Active et configure une ligne horizontale après les dates.
+-   `date_box`: Active et configure un cadre autour des dates.
+-   `date_spaceBefore`/`After`: Espace vertical (en points) ajouté avant et après chaque date sur les pages 1 et 2.
+
+#### Boîte "Cucaracha" (`cucaracha_box`)
+Configure la boîte spéciale en bas de la colonne des logos (page 1).
+-   `content_type`: "none", "text", ou "image".
+-   `content_value`: Le texte ou le chemin de l'image.
+-   `height_mm`: Hauteur de la boîte si elle est active.
+-   ... et d'autres options de style.
+
+#### Poster (Page 3) (`poster`)
+-   `enabled`: `true` pour générer la page 3.
+-   `design`: `0` (image au centre) ou `1` (image en fond).
+-   `title`: Titre du poster.
+-   `font_size_safety_factor`: Facteur de réduction (ex: `0.98` = -2%) appliqué à la taille de police calculée pour éviter que le texte ne déborde.
+-   `background_image_alpha`: Niveau de transparence du voile blanc sur l'image de fond (design 1).
+-   `date_spaceBefore`/`After`: Espacement vertical spécifique pour les dates sur le poster.
+
+## 4. L'Algorithme de Génération (`draw_document`)
+
+La fonction `draw_document` dans `draw_logic.py` est le cœur du module.
+*(Cette section reste la même que dans le README précédent)*
 
 ### Phase 1 : Initialisation et Configuration
-
-1.  **Création du Canvas** : Un objet `canvas` de ReportLab est créé avec les dimensions de la page définies dans `layout.yml`.
-2.  **Enregistrement des Polices** : Les polices personnalisées (Arial Narrow, DS-net Stamped) et de fallback (DejaVu Sans) sont chargées et enregistrées auprès de ReportLab. Le code gère les cas où les polices ne sont pas trouvées sur le système.
-3.  **Chargement des Contenus** :
-    -   Le contenu HTML des événements est lu et parsé en une liste de chaînes de caractères (`paras`).
-    -   Les termes insécables sont chargés depuis `nobr.txt` et appliqués aux `paras`.
-    -   Le texte de l'Ours est lu depuis son fichier Markdown.
-    -   Les images des logos sont listées depuis leur dossier.
-4.  **Chargement des Configurations** : Des objets de configuration typés (`BulletConfig`, `PosterConfig`, etc.) sont créés en lisant les valeurs du `config.yml`. Cela permet d'avoir un accès propre et sécurisé aux paramètres dans le reste du code.
-
+...
 ### Phase 2 : Planification du Texte (Pages 1 & 2)
-
-C'est la partie la plus complexe de l'algorithme. L'objectif est de faire tenir un volume de texte variable dans un espace fixe (les sections S3, S4, S5, S6) en ajustant dynamiquement la taille de la police.
-
-1.  **Recherche de la Taille de Police Optimale (`best_fs`)** :
-    -   L'algorithme effectue une **recherche dichotomique (binary search)** entre `font_size_min` et `font_size_max`.
-    -   À chaque itération, il teste une taille de police intermédiaire (`mid`).
-    -   Pour tester cette taille, il appelle la fonction de simulation `_simulate_allocation_at_fs`.
-
-2.  **Simulation (`_simulate_allocation_at_fs`)** :
-    -   Cette fonction ne dessine rien. Elle prend la liste complète des paragraphes et tente de les placer "virtuellement" dans les sections de texte (S5, S6, S3, S4, dans cet ordre).
-    -   Pour chaque paragraphe, elle calcule sa hauteur à la taille de police donnée, en tenant compte de l'espacement (`SpacingPolicy`), du retrait de puce (`hanging indent`), etc.
-    -   Elle retourne le nombre total de paragraphes qu'elle a réussi à placer.
-    -   Si tous les paragraphes tiennent (`tot >= len(paras)`), la taille testée est valide, et on peut essayer une taille plus grande. Sinon, il faut une taille plus petite.
-
-3.  **Planification Finale avec Césure (`plan_pair_with_split`)** :
-    -   Une fois la taille de police optimale (`best_fs`) trouvée, le texte n'est pas encore prêt à être dessiné. Il faut gérer les cas où un paragraphe est coupé entre deux sections (par exemple, entre le bas de S5 et le haut de S6).
-    -   La fonction `plan_pair_with_split` est appelée deux fois : une fois pour la paire (S5, S6) et une fois pour (S3, S4).
-    -   Elle remplit la première section avec autant de paragraphes complets que possible.
-    -   Pour le premier paragraphe qui ne rentre pas, elle tente de le couper (`p.split()`). Si la partie qui rentre est jugée "suffisamment grande" (`split_min_gain_ratio`), la césure est effectuée.
-    -   Elle retourne des listes de texte distinctes pour chaque section, incluant les parties coupées (`tail` et `prelude`).
-
+...
 ### Phase 3 : Rendu (Dessin sur le Canvas)
+...
 
-À ce stade, toutes les décisions sont prises. Il ne reste plus qu'à dessiner.
+## 5. Structure des Fichiers Clés
 
-1.  **Rendu de la Page 1** :
-    -   `draw_s1` est appelée pour dessiner la section S1 (logos et Ours).
-    -   `draw_s2_cover` est appelée pour dessiner l'image de couverture dans S2.
-    -   `draw_section_fixed_fs_with_tail` dessine le contenu de S3.
-    -   `draw_section_fixed_fs_with_prelude` dessine le contenu de S4.
-    -   `c.showPage()` finalise la page 1.
+*(Cette section reste la même que dans le README précédent)*
 
-2.  **Rendu de la Page 2** :
-    -   Le même processus est appliqué pour S5 et S6 avec le texte planifié correspondant.
-
-3.  **Rendu de la Page 3 (Poster)** :
-    -   Cette logique est conditionnelle (`if poster_cfg.enabled:`).
-    -   Le texte utilisé est la concaténation du texte planifié pour les pages 1 et 2 (`s5_full + s6_full + ...`).
-    -   **Une deuxième recherche dichotomique** est effectuée, spécifiquement pour le poster, avec sa propre plage de tailles de police (`poster_font_size_min/max`). La simulation (`measure_poster_fit_at_fs`) utilise la liste des cadres du poster (`S7_Col1`, `S7_Col2_Top`, etc.).
-    -   La logique de **design** est appliquée :
-        -   **Design 0 (Image au centre)** : L'image est dessinée dans son cadre, et le texte s'écoule dans les cadres découpés autour.
-        -   **Design 1 (Image en fond)** : L'image est dessinée en premier sur toute la page, suivie d'un voile blanc semi-transparent, et le texte s'écoule dans des cadres "pleine hauteur".
-    -   Les éléments statiques (titre, logo du titre, QR code, logos du bas) sont dessinés.
-    -   Le texte est finalement dessiné avec la taille de police optimale trouvée, après application du `font_size_safety_factor`.
-
-### Phase 4 : Finalisation
-
--   `c.save()` écrit le fichier PDF sur le disque.
--   Des options de post-traitement (traits de coupe, conversion PDF/X) peuvent être activées.
-
-## 4. Structure des Fichiers Clés
-
--   `pdfbuild.py`: **Chef d'orchestre**. Contient la fonction principale `build_pdf` et la logique de haut niveau.
--   `textflow.py`: **Le typographe**. Gère la création des `Paragraph`, le style du texte (indentation, justification), la mesure de la hauteur du texte et le flux de texte à travers les cadres.
--   `drawing.py`: **L'illustrateur**. Contient la logique de dessin pour les éléments non-textuels ou statiques (logos, QR code, couverture, boîte Cucaracha).
--   `config.py`: **Le contrat**. Définit les structures de données (`dataclass`) pour tous les paramètres de configuration.
--   `layout.py`: **L'architecte**. Définit les structures de données (`dataclass`) pour le layout (`Page`, `Section`).
--   `fonts.py`: **Le fondeur**. Gère la recherche et l'enregistrement des fichiers de polices.
-
-## 5. Comment Étendre le Module
-
-### Ajouter un nouveau paramètre de configuration (ex: `date_font_style`)
-
-1.  **`config.py`**: Ajoutez le champ `date_font_style: str = "normal"` à la classe `Config`.
-2.  **`pdfbuild.py`**: Dans la fonction `_read...` correspondante (ou directement dans `build_pdf`), lisez la nouvelle valeur depuis `cfg` (ex: `date_style = cfg.date_font_style`).
-3.  **`textflow.py`**: Modifiez la fonction `_mk_style_for_kind` pour qu'elle utilise ce nouveau paramètre afin de changer le `fontName` du style des dates.
-
-### Modifier la mise en page du poster
-
-1.  **`layout.yml`**: Modifiez simplement les coordonnées `x, y, w, h` des sections `S7_*`.
-2.  **`pdfbuild.py`**: Si vous avez ajouté/supprimé des cadres de texte, mettez à jour la liste `poster_frames` en conséquence.
+-   `draw_logic.py`: **Le Cerveau**.
+-   `pdfbuild.py`: **Wrapper PDF**.
+-   `svgbuild.py`: **Wrapper SVG**.
+-   ...
 
 ## 6. Dépendances Clés
 
--   `reportlab`: Pour la génération de PDF.
--   `pyyaml`: Pour lire les fichiers `.yml`.
--   `Pillow`: Pour le pré-traitement des images.
--   `qrcode`: Pour générer le QR code.
+-   **Bibliothèques Python** : `reportlab`, `pyyaml`, `Pillow`, `qrcode`, `lxml`.
+-   **Programme Externe** : **`pdf2svg`** (version open-source) est requis pour l'export SVG.

@@ -2,13 +2,12 @@
 
 ## Priorité Élevée
 - [x] Infos couv (flag couv/no couv, nom dessinat.eur.rice + hyperlink) (gui + cli)
-- [ ] Fichier .scribus.py comme argument dans cli.
 - [x] Ajouter fichiers templates csv et xlsx.
 - [x] Fichier release notes
 - [ ] Build release process.
 - [x] Icône.
-- [ ] Tester svg outputs avec différents types de paramètres pour le bidul pour voir si on a besoin d'ajustement.
 - [ ] Unit tests.
+- [ ] Améliorer les informations à afficher après création des fichiers.
 
 ## Priorité Moyenne
 - [ ] Ajout helpers.
