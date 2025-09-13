@@ -6,6 +6,7 @@ from biduleur.csv_utils import parse_bidul
 from biduleur.format_utils import output_html_file
 import importlib.resources as res
 from tkinter import ttk
+import traceback
 
 def run_biduleur(input_file, bidul_output_file=None, agenda_output_file=None):
     """
@@ -35,6 +36,7 @@ def run_biduleur(input_file, bidul_output_file=None, agenda_output_file=None):
 
         return True, number_of_lines
     except Exception as e:
+        print(traceback.format_exc())
         print(f"Erreur : {str(e)}")
         return False, str(e)
 
@@ -206,5 +208,6 @@ if __name__ == '__main__':
         cli_mode()
     else:
         gui_mode()
-    # filename1 = './tapages/Copy of 202509_tapage_biduleur_Septembre_2025.xls.xlsx'
+    # # filename1 = './tapages/Copy of 202509_tapage_biduleur_Septembre_2025.xls.xlsx'
+    # filename1 = 'C:\\Users\\thiba\\repos\\bidul.biduleur\\biduleur\\tapages\\toBeConverted\\outputs\\202301_tapage_biduleur_janvier_2023.new.csv'
     # run_biduleur(filename1)
