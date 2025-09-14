@@ -92,9 +92,26 @@ jobs:
           retention-days: 7
 
       - name: Get Release Notes
-        # ... (cette étape est correcte et n'a pas besoin de changer)
+        id: get_release_notes
+        shell: pwsh
+        run: |
+          $version = "${{ env.VERSION }}"
+          $notes_file = "RELEASE_NOTES.md"
+          $release_notes = "Pas de notes de version trouvées pour la version $version."
+          
+          if (Test-Path $notes_file) {
+            $content = Get-Content -Path $notes_file -Raw
+            $pattern = "(?s)## \[$version\](.*?)(?=## \[|\Z)"
+            $match = [regex]::Match($content, $pattern)
+            
+            if ($match.Success) {
+              $release_notes = $match.Groups[1].Value.Trim()
+            }
+          }
+          
+          $release_notes = $release_notes.Replace('%', '%25').Replace("`n", '%0A').Replace("`r", '%0D')
+          echo "RELEASE_NOTES=$release_notes" | Out-File -FilePath $env:GITHUB_OUTPUT
 
-      # ==================== ÉTAPES CONDITIONNELLES ====================
       - name: Commit and Push Version Bump and Tag
         # On ne fait cela QUE pour les push sur master
         if: github.event_name == 'push'
