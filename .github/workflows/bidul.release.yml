@@ -3,17 +3,17 @@ name: Build and Release - Bidul
 on:
   push:
     branches:
-      - master
+      - master # Se déclenche à chaque push/merge sur master
   workflow_dispatch:
     inputs:
       version:
         description: 'Version à construire (ex: 1.2.3)'
-        required: true
-        default: '1.0.0'
+        required: false
 
 jobs:
   build-release:
     runs-on: windows-latest
+
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}
       cancel-in-progress: true
@@ -36,13 +36,6 @@ jobs:
           pip install pyinstaller==6.6.0
           pip install -r biduleur/requirements.txt
           pip install -r misenpageur/requirements.txt
-          
-      # ==================== NOUVELLE ÉTAPE DE DÉBOGAGE ====================
-      - name: List files for debugging
-        run: |
-          echo "--- Current Directory ---"
-          ls -R
-          echo "--- End of File List ---"
 
       - name: Determine Version
         id: versioning
@@ -51,7 +44,6 @@ jobs:
           $version = "0.0.0"
           $tag_name = "v0.0.0"
           
-          # Si c'est un push sur master, on auto-incrémente
           if ("${{ github.event_name }}" -eq "push") {
             $latest_tag = git describe --tags --abbrev=0 2>$null
             if ($latest_tag) {
@@ -59,10 +51,9 @@ jobs:
               $new_patch = [int]$version_parts[2] + 1
               $version = "$($version_parts[0]).$($version_parts[1]).$new_patch"
             } else {
-              $version = "1.0.0" # Premier tag si aucun n'existe
+              $version = "1.0.0"
             }
           }
-          # Si c'est un lancement manuel, on utilise la version fournie
           else {
             $version = "${{ github.event.inputs.version }}"
           }
@@ -70,7 +61,6 @@ jobs:
           $tag_name = "v$version"
           echo "Determined Version: $version"
           echo "Determined Tag: $tag_name"
-
           "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
           "TAG=$tag_name" | Out-File -FilePath $env:GITHUB_ENV -Append
 
@@ -84,26 +74,45 @@ jobs:
         run: pyinstaller bidul.spec --clean --noconfirm
 
       - name: Package release artifact
-        id: package
         shell: pwsh
         run: |
           $version = "${{ env.VERSION }}"
           $sourceFolder = "dist/bidul"
           $zipFileName = "bidul-${version}-win64.zip"
-
-          # On s'assure que le dossier source existe
-          if (-not (Test-Path $sourceFolder)) {
-            Write-Error "Le dossier de build '$sourceFolder' n'a pas été trouvé !"
-            exit 1
+          
+          # 1. Supprimer le fichier de log de débogage s'il existe
+          if (Test-Path "$sourceFolder/debug_log.txt") {
+            Remove-Item "$sourceFolder/debug_log.txt"
+            echo "debug_log.txt supprimé."
           }
-
-          # ==================== CORRECTION ZIP ====================
-          # On compresse directement le dossier, mais on s'assurera
-          # que l'utilisateur sait qu'il doit ouvrir le dossier "bidul" à l'intérieur.
-          # C'est plus simple et plus robuste.
-          Compress-Archive -Path $sourceFolder -DestinationPath $zipFileName -Force
-          # ======================================================
-
+          
+          # 2. Créer le fichier README.txt
+          $readmeContent = @"
+          Bidul v$version
+          ==============================================
+          
+          Merci d'utiliser Bidul !
+          
+          INSTRUCTIONS:
+          1. Décompressez cette archive.
+          2. Ouvrez le dossier "bidul" qui vient d'être créé.
+          3. Double-cliquez sur bidul.exe pour lancer l'application.
+          
+          Pour plus de détails, consultez le fichier RELEASE_NOTES.md.
+          "@
+          $readmeContent | Out-File -FilePath "$sourceFolder/README.txt" -Encoding utf8
+          
+          # 3. Copier le fichier RELEASE_NOTES.md
+          if (Test-Path "RELEASE_NOTES.md") {
+            Copy-Item -Path "RELEASE_NOTES.md" -Destination "$sourceFolder/"
+          }
+          
+          # 4. Créer une archive ZIP "plate"
+          # On se place dans le dossier parent (dist) pour que le chemin source soit "bidul"
+          Set-Location -Path "dist"
+          Compress-Archive -Path "bidul" -DestinationPath "../$zipFileName" -Force
+          Set-Location -Path ".." # Revenir à la racine
+          
           echo "ZIP_NAME=$zipFileName" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Upload Build Artifact
@@ -112,13 +121,6 @@ jobs:
           name: bidul-windows-build-${{ env.VERSION }}
           path: ${{ env.ZIP_NAME }}
           retention-days: 7
-
-#      - name: Upload Build Folder for Debugging
-#        uses: actions/upload-artifact@v4
-#        with:
-#          name: bidul-windows-build-folder
-#          path: dist/bidul/ # On téléverse le dossier complet```
-
 
       - name: Get Release Notes
         id: get_release_notes
@@ -141,27 +143,27 @@ jobs:
           $release_notes = $release_notes.Replace('%', '%25').Replace("`n", '%0A').Replace("`r", '%0D')
           echo "RELEASE_NOTES=$release_notes" | Out-File -FilePath $env:GITHUB_OUTPUT
 
-      - name: Commit and Push Version Bump and Tag
-        # On ne fait cela QUE pour les push sur master
-        if: github.event_name == 'push'
+      - name: Commit, Tag, and Release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         run: |
           git config --global user.name "GitHub Actions"
           git config --global user.email "github-actions@github.com"
           
-          # Mettre à jour le fichier VERSION avec le nouveau numéro
-          # Cette étape a été supprimée, car le tag est maintenant la source de vérité
+          git add bidul_version_info.txt
+          # Le fichier VERSION n'est plus utilisé, on ne le commite pas.
           
-          # Créer et pousser le tag
+          # On vérifie s'il y a des changements à commiter
+          if (-not $(git status --porcelain)) {
+            echo "No changes to commit."
+          } else {
+            git commit -m "chore(release): Update version info for ${{ env.TAG }}"
+            git push
+          }
+
           git tag ${{ env.TAG }}
           git push origin ${{ env.TAG }}
-          
-          # Commiter le changement de version dans bidul_version_info.txt
-          git add bidul_version_info.txt
-          git commit -m "chore(release): Prepare for release ${{ env.TAG }}"
-          git push
 
       - name: Create Release
-        # On ne crée une release que pour les push sur master
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         uses: softprops/action-gh-release@v2
         with:
@@ -169,4 +171,3 @@ jobs:
           tag_name: ${{ env.TAG }}
           files: ${{ env.ZIP_NAME }}
           body: ${{ steps.get_release_notes.outputs.RELEASE_NOTES }}
-      # =============================================================
