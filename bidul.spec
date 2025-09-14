@@ -2,8 +2,11 @@
 import os
 from PyInstaller.building.build_main import Analysis, PYZ, EXE, COLLECT
 
-# On utilise la méthode qui fonctionne dans le contexte de PyInstaller
+# ==================== DÉBOGAGE ====================
+print("--- Début de l'exécution de bidul.spec ---")
 BASE_DIR = os.getcwd()
+print(f"BASE_DIR (os.getcwd()): {BASE_DIR}")
+# ==============================================
 
 entry_script = os.path.join(BASE_DIR, 'gui.py')
 ICON_PATH = os.path.join(BASE_DIR, 'biduleur.ico')
@@ -17,10 +20,18 @@ datas = [
     ('biduleur/templates', 'biduleur/templates'),
 ]
 
-binaries = [
-    ('bin/win64/pdf2svg.exe', 'bin'),
-    ('bin/win64/*.dll', 'bin')
-]
+# ==================== DÉBOGAGE ====================
+print("\n--- Chemins des données (datas) ---")
+for src, dst in datas:
+    abs_src = os.path.join(BASE_DIR, src)
+    print(f"Source: {src} -> Absolu: {abs_src} (Existe: {os.path.exists(abs_src)})")
+print("------------------------------------")
+
+print("\n--- Chemins des binaires (binaries) ---")
+for src, dst in binaries:
+    abs_src = os.path.join(BASE_DIR, src)
+    print(f"Source: {src} -> Absolu: {abs_src} (Existe: {os.path.exists(abs_src)})")
+print("------------------------------------")
 
 EXCLUDES = [
     'torch', 'tensorflow', 'scipy', 'matplotlib',

@@ -36,6 +36,13 @@ jobs:
           pip install pyinstaller==6.6.0
           pip install -r biduleur/requirements.txt
           pip install -r misenpageur/requirements.txt
+          
+      # ==================== NOUVELLE ÉTAPE DE DÉBOGAGE ====================
+      - name: List files for debugging
+        run: |
+          echo "--- Current Directory ---"
+          ls -R
+          echo "--- End of File List ---"
 
       - name: Determine Version
         id: versioning
