@@ -22,3 +22,5 @@ lxml==5.2.1
 # svglib n'est plus nécessaire car nous utilisons un outil externe (pdf2svg)
 # mais si vous aviez des fonctions qui l'utilisent encore, il faudrait l'ajouter :
 # svglib==1.5.1
+
+pandas~=2.2.3
