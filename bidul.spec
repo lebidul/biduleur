@@ -12,17 +12,23 @@ entry_script = os.path.join(BASE_DIR, 'gui.py')
 ICON_PATH = os.path.join(BASE_DIR, 'biduleur.ico')
 VERSION_FILE = os.path.join(BASE_DIR, 'bidul_version_info.txt')
 
-# Les chemins relatifs sont corrects car BASE_DIR est la racine du projet
+# On déplace le dossier bin/win64 dans les `datas`.
+# Le format est (source, destination_relative_dans_le_build)
 datas = [
     ('misenpageur/assets', 'misenpageur/assets'),
     ('misenpageur/config.yml', 'misenpageur'),
     ('misenpageur/layout.yml', 'misenpageur'),
     ('biduleur/templates', 'biduleur/templates'),
+    ('bin/win64', 'bin/win64') # <--- ON AJOUTE LE DOSSIER ICI
 ]
 
-binaries = [
-    ('bin/win64/pdf2svg.exe', 'bin'),
-    ('bin/win64/*.dll', 'bin')
+# La liste `binaries` est maintenant vide, car PyInstaller trouvera
+# pdf2svg.exe comme une "data". Ce n'est pas un problème.
+binaries = []
+# =============================================================
+
+EXCLUDES = [
+    'torch', 'tensorflow', 'scipy', 'matplotlib',
 ]
 
 # ==================== DÉBOGAGE ====================
