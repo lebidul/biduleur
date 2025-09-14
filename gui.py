@@ -3,6 +3,33 @@
 import os
 import sys
 import tkinter as tk
+
+# ==================== DÉBUT DU BLOC DE DÉBOGAGE ====================
+# PyInstaller définit la variable `frozen` à True quand le code s'exécute dans l'exe.
+if getattr(sys, 'frozen', False):
+    # On écrit dans un fichier log à côté de l'exécutable.
+    log_path = os.path.join(os.path.dirname(sys.executable), 'debug_log.txt')
+    with open(log_path, 'w') as f:
+        f.write("--- DÉBUT DU LOG DE DÉBOGAGE ---\n")
+        # sys._MEIPASS est le dossier temporaire où PyInstaller a tout décompressé.
+        f.write(f"sys.frozen: {getattr(sys, 'frozen', False)}\n")
+        f.write(f"sys.executable: {sys.executable}\n")
+        f.write(f"sys._MEIPASS: {getattr(sys, '_MEIPASS', 'Non défini')}\n")
+
+        f.write("\n--- Contenu de sys.path ---\n")
+        for p in sys.path:
+            f.write(f"{p}\n")
+
+        f.write("\n--- Contenu du dossier de l'exécutable ---\n")
+        try:
+            exe_dir = os.path.dirname(sys.executable)
+            for item in os.listdir(exe_dir):
+                f.write(f"{item}\n")
+        except Exception as e:
+            f.write(f"Erreur lors du listage du dossier : {e}\n")
+# ==================== FIN DU BLOC DE DÉBOGAGE ====================
+
+
 from tkinter import filedialog, messagebox
 from tkinter import ttk
 from pathlib import Path
