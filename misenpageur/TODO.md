@@ -18,7 +18,7 @@
 - [ ] Qualité pdf. - convert_image affecte qualité ?
 - [ ] Unit tests.
 - [ ] Intégrer nouveaux logos de Gaelle.
-- [ ] Enlever watermark pdf2svg dans svg outputs.
+- [x] Enlever watermark pdf2svg dans svg outputs.
 - [ ] Améliorer visuel QR code.
 
 ## Priorité Moyenne

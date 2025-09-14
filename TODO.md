@@ -7,7 +7,7 @@
 - [ ] Build release process.
 - [x] Icône.
 - [ ] Unit tests.
-- [ ] Améliorer les informations à afficher après création des fichiers.
+- [x] Améliorer les informations à afficher après création des fichiers.
 
 ## Priorité Moyenne
 - [ ] Ajout helpers.
