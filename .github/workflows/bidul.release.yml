@@ -4,12 +4,11 @@ on:
   push:
     tags:
       - 'v*' # Se déclenche quand un tag (ex: v1.0.1) est poussé
-  workflow_dispatch: # Permet de le lancer manuellement depuis l'interface GitHub
+  workflow_dispatch: # Permet de le lancer manuellement
     inputs:
       version:
-        description: 'Numéro de version à forcer (ex: 1.0.0)'
-        required: true
-        default: '1.0.0'
+        description: 'Version (ex: 1.2.3). Laisser vide pour auto-incrémenter.'
+        required: false
 
 jobs:
   build-release:
@@ -18,6 +17,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Nécessaire pour l'historique des tags
 
       - name: Set up Python 3.10
         uses: actions/setup-python@v5
@@ -28,20 +29,45 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install pyinstaller==6.6.0
-          # Installe les dépendances des DEUX modules
           pip install -r biduleur/requirements.txt
           pip install -r misenpageur/requirements.txt
+
+      # ====================================================================
+      #           Étape 1 : Logique de Version Corrigée et Simplifiée
+      # ====================================================================
+      - name: Determine Version
+        id: versioning
+        shell: pwsh
+        run: |
+          # Si un tag a déclenché le workflow, on utilise ce tag.
+          if ("${{ github.ref_type }}" -eq "tag") {
+            $version = "${{ github.ref_name }}".TrimStart("v")
+          }
+          # Si lancé manuellement avec une version, on l'utilise.
+          elseif ("${{ github.event.inputs.version }}") {
+            $version = "${{ github.event.inputs.version }}"
+          }
+          # Sinon (push sur master), on auto-incrémente.
+          else {
+            $latest_tag = git describe --tags --abbrev=0 2>$null
+            if ($latest_tag) {
+              $version_parts = $latest_tag.TrimStart("v").Split(".")
+              $new_patch = [int]$version_parts[2] + 1
+              $version = "$($version_parts[0]).$($version_parts[1]).$new_patch"
+            } else {
+              # Aucun tag n'existe, on commence à 1.0.0
+              $version = "1.0.0"
+            }
+          }
+          echo "Determined Version: $version"
+          "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
+      # ====================================================================
 
       - name: Update version file
         shell: pwsh
         run: |
-          # Utilise la version du tag ou celle fournie manuellement
-          $version = "${{ github.ref_name }}".Replace("v", "") `
-            -or "${{ github.event.inputs.version }}" `
-            -or "1.0.0"
-          (Get-Content -Path bidul_version_info.txt -Raw).Replace("1.0.0", $version) `
+          (Get-Content -Path bidul_version_info.txt -Raw).Replace("1.0.0", "${{ env.VERSION }}") `
             | Set-Content -Path bidul_version_info.txt
-          echo "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Build with PyInstaller
         run: pyinstaller bidul.spec --clean --noconfirm
@@ -49,24 +75,33 @@ jobs:
       - name: Package release artifact
         shell: pwsh
         run: |
-          # Créer un dossier de distribution propre
-          New-Item -ItemType Directory -Force -Path "release"
-          
-          # Copier l'exécutable et ses dépendances
-          Copy-Item -Path "dist/bidul/*" -Destination "release/" -Recurse
-          
-          # Ajouter un README
-          "Bidul v${{ env.VERSION }}" | Out-File -FilePath release/README.txt -Encoding utf8
+          # Le nom du dossier de sortie est défini par PyInstaller (ici, 'bidul')
+          $sourceFolder = "dist/bidul"
+          $zipFileName = "bidul-${{ env.VERSION }}-win64.zip"
           
           # Créer l'archive ZIP
-          Compress-Archive -Path "release/*" -DestinationPath "bidul-${{ env.VERSION }}-win64.zip"
+          Compress-Archive -Path "$sourceFolder/*" -DestinationPath $zipFileName
+          echo "ZIP_NAME=$zipFileName" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      # ====================================================================
+      #               Étape 2 : Upload de l'artefact ZIP
+      # ====================================================================
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bidul-windows-build-${{ env.VERSION }}
+          path: ${{ env.ZIP_NAME }}
+          retention-days: 7 # Garde l'artefact pendant 7 jours
+      # ====================================================================
 
       - name: Create Release
+        # On ne crée une release que si c'est un push sur un tag
+        if: github.event_name == 'push' && github.ref_type == 'tag'
         uses: softprops/action-gh-release@v2
         with:
-          name: Bidul v${{ env.VERSION }}
-          tag_name: ${{ github.ref_name || format('v{0}', github.event.inputs.version) }}
-          files: bidul-${{ env.VERSION }}-win64.zip
+          name: Bidul ${{ env.VERSION }}
+          tag_name: ${{ github.ref_name }}
+          files: ${{ env.ZIP_NAME }}
           body: |
             Version ${{ env.VERSION }} de Bidul.
             - Téléchargez le fichier `bidul-${{ env.VERSION }}-win64.zip` ci-dessous.
