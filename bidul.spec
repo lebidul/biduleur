@@ -1,68 +1,69 @@
-# bidul.spec — build GUI "bidul" (sans console) avec icône
-
+# bidul.spec
 import os
 from PyInstaller.building.build_main import Analysis, PYZ, EXE, COLLECT
 
 BASE_DIR = os.getcwd()
-entry_script = os.path.join('', 'gui.py')
+entry_script = os.path.join(BASE_DIR, 'gui.py')
+ICON_PATH = os.path.join(BASE_DIR, 'misenpageur', 'assets', 'icon', 'biduleur.ico') # Assurez-vous que l'icône est bien là
+VERSION_FILE = os.path.join(BASE_DIR, 'bidul_version_info.txt')
 
-# >>> ADAPTE ICI le chemin de l'icône (même que biduleur) :
-ICON_PATH = os.path.join(BASE_DIR, 'biduleur.ico')
-# Par ex. si tu l’as ailleurs :
-# ICON_PATH = os.path.join(BASE_DIR, 'assets', 'biduleur.ico')
+# On liste toutes les données à inclure
+datas = [
+    # Les assets de misenpageur
+    ('misenpageur/assets', 'misenpageur/assets'),
+    # Les fichiers de config et layout
+    ('misenpageur/config.yml', 'misenpageur'),
+    ('misenpageur/layout.yml', 'misenpageur'),
+    # Les templates de biduleur
+    ('biduleur/templates', 'biduleur/templates'),
+]
 
-datas = []
+# On liste les binaires externes à inclure
+binaries = [
+    ('bin/win64/pdf2svg.exe', 'bin/win64'),
+    ('bin/win64/*.dll', 'bin/win64')
+]
 
-# misenpageur config/layout
-for rel in ('misenpageur/config.yml', 'misenpageur/layout.yml'):
-    absf = os.path.join(BASE_DIR, rel)
-    if os.path.isfile(absf):
-        datas.append((absf, 'misenpageur'))
-
-# misenpageur assets
-assets_abs = os.path.join(BASE_DIR, 'misenpageur', 'assets')
-if os.path.isdir(assets_abs):
-    datas.append((assets_abs, 'misenpageur/assets'))
-
-# biduleur templates (CSV / XLSX)
-templates_abs = os.path.join(BASE_DIR, 'biduleur', 'templates')
-if os.path.isdir(templates_abs):
-    datas.append((templates_abs, 'biduleur/templates'))
+# Paquets lourds à exclure
+EXCLUDES = [
+    'torch', 'tensorflow', 'scipy', 'matplotlib',
+]
 
 a = Analysis(
     [entry_script],
     pathex=[BASE_DIR],
-    binaries=[],
+    binaries=binaries,
     datas=datas,
-    hiddenimports=[],
+    hiddenimports=['svglib', 'lxml'], # Aides pour PyInstaller
     hookspath=[],
-    hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=EXCLUDES,
+    win_no_prefer_redirects=False,
+    win_private_assemblies=False,
+    cipher=None,
     noarchive=False,
 )
-
 pyz = PYZ(a.pure, a.zipped_data, cipher=None)
 
 exe = EXE(
-    pyz,
-    a.scripts,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
+    pyz, a.scripts, [],
+    exclude_binaries=True,
     name='bidul',
     debug=False,
+    bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=False,         # GUI
-    icon=ICON_PATH,        # <<—— Icône
+    console=False, # Important : pas de console
+    disable_windowed_traceback=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+    icon=ICON_PATH,
+    version=VERSION_FILE,
 )
 
 coll = COLLECT(
-    exe,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
+    exe, a.binaries, a.zipfiles, a.datas,
     strip=False,
     upx=True,
     upx_exclude=[],
