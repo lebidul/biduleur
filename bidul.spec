@@ -8,20 +8,32 @@ entry_script = os.path.join(BASE_DIR, 'gui.py')
 ICON_PATH = os.path.join(BASE_DIR, 'biduleur.ico')
 VERSION_FILE = os.path.join(BASE_DIR, 'bidul_version_info.txt')
 
+# ==================== LA CORRECTION EST ICI ====================
+# On ajoute nos dossiers de code source comme des "données".
+# PyInstaller va les copier tels quels dans le dossier final.
 datas = [
     ('misenpageur/assets', 'misenpageur/assets'),
     ('misenpageur/config.yml', 'misenpageur'),
     ('misenpageur/layout.yml', 'misenpageur'),
     ('biduleur/templates', 'biduleur/templates'),
-    ('bin/win64', 'bin')
+    ('bin/win64', 'bin/win64'),
+    ('biduleur', 'biduleur'), # Copier le dossier biduleur
+    ('misenpageur', 'misenpageur') # Copier le dossier misenpageur
 ]
+
+# On n'a plus besoin de `hiddenimports` pour nos modules,
+# car ils seront trouvés directement comme des dossiers.
+hiddenimports = ['svglib', 'lxml', 'lxml._elementpath', 'pandas', 'openpyxl']
+# =============================================================
+
+binaries = []
 
 a = Analysis(
     [entry_script],
     pathex=[BASE_DIR],
-    binaries=[],
+    binaries=binaries,
     datas=datas,
-    hiddenimports=['svglib', 'lxml', 'lxml._elementpath', 'pandas', 'openpyxl'],
+    hiddenimports=hiddenimports,
     hookspath=[],
     runtime_hooks=[],
     excludes=[],
