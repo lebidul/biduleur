@@ -1,32 +1,43 @@
-# bidul_version_info.txt (UTF-8)
-
+# UTF-8
+#
+# For more details about fixed file info 'ffi' see:
+# http://msdn.microsoft.com/en-us/library/ms646997.aspx
 VSVersionInfo(
   ffi=FixedFileInfo(
+    # filevers and prodvers should be always a tuple with four items: (1, 0, 0, 0)
+    # Set not needed items to zero 0.
     filevers=(1, 0, 0, 0),
     prodvers=(1, 0, 0, 0),
+    # Contains a bitmask that specifies the valid bits 'flags'r
     mask=0x3f,
+    # Contains a bitmask that specifies the Boolean attributes of the file.
     flags=0x0,
+    # The operating system for which this file was designed.
+    # 0x4 - NT and there is no need to change it.
     OS=0x40004,
-    fileType=0x1,    # VFT_APP
+    # The general type of file.
+    # 0x1 - application
+    fileType=0x1,
+    # The function of the file.
+    # 0x0 - unknown
     subtype=0x0,
+    # Creation date and time stamp.
     date=(0, 0)
-  ),
+    ),
   kids=[
-    StringFileInfo([
+    StringFileInfo(
+      [
       StringTable(
-        '040C04B0',  # 040C = fr-FR ; 04B0 = Unicode
-        [
-          StringStruct('CompanyName', 'Le Bidul'),
-          StringStruct('FileDescription', 'Bidul – Générateur HTML/PDF/Scribus'),
-          StringStruct('FileVersion', '1.3.0'),
-          StringStruct('InternalName', 'bidul'),
-          StringStruct('LegalCopyright', '© 2025 Le Bidul'),
-          StringStruct('OriginalFilename', 'bidul.exe'),
-          StringStruct('ProductName', 'the Bidul'),
-          StringStruct('ProductVersion', '1.3.0'),
-        ]
-      )
-    ]),
-    VarFileInfo([VarStruct('Translation', [0x040C, 1200])])  # fr-FR, Unicode
+        '040c04b0',
+        [StringStruct('CompanyName', 'Le Bidul'),
+        StringStruct('FileDescription', 'Application Biduleur'),
+        StringStruct('FileVersion', '1.0.0'),
+        StringStruct('InternalName', 'Bidul'),
+        StringStruct('LegalCopyright', '© Le Bidul. Tous droits réservés.'),
+        StringStruct('OriginalFilename', 'bidul.exe'),
+        StringStruct('ProductName', 'Biduleur'),
+        StringStruct('ProductVersion', '1.0.0')])
+      ]),
+    VarFileInfo([VarStruct('Translation', [1036, 1200])])
   ]
 )

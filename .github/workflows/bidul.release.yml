@@ -1,65 +1,74 @@
-name: bidul - Release
+name: Build and Release - Bidul
 
 on:
   push:
     tags:
-      - 'bidul-v*.*.*'
+      - 'v*' # Se déclenche quand un tag (ex: v1.0.1) est poussé
+  workflow_dispatch: # Permet de le lancer manuellement depuis l'interface GitHub
+    inputs:
+      version:
+        description: 'Numéro de version à forcer (ex: 1.0.0)'
+        required: true
+        default: '1.0.0'
 
 jobs:
-  build:
-    name: Build (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [windows-latest, ubuntu-latest]
+  build-release:
+    runs-on: windows-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Python
+      - name: Set up Python 3.10
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.10'
 
-      - name: Install deps
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pyinstaller
+          pip install pyinstaller==6.6.0
+          # Installe les dépendances des DEUX modules
+          pip install -r biduleur/requirements.txt
+          pip install -r misenpageur/requirements.txt
+
+      - name: Update version file
+        shell: pwsh
+        run: |
+          # Utilise la version du tag ou celle fournie manuellement
+          $version = "${{ github.ref_name }}".Replace("v", "") `
+            -or "${{ github.event.inputs.version }}" `
+            -or "1.0.0"
+          (Get-Content -Path bidul_version_info.txt -Raw).Replace("1.0.0", $version) `
+            | Set-Content -Path bidul_version_info.txt
+          echo "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Build with PyInstaller
-        shell: bash
+        run: pyinstaller bidul.spec --clean --noconfirm
+
+      - name: Package release artifact
+        shell: pwsh
         run: |
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
-            pyinstaller --noconfirm bidul.spec
-            echo "artifact_name=bidul-windows" >> $GITHUB_ENV
-          else
-            pyinstaller --noconfirm bidul.spec
-            echo "artifact_name=bidul-linux" >> $GITHUB_ENV
-          fi
+          # Créer un dossier de distribution propre
+          New-Item -ItemType Directory -Force -Path "release"
+          
+          # Copier l'exécutable et ses dépendances
+          Copy-Item -Path "dist/bidul/*" -Destination "release/" -Recurse
+          
+          # Ajouter un README
+          "Bidul v${{ env.VERSION }}" | Out-File -FilePath release/README.txt -Encoding utf8
+          
+          # Créer l'archive ZIP
+          Compress-Archive -Path "release/*" -DestinationPath "bidul-${{ env.VERSION }}-win64.zip"
 
-      - name: Archive artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ env.artifact_name }}
-          path: dist/bidul/**
-
-  release:
-    name: Create Release & Upload
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: dist
-
-      - name: Create release
-        id: create_release
+      - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            dist/**/*
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: Bidul v${{ env.VERSION }}
+          tag_name: ${{ github.ref_name || format('v{0}', github.event.inputs.version) }}
+          files: bidul-${{ env.VERSION }}-win64.zip
+          body: |
+            Version ${{ env.VERSION }} de Bidul.
+            - Téléchargez le fichier `bidul-${{ env.VERSION }}-win64.zip` ci-dessous.
+            - Décompressez l'archive.
+            - Lancez `bidul.exe`.
