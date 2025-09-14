@@ -1,70 +1,40 @@
-# Release Notes - Biduleur
+# Bidul v1.0.0 - Première Version Stable
 
-## v1.3.1
-### 🌟 Nouvelles fonctionnalités
-- Possibilité de dessiner une ligne de séparation pour les dates (true par défaut dans gui)
+Bienvenue dans la première version officielle de **Bidul** ! 🎉
 
-## v1.3.0
-### 🌟 Nouvelles fonctionnalités
-- Flag pour imprimer couverture ou non
-- Ajout d'une marge globale définie page_margin_mm
-- Ajout d'une éventuelle additional_box sous les logos
+Cette version marque l'aboutissement d'un long cycle de développement et offre un outil complet pour transformer vos listes d'événements en de superbes documents PDF et SVG, prêts à être partagés ou édités.
 
-### 🔧 Améliorations
-- Développement transféré à Google AI Studio
-- Rendu de l'ours, du qr code et des logos
-- Plus de paramètres d'affichages fournis dans la config
+## 🚀 Fonctionnalités Principales
 
-## v1.1.2
-### 🌟 Nouvelles fonctionnalités
-- Template de fichiers tapageurs .csv et .xlsx disponibles pour les utilisateurs du gui.
-- Repository devient public.
+*   **Conversion de Données** : Importez facilement vos événements depuis des fichiers `.xls`, `.xlsx`, ou `.csv`.
+*   **Génération PDF Multi-pages** :
+    *   Créez un agenda détaillé sur deux pages avec une taille de police qui s'adapte automatiquement à votre contenu.
+    *   Générez un magnifique poster A4 sur une troisième page, parfait pour l'affichage.
+*   **Export SVG Éditable** : En plus du PDF, générez des fichiers SVG pour chaque page. Ces fichiers sont parfaits pour des retouches de dernière minute dans des logiciels comme **Inkscape**.
+*   **Interface Graphique Intuitive** : Une application de bureau simple pour Windows qui vous guide à travers tout le processus, sans avoir besoin d'utiliser la ligne de commande.
 
-### 🔧 Améliorations
-- Amélioration du workflow build and release:
-  - Optimisation de la structure des .zip du build et des releases.
-  - Release créée après merge sur la branche aster avec incrémentation du tag.
+## ✨ Personnalisation Avancée via l'Interface
 
-## v1.1.0
-### 🌟 Nouvelles fonctionnalités
-- **Support des fichiers Excel** : Ajout de la prise en charge des fichiers `.xls` et `.xlsx` en plus des fichiers `.csv`.
-  - Utilisation de `pandas` pour lire les fichiers Excel.
-  - Mise à jour de l'interface graphique pour permettre la sélection de fichiers Excel.
+Tout est configurable directement depuis l'application :
 
-### 🔧 Améliorations
-- Optimisation du processus de build pour:
-  - réduire la taille du fichier exécutable.
-  - créer une release après une PR mergée sur master avc gestion automatique des tags.
-- Meilleure gestion des erreurs lors de la lecture des fichiers.
+*   **Couverture** : Choisissez votre image de couverture, créditez l'auteur et ajoutez un lien.
+*   **Mise en Page** : Ajustez la marge globale de votre document et l'espacement entre les sections.
+*   **Boîte "Cucaracha"** : Ajoutez du contenu personnalisé (texte ou image) dans une boîte dédiée sur la première page.
+*   **Design du Poster** : Choisissez entre deux designs pour votre poster :
+    1.  **Image au centre** : Pour mettre en avant l'illustration.
+    2.  **Image en fond** : Pour un style plus immersif, avec un contrôle précis de la transparence.
+*   **Séparateurs de Dates** : Personnalisez l'affichage des dates avec des lignes, des boîtes, ou rien du tout.
 
----
+## ⚙️ Pour les Développeurs (et les curieux)
 
-## v1.0.0 (Première version stable)
-### 🌟 Nouvelles fonctionnalités
-- **Interface Graphique (GUI)** : Interface utilisateur intuitive pour sélectionner les fichiers CSV et générer les fichiers HTML.
-  - Sélection des fichiers d'entrée et de sortie via des boîtes de dialogue.
-  - Affichage des messages de succès ou d'erreur.
+*   **Architecture Modulaire** : Le projet est divisé en deux modules principaux : `biduleur` (pour le parsing des données) et `misenpageur` (pour la mise en page et le rendu).
+*   **Configuration par Fichiers** : Toute la logique de mise en page est contrôlée par des fichiers `config.yml` et `layout.yml`, ce qui la rend facile à modifier sans toucher au code.
+*   **Build Automatisé** : Le processus de création de l'exécutable pour Windows est entièrement automatisé grâce à GitHub Actions.
 
-- **Mode Ligne de Commande (CLI)** : Utilisation en ligne de commande pour les scripts automatisés.
-  - Arguments pour spécifier les fichiers d'entrée et de sortie.
+## 📥 Comment l'utiliser
 
-- **Génération de fichiers HTML** : Conversion des fichiers CSV en fichiers HTML pour Bidul et Agenda.
-  - Formatage des événements et tri par date, genre et horaire.
+1.  Téléchargez le fichier `bidul-v1.0.0-win64.zip` ci-dessous (dans la section "Assets").
+2.  Décompressez l'archive dans un dossier de votre choix.
+3.  Double-cliquez sur `bidul.exe` pour lancer l'application.
 
----
-
-## 📅 Historique des versions
-
-| Version | Date       | Description                                           |
-|---------|------------|-------------------------------------------------------|
-| v1.2.0  | 08/09/2025 | Amélioration ours et logos                            |
-| v1.1.2  | 31/08/2025 | Ajout de tapageurs templates sur le gui               |
-| v1.1.0  | 30/08/2025 | Ajout du support des fichiers Excel (.xls, .xlsx)     |
-| v1.0.0  | 29/8/2025  | Première version stable avec support des fichiers CSV |
-
----
-
-### Pour les développeurs
-1. Clonez le dépôt :
-   ```bash
-   git clone https://github.com/votre-utilisateur/biduleur.git
+Un grand merci à tous ceux qui ont contribué et testé cette version. N'hésitez pas à ouvrir une "issue" sur GitHub si vous rencontrez un problème ou si vous avez des suggestions !
