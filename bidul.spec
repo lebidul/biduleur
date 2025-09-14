@@ -20,6 +20,11 @@ datas = [
     ('biduleur/templates', 'biduleur/templates'),
 ]
 
+binaries = [
+    ('bin/win64/pdf2svg.exe', 'bin'),
+    ('bin/win64/*.dll', 'bin')
+]
+
 # ==================== DÉBOGAGE ====================
 print("\n--- Chemins des données (datas) ---")
 for src, dst in datas:
