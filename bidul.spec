@@ -4,37 +4,38 @@ from PyInstaller.building.build_main import Analysis, PYZ, EXE, COLLECT
 
 BASE_DIR = os.getcwd()
 entry_script = os.path.join(BASE_DIR, 'gui.py')
-ICON_PATH = os.path.join(BASE_DIR, 'misenpageur', 'assets', 'icon', 'biduleur.ico') # Assurez-vous que l'icône est bien là
+ICON_PATH = os.path.join(BASE_DIR, 'biduleur.ico')
 VERSION_FILE = os.path.join(BASE_DIR, 'bidul_version_info.txt')
 
 # On liste toutes les données à inclure
 datas = [
-    # Les assets de misenpageur
     ('misenpageur/assets', 'misenpageur/assets'),
-    # Les fichiers de config et layout
     ('misenpageur/config.yml', 'misenpageur'),
     ('misenpageur/layout.yml', 'misenpageur'),
-    # Les templates de biduleur
     ('biduleur/templates', 'biduleur/templates'),
 ]
 
-# On liste les binaires externes à inclure
 binaries = [
-    ('bin/win64/pdf2svg.exe', 'bin/win64'),
-    ('bin/win64/*.dll', 'bin/win64')
+    ('bin/win64/pdf2svg.exe', 'bin'),
+    ('bin/win64/*.dll', 'bin')
 ]
 
-# Paquets lourds à exclure
 EXCLUDES = [
     'torch', 'tensorflow', 'scipy', 'matplotlib',
 ]
 
 a = Analysis(
     [entry_script],
-    pathex=[BASE_DIR],
+    pathex=[], # On le laisse vide pour l'instant
     binaries=binaries,
     datas=datas,
-    hiddenimports=['svglib', 'lxml'], # Aides pour PyInstaller
+    # ==================== LA CORRECTION EST ICI ====================
+    # On dit explicitement à PyInstaller de trouver ces deux modules
+    hiddenimports=[
+        'svglib', 'lxml', 'lxml._elementpath',
+        'biduleur', 'misenpageur'
+    ],
+    # =============================================================
     hookspath=[],
     runtime_hooks=[],
     excludes=EXCLUDES,
@@ -53,7 +54,7 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=False, # Important : pas de console
+    console=False,
     disable_windowed_traceback=False,
     target_arch=None,
     codesign_identity=None,

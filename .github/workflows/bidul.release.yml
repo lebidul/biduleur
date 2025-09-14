@@ -2,22 +2,34 @@ name: Build and Release - Bidul
 
 on:
   push:
-    tags:
-      - 'v*' # Se déclenche quand un tag (ex: v1.0.1) est poussé
-  workflow_dispatch: # Permet de le lancer manuellement depuis l'interface GitHub
+    branches:
+      - master # Se déclenche à chaque push/merge sur master
+
+  workflow_dispatch: # Permet le lancement manuel
     inputs:
-      version:
-        description: 'Numéro de version à forcer (ex: 1.0.0)'
+      release_type:
+        description: 'Type de release (patch, minor, major)'
         required: true
-        default: '1.0.0'
+        default: 'patch'
+        type: choice
+        options: ['patch', 'minor', 'major']
 
 jobs:
   build-release:
     runs-on: windows-latest
+    
+    # Empêcher les exécutions multiples pour le même commit
+    concurrency: 
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          # On a besoin du token pour pouvoir pousser des commits et des tags
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
 
       - name: Set up Python 3.10
         uses: actions/setup-python@v5
@@ -28,20 +40,65 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install pyinstaller==6.6.0
-          # Installe les dépendances des DEUX modules
           pip install -r biduleur/requirements.txt
           pip install -r misenpageur/requirements.txt
+
+      - name: Determine Next Version
+        id: versioning
+        shell: pwsh
+        run: |
+          # Lire la version depuis le fichier VERSION
+          $file_version = (Get-Content -Path VERSION).Trim()
+          
+          # Récupérer le dernier tag Git
+          $latest_tag = git describe --tags --abbrev=0 2>$null
+          $tag_version = "0.0.0"
+          if ($latest_tag) {
+            $tag_version = $latest_tag.TrimStart("v")
+          }
+          
+          # Choisir la version la plus élevée entre le fichier et le tag comme base
+          $base_version = ([System.Version]$file_version -ge [System.Version]$tag_version) ? $file_version : $tag_version
+          
+          # Déterminer le type d'incrémentation
+          $release_type = "${{ github.event.inputs.release_type }}"
+          if (-not $release_type) {
+            # Si c'est un push sur master, on fait un patch par défaut
+            $release_type = "patch" 
+          }
+          
+          # Incrémenter la version
+          $version_parts = $base_version.Split(".")
+          $major = [int]$version_parts[0]
+          $minor = [int]$version_parts[1]
+          $patch = [int]$version_parts[2]
+          
+          if ($release_type -eq "major") {
+            $major += 1
+            $minor = 0
+            $patch = 0
+          } elseif ($release_type -eq "minor") {
+            $minor += 1
+            $patch = 0
+          } else { # patch
+            $patch += 1
+          }
+          
+          $new_version = "$major.$minor.$patch"
+          $new_tag = "v$new_version"
+          
+          echo "Base version: $base_version"
+          echo "New Version: $new_version"
+          echo "New Tag: $new_tag"
+
+          "VERSION=$new_version" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "TAG=$new_tag" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Update version file
         shell: pwsh
         run: |
-          # Utilise la version du tag ou celle fournie manuellement
-          $version = "${{ github.ref_name }}".Replace("v", "") `
-            -or "${{ github.event.inputs.version }}" `
-            -or "1.0.0"
-          (Get-Content -Path bidul_version_info.txt -Raw).Replace("1.0.0", $version) `
+          (Get-Content -Path bidul_version_info.txt -Raw).Replace("1.0.0", "${{ env.VERSION }}") `
             | Set-Content -Path bidul_version_info.txt
-          echo "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Build with PyInstaller
         run: pyinstaller bidul.spec --clean --noconfirm
@@ -49,26 +106,68 @@ jobs:
       - name: Package release artifact
         shell: pwsh
         run: |
-          # Créer un dossier de distribution propre
-          New-Item -ItemType Directory -Force -Path "release"
-          
-          # Copier l'exécutable et ses dépendances
-          Copy-Item -Path "dist/bidul/*" -Destination "release/" -Recurse
-          
-          # Ajouter un README
-          "Bidul v${{ env.VERSION }}" | Out-File -FilePath release/README.txt -Encoding utf8
-          
-          # Créer l'archive ZIP
-          Compress-Archive -Path "release/*" -DestinationPath "bidul-${{ env.VERSION }}-win64.zip"
+          $sourceFolder = "dist/bidul"
+          $zipFileName = "bidul-${{ env.VERSION }}-win64.zip"
+          Compress-Archive -Path "$sourceFolder/*" -DestinationPath $zipFileName
+          echo "ZIP_NAME=$zipFileName" | Out-File -FilePath $env:GITHUB_ENV -Append
 
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bidul-windows-build-${{ env.VERSION }}
+          path: ${{ env.ZIP_NAME }}
+          retention-days: 7
+
+      - name: Get Release Notes
+        id: get_release_notes
+        shell: pwsh
+        run: |
+          $version = "${{ env.VERSION }}"
+          $notes_file = "RELEASE_NOTES.md"
+          $release_notes = "Pas de notes de version trouvées pour la version $version."
+          
+          if (Test-Path $notes_file) {
+            $content = Get-Content -Path $notes_file -Raw
+            $pattern = "(?s)## \[$version\](.*?)(?=## \[|\Z)"
+            $match = [regex]::Match($content, $pattern)
+            
+            if ($match.Success) {
+              $release_notes = $match.Groups[1].Value.Trim()
+            }
+          }
+          
+          $release_notes = $release_notes.Replace('%', '%25').Replace("`n", '%0A').Replace("`r", '%0D')
+          echo "RELEASE_NOTES=$release_notes" | Out-File -FilePath $env:GITHUB_OUTPUT
+
+      - name: Commit and Push Version Bump
+        if: github.event_name == 'push'
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "github-actions@github.com"
+          
+          Set-Content -Path VERSION -Value "${{ env.VERSION }}"
+          
+          git add VERSION bidul_version_info.txt
+          # On vérifie s'il y a des changements à commiter
+          if (-not $(git status --porcelain)) {
+            echo "No changes to commit."
+          } else {
+            git commit -m "chore(release): Bump version to ${{ env.VERSION }}"
+            git push
+          }
+
+      - name: Create and Push Git Tag
+        if: github.event_name == 'push'
+        run: |
+          git tag ${{ env.TAG }}
+          git push origin ${{ env.TAG }}
+      
       - name: Create Release
+        # On ne crée une release que pour les pushs sur master
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         uses: softprops/action-gh-release@v2
         with:
           name: Bidul v${{ env.VERSION }}
-          tag_name: ${{ github.ref_name || format('v{0}', github.event.inputs.version) }}
-          files: bidul-${{ env.VERSION }}-win64.zip
-          body: |
-            Version ${{ env.VERSION }} de Bidul.
-            - Téléchargez le fichier `bidul-${{ env.VERSION }}-win64.zip` ci-dessous.
-            - Décompressez l'archive.
-            - Lancez `bidul.exe`.
+          tag_name: ${{ env.TAG }}
+          files: ${{ env.ZIP_NAME }}
+          body: ${{ steps.get_release_notes.outputs.RELEASE_NOTES }}

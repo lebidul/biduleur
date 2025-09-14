@@ -1,0 +1,24 @@
+# Fichier de dépendances pour le module misenpageur
+
+# Pour la lecture des fichiers de configuration .yml
+PyYAML==6.0.1
+
+# Bibliothèque principale pour la génération des documents PDF
+reportlab==4.2.0
+
+# Pour la manipulation d'images (ouverture, pré-traitement pour la couverture)
+# Également requis par qrcode.
+Pillow==10.3.0
+
+# Pour la génération des QR codes
+qrcode==7.4.2
+
+# Pour parser le contenu Markdown du fichier "Ours"
+markdown-it-py==3.0.0
+
+# Pour le post-traitement des fichiers SVG (parser et modifier le XML)
+lxml==5.2.1
+
+# svglib n'est plus nécessaire car nous utilisons un outil externe (pdf2svg)
+# mais si vous aviez des fonctions qui l'utilisent encore, il faudrait l'ajouter :
+# svglib==1.5.1
