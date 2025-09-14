@@ -83,41 +83,41 @@ jobs:
       - name: Build with PyInstaller
         run: pyinstaller bidul.spec --clean --noconfirm
 
-#      - name: Package release artifact
-#        id: package
-#        shell: pwsh
-#        run: |
-#          $version = "${{ env.VERSION }}"
-#          $sourceFolder = "dist/bidul"
-#          $zipFileName = "bidul-${version}-win64.zip"
-#
-#          # On s'assure que le dossier source existe
-#          if (-not (Test-Path $sourceFolder)) {
-#            Write-Error "Le dossier de build '$sourceFolder' n'a pas été trouvé !"
-#            exit 1
-#          }
-#
-#          # ==================== CORRECTION ZIP ====================
-#          # On compresse directement le dossier, mais on s'assurera
-#          # que l'utilisateur sait qu'il doit ouvrir le dossier "bidul" à l'intérieur.
-#          # C'est plus simple et plus robuste.
-#          Compress-Archive -Path $sourceFolder -DestinationPath $zipFileName -Force
-#          # ======================================================
-#
-#          echo "ZIP_NAME=$zipFileName" | Out-File -FilePath $env:GITHUB_ENV -Append
+      - name: Package release artifact
+        id: package
+        shell: pwsh
+        run: |
+          $version = "${{ env.VERSION }}"
+          $sourceFolder = "dist/bidul"
+          $zipFileName = "bidul-${version}-win64.zip"
 
-#      - name: Upload Build Artifact
-#        uses: actions/upload-artifact@v4
-#        with:
-#          name: bidul-windows-build-${{ env.VERSION }}
-#          path: ${{ env.ZIP_NAME }}
-#          retention-days: 7
+          # On s'assure que le dossier source existe
+          if (-not (Test-Path $sourceFolder)) {
+            Write-Error "Le dossier de build '$sourceFolder' n'a pas été trouvé !"
+            exit 1
+          }
 
-      - name: Upload Build Folder for Debugging
+          # ==================== CORRECTION ZIP ====================
+          # On compresse directement le dossier, mais on s'assurera
+          # que l'utilisateur sait qu'il doit ouvrir le dossier "bidul" à l'intérieur.
+          # C'est plus simple et plus robuste.
+          Compress-Archive -Path $sourceFolder -DestinationPath $zipFileName -Force
+          # ======================================================
+
+          echo "ZIP_NAME=$zipFileName" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: bidul-windows-build-folder
-          path: dist/bidul/ # On téléverse le dossier complet```
+          name: bidul-windows-build-${{ env.VERSION }}
+          path: ${{ env.ZIP_NAME }}
+          retention-days: 7
+
+#      - name: Upload Build Folder for Debugging
+#        uses: actions/upload-artifact@v4
+#        with:
+#          name: bidul-windows-build-folder
+#          path: dist/bidul/ # On téléverse le dossier complet```
 
 
       - name: Get Release Notes
