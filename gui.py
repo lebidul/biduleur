@@ -25,13 +25,10 @@ else:
     _IMPORT_ERR = None
 
 
-# ... (fonctions _default_paths_from_input, _project_defaults, _load_cfg_defaults, _ensure_parent_dir inchangées) ...
 def _default_paths_from_input(input_file: str) -> dict:
-    # On utilise pathlib pour une manipulation propre des chemins
     input_path = Path(input_file)
-    base = input_path.stem # Nom du fichier sans extension (ex: "tapage")
-    folder = input_path.parent # Dossier parent (ex: "C:/Users/thiba/Desktop/test.bidul")
-
+    base = input_path.stem
+    folder = input_path.parent
     return {
         "html": str(folder / f"{base}.html"),
         "agenda_html": str(folder / f"{base}.agenda.html"),
@@ -41,6 +38,7 @@ def _default_paths_from_input(input_file: str) -> dict:
 
 
 def _project_defaults() -> dict:
+    # On suppose que ce script est à la racine du projet, à côté de 'misenpageur'
     repo_root = Path(__file__).resolve().parent
     cfg = repo_root / "misenpageur" / "config.yml"
     lay = repo_root / "misenpageur" / "layout.yml"
@@ -52,90 +50,67 @@ def _load_cfg_defaults() -> dict:
         "cover": "", "ours_md": "", "logos_dir": "", "auteur_couv": "",
         "auteur_couv_url": "", "skip_cover": False,
         "page_margin_mm": 1.0,
-        "date_separator_type": "ligne", # Nouveau : "aucun", "ligne", "box"
-        "date_spacing": "4", # Nouveau
-        "poster_design": 0,
-        "font_size_safety_factor": 0.98,
-        "background_alpha": 0.85,
-        "poster_title": "",
-        "cucaracha_type": "none",
-        "cucaracha_value": "",
-        "cucaracha_text_font": "Arial"
+        "date_separator_type": "ligne", "date_spacing": "4",
+        "poster_design": 0, "font_size_safety_factor": 0.98,
+        "background_alpha": 0.85, "poster_title": "",
+        "cucaracha_type": "none", "cucaracha_value": "", "cucaracha_text_font": "Arial"
     }
-
-    if _IMPORT_ERR:
-        return out
-
+    if _IMPORT_ERR: return out
     try:
         defaults = _project_defaults()
         cfg = Config.from_yaml(defaults["config"])
-
-        # Charger les valeurs de base
-        out["cover"] = cfg.cover_image or ""
-        out["ours_md"] = cfg.ours_md or ""
-        out["logos_dir"] = cfg.logos_dir or ""
-        out["auteur_couv"] = getattr(cfg, "auteur_couv", "") or ""
-        out["auteur_couv_url"] = getattr(cfg, "auteur_couv_url", "") or ""
-        out["skip_cover"] = getattr(cfg, "skip_cover", False)
-
-        out["date_spacing"] = str(cfg.date_spaceBefore) # On suppose que Before et After sont identiques
+        out.update({
+            "cover": cfg.cover_image or "",
+            "ours_md": cfg.ours_md or "",
+            "logos_dir": cfg.logos_dir or "",
+            "auteur_couv": getattr(cfg, "auteur_couv", "") or "",
+            "auteur_couv_url": getattr(cfg, "auteur_couv_url", "") or "",
+            "skip_cover": getattr(cfg, "skip_cover", False),
+            "date_spacing": str(cfg.date_spaceBefore),
+        })
+        if isinstance(cfg.pdf_layout, dict): out["page_margin_mm"] = cfg.pdf_layout.get("page_margin_mm", 1.0)
         if cfg.date_line.get("enabled", True):
             out["date_separator_type"] = "ligne"
         elif cfg.date_box.get("enabled", False):
             out["date_separator_type"] = "box"
         else:
             out["date_separator_type"] = "aucun"
-
-        # On s'assure de lire les clés imbriquées correctement
-        if isinstance(cfg.pdf_layout, dict):
-            out["page_margin_mm"] = cfg.pdf_layout.get("page_margin_mm", 1.0)
-
-        if isinstance(cfg.date_line, dict):
-            out["date_line_enabled"] = cfg.date_line.get("enabled", True)
-
         if isinstance(cfg.poster, dict):
-            out["poster_design"] = cfg.poster.get("design", 0)
-            out["font_size_safety_factor"] = cfg.poster.get("font_size_safety_factor", 0.98)
-            out["background_alpha"] = cfg.poster.get("background_image_alpha", 0.85)
-            # out["poster_title"] = cfg.poster.get("title", "") # Charger le titre
-
+            out.update({
+                "poster_design": cfg.poster.get("design", 0),
+                "font_size_safety_factor": cfg.poster.get("font_size_safety_factor", 0.98),
+                "background_alpha": cfg.poster.get("background_image_alpha", 0.85),
+                "poster_title": cfg.poster.get("title", "")
+            })
         if isinstance(cfg.cucaracha_box, dict):
-            out["cucaracha_type"] = cfg.cucaracha_box.get("content_type", "none")
-            out["cucaracha_value"] = cfg.cucaracha_box.get("content_value", "")
-            out["cucaracha_text_font"] = cfg.cucaracha_box.get("text_font_name", "Arial")
-
+            out.update({
+                "cucaracha_type": cfg.cucaracha_box.get("content_type", "none"),
+                "cucaracha_value": cfg.cucaracha_box.get("content_value", ""),
+                "cucaracha_text_font": cfg.cucaracha_box.get("text_font_name", "Arial")
+            })
     except Exception as e:
-        # En cas d'erreur de lecture, on utilise les valeurs par défaut
         print(f"[WARN] Erreur lors de la lecture des défauts depuis config.yml : {e}")
-        pass
-
     return out
 
 
 def _ensure_parent_dir(path: str):
-    if path:
-        Path(path).parent.mkdir(parents=True, exist_ok=True)
+    if path: Path(path).parent.mkdir(parents=True, exist_ok=True)
 
 
-def run_pipeline(input_file: str,
-                 generate_cover: bool, cover_image: str, ours_md: str, logos_dir: str,
-                 out_html: str, out_agenda_html: str, out_pdf: str,
-                 auteur_couv: str, auteur_couv_url: str, page_margin_mm: float,
-                 generate_svg: bool, out_svg: str,
-                 date_separator_type: str, date_spacing: float,
-                 poster_design: int, font_size_safety_factor: float,
-                 background_alpha: float, poster_title: str,
-                 cucaracha_type: str, cucaracha_value: str, cucaracha_text_font: str
-                 ) -> tuple[bool, str]:
-    """
-    Enchaîne : XLS/CSV -> (biduleur) -> 2 HTML -> (misenpageur) -> PDF
-    """
+def run_pipeline(
+        input_file: str, generate_cover: bool, cover_image: str, ours_md: str, logos_dir: str,
+        out_html: str, out_agenda_html: str, out_pdf: str, auteur_couv: str, auteur_couv_url: str,
+        page_margin_mm: float, generate_svg: bool, out_svg: str, date_separator_type: str,
+        date_spacing: float, poster_design: int, font_size_safety_factor: float,
+        background_alpha: float, poster_title: str, cucaracha_type: str,
+        cucaracha_value: str, cucaracha_text_font: str
+) -> tuple[bool, str]:
     if _IMPORT_ERR:
         return False, f"Imports misenpageur impossibles : {repr(_IMPORT_ERR)}"
-
     final_layout_path = None
+    report = {}
     try:
-        for p in (out_html, out_agenda_html, out_pdf):
+        for p in (out_html, out_agenda_html, out_pdf, out_svg):
             if p: _ensure_parent_dir(p)
 
         html_body_bidul, html_body_agenda, number_of_lines = parse_bidul(input_file)
@@ -144,28 +119,21 @@ def run_pipeline(input_file: str,
 
         defaults = _project_defaults()
         project_root, cfg_path, lay_path = defaults["root"], defaults["config"], defaults["layout"]
-
         cfg = Config.from_yaml(cfg_path)
 
-        # --- APPLICATION DE TOUS LES PARAMÈTRES DE LA GUI SUR L'OBJET CONFIG ---
-        cfg.skip_cover = not generate_cover
         cfg.input_html = out_html
+        cfg.skip_cover = not generate_cover
         if out_pdf: cfg.output_pdf = out_pdf
         if (cover_image or "").strip(): cfg.cover_image = cover_image.strip()
         if (ours_md or "").strip(): cfg.ours_md = ours_md.strip()
         if (logos_dir or "").strip(): cfg.logos_dir = logos_dir.strip()
         if (auteur_couv or "").strip(): cfg.auteur_couv = auteur_couv.strip()
         if (auteur_couv_url or "").strip(): cfg.auteur_couv_url = auteur_couv_url.strip()
-
-        # Paramètres de mise en page
         cfg.pdf_layout['page_margin_mm'] = page_margin_mm
-
-        # Paramètres de séparateurs de dates
+        cfg.date_line['enabled'] = (date_separator_type == "ligne")
         cfg.date_box['enabled'] = (date_separator_type == "box")
         cfg.date_spaceBefore = date_spacing
         cfg.date_spaceAfter = date_spacing
-
-        # Nouveaux paramètres du poster
         cfg.poster['design'] = poster_design
         cfg.poster['font_size_safety_factor'] = font_size_safety_factor
         cfg.poster['background_image_alpha'] = background_alpha
@@ -174,32 +142,40 @@ def run_pipeline(input_file: str,
         cfg.cucaracha_box['content_value'] = cucaracha_value
         cfg.cucaracha_box['text_font_name'] = cucaracha_text_font
 
-        # On utilise le layout_builder pour les pages 1 & 2
         final_layout_path = build_layout_with_margins(lay_path, cfg)
         lay = Layout.from_yaml(final_layout_path)
 
-        build_pdf(project_root, cfg, lay, out_pdf, cfg_path)
+        if out_pdf:
+            report = build_pdf(project_root, cfg, lay, out_pdf, cfg_path)
+        if generate_svg and out_svg:
+            if not report:
+                report = build_pdf(project_root, cfg, lay, os.devnull, cfg_path)
+            build_svg(project_root, cfg, lay, out_svg, cfg_path)
 
         summary_lines = [
-            f"HTML            : {out_html}",
-            f"HTML (agenda)   : {out_agenda_html}",
-            f"PDF             : {cfg.output_pdf}",
-            # ... (autres lignes de résumé) ...
-            f"\nÉvénements : {number_of_lines}",
+            f"Fichier d'entrée : {os.path.basename(input_file)}", "-" * 40, "Fichiers de sortie créés :"
         ]
-
-        if generate_svg and out_svg:
-            build_svg(project_root, cfg, lay, out_svg, cfg_path)
-            summary_lines.append(f"SVG (éditable) : {out_svg}")
+        if out_html: summary_lines.append(f"  - HTML: {out_html}")
+        if out_agenda_html: summary_lines.append(f"  - HTML (Agenda): {out_agenda_html}")
+        if out_pdf: summary_lines.append(f"  - PDF: {out_pdf}")
+        if generate_svg and out_svg: summary_lines.append(f"  - SVG (éditable): {out_svg}")
+        summary_lines.append("\n" + "-" * 40)
+        summary_lines.append(f"Nombre d'événements traités : {number_of_lines}")
+        fs_main = report.get("font_size_main")
+        if fs_main: summary_lines.append(f"Taille de police (pages 1-2): {fs_main:.2f} pt")
+        fs_poster = report.get("font_size_poster_final")
+        if fs_poster:
+            fs_poster_opt = report.get("font_size_poster_optimal", 0)
+            summary_lines.append(
+                f"Taille de police (poster)    : {fs_poster:.2f} pt (optimale: {fs_poster_opt:.2f} pt)")
 
         return True, "\n".join(summary_lines)
 
     except Exception as e:
         import traceback
         return False, f"{type(e).__name__}: {e}\n\n{traceback.format_exc()}"
-
     finally:
-        if final_layout_path and os.path.exists(final_layout_path):
+        if final_layout_path and os.path.exists(final_layout_path) and Path(final_layout_path).name.endswith(".yml"):
             try:
                 os.remove(final_layout_path)
             except OSError:
@@ -209,60 +185,40 @@ def run_pipeline(input_file: str,
 def main():
     root = tk.Tk()
     root.title("Bidul – Pipeline XLS/CSV → HTMLs → PDF")
-    root.minsize(900, 750)  # Augmentation de la hauteur min
-
-    # --- Configuration de la grille principale ---
+    root.minsize(900, 900)
     root.columnconfigure(0, weight=1)
-    root.rowconfigure(5, weight=1)  # Ligne du statut
 
-    # --- Préremplissages ---
     cfg_defaults = _load_cfg_defaults()
 
     # --- Variables Tkinter ---
     input_var = tk.StringVar()
     ours_var = tk.StringVar(value=cfg_defaults.get("ours_md", ""))
     logos_var = tk.StringVar(value=cfg_defaults.get("logos_dir", ""))
-
-    # Couverture
     generate_cover_var = tk.BooleanVar(value=not cfg_defaults.get("skip_cover", False))
     cover_var = tk.StringVar(value=cfg_defaults.get("cover", ""))
     auteur_var = tk.StringVar(value=cfg_defaults.get("auteur_couv", ""))
     auteur_url_var = tk.StringVar(value=cfg_defaults.get("auteur_couv_url", ""))
-
-    # Mise en page
     margin_var = tk.StringVar(value=str(cfg_defaults.get("page_margin_mm", "1.0")))
-
-    # Séaparateurs de dates
     date_separator_var = tk.StringVar(value=cfg_defaults.get("date_separator_type", "ligne"))
     date_spacing_var = tk.StringVar(value=cfg_defaults.get("date_spacing", "4"))
-
-    # Design du poster
-    poster_design_var = tk.IntVar(value=cfg_defaults.get("poster", {}).get("design", 0))  # 0 ou 1
+    poster_title_var = tk.StringVar(value=cfg_defaults.get("poster_title", ""))
+    poster_design_var = tk.IntVar(value=cfg_defaults.get("poster_design", 0))
     safety_factor_var = tk.StringVar(value=str(cfg_defaults.get("font_size_safety_factor", "0.98")))
     alpha_var = tk.DoubleVar(value=cfg_defaults.get("background_alpha", 0.85))
-    poster_title_var = tk.StringVar(value=cfg_defaults.get("poster_title", ""))
-
-    # Design de la cucaracha
     cucaracha_type_var = tk.StringVar(value=cfg_defaults.get("cucaracha_type", "none"))
     cucaracha_value_var = tk.StringVar(value=cfg_defaults.get("cucaracha_value", ""))
     cucaracha_font_var = tk.StringVar(value=cfg_defaults.get("cucaracha_text_font", "Arial"))
-
-    # Sorties
-    html_var = tk.StringVar()
-    agenda_var = tk.StringVar()
-    pdf_var = tk.StringVar()
+    html_var, agenda_var, pdf_var, svg_var = tk.StringVar(), tk.StringVar(), tk.StringVar(), tk.StringVar()
     generate_svg_var = tk.BooleanVar(value=True)
-    svg_var = tk.StringVar()
 
-    # --- Helpers (inchangés) ---
     def pick_input():
         file_path = filedialog.askopenfilename(title="Sélectionner l’entrée (CSV / XLS / XLSX)",
                                                filetypes=[("Excel", "*.xls;*.xlsx"), ("CSV", "*.csv"), ("Tous", "*.*")])
         if not file_path: return
         input_var.set(file_path)
         d = _default_paths_from_input(file_path)
-        html_var.set(d["html"]);
-        agenda_var.set(d["agenda_html"]);
+        html_var.set(d["html"])
+        agenda_var.set(d["agenda_html"])
         pdf_var.set(d["pdf"])
         svg_var.set(d["svg"])
 
@@ -281,6 +237,10 @@ def main():
         path = filedialog.askdirectory(title="Dossier des logos")
         if path: logos_var.set(path)
 
+    def pick_file(entry_var):
+        path = filedialog.askopenfilename(title="Choisir une image", filetypes=[("Images", "*.jpg *.jpeg *.png")])
+        if path: entry_var.set(path)
+
     def pick_save(var, title, ext, ftypes):
         path = filedialog.asksaveasfilename(title=title, defaultextension=ext, filetypes=ftypes)
         if path: var.set(path)
@@ -298,18 +258,14 @@ def main():
         except Exception as e:
             messagebox.showerror("Erreur", f"Impossible d'enregistrer le modèle : {e}")
 
-    # --- Construction de l'UI par sections ---
     main_frame = ttk.Frame(root, padding="10")
     main_frame.grid(row=0, column=0, sticky="nsew")
     main_frame.columnconfigure(1, weight=1)
+    r = 0
 
-    r = 0  # Row counter for the main_frame grid
-
-    # --- Section : Fichier d'entrée et Modèles ---
     tk.Label(main_frame, text="Fichier d’entrée (CSV / XLS) :").grid(row=r, column=0, sticky="e", padx=5, pady=5)
     tk.Entry(main_frame, textvariable=input_var).grid(row=r, column=1, sticky="ew", padx=5, pady=5)
     tk.Button(main_frame, text="Parcourir…", command=pick_input).grid(row=r, column=2, padx=5, pady=5)
-
     r += 1
     models_frame = ttk.Frame(main_frame)
     models_frame.grid(row=r, column=1, columnspan=2, sticky="w", padx=5, pady=(0, 10))
@@ -320,11 +276,8 @@ def main():
     tk.Button(models_frame, text="Modèle XLSX",
               command=lambda: save_embedded_template('tapage_template.xlsx', "Enregistrer le modèle XLSX")).pack(
         side=tk.LEFT, padx=5)
-
     r += 1
     ttk.Separator(main_frame, orient='horizontal').grid(row=r, column=0, columnspan=3, sticky="ew", pady=10)
-
-    # --- Section : Ours & Logos ---
     r += 1
     tk.Label(main_frame, text="Ours (Markdown) :").grid(row=r, column=0, sticky="e", padx=5, pady=5)
     tk.Entry(main_frame, textvariable=ours_var).grid(row=r, column=1, sticky="ew", padx=5, pady=5)
@@ -333,47 +286,30 @@ def main():
     tk.Label(main_frame, text="Dossier logos :").grid(row=r, column=0, sticky="e", padx=5, pady=5)
     tk.Entry(main_frame, textvariable=logos_var).grid(row=r, column=1, sticky="ew", padx=5, pady=5)
     tk.Button(main_frame, text="Parcourir…", command=pick_logos).grid(row=r, column=2, padx=5, pady=5)
-
-    # --- Section : CUCARACHA BOX ---
     r += 1
     cucaracha_frame = ttk.LabelFrame(main_frame, text="Boîte 'Cucaracha'", padding="10")
     cucaracha_frame.grid(row=r, column=0, columnspan=3, sticky="ew", pady=10)
     cucaracha_frame.columnconfigure(1, weight=1)
-
-    # --- Widgets pour le contenu (placés sur la grille du cucaracha_frame) ---
     cucaracha_text_entry = tk.Entry(cucaracha_frame, textvariable=cucaracha_value_var)
     cucaracha_font_label = tk.Label(cucaracha_frame, text="Police :")
-    cucaracha_font_combo = ttk.Combobox(
-        cucaracha_frame,
-        textvariable=cucaracha_font_var,
-        values=["Arial", "Helvetica", "Times", "Courier"], # Polices standard
-        state="readonly"
-    )
+    cucaracha_font_combo = ttk.Combobox(cucaracha_frame, textvariable=cucaracha_font_var,
+                                        values=["Arial", "Helvetica", "Times", "Courier"], state="readonly")
     cucaracha_image_entry = tk.Entry(cucaracha_frame, textvariable=cucaracha_value_var)
     cucaracha_image_btn = tk.Button(cucaracha_frame, text="Parcourir…", command=lambda: pick_file(cucaracha_value_var))
 
-    def pick_file(entry_var):
-        path = filedialog.askopenfilename(title="Choisir une image", filetypes=[("Images", "*.jpg *.jpeg *.png")])
-        if path: entry_var.set(path)
-
     def toggle_cucaracha_widgets(*args):
-        # Cache tous les widgets de contenu
-        cucaracha_text_entry.grid_remove()
-        cucaracha_font_label.grid_remove()
-        cucaracha_font_combo.grid_remove()
-        cucaracha_image_entry.grid_remove()
-        cucaracha_image_btn.grid_remove()
-
+        for widget in [cucaracha_text_entry, cucaracha_font_label, cucaracha_font_combo, cucaracha_image_entry,
+                       cucaracha_image_btn]:
+            widget.grid_remove()
         ctype = cucaracha_type_var.get()
         if ctype == "text":
-            cucaracha_text_entry.grid(row=1, column=0, columnspan=3, sticky="ew", pady=(5,0))
+            cucaracha_text_entry.grid(row=1, column=0, columnspan=3, sticky="ew", pady=(5, 0))
             cucaracha_font_label.grid(row=2, column=0, sticky="w", padx=5, pady=5)
             cucaracha_font_combo.grid(row=2, column=1, sticky="w", padx=5)
         elif ctype == "image":
             cucaracha_image_entry.grid(row=1, column=0, columnspan=2, sticky="ew", pady=5)
             cucaracha_image_btn.grid(row=1, column=2, padx=5)
 
-    # Boutons Radio pour choisir le type
     radio_frame = ttk.Frame(cucaracha_frame)
     radio_frame.grid(row=0, column=0, columnspan=3, sticky="w")
     tk.Radiobutton(radio_frame, text="Rien", variable=cucaracha_type_var, value="none",
@@ -382,15 +318,12 @@ def main():
                    command=toggle_cucaracha_widgets).pack(side=tk.LEFT)
     tk.Radiobutton(radio_frame, text="Image", variable=cucaracha_type_var, value="image",
                    command=toggle_cucaracha_widgets).pack(side=tk.LEFT)
+    toggle_cucaracha_widgets()
 
-    toggle_cucaracha_widgets()  # Appel initial pour afficher le bon widget
-
-    # --- Section : Informations de couverture ---
     r += 1
     cover_frame = ttk.LabelFrame(main_frame, text="Informations de couverture", padding="10")
     cover_frame.grid(row=r, column=0, columnspan=3, sticky="ew", pady=10)
     cover_frame.columnconfigure(1, weight=1)
-
     tk.Checkbutton(cover_frame, text="Avec couv' (générer la page de couverture)", variable=generate_cover_var).grid(
         row=0, column=0, columnspan=3, sticky="w", pady=2)
     tk.Label(cover_frame, text="Image de Couverture :").grid(row=1, column=0, sticky="e", padx=5, pady=5)
@@ -401,42 +334,36 @@ def main():
     tk.Label(cover_frame, text="URL auteur couverture :").grid(row=3, column=0, sticky="e", padx=5, pady=5)
     tk.Entry(cover_frame, textvariable=auteur_url_var).grid(row=3, column=1, columnspan=2, sticky="ew", padx=5, pady=5)
 
-    # ====================================================================================
-    #                  NOUVELLE SECTION : Séparateur de dates
-    # ====================================================================================
+    r += 1
+    page_layout_frame = ttk.LabelFrame(main_frame, text="Mise en Page Globale", padding="10")
+    page_layout_frame.grid(row=r, column=0, columnspan=3, sticky="ew", pady=10)
+    page_layout_frame.columnconfigure(1, weight=1)
+    tk.Label(page_layout_frame, text="Marge globale (mm) :").grid(row=0, column=0, sticky="w", padx=5, pady=5)
+    tk.Entry(page_layout_frame, textvariable=margin_var, width=10).grid(row=0, column=1, sticky="w", padx=5, pady=5)
+
     r += 1
     date_sep_frame = ttk.LabelFrame(main_frame, text="Séparateur de dates", padding="10")
     date_sep_frame.grid(row=r, column=0, columnspan=3, sticky="ew", pady=10)
     date_sep_frame.columnconfigure(1, weight=1)
-
-    # --- Ligne 0 : Type de séparateur ---
     tk.Label(date_sep_frame, text="Type de séparateur :").grid(row=0, column=0, sticky="w", padx=5, pady=5)
     date_sep_radios = ttk.Frame(date_sep_frame)
     date_sep_radios.grid(row=0, column=1, sticky="w", padx=5, pady=5)
     tk.Radiobutton(date_sep_radios, text="Aucun", variable=date_separator_var, value="aucun").pack(side=tk.LEFT)
-    tk.Radiobutton(date_sep_radios, text="Ligne", variable=date_separator_var, value="ligne").pack(side=tk.LEFT, padx=10)
+    tk.Radiobutton(date_sep_radios, text="Ligne", variable=date_separator_var, value="ligne").pack(side=tk.LEFT,
+                                                                                                   padx=10)
     tk.Radiobutton(date_sep_radios, text="Box", variable=date_separator_var, value="box").pack(side=tk.LEFT)
-
-    # --- Ligne 1 : Espacement ---
     tk.Label(date_sep_frame, text="Espace avant/après date (pt) :").grid(row=1, column=0, sticky="w", padx=5, pady=5)
     tk.Entry(date_sep_frame, textvariable=date_spacing_var, width=10).grid(row=1, column=1, sticky="w", padx=5, pady=5)
 
-    # --- Section : Paramètres de mise en page du poster ---
     r += 1
     layout_frame = ttk.LabelFrame(main_frame, text="Paramètres de mise en page (Poster)", padding="10")
     layout_frame.grid(row=r, column=0, columnspan=3, sticky="ew", pady=10)
     layout_frame.columnconfigure(1, weight=1)
-
-    # --- Ligne 1 ---
-    tk.Label(layout_frame, text="Titre du poster :").grid(row=2, column=0, sticky="w", padx=5, pady=5)
-    tk.Entry(layout_frame, textvariable=poster_title_var).grid(row=2, column=1, sticky="ew", padx=5, pady=5)
-
-    # --- Ligne 2 ---
-    tk.Label(layout_frame, text="Design du poster :").grid(row=3, column=0, sticky="w", padx=5, pady=5)
+    tk.Label(layout_frame, text="Titre du poster :").grid(row=0, column=0, sticky="w", padx=5, pady=5)
+    tk.Entry(layout_frame, textvariable=poster_title_var).grid(row=0, column=1, sticky="ew", padx=5, pady=5)
+    tk.Label(layout_frame, text="Design du poster :").grid(row=1, column=0, sticky="w", padx=5, pady=5)
     design_frame = ttk.Frame(layout_frame)
-    design_frame.grid(row=3, column=1, sticky="w", padx=5, pady=5)
-
-    # --- Widgets à afficher/cacher ---
+    design_frame.grid(row=1, column=1, sticky="w", padx=5, pady=5)
     alpha_label = tk.Label(layout_frame, text="Transparence du fond :")
     alpha_scale_frame = ttk.Frame(layout_frame)
     alpha_scale = ttk.Scale(alpha_scale_frame, from_=0.0, to=1.0, orient=tk.HORIZONTAL, variable=alpha_var)
@@ -451,8 +378,8 @@ def main():
 
     def toggle_alpha_slider(*args):
         if poster_design_var.get() == 1:
-            alpha_label.grid(row=4, column=0, sticky="w", padx=5, pady=5)
-            alpha_scale_frame.grid(row=4, column=1, sticky="ew", padx=5, pady=5)
+            alpha_label.grid(row=2, column=0, sticky="w", padx=5, pady=5)
+            alpha_scale_frame.grid(row=2, column=1, sticky="ew", padx=5, pady=5)
         else:
             alpha_label.grid_remove()
             alpha_scale_frame.grid_remove()
@@ -462,19 +389,15 @@ def main():
     tk.Radiobutton(design_frame, text="Image en fond", variable=poster_design_var, value=1,
                    command=toggle_alpha_slider).pack(side=tk.LEFT, padx=5)
 
-    # --- Ligne 5 ---
-    tk.Label(layout_frame, text="Facteur de sécurité de la taille de police du poster :").grid(row=5, column=0, sticky="w", padx=5, pady=5)
-    tk.Entry(layout_frame, textvariable=safety_factor_var, width=10).grid(row=5, column=1, sticky="w", padx=5, pady=5)
+    tk.Label(layout_frame, text="Facteur de sécurité police :").grid(row=3, column=0, sticky="w", padx=5, pady=5)
+    tk.Entry(layout_frame, textvariable=safety_factor_var, width=10).grid(row=3, column=1, sticky="w", padx=5, pady=5)
 
-    # Appel initial pour définir la visibilité du curseur
     toggle_alpha_slider()
 
-    # --- Section : Fichiers de sortie ---
     r += 1
     output_frame = ttk.LabelFrame(main_frame, text="Fichiers de sortie", padding="10")
     output_frame.grid(row=r, column=0, columnspan=3, sticky="ew", pady=10)
     output_frame.columnconfigure(1, weight=1)
-
     tk.Label(output_frame, text="HTML (biduleur) :").grid(row=0, column=0, sticky="e", padx=5, pady=5)
     tk.Entry(output_frame, textvariable=html_var).grid(row=0, column=1, sticky="ew", padx=5, pady=5)
     tk.Button(output_frame, text="…", width=3,
@@ -490,21 +413,19 @@ def main():
     tk.Button(output_frame, text="…", width=3,
               command=lambda: pick_save(pdf_var, "PDF", ".pdf", [("PDF", "*.pdf")])).grid(row=2, column=2, padx=5,
                                                                                           pady=5)
-    tk.Checkbutton(output_frame, text="GNom de base SVG (pour Inkscape) :", variable=generate_svg_var).grid(row=3,
+    tk.Checkbutton(output_frame, text="Générer un SVG éditable (pour Inkscape)", variable=generate_svg_var).grid(row=3,
                                                                                                                  column=0,
                                                                                                                  columnspan=3,
                                                                                                                  sticky="w",
                                                                                                                  padx=5,
                                                                                                                  pady=5)
-
-    tk.Label(output_frame, text="Sortie SVG :").grid(row=4, column=0, sticky="e", padx=5, pady=5)
+    tk.Label(output_frame, text="Nom de base SVG :").grid(row=4, column=0, sticky="e", padx=5, pady=5)
     tk.Entry(output_frame, textvariable=svg_var).grid(row=4, column=1, sticky="ew", padx=5, pady=5)
     tk.Button(output_frame, text="…", width=3,
               command=lambda: pick_save(svg_var, "Enregistrer le SVG", ".svg", [("SVG", "*.svg")])).grid(row=4,
                                                                                                          column=2,
                                                                                                          padx=5, pady=5)
 
-    # --- Status & action ---
     status = tk.StringVar(value="Prêt.")
 
     def run_now():
@@ -512,7 +433,6 @@ def main():
         if not inp:
             messagebox.showerror("Erreur", "Veuillez sélectionner un fichier d’entrée.")
             return
-
         try:
             margin_val = float(margin_var.get().strip().replace(',', '.'))
             safety_factor_val = float(safety_factor_var.get().strip().replace(',', '.'))
@@ -521,18 +441,13 @@ def main():
             messagebox.showerror("Erreur",
                                  "La marge, l'espacement et le facteur de sécurité doivent être des nombres valides.")
             return
-
         poster_title = poster_title_var.get().strip()
         if not poster_title:
             messagebox.showerror("Erreur", "Le titre du poster est obligatoire.")
             return
-
-        # Récupérer les valeurs de la Cucaracha box
         cuca_value = cucaracha_value_var.get().strip()
-
         status.set("Traitement en cours…")
         root.update_idletasks()
-
         ok, msg = run_pipeline(
             input_file=inp,
             generate_cover=generate_cover_var.get(),
@@ -545,6 +460,8 @@ def main():
             auteur_couv=auteur_var.get().strip(),
             auteur_couv_url=auteur_url_var.get().strip(),
             page_margin_mm=margin_val,
+            generate_svg=generate_svg_var.get(),
+            out_svg=svg_var.get().strip(),
             date_separator_type=date_separator_var.get(),
             date_spacing=date_spacing_val,
             poster_design=poster_design_var.get(),
@@ -553,28 +470,23 @@ def main():
             poster_title=poster_title,
             cucaracha_type=cucaracha_type_var.get(),
             cucaracha_value=cuca_value,
-            cucaracha_text_font=cucaracha_font_var.get(),
-            generate_svg=generate_svg_var.get(),
-            out_svg=svg_var.get().strip()
+            cucaracha_text_font=cucaracha_font_var.get()
         )
         if ok:
-            messagebox.showinfo("Succès", msg)
-            status.set("Terminé.")
+            messagebox.showinfo("Génération Terminée", msg)
+            status.set("Terminé avec succès.")
         else:
             messagebox.showerror("Erreur", msg)
             status.set("Échec.")
 
-    # --- Positionnement final du bouton et du statut ---
     action_frame = ttk.Frame(root, padding="10")
     action_frame.grid(row=1, column=0, sticky="ew")
     action_frame.columnconfigure(0, weight=1)
-
-    tk.Button(action_frame, text="Lancer (.HTMLs + .PDF + .SVG)", command=run_now, bg="#4CAF50", fg="white",
-              font=("Arial", 10, "bold")).pack(pady=5)
-
-    status_bar = tk.Label(root, textvariable=status, bd=1, relief=tk.SUNKEN, anchor=tk.W, padx=5)
+    tk.Button(action_frame, text="Lancer la Génération", command=run_now, bg="#4CAF50", fg="white",
+              font=("Arial", 12, "bold")).pack(pady=10, ipady=5)
+    status_bar = tk.Label(root, textvariable=status, bd=1, relief=tk.SUNKEN, anchor=tk.W, padx=10, pady=5,
+                          font=("Arial", 10))
     status_bar.grid(row=2, column=0, sticky="ew")
-
     root.mainloop()
 
 

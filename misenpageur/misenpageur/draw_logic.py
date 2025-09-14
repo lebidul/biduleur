@@ -472,7 +472,12 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
     S = layout.sections
 
     # --- Configurations ---
-    spacing_cfg = SpacingConfig()
+    spacing_cfg = SpacingConfig(
+        date_spaceBefore=cfg.date_spaceBefore,
+        date_spaceAfter=cfg.date_spaceAfter,
+        event_spaceBefore=cfg.event_spaceBefore,
+        event_spaceAfter=cfg.event_spaceAfter
+    )
     bullet_cfg = _read_bullet_config(cfg)
     date_box = _read_date_box_config(cfg)
     date_line = _read_date_line_config(cfg)
@@ -503,6 +508,7 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
         cfg.split_min_gain_ratio, spacing_policy, bullet_cfg, date_box
     )
     report["unused_paragraphs"] = len(rest_after_p1)
+    report["font_size_main"] = best_fs
 
 
     def count_events(para_list: List[str]) -> int:
@@ -649,6 +655,10 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
 
         # --- Dessin du texte ---
         final_fs_poster = best_fs_poster * poster_cfg.font_size_safety_factor
+
+        report["font_size_poster_optimal"] = best_fs_poster
+        report["font_size_poster_final"] = final_fs_poster
+
         draw_poster_text_in_frames(
             c, poster_frames, poster_paras,
             cfg.font_name, final_fs_poster, cfg.leading_ratio, bullet_cfg,
