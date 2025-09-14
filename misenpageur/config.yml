@@ -13,6 +13,7 @@ output_pdf: "misenpageur/bidul/bidul_prototype.pdf"      # chemin du PDF génér
 logos_dir: "misenpageur/assets/logos"   # dossier contenant jusqu'à 10 logos
 cover_image: "misenpageur/assets/couv/couverture.png"  # image de couverture
 ours_md: "misenpageur/assets/ours/ours.md"   # fichier texte constant (ours)
+nobr_file: "misenpageur/assets/textes/nobr.txt" # fichier avec les strings insécables
 
 # =========================
 # Paramètres typographiques
@@ -67,7 +68,8 @@ split_min_gain_ratio: 0.10 # n’autoriser la césure A→B que si elle comble �
 # Bullets / hanging indent
 show_event_bullet: true
 event_bullet_replacement: null
-event_hanging_indent: 10
+event_hanging_indent: 13     # Marge gauche totale pour les lignes d'événement
+bullet_text_indent: 1       # Position de la puce par rapport au texte (négatif = à gauche)
 
 # Date box (bloc)
 date_box:
@@ -80,7 +82,7 @@ date_box:
 # Configuration de la ligne horizontale pour les dates (Jeudi 25, etc.)
 date_line:
   enabled: true       # Mettre à true pour afficher la ligne, false pour la cacher
-  width: 1.3         # Épaisseur de la ligne en points (0.5 est fin)
+  width: 1.5         # Épaisseur de la ligne en points (0.5 est fin)
   color: "#000000"    # Couleur de la ligne au format hexadécimal
   gap_after_text_mm: 3.0
 
@@ -108,7 +110,7 @@ s1_split:
   gutter: 6            # (optionnel) gouttière verticale entre logos et ours
 
 pdf_layout:
-  page_margin_mm: 5 # Marge globale sur la page A4, en millimètres
+  page_margin_mm: 1 # Marge globale sur la page A4, en millimètres
   section_spacing_mm: 1 # Espacement entre les sections A5, si désiré
 
 section_1:
@@ -129,5 +131,44 @@ section_1:
   additional_box_height_mm: 35 # Hauteur de la "boîte additionnelle" sous les logos
   logo_box_bottom_margin_mm: 0 # Marge entre la zone des logos et la boîte additionnelle
 
+
+# Configuration de la boîte "Cucaracha" (anciennement additional_box)
+cucaracha_box:
+  # Type de contenu: "none", "text", ou "image"
+  content_type: "none"
+
+  # Valeur du contenu (chemin de l'image ou texte brut)
+  content_value: ""
+
+  # Paramètres du titre
+  title: "Cucaracha"
+  title_font_name: "Arial-BoldItalic"
+  title_font_size: 8
+
+  text_font_name: "Arial"
+  text_font_size: 10
+  text_style: "italic" # "normal" ou "italic"
+  text_align: "center"   # "left", "center", ou "right"
+
+  # Hauteur de la boîte en mm (si le contenu n'est pas "none")
+  height_mm: 35
+
 # Impression facultative de la section de couverture
 skip_cover: false
+
+poster:
+  enabled: true
+  # 0: image au centre, 1: image en fond
+  design: 0
+  background_image_alpha: 0.75
+  title: "le bidul - octobre 2025" # Sera surchargé par la GUI
+  font_name_title: "DSNetStamped" # Le nom qu'on a enregistré dans fonts.py
+  title_logo_path: "misenpageur/assets/icons/logo-les-arts-services.png"
+  title_back_color: "#7F7F7F"
+  font_size_title: 34.0
+  # Tailles de police pour le corps du texte du poster
+  font_size_min: 6.0
+  font_size_max: 10.0
+  font_size_safety_factor: 0.951
+  date_spaceBefore: 3
+  date_spaceAfter: 3

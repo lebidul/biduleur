@@ -1,21 +1,47 @@
 # misenpageur/misenpageur/config.py
-
 import yaml
 from dataclasses import dataclass, field
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
+
+# ==================== DÉFINITIONS CENTRALISÉES ====================
+@dataclass
+class BulletConfig:
+    show_event_bullet: bool = True
+    event_bullet_replacement: str | None = None
+    event_hanging_indent: float = 10.0
+    bullet_text_indent: float = -3.0  # Décalage puce/texte
+
+
+@dataclass
+class PosterConfig:
+    enabled: bool = False
+    design: int = 0
+    title: str = "L'AGENDA COMPLET"
+    font_name_title: str = "Helvetica-Bold"
+    title_logo_path: Optional[str] = None
+    title_back_color: str = "#7F7F7F"
+    font_size_title: float = 36.0
+    font_size_min: float = 6.0
+    font_size_max: float = 10.0
+    font_size_safety_factor: float = 0.98
+    background_image_alpha: float = 0.85
+    date_spaceBefore: float = 2.0
+    date_spaceAfter: float = 2.0
+    date_spaceBefore: float = 2.0
+    date_spaceAfter: float = 2.0
 
 @dataclass
 class Config:
     # --- Paths ---
     input_html: str = "input.html"
     output_pdf: str = "output.pdf"
-    output_scribus: str = "output.py"
     cover_image: Optional[str] = None
     auteur_couv: Optional[str] = None
     auteur_couv_url: Optional[str] = None
     logos_dir: str = "assets/logos"
     ours_md: str = "assets/ours/ours.md"
+    nobr_file: Optional[str] = None
 
     # --- Font & Layout ---
     font_name: str = "ArialNarrow"
@@ -30,33 +56,24 @@ class Config:
     date_spaceAfter: float = 3.0
     event_spaceBefore: float = 1.0
     event_spaceAfter: float = 1.0
-    event_spaceAfter_perLine: float = 0.4
-    min_event_spaceAfter: float = 1.0
-    first_non_event_spaceBefore_in_S5: float = 0.0
 
-    # --- Bullets ---
+    # --- Bullets (maintenant des champs directs) ---
     show_event_bullet: bool = True
     event_bullet_replacement: Optional[str] = None
     event_hanging_indent: float = 10.0
+    bullet_text_indent: float = -3.0
 
-    # --- DateBox (dict for flexibility) ---
+    # --- Dictionnaires pour les configs complexes ---
     date_box: Dict[str, Any] = field(default_factory=dict)
-
-    # ==================== NOUVELLE SECTION ====================
-    # --- Ligne Horizontale pour les Dates ---
     date_line: Dict[str, Any] = field(default_factory=dict)
-    # ==========================================================
-
-    # --- Prepress ---
     prepress: Dict[str, Any] = field(default_factory=dict)
-
-    # --- Section 1 ---
     section_1: Dict[str, Any] = field(default_factory=dict)
-
-    # --- pdf layout (marge globale)
     pdf_layout: Dict[str, Any] = field(default_factory=dict)
+    poster: Dict[str, Any] = field(default_factory=dict)
 
     skip_cover: bool = False
+
+    cucaracha_box: Dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_yaml(cls, path: str) -> "Config":
@@ -78,3 +95,18 @@ class Config:
         known_fields = {f.name for f in cls.__dataclass_fields__.values()}
         kwargs = {k: v for k, v in d.items() if k in known_fields}
         return cls(**kwargs)
+
+@dataclass
+class DateBoxConfig:
+    enabled: bool = False
+    padding: float = 2.0
+    border_width: float = 0.5
+    border_color: str | None = "#000000"
+    back_color: str | None = None
+
+@dataclass
+class DateLineConfig:
+    enabled: bool = False
+    width: float = 0.5
+    color: str = "#000000"
+    gap_after_text_mm: float = 3.0
