@@ -2,16 +2,12 @@
 import os
 from PyInstaller.building.build_main import Analysis, PYZ, EXE, COLLECT
 
-# ==================== LA CORRECTION EST ICI ====================
-# On revient à la méthode la plus simple et la plus fiable pour un .spec
 BASE_DIR = os.getcwd()
-# =============================================================
-
 entry_script = os.path.join(BASE_DIR, 'gui.py')
 ICON_PATH = os.path.join(BASE_DIR, 'biduleur.ico')
 VERSION_FILE = os.path.join(BASE_DIR, 'bidul_version_info.txt')
 
-# On utilise des chemins relatifs, PyInstaller les résoudra à partir de la racine
+# On liste toutes les données à inclure
 datas = [
     ('misenpageur/assets', 'misenpageur/assets'),
     ('misenpageur/config.yml', 'misenpageur'),
@@ -30,10 +26,16 @@ EXCLUDES = [
 
 a = Analysis(
     [entry_script],
-    pathex=[BASE_DIR],
+    pathex=[], # On le laisse vide pour l'instant
     binaries=binaries,
     datas=datas,
-    hiddenimports=['svglib', 'lxml', 'lxml._elementpath'],
+    # ==================== LA CORRECTION EST ICI ====================
+    # On dit explicitement à PyInstaller de trouver ces deux modules
+    hiddenimports=[
+        'svglib', 'lxml', 'lxml._elementpath',
+        'biduleur', 'misenpageur'
+    ],
+    # =============================================================
     hookspath=[],
     runtime_hooks=[],
     excludes=EXCLUDES,
