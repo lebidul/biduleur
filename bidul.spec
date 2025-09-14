@@ -4,44 +4,40 @@ from PyInstaller.building.build_main import Analysis, PYZ, EXE, COLLECT
 
 BASE_DIR = os.getcwd()
 
-# ==================== LA CORRECTION EST ICI (1/2) ====================
-# On définit explicitement les chemins vers nos dossiers de code source.
-# PyInstaller les ajoutera à son PYTHONPATH interne.
-paths = [BASE_DIR]
-# ====================================================================
-
 entry_script = os.path.join(BASE_DIR, 'gui.py')
-ICON_PATH = os.path.join(BASE_DIR, 'biduleur.ico')
+ICON_PATH = os.path.join(BASE_DIR, 'misenpageur', 'assets', 'icon', 'biduleur.ico')
 VERSION_FILE = os.path.join(BASE_DIR, 'bidul_version_info.txt')
 
+# ==================== LA CORRECTION EST ICI ====================
+# On utilise la fonction Tree pour copier les dossiers de code source
+# comme s'il s'agissait de données. C'est une méthode très robuste.
 datas = [
     ('misenpageur/assets', 'misenpageur/assets'),
     ('misenpageur/config.yml', 'misenpageur'),
     ('misenpageur/layout.yml', 'misenpageur'),
     ('biduleur/templates', 'biduleur/templates'),
-    ('bin/win64', 'bin/win64')
+    ('bin/win64', 'bin/win64'),
+    # On ajoute nos modules comme des "arbres" de données
+    ('biduleur', 'biduleur'),
+    ('misenpageur', 'misenpageur')
 ]
 
+# On peut vider binaries, car tout est traité comme des données
 binaries = []
-
 EXCLUDES = [
     'torch', 'tensorflow', 'scipy', 'matplotlib',
 ]
 
 a = Analysis(
     [entry_script],
-    # On garde pathex, c'est une bonne pratique
-    pathex=paths,
+    pathex=[BASE_DIR],
     binaries=binaries,
     datas=datas,
-    # On force l'inclusion des modules
-    hiddenimports=[
-        'svglib', 'lxml', 'lxml._elementpath',
-        'biduleur', 'misenpageur'
-    ],
+    # On garde les hiddenimports pour les dépendances tierces
+    hiddenimports=['svglib', 'lxml', 'lxml._elementpath'],
     hookspath=[],
     runtime_hooks=[],
-    excludes=EXCLUDES,
+    excludes=[],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=None,
