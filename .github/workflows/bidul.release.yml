@@ -39,26 +39,33 @@ jobs:
         id: versioning
         shell: pwsh
         run: |
-          # Si un tag a déclenché le workflow, on utilise ce tag.
+          $version = "dev" # Valeur par défaut
+          
+          # Priorité 1: Si c'est un tag
           if ("${{ github.ref_type }}" -eq "tag") {
             $version = "${{ github.ref_name }}".TrimStart("v")
           }
-          # Si lancé manuellement avec une version, on l'utilise.
+          # Priorité 2: Si lancé manuellement avec une version
           elseif ("${{ github.event.inputs.version }}") {
             $version = "${{ github.event.inputs.version }}"
           }
-          # Sinon (push sur master), on auto-incrémente.
-          else {
+          # Priorité 3: Si c'est un push sur master, on auto-incrémente
+          elseif ("${{ github.ref_name }}" -eq "master") {
             $latest_tag = git describe --tags --abbrev=0 2>$null
             if ($latest_tag) {
               $version_parts = $latest_tag.TrimStart("v").Split(".")
               $new_patch = [int]$version_parts[2] + 1
               $version = "$($version_parts[0]).$($version_parts[1]).$new_patch"
             } else {
-              # Aucun tag n'existe, on commence à 1.0.0
               $version = "1.0.0"
             }
           }
+          # Sinon (push sur une branche de feature), on utilise un nom de branche "nettoyé"
+          else {
+            $branch_name = "${{ github.ref_name }}".Replace("/", "-")
+            $version = "dev-$branch_name"
+          }
+
           echo "Determined Version: $version"
           "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
       # ====================================================================
