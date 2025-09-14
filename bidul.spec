@@ -2,14 +2,14 @@
 import os
 from PyInstaller.building.build_main import Analysis, PYZ, EXE, COLLECT
 
-# La méthode la plus fiable pour trouver la racine dans tous les contextes
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# On utilise la méthode qui fonctionne dans le contexte de PyInstaller
+BASE_DIR = os.getcwd()
 
 entry_script = os.path.join(BASE_DIR, 'gui.py')
 ICON_PATH = os.path.join(BASE_DIR, 'biduleur.ico')
 VERSION_FILE = os.path.join(BASE_DIR, 'bidul_version_info.txt')
 
-# On utilise des chemins relatifs, PyInstaller les résoudra
+# Les chemins relatifs sont corrects car BASE_DIR est la racine du projet
 datas = [
     ('misenpageur/assets', 'misenpageur/assets'),
     ('misenpageur/config.yml', 'misenpageur'),
@@ -28,18 +28,15 @@ EXCLUDES = [
 
 a = Analysis(
     [entry_script],
-    # ==================== LA CORRECTION EST ICI ====================
-    # On combine les deux approches pour une robustesse maximale.
-    # pathex dit à PyInstaller où chercher les modules.
+    # On garde pathex, c'est une bonne pratique
     pathex=[BASE_DIR],
-    # hiddenimports force l'inclusion, même si l'analyse statique les manque.
+    binaries=binaries,
+    datas=datas,
+    # On force l'inclusion des modules
     hiddenimports=[
         'svglib', 'lxml', 'lxml._elementpath',
         'biduleur', 'misenpageur'
     ],
-    # =============================================================
-    binaries=binaries,
-    datas=datas,
     hookspath=[],
     runtime_hooks=[],
     excludes=EXCLUDES,
