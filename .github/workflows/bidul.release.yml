@@ -86,17 +86,19 @@ jobs:
       - name: Package release artifact
         shell: pwsh
         run: |
-          $sourceFolder = "dist/bidul"
-          $zipFileName = "bidul-${{ env.VERSION }}-win64.zip"
+          $version = "${{ env.VERSION }}"
+          $zipFileName = "bidul-${version}-win64.zip"
           
-          # ==================== CORRECTION ZIP ====================
-          # On se place dans le dossier de distribution avant de compresser
-          # pour éviter d'avoir le dossier "release" dans le zip.
-          Set-Location -Path $sourceFolder
-          Compress-Archive -Path "*" -DestinationPath "../../$zipFileName" # Remonter de deux niveaux
-          Set-Location -Path "../.." # Revenir à la racine
-          # ======================================================
-
+          # On crée un dossier temporaire pour la release
+          $releaseFolder = "release_temp"
+          New-Item -ItemType Directory -Force -Path $releaseFolder
+          
+          # On copie le contenu du build dans ce dossier
+          Copy-Item -Path "dist/bidul/*" -Destination $releaseFolder -Recurse
+          
+          # On compresse le contenu du dossier temporaire
+          Compress-Archive -Path "$releaseFolder/*" -DestinationPath $zipFileName
+          
           echo "ZIP_NAME=$zipFileName" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Upload Build Artifact
