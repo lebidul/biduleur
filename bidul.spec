@@ -2,21 +2,26 @@
 import os
 from PyInstaller.building.build_main import Analysis, PYZ, EXE, COLLECT
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# ==================== LA CORRECTION EST ICI ====================
+# On revient à la méthode la plus simple et la plus fiable pour un .spec
+BASE_DIR = os.getcwd()
+# =============================================================
+
 entry_script = os.path.join(BASE_DIR, 'gui.py')
 ICON_PATH = os.path.join(BASE_DIR, 'biduleur.ico')
 VERSION_FILE = os.path.join(BASE_DIR, 'bidul_version_info.txt')
 
+# On utilise des chemins relatifs, PyInstaller les résoudra à partir de la racine
 datas = [
-    (os.path.join(BASE_DIR, 'misenpageur/assets'), 'misenpageur/assets'),
-    (os.path.join(BASE_DIR, 'misenpageur/config.yml'), 'misenpageur'),
-    (os.path.join(BASE_DIR, 'misenpageur/layout.yml'), 'misenpageur'),
-    (os.path.join(BASE_DIR, 'biduleur/templates'), 'biduleur/templates'),
+    ('misenpageur/assets', 'misenpageur/assets'),
+    ('misenpageur/config.yml', 'misenpageur'),
+    ('misenpageur/layout.yml', 'misenpageur'),
+    ('biduleur/templates', 'biduleur/templates'),
 ]
 
 binaries = [
-    (os.path.join(BASE_DIR, 'bin/win64/pdf2svg.exe'), 'bin/win64'),
-    (os.path.join(BASE_DIR, 'bin/win64/*.dll'), 'bin/win64')
+    ('bin/win64/pdf2svg.exe', 'bin'),
+    ('bin/win64/*.dll', 'bin')
 ]
 
 EXCLUDES = [
@@ -25,11 +30,7 @@ EXCLUDES = [
 
 a = Analysis(
     [entry_script],
-    # ==================== LA CORRECTION EST ICI ====================
-    # pathex indique à PyInstaller où chercher les imports.
-    # En lui donnant BASE_DIR, il saura trouver les dossiers 'biduleur' et 'misenpageur'.
     pathex=[BASE_DIR],
-    # =============================================================
     binaries=binaries,
     datas=datas,
     hiddenimports=['svglib', 'lxml', 'lxml._elementpath'],
