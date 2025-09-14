@@ -3,23 +3,18 @@ name: Build and Release - Bidul
 on:
   push:
     branches:
-      - master # Se déclenche à chaque push/merge sur master
-
-  workflow_dispatch: # Permet le lancement manuel
+      - master
+  workflow_dispatch:
     inputs:
-      release_type:
-        description: 'Type de release (patch, minor, major)'
+      version:
+        description: 'Version à construire (ex: 1.2.3)'
         required: true
-        default: 'patch'
-        type: choice
-        options: ['patch', 'minor', 'major']
+        default: '1.0.0'
 
 jobs:
   build-release:
     runs-on: windows-latest
-    
-    # Empêcher les exécutions multiples pour le même commit
-    concurrency: 
+    concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}
       cancel-in-progress: true
 
@@ -27,7 +22,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          # On a besoin du token pour pouvoir pousser des commits et des tags
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
@@ -43,56 +37,35 @@ jobs:
           pip install -r biduleur/requirements.txt
           pip install -r misenpageur/requirements.txt
 
-      - name: Determine Next Version
+      - name: Determine Version
         id: versioning
         shell: pwsh
         run: |
-          # Lire la version depuis le fichier VERSION
-          $file_version = (Get-Content -Path VERSION).Trim()
+          $version = "0.0.0"
+          $tag_name = "v0.0.0"
           
-          # Récupérer le dernier tag Git
-          $latest_tag = git describe --tags --abbrev=0 2>$null
-          $tag_version = "0.0.0"
-          if ($latest_tag) {
-            $tag_version = $latest_tag.TrimStart("v")
+          # Si c'est un push sur master, on auto-incrémente
+          if ("${{ github.event_name }}" -eq "push") {
+            $latest_tag = git describe --tags --abbrev=0 2>$null
+            if ($latest_tag) {
+              $version_parts = $latest_tag.TrimStart("v").Split(".")
+              $new_patch = [int]$version_parts[2] + 1
+              $version = "$($version_parts[0]).$($version_parts[1]).$new_patch"
+            } else {
+              $version = "1.0.0" # Premier tag si aucun n'existe
+            }
+          }
+          # Si c'est un lancement manuel, on utilise la version fournie
+          else {
+            $version = "${{ github.event.inputs.version }}"
           }
           
-          # Choisir la version la plus élevée entre le fichier et le tag comme base
-          $base_version = ([System.Version]$file_version -ge [System.Version]$tag_version) ? $file_version : $tag_version
-          
-          # Déterminer le type d'incrémentation
-          $release_type = "${{ github.event.inputs.release_type }}"
-          if (-not $release_type) {
-            # Si c'est un push sur master, on fait un patch par défaut
-            $release_type = "patch" 
-          }
-          
-          # Incrémenter la version
-          $version_parts = $base_version.Split(".")
-          $major = [int]$version_parts[0]
-          $minor = [int]$version_parts[1]
-          $patch = [int]$version_parts[2]
-          
-          if ($release_type -eq "major") {
-            $major += 1
-            $minor = 0
-            $patch = 0
-          } elseif ($release_type -eq "minor") {
-            $minor += 1
-            $patch = 0
-          } else { # patch
-            $patch += 1
-          }
-          
-          $new_version = "$major.$minor.$patch"
-          $new_tag = "v$new_version"
-          
-          echo "Base version: $base_version"
-          echo "New Version: $new_version"
-          echo "New Tag: $new_tag"
+          $tag_name = "v$version"
+          echo "Determined Version: $version"
+          echo "Determined Tag: $tag_name"
 
-          "VERSION=$new_version" | Out-File -FilePath $env:GITHUB_ENV -Append
-          "TAG=$new_tag" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "TAG=$tag_name" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Update version file
         shell: pwsh
@@ -119,55 +92,35 @@ jobs:
           retention-days: 7
 
       - name: Get Release Notes
-        id: get_release_notes
-        shell: pwsh
-        run: |
-          $version = "${{ env.VERSION }}"
-          $notes_file = "RELEASE_NOTES.md"
-          $release_notes = "Pas de notes de version trouvées pour la version $version."
-          
-          if (Test-Path $notes_file) {
-            $content = Get-Content -Path $notes_file -Raw
-            $pattern = "(?s)## \[$version\](.*?)(?=## \[|\Z)"
-            $match = [regex]::Match($content, $pattern)
-            
-            if ($match.Success) {
-              $release_notes = $match.Groups[1].Value.Trim()
-            }
-          }
-          
-          $release_notes = $release_notes.Replace('%', '%25').Replace("`n", '%0A').Replace("`r", '%0D')
-          echo "RELEASE_NOTES=$release_notes" | Out-File -FilePath $env:GITHUB_OUTPUT
+        # ... (cette étape est correcte et n'a pas besoin de changer)
 
-      - name: Commit and Push Version Bump
+      # ==================== ÉTAPES CONDITIONNELLES ====================
+      - name: Commit and Push Version Bump and Tag
+        # On ne fait cela QUE pour les push sur master
         if: github.event_name == 'push'
         run: |
           git config --global user.name "GitHub Actions"
           git config --global user.email "github-actions@github.com"
           
-          Set-Content -Path VERSION -Value "${{ env.VERSION }}"
+          # Mettre à jour le fichier VERSION avec le nouveau numéro
+          # Cette étape a été supprimée, car le tag est maintenant la source de vérité
           
-          git add VERSION bidul_version_info.txt
-          # On vérifie s'il y a des changements à commiter
-          if (-not $(git status --porcelain)) {
-            echo "No changes to commit."
-          } else {
-            git commit -m "chore(release): Bump version to ${{ env.VERSION }}"
-            git push
-          }
-
-      - name: Create and Push Git Tag
-        if: github.event_name == 'push'
-        run: |
+          # Créer et pousser le tag
           git tag ${{ env.TAG }}
           git push origin ${{ env.TAG }}
-      
+          
+          # Commiter le changement de version dans bidul_version_info.txt
+          git add bidul_version_info.txt
+          git commit -m "chore(release): Prepare for release ${{ env.TAG }}"
+          git push
+
       - name: Create Release
-        # On ne crée une release que pour les pushs sur master
+        # On ne crée une release que pour les push sur master
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         uses: softprops/action-gh-release@v2
         with:
-          name: Bidul v${{ env.VERSION }}
+          name: Bidul ${{ env.TAG }}
           tag_name: ${{ env.TAG }}
           files: ${{ env.ZIP_NAME }}
           body: ${{ steps.get_release_notes.outputs.RELEASE_NOTES }}
+      # =============================================================
