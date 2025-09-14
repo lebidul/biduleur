@@ -7,21 +7,17 @@ entry_script = os.path.join(BASE_DIR, 'gui.py')
 ICON_PATH = os.path.join(BASE_DIR, 'misenpageur', 'assets', 'icon', 'biduleur.ico') # Assurez-vous que l'icône est bien là
 VERSION_FILE = os.path.join(BASE_DIR, 'bidul_version_info.txt')
 
-# On liste toutes les données à inclure
 datas = [
-    # Les assets de misenpageur
-    ('misenpageur/assets', 'misenpageur/assets'),
-    # Les fichiers de config et layout
-    ('misenpageur/config.yml', 'misenpageur'),
-    ('misenpageur/layout.yml', 'misenpageur'),
-    # Les templates de biduleur
-    ('biduleur/templates', 'biduleur/templates'),
+    (os.path.join(BASE_DIR, 'misenpageur/assets'), 'misenpageur/assets'),
+    (os.path.join(BASE_DIR, 'misenpageur/config.yml'), 'misenpageur'),
+    (os.path.join(BASE_DIR, 'misenpageur/layout.yml'), 'misenpageur'),
+    (os.path.join(BASE_DIR, 'biduleur/templates'), 'biduleur/templates'),
 ]
 
-# On liste les binaires externes à inclure
+# On construit des chemins absolus pour les binaires
 binaries = [
-    ('bin/win64/pdf2svg.exe', 'bin/win64'),
-    ('bin/win64/*.dll', 'bin/win64')
+    (os.path.join(BASE_DIR, 'bin/win64/pdf2svg.exe'), 'bin/win64'),
+    (os.path.join(BASE_DIR, 'bin/win64/*.dll'), 'bin/win64')
 ]
 
 # Paquets lourds à exclure

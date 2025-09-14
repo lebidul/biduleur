@@ -30,7 +30,7 @@ jobs:
           pip install pyinstaller==6.6.0
           # Installe les dépendances des DEUX modules
           pip install -r biduleur/requirements.txt
-#          pip install -r misenpageur/requirements.txt
+          pip install -r misenpageur/requirements.txt
 
       - name: Update version file
         shell: pwsh
