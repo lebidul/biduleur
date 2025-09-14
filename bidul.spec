@@ -11,7 +11,7 @@ paths = [BASE_DIR]
 # ====================================================================
 
 entry_script = os.path.join(BASE_DIR, 'gui.py')
-ICON_PATH = os.path.join(BASE_DIR, 'misenpageur', 'assets', 'icon', 'biduleur.ico')
+ICON_PATH = os.path.join(BASE_DIR, 'biduleur.ico')
 VERSION_FILE = os.path.join(BASE_DIR, 'bidul_version_info.txt')
 
 datas = [
