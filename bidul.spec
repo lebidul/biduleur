@@ -2,7 +2,7 @@
 import os
 from PyInstaller.building.build_main import Analysis, PYZ, EXE, COLLECT
 
-BASE_DIR = os.getcwd()
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 entry_script = os.path.join(BASE_DIR, 'gui.py')
 ICON_PATH = os.path.join(BASE_DIR, 'biduleur.ico')
 VERSION_FILE = os.path.join(BASE_DIR, 'bidul_version_info.txt')
@@ -14,23 +14,25 @@ datas = [
     (os.path.join(BASE_DIR, 'biduleur/templates'), 'biduleur/templates'),
 ]
 
-# On construit des chemins absolus pour les binaires
 binaries = [
     (os.path.join(BASE_DIR, 'bin/win64/pdf2svg.exe'), 'bin/win64'),
     (os.path.join(BASE_DIR, 'bin/win64/*.dll'), 'bin/win64')
 ]
 
-# Paquets lourds à exclure
 EXCLUDES = [
     'torch', 'tensorflow', 'scipy', 'matplotlib',
 ]
 
 a = Analysis(
     [entry_script],
+    # ==================== LA CORRECTION EST ICI ====================
+    # pathex indique à PyInstaller où chercher les imports.
+    # En lui donnant BASE_DIR, il saura trouver les dossiers 'biduleur' et 'misenpageur'.
     pathex=[BASE_DIR],
+    # =============================================================
     binaries=binaries,
     datas=datas,
-    hiddenimports=['svglib', 'lxml'], # Aides pour PyInstaller
+    hiddenimports=['svglib', 'lxml', 'lxml._elementpath'],
     hookspath=[],
     runtime_hooks=[],
     excludes=EXCLUDES,
@@ -49,7 +51,7 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=False, # Important : pas de console
+    console=False,
     disable_windowed_traceback=False,
     target_arch=None,
     codesign_identity=None,
