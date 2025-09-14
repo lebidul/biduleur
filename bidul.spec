@@ -8,22 +8,17 @@ entry_script = os.path.join(BASE_DIR, 'gui.py')
 ICON_PATH = os.path.join(BASE_DIR, 'biduleur.ico')
 VERSION_FILE = os.path.join(BASE_DIR, 'bidul_version_info.txt')
 
-# ==================== LA CORRECTION EST ICI ====================
-# On utilise la fonction Tree pour copier les dossiers de code source
-# comme s'il s'agissait de données. C'est une méthode très robuste.
+# `datas` ne contient QUE les assets, pas les fichiers .py
 datas = [
     ('misenpageur/assets', 'misenpageur/assets'),
     ('misenpageur/config.yml', 'misenpageur'),
     ('misenpageur/layout.yml', 'misenpageur'),
     ('biduleur/templates', 'biduleur/templates'),
-    ('bin/win64', 'bin/win64'),
-    # On ajoute nos modules comme des "arbres" de données
-    ('biduleur', 'biduleur'),
-    ('misenpageur', 'misenpageur')
+    ('bin/win64', 'bin')
 ]
 
-# On peut vider binaries, car tout est traité comme des données
 binaries = []
+
 EXCLUDES = [
     'torch', 'tensorflow', 'scipy', 'matplotlib',
 ]
@@ -33,11 +28,15 @@ a = Analysis(
     pathex=[BASE_DIR],
     binaries=binaries,
     datas=datas,
-    # On garde les hiddenimports pour les dépendances tierces
-    hiddenimports=['svglib', 'lxml', 'lxml._elementpath'],
+    # `hiddenimports` contient toutes les bibliothèques et nos modules locaux
+    hiddenimports=[
+        'svglib', 'lxml', 'lxml._elementpath',
+        'pandas', 'numpy', 'openpyxl', # Dépendances clés
+        'biduleur', 'misenpageur'      # Nos modules locaux
+    ],
     hookspath=[],
     runtime_hooks=[],
-    excludes=[],
+    excludes=EXCLUDES,
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=None,
@@ -54,10 +53,6 @@ exe = EXE(
     strip=False,
     upx=True,
     console=False,
-    disable_windowed_traceback=False,
-    target_arch=None,
-    codesign_identity=None,
-    entitlements_file=None,
     icon=ICON_PATH,
     version=VERSION_FILE,
 )
