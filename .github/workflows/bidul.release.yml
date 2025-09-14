@@ -81,7 +81,15 @@ jobs:
         run: |
           $sourceFolder = "dist/bidul"
           $zipFileName = "bidul-${{ env.VERSION }}-win64.zip"
-          Compress-Archive -Path "$sourceFolder/*" -DestinationPath $zipFileName
+          
+          # ==================== CORRECTION ZIP ====================
+          # On se place dans le dossier de distribution avant de compresser
+          # pour éviter d'avoir le dossier "release" dans le zip.
+          Set-Location -Path $sourceFolder
+          Compress-Archive -Path "*" -DestinationPath "../../$zipFileName" # Remonter de deux niveaux
+          Set-Location -Path "../.." # Revenir à la racine
+          # ======================================================
+
           echo "ZIP_NAME=$zipFileName" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Upload Build Artifact
