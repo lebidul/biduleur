@@ -77,44 +77,36 @@ jobs:
         run: pyinstaller bidul.spec --clean --noconfirm
 
       - name: Package release artifact
+        id: package
         shell: pwsh
         run: |
           $version = "${{ env.VERSION }}"
+          # ==================== CORRECTION DU NOM DE DOSSIER ====================
           $sourceFolder = "dist/bidul"
+          # ====================================================================
           $zipFileName = "bidul-${version}-win64.zip"
           
-          # 1. Supprimer le fichier de log de débogage s'il existe
-          if (Test-Path "$sourceFolder/debug_log.txt") {
-            Remove-Item "$sourceFolder/debug_log.txt"
-            echo "debug_log.txt supprimé."
+          # Vérifier que le dossier source existe
+          if (-not (Test-Path $sourceFolder)) {
+            Write-Error "Le dossier de build '$sourceFolder' n'a pas été trouvé !"
+            exit 1
           }
           
-          # 2. Créer le fichier README.txt
+          # Créer le README
           $readmeContent = @"
           Bidul v$version
           ==============================================
-          
           Merci d'utiliser Bidul !
-          
-          INSTRUCTIONS:
-          1. Décompressez cette archive.
-          2. Ouvrez le dossier "bidul" qui vient d'être créé.
-          3. Double-cliquez sur bidul.exe pour lancer l'application.
-          
-          Pour plus de détails, consultez le fichier RELEASE_NOTES.md.
           "@
           $readmeContent | Out-File -FilePath "$sourceFolder/README.txt" -Encoding utf8
           
-          # 3. Copier le fichier RELEASE_NOTES.md
+          # Copier les notes de version
           if (Test-Path "RELEASE_NOTES.md") {
             Copy-Item -Path "RELEASE_NOTES.md" -Destination "$sourceFolder/"
           }
           
-          # 4. Créer une archive ZIP "plate"
-          # On se place dans le dossier parent (dist) pour que le chemin source soit "bidul"
-          Set-Location -Path "dist"
-          Compress-Archive -Path "bidul" -DestinationPath "../$zipFileName" -Force
-          Set-Location -Path ".." # Revenir à la racine
+          # Créer l'archive ZIP
+          Compress-Archive -Path "$sourceFolder/*" -DestinationPath $zipFileName -Force
           
           echo "ZIP_NAME=$zipFileName" | Out-File -FilePath $env:GITHUB_ENV -Append
 
@@ -146,25 +138,24 @@ jobs:
           $release_notes = $release_notes.Replace('%', '%25').Replace("`n", '%0A').Replace("`r", '%0D')
           echo "RELEASE_NOTES=$release_notes" | Out-File -FilePath $env:GITHUB_OUTPUT
 
-      - name: Commit, Tag, and Release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+      - name: Commit and Push Version Bump and Tag
+        if: github.event_name == 'push'
         run: |
           git config --global user.name "GitHub Actions"
           git config --global user.email "github-actions@github.com"
           
-          git add bidul_version_info.txt
-          # Le fichier VERSION n'est plus utilisé, on ne le commite pas.
+          git tag ${{ env.TAG }}
+          git push origin ${{ env.TAG }}
           
-          # On vérifie s'il y a des changements à commiter
+          # On ne commite que le changement de version, pas le tag.
+          # Le fichier VERSION n'est plus utilisé.
+          git add bidul_version_info.txt
           if (-not $(git status --porcelain)) {
             echo "No changes to commit."
           } else {
             git commit -m "chore(release): Update version info for ${{ env.TAG }}"
             git push
           }
-
-          git tag ${{ env.TAG }}
-          git push origin ${{ env.TAG }}
 
       - name: Create Release
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
