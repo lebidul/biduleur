@@ -7,8 +7,7 @@
 - [x] Amélioration display dates
 - [x] Config cucarcaha
 - [x] Config ours v1
-- [ ] Config ours v2 - lecture as .md ou .html
-- [ ] Config ours v2 - icones
+- [ ] Config ours v2 - lecture as .md ou .html ou .svg avec icones.
 - [x] UI: Espace pour configuration visuelle couv, marge
 - [x] Config logos v1
 - [x] Config cucaracha v1
