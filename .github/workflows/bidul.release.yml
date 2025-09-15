@@ -1,9 +1,12 @@
 name: Build and Release - Bidul
 
 on:
+  # 1. Se déclenche quand un tag comme "bidul-v1.2.3" est poussé
   push:
     tags:
-      - 'bidul-v*' # Se déclenche UNIQUEMENT quand un tag est poussé
+      - 'bidul-v*'
+  # 2. Permet un déclenchement manuel depuis l'onglet "Actions" de GitHub
+  workflow_dispatch:
 
 jobs:
   build-release:
@@ -25,86 +28,81 @@ jobs:
           pip install -r biduleur/requirements.txt
           pip install -r misenpageur/requirements.txt
 
-      # ==================== LOGIQUE DE VERSION SIMPLIFIÉE ====================
-      - name: Determine Version from Tag
+      - name: Determine Version
         id: versioning
         shell: pwsh
         run: |
-          # La version est simplement le nom du tag, sans le "v"
-          $version = "${{ github.ref_name }}".TrimStart("v")
+          # Si le workflow est déclenché par un tag (push)...
+          if ("${{ github.event_name }}" -eq "push") {
+            $version = ("${{ github.ref_name }}".Split('-')[1]).TrimStart('v')
+            echo "Version de release détectée : $version"
+          } 
+          # Sinon (déclenchement manuel)...
+          else {
+            $branch = "${{ github.ref_name }}".Replace('/', '-') # Nettoie les noms de branche
+            $sha = "${{ github.sha }}".Substring(0, 7)
+            $version = "MANUAL-$branch-$sha"
+            echo "Version de build manuel détectée : $version"
+          }
           echo "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
-      # =====================================================================
 
       - name: Update version file
         shell: pwsh
         run: |
+          # Attention: Cette ligne peut échouer si le build manuel est lancé et que le fichier ne contient pas "1.0.0"
           (Get-Content -Path bidul_version_info.txt -Raw).Replace("1.0.0", "${{ env.VERSION }}") `
             | Set-Content -Path bidul_version_info.txt
 
       - name: Build with PyInstaller
         run: pyinstaller bidul.spec --clean --noconfirm
 
-      - name: Package release artifact
-        id: package # ON AJOUTE UN ID À L'ÉTAPE
+      - name: Package artifact
+        id: package
         shell: pwsh
         run: |
           $version = "${{ env.VERSION }}"
           $sourceFolder = "dist/bidul"
           $zipFileName = "bidul-${version}-win64.zip"
           
-          # Créer le README
-          $readmeContent = @"
-          Bidul v$version
-          ==============================================
-          Merci d'utiliser Bidul !
-          "@
-          $readmeContent | Out-File -FilePath "$sourceFolder/README.txt" -Encoding utf8
-          
-          # Copier les notes de version
+          # Copie des fichiers additionnels (README, etc.)
           if (Test-Path "RELEASE_NOTES.md") {
             Copy-Item -Path "RELEASE_NOTES.md" -Destination "$sourceFolder/"
           }
           
-          # Créer l'archive ZIP
+          # Création de l'archive
           Compress-Archive -Path "$sourceFolder/*" -DestinationPath $zipFileName -Force
           
           echo "zip_name=$zipFileName" | Out-File -FilePath $env:GITHUB_OUTPUT
 
-#      - name: Upload Build Artifact
-#        uses: actions/upload-artifact@v4
-#        with:
-#          name: bidul-windows-build-${{ env.VERSION }}
-#          path: ${{ env.ZIP_NAME }}
-#          retention-days: 7
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bidul-windows-build-${{ env.VERSION }}
+          path: ${{ steps.package.outputs.zip_name }}
+          retention-days: 7
+
+      # ==================== ÉTAPES CONDITIONNELLES POUR LA RELEASE ====================
+      # Ces étapes ne s'exécuteront que si le workflow a été déclenché par un PUSH de TAG.
 
       - name: Get Release Notes
+        if: github.event_name == 'push'
         id: get_release_notes
         shell: pwsh
         run: |
-          $version = "${{ env.VERSION }}"
           $notes_file = "RELEASE_NOTES.md"
-          $release_notes = "Pas de notes de version trouvées pour la version $version."
-          
+          $body = "Release pour la version ${{ env.VERSION }}"
           if (Test-Path $notes_file) {
-            $content = Get-Content -Path $notes_file -Raw
-            $pattern = "(?s)## \[$version\](.*?)(?=## \[|\Z)"
-            $match = [regex]::Match($content, $pattern)
-            
-            if ($match.Success) {
-              $release_notes = $match.Groups[1].Value.Trim()
-            }
+            $body = Get-Content -Path $notes_file -Raw
           }
-          
-          $release_notes = $release_notes.Replace('%', '%25').Replace("`n", '%0A').Replace("`r", '%0D')
-          echo "RELEASE_NOTES=$release_notes" | Out-File -FilePath $env:GITHUB_OUTPUT
+          # Échappement pour le passage à l'étape suivante
+          $body = $body.Replace('%', '%25').Replace("`n", '%0A').Replace("`r", '%0D')
+          echo "body=$body" | Out-File -FilePath $env:GITHUB_OUTPUT
 
       - name: Create Release
+        if: github.event_name == 'push'
         uses: softprops/action-gh-release@v2
         with:
           name: Bidul v${{ env.VERSION }}
           tag_name: ${{ github.ref_name }}
-          # ==================== LA CORRECTION EST ICI ====================
-          # On utilise la sortie de l'étape "package"
           files: ${{ steps.package.outputs.zip_name }}
-          # =============================================================
-          body: ${{ steps.get_release_notes.outputs.RELEASE_NOTES }}
+          body: ${{ steps.get_release_notes.outputs.body }}
