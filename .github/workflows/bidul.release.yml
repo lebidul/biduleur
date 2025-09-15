@@ -3,7 +3,7 @@ name: Build and Release - Bidul
 on:
   push:
     tags:
-      - 'v*' # Se déclenche UNIQUEMENT quand un tag est poussé
+      - 'bidul-v*' # Se déclenche UNIQUEMENT quand un tag est poussé
 
 jobs:
   build-release:
