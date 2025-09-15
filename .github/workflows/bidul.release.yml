@@ -45,6 +45,7 @@ jobs:
         run: pyinstaller bidul.spec --clean --noconfirm
 
       - name: Package release artifact
+        id: package # ON AJOUTE UN ID À L'ÉTAPE
         shell: pwsh
         run: |
           $version = "${{ env.VERSION }}"
@@ -67,7 +68,7 @@ jobs:
           # Créer l'archive ZIP
           Compress-Archive -Path "$sourceFolder/*" -DestinationPath $zipFileName -Force
           
-          echo "ZIP_NAME=$zipFileName" | Out-File -FilePath $env:GITHUB_ENV -Append
+          echo "zip_name=$zipFileName" | Out-File -FilePath $env:GITHUB_OUTPUT
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
@@ -98,10 +99,12 @@ jobs:
           echo "RELEASE_NOTES=$release_notes" | Out-File -FilePath $env:GITHUB_OUTPUT
 
       - name: Create Release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         uses: softprops/action-gh-release@v2
         with:
-          name: Bidul ${{ env.TAG }}
-          tag_name: ${{ env.TAG }}
-          files: ${{ env.ZIP_NAME }}
+          name: Bidul v${{ env.VERSION }}
+          tag_name: ${{ github.ref_name }}
+          # ==================== LA CORRECTION EST ICI ====================
+          # On utilise la sortie de l'étape "package"
+          files: ${{ steps.package.outputs.zip_name }}
+          # =============================================================
           body: ${{ steps.get_release_notes.outputs.RELEASE_NOTES }}
