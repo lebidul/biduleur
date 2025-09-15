@@ -70,12 +70,12 @@ jobs:
           
           echo "zip_name=$zipFileName" | Out-File -FilePath $env:GITHUB_OUTPUT
 
-      - name: Upload Build Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: bidul-windows-build-${{ env.VERSION }}
-          path: ${{ env.ZIP_NAME }}
-          retention-days: 7
+#      - name: Upload Build Artifact
+#        uses: actions/upload-artifact@v4
+#        with:
+#          name: bidul-windows-build-${{ env.VERSION }}
+#          path: ${{ env.ZIP_NAME }}
+#          retention-days: 7
 
       - name: Get Release Notes
         id: get_release_notes
