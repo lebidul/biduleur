@@ -4,7 +4,7 @@
 - [x] Infos couv (flag couv/no couv, nom dessinat.eur.rice + hyperlink) (gui + cli)
 - [x] Ajouter fichiers templates csv et xlsx.
 - [x] Fichier release notes
-- [ ] Build release process.
+- [x] Build release process.
 - [x] Icône.
 - [ ] Unit tests.
 - [x] Améliorer les informations à afficher après création des fichiers.
