@@ -44,7 +44,8 @@ jobs:
           $version = "0.0.0"
           $tag_name = "v0.0.0"
           
-          if ("${{ github.event_name }}" -eq "push") {
+          # CAS 1 : C'est un push sur master
+          if ("${{ github.event_name }}" -eq "push" -and "${{ github.ref_name }}" -eq "master") {
             $latest_tag = git describe --tags --abbrev=0 2>$null
             if ($latest_tag) {
               $version_parts = $latest_tag.TrimStart("v").Split(".")
@@ -54,6 +55,7 @@ jobs:
               $version = "1.0.0"
             }
           }
+          # CAS 2 : C'est un lancement manuel
           else {
             $version = "${{ github.event.inputs.version }}"
           }
@@ -61,6 +63,7 @@ jobs:
           $tag_name = "v$version"
           echo "Determined Version: $version"
           echo "Determined Tag: $tag_name"
+
           "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
           "TAG=$tag_name" | Out-File -FilePath $env:GITHUB_ENV -Append
 
