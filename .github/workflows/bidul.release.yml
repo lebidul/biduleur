@@ -4,22 +4,17 @@ on:
   push:
     branches:
       - master # Se déclenche à chaque push/merge sur master
-
-  workflow_dispatch: # Permet le lancement manuel
+  workflow_dispatch:
     inputs:
-      release_type:
-        description: 'Type de release (patch, minor, major)'
-        required: true
-        default: 'patch'
-        type: choice
-        options: ['patch', 'minor', 'major']
+      version:
+        description: 'Version à construire (ex: 1.2.3)'
+        required: false
 
 jobs:
   build-release:
     runs-on: windows-latest
-    
-    # Empêcher les exécutions multiples pour le même commit
-    concurrency: 
+
+    concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}
       cancel-in-progress: true
 
@@ -27,7 +22,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          # On a besoin du token pour pouvoir pousser des commits et des tags
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
@@ -43,56 +37,32 @@ jobs:
           pip install -r biduleur/requirements.txt
           pip install -r misenpageur/requirements.txt
 
-      - name: Determine Next Version
+      - name: Determine Version
         id: versioning
         shell: pwsh
         run: |
-          # Lire la version depuis le fichier VERSION
-          $file_version = (Get-Content -Path VERSION).Trim()
+          $version = "0.0.0"
+          $tag_name = "v0.0.0"
           
-          # Récupérer le dernier tag Git
-          $latest_tag = git describe --tags --abbrev=0 2>$null
-          $tag_version = "0.0.0"
-          if ($latest_tag) {
-            $tag_version = $latest_tag.TrimStart("v")
+          if ("${{ github.event_name }}" -eq "push") {
+            $latest_tag = git describe --tags --abbrev=0 2>$null
+            if ($latest_tag) {
+              $version_parts = $latest_tag.TrimStart("v").Split(".")
+              $new_patch = [int]$version_parts[2] + 1
+              $version = "$($version_parts[0]).$($version_parts[1]).$new_patch"
+            } else {
+              $version = "1.0.0"
+            }
+          }
+          else {
+            $version = "${{ github.event.inputs.version }}"
           }
           
-          # Choisir la version la plus élevée entre le fichier et le tag comme base
-          $base_version = ([System.Version]$file_version -ge [System.Version]$tag_version) ? $file_version : $tag_version
-          
-          # Déterminer le type d'incrémentation
-          $release_type = "${{ github.event.inputs.release_type }}"
-          if (-not $release_type) {
-            # Si c'est un push sur master, on fait un patch par défaut
-            $release_type = "patch" 
-          }
-          
-          # Incrémenter la version
-          $version_parts = $base_version.Split(".")
-          $major = [int]$version_parts[0]
-          $minor = [int]$version_parts[1]
-          $patch = [int]$version_parts[2]
-          
-          if ($release_type -eq "major") {
-            $major += 1
-            $minor = 0
-            $patch = 0
-          } elseif ($release_type -eq "minor") {
-            $minor += 1
-            $patch = 0
-          } else { # patch
-            $patch += 1
-          }
-          
-          $new_version = "$major.$minor.$patch"
-          $new_tag = "v$new_version"
-          
-          echo "Base version: $base_version"
-          echo "New Version: $new_version"
-          echo "New Tag: $new_tag"
-
-          "VERSION=$new_version" | Out-File -FilePath $env:GITHUB_ENV -Append
-          "TAG=$new_tag" | Out-File -FilePath $env:GITHUB_ENV -Append
+          $tag_name = "v$version"
+          echo "Determined Version: $version"
+          echo "Determined Tag: $tag_name"
+          "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "TAG=$tag_name" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Update version file
         shell: pwsh
@@ -106,9 +76,43 @@ jobs:
       - name: Package release artifact
         shell: pwsh
         run: |
+          $version = "${{ env.VERSION }}"
           $sourceFolder = "dist/bidul"
-          $zipFileName = "bidul-${{ env.VERSION }}-win64.zip"
-          Compress-Archive -Path "$sourceFolder/*" -DestinationPath $zipFileName
+          $zipFileName = "bidul-${version}-win64.zip"
+          
+          # 1. Supprimer le fichier de log de débogage s'il existe
+          if (Test-Path "$sourceFolder/debug_log.txt") {
+            Remove-Item "$sourceFolder/debug_log.txt"
+            echo "debug_log.txt supprimé."
+          }
+          
+          # 2. Créer le fichier README.txt
+          $readmeContent = @"
+          Bidul v$version
+          ==============================================
+          
+          Merci d'utiliser Bidul !
+          
+          INSTRUCTIONS:
+          1. Décompressez cette archive.
+          2. Ouvrez le dossier "bidul" qui vient d'être créé.
+          3. Double-cliquez sur bidul.exe pour lancer l'application.
+          
+          Pour plus de détails, consultez le fichier RELEASE_NOTES.md.
+          "@
+          $readmeContent | Out-File -FilePath "$sourceFolder/README.txt" -Encoding utf8
+          
+          # 3. Copier le fichier RELEASE_NOTES.md
+          if (Test-Path "RELEASE_NOTES.md") {
+            Copy-Item -Path "RELEASE_NOTES.md" -Destination "$sourceFolder/"
+          }
+          
+          # 4. Créer une archive ZIP "plate"
+          # On se place dans le dossier parent (dist) pour que le chemin source soit "bidul"
+          Set-Location -Path "dist"
+          Compress-Archive -Path "bidul" -DestinationPath "../$zipFileName" -Force
+          Set-Location -Path ".." # Revenir à la racine
+          
           echo "ZIP_NAME=$zipFileName" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Upload Build Artifact
@@ -139,35 +143,31 @@ jobs:
           $release_notes = $release_notes.Replace('%', '%25').Replace("`n", '%0A').Replace("`r", '%0D')
           echo "RELEASE_NOTES=$release_notes" | Out-File -FilePath $env:GITHUB_OUTPUT
 
-      - name: Commit and Push Version Bump
-        if: github.event_name == 'push'
+      - name: Commit, Tag, and Release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         run: |
           git config --global user.name "GitHub Actions"
           git config --global user.email "github-actions@github.com"
           
-          Set-Content -Path VERSION -Value "${{ env.VERSION }}"
+          git add bidul_version_info.txt
+          # Le fichier VERSION n'est plus utilisé, on ne le commite pas.
           
-          git add VERSION bidul_version_info.txt
           # On vérifie s'il y a des changements à commiter
           if (-not $(git status --porcelain)) {
             echo "No changes to commit."
           } else {
-            git commit -m "chore(release): Bump version to ${{ env.VERSION }}"
+            git commit -m "chore(release): Update version info for ${{ env.TAG }}"
             git push
           }
 
-      - name: Create and Push Git Tag
-        if: github.event_name == 'push'
-        run: |
           git tag ${{ env.TAG }}
           git push origin ${{ env.TAG }}
-      
+
       - name: Create Release
-        # On ne crée une release que pour les pushs sur master
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         uses: softprops/action-gh-release@v2
         with:
-          name: Bidul v${{ env.VERSION }}
+          name: Bidul ${{ env.TAG }}
           tag_name: ${{ env.TAG }}
           files: ${{ env.ZIP_NAME }}
           body: ${{ steps.get_release_notes.outputs.RELEASE_NOTES }}
