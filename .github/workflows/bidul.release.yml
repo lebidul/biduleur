@@ -84,33 +84,33 @@ jobs:
       # ==================== ÉTAPES CONDITIONNELLES POUR LA RELEASE ====================
       # Ces étapes ne s'exécuteront que si le workflow a été déclenché par un PUSH de TAG.
 
-      - name: Get Release Notes
+      - name: Extract Release Notes
         if: github.event_name == 'push'
         id: get_release_notes
         shell: pwsh
         run: |
           $notes_file = "RELEASE_NOTES.md"
           $version = "${{ env.VERSION }}"
+          $output_file = "current_release_notes.md" # Fichier de sortie temporaire
           $release_body = "Pas de notes de version trouvées pour la v$version."
 
           if (Test-Path $notes_file) {
             $content = Get-Content -Path $notes_file -Raw
             
-            # Expression régulière pour trouver le contenu entre le titre de la version actuelle
-            # et le prochain titre de version (ou la fin du fichier).
-            # (?s) active le mode "dotall" pour que '.' corresponde aussi aux sauts de ligne.
+            # La regex reste la même, elle est correcte
             $pattern = "(?s)# Bidul v$version(.*?)(?=# Bidul v|\z)"
             $match = [regex]::Match($content, $pattern)
             
             if ($match.Success) {
-              # On prend le premier groupe capturé et on nettoie les espaces superflus.
-              $release_body = $match.Groups[1].Value.Trim()
+              $release_body = $match.Groups.Value.Trim()
             }
           }
           
-          # L'échappement pour les multilignes est crucial pour la sortie
-          $release_body = $release_body.Replace('%', '%25').Replace("`n", '%0A').Replace("`r", '%0D')
-          echo "body=$release_body" | Out-File -FilePath $env:GITHUB_OUTPUT
+          # On écrit le contenu propre dans le fichier temporaire
+          Set-Content -Path $output_file -Value $release_body -Encoding utf8
+          
+          # On définit le chemin du fichier comme une sortie de l'étape
+          echo "notes_path=$output_file" | Out-File -FilePath $env:GITHUB_OUTPUT
 
       - name: Create Release
         if: github.event_name == 'push'
@@ -119,4 +119,5 @@ jobs:
           name: Bidul v${{ env.VERSION }}
           tag_name: ${{ github.ref_name }}
           files: ${{ steps.package.outputs.zip_name }}
-          body: ${{ steps.get_release_notes.outputs.body }}
+          # On utilise 'body_path' pour lire directement le fichier
+          body_path: ${{ steps.get_release_notes.outputs.notes_path }}

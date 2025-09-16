@@ -33,8 +33,7 @@ if getattr(sys, 'frozen', False):
 # ==================== FIN DU BLOC DE DÉBOGAGE ====================
 
 
-from tkinter import filedialog, messagebox
-from tkinter import ttk
+from tkinter import filedialog, messagebox, ttk, colorchooser
 from pathlib import Path
 import importlib.resources as res
 
@@ -165,8 +164,9 @@ def run_pipeline(
         out_html: str, out_agenda_html: str, out_pdf: str, auteur_couv: str, auteur_couv_url: str,
         page_margin_mm: float, generate_svg: bool, out_svg: str, date_separator_type: str,
         date_spacing: float, poster_design: int, font_size_safety_factor: float, logos_padding_mm: float,
-        background_alpha: float, poster_title: str, cucaracha_type: str, 
-        cucaracha_value: str, cucaracha_text_font: str, logos_layout: str
+        background_alpha: float, poster_title: str, cucaracha_type: str,
+        cucaracha_value: str, cucaracha_text_font: str, logos_layout: str,
+        date_box_border_color: str, date_box_back_color: str
 ) -> tuple[bool, str]:
     try:
         from misenpageur.misenpageur.config import Config
@@ -208,6 +208,9 @@ def run_pipeline(
         cfg.logos_padding_mm = logos_padding_mm
         cfg.date_line['enabled'] = (date_separator_type == "ligne")
         cfg.date_box['enabled'] = (date_separator_type == "box")
+        if cfg.date_box['enabled']:
+            cfg.date_box['border_color'] = date_box_border_color
+            cfg.date_box['back_color'] = date_box_back_color
         cfg.date_spaceBefore = date_spacing
         cfg.date_spaceAfter = date_spacing
         cfg.poster['design'] = poster_design
@@ -307,6 +310,8 @@ def main():
     margin_var = tk.StringVar(value=str(cfg_defaults.get("page_margin_mm", "1.0")))
     date_separator_var = tk.StringVar(value=cfg_defaults.get("date_separator_type", "ligne"))
     date_spacing_var = tk.StringVar(value=cfg_defaults.get("date_spacing", "4"))
+    date_box_border_color_var = tk.StringVar(value="#000000")
+    date_box_back_color_var = tk.StringVar(value="#FFFFFF")
     poster_title_var = tk.StringVar(value=cfg_defaults.get("poster_title", ""))
     poster_design_var = tk.IntVar(value=cfg_defaults.get("poster_design", 0))
     safety_factor_var = tk.StringVar(value=str(cfg_defaults.get("font_size_safety_factor", "0.98")))
@@ -526,15 +531,68 @@ def main():
     date_sep_frame = ttk.LabelFrame(main_frame, text="Séparateur de dates", padding="10")
     date_sep_frame.grid(row=r, column=0, columnspan=3, sticky="ew", pady=10)
     date_sep_frame.columnconfigure(1, weight=1)
-    tk.Label(date_sep_frame, text="Type de séparateur :").grid(row=0, column=0, sticky="w", padx=5, pady=5)
+
+    lr = 0
+
+    tk.Label(date_sep_frame, text="Type de séparateur :").grid(row=lr, column=0, sticky="w", padx=5, pady=5)
     date_sep_radios = ttk.Frame(date_sep_frame)
-    date_sep_radios.grid(row=0, column=1, sticky="w", padx=5, pady=5)
-    tk.Radiobutton(date_sep_radios, text="Aucun", variable=date_separator_var, value="aucun").pack(side=tk.LEFT)
-    tk.Radiobutton(date_sep_radios, text="Ligne", variable=date_separator_var, value="ligne").pack(side=tk.LEFT,
-                                                                                                   padx=10)
-    tk.Radiobutton(date_sep_radios, text="Box", variable=date_separator_var, value="box").pack(side=tk.LEFT)
-    tk.Label(date_sep_frame, text="Espace avant/après date (pt) :").grid(row=1, column=0, sticky="w", padx=5, pady=5)
-    tk.Entry(date_sep_frame, textvariable=date_spacing_var, width=10).grid(row=1, column=1, sticky="w", padx=5, pady=5)
+    date_sep_radios.grid(row=lr, column=1, sticky="w", padx=5, pady=5)
+    lr += 1
+
+    tk.Label(date_sep_frame, text="Espace avant/après date (pt) :").grid(row=lr, column=0, sticky="w", padx=5, pady=5)
+    tk.Entry(date_sep_frame, textvariable=date_spacing_var, width=10).grid(row=lr, column=1, sticky="w", padx=5, pady=5)
+    lr += 1
+
+    # 1. Créer le cadre qui contiendra les widgets de couleur
+    date_box_colors_frame = ttk.Frame(date_sep_frame)
+
+    # 2. Widgets pour la couleur de la bordure
+    border_color_label = tk.Label(date_box_colors_frame, text="Couleur de la bordure :")
+    border_color_preview = tk.Label(date_box_colors_frame, text="    ", bg=date_box_border_color_var.get(),
+                                    relief="sunken")
+    border_color_btn = tk.Button(date_box_colors_frame, text="Choisir…")
+
+    # 3. Widgets pour la couleur de fond
+    back_color_label = tk.Label(date_box_colors_frame, text="Couleur de fond :")
+    back_color_preview = tk.Label(date_box_colors_frame, text="    ", bg=date_box_back_color_var.get(), relief="sunken")
+    back_color_btn = tk.Button(date_box_colors_frame, text="Choisir…")
+
+    def pick_color(color_var, preview_widget):
+        """Ouvre le color chooser et met à jour la variable et l'aperçu."""
+        # askcolor retourne une tuple ( (r,g,b), "#rrggbb" ) ou (None, None) si annulé
+        _, color_hex = colorchooser.askcolor(initialcolor=color_var.get())
+        if color_hex:
+            color_var.set(color_hex)
+            preview_widget.config(bg=color_hex)
+
+    # Lier les commandes aux boutons
+    border_color_btn.config(command=lambda: pick_color(date_box_border_color_var, border_color_preview))
+    back_color_btn.config(command=lambda: pick_color(date_box_back_color_var, back_color_preview))
+
+    # Placer les widgets de couleur dans leur propre grille
+    border_color_label.grid(row=0, column=0, sticky="w", padx=(0, 5))
+    border_color_preview.grid(row=0, column=1, sticky="w")
+    border_color_btn.grid(row=0, column=2, sticky="w", padx=5)
+    back_color_label.grid(row=0, column=3, sticky="w", padx=(20, 5))
+    back_color_preview.grid(row=0, column=4, sticky="w")
+    back_color_btn.grid(row=0, column=5, sticky="w", padx=5)
+
+    # 4. Fonction pour afficher/cacher le cadre de couleur
+    def toggle_date_sep_options(*args):
+        if date_separator_var.get() == "box":
+            date_box_colors_frame.grid(row=lr, column=0, columnspan=2, sticky="w", padx=5, pady=5)
+        else:
+            date_box_colors_frame.grid_remove()
+
+    # 5. Lier la fonction aux boutons radio
+    tk.Radiobutton(date_sep_radios, text="Aucun", variable=date_separator_var, value="aucun",
+                   command=toggle_date_sep_options).pack(side=tk.LEFT)
+    tk.Radiobutton(date_sep_radios, text="Ligne", variable=date_separator_var, value="ligne",
+                   command=toggle_date_sep_options).pack(side=tk.LEFT, padx=10)
+    tk.Radiobutton(date_sep_radios, text="Box", variable=date_separator_var, value="box",
+                   command=toggle_date_sep_options).pack(side=tk.LEFT)
+
+    toggle_date_sep_options()  # Appel initial
 
     r += 1
     layout_frame = ttk.LabelFrame(main_frame, text="Paramètres de mise en page (Poster)", padding="10")
@@ -644,6 +702,8 @@ def main():
             generate_svg=generate_svg_var.get(),
             out_svg=svg_var.get().strip(),
             date_separator_type=date_separator_var.get(),
+            date_box_border_color=date_box_border_color_var.get(),
+            date_box_back_color=date_box_back_color_var.get(),
             date_spacing=date_spacing_val,
             poster_design=poster_design_var.get(),
             font_size_safety_factor=safety_factor_val,

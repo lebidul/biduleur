@@ -49,6 +49,7 @@ class Config:
     logos_dir: str = "assets/logos"
     logos_layout: str = "colonnes"
     logos_padding_mm: float = 1.0 # Marge en mm pour le layout optimisé
+    logo_hyperlinks: List[Dict[str, str]] = field(default_factory=list)
     ours_md: str = "assets/ours/ours.md"
     ours_svg: str = "assets/ours/ours_template.svg"
     nobr_file: Optional[str] = None

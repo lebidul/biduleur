@@ -9,7 +9,7 @@
 - [ ] Unit tests.
 - [x] Taille fenêtre dynamique
 - [ ] Export dans 1 seul svg
-- [ ] Hyperlinks sponsors
+- [x] Hyperlinks sponsors
 - [x] Champs paths par défaut depuis build github
 - [x] Dossier logos dupliqué
 
@@ -17,9 +17,11 @@
 - [ ] Ajout helpers.
 - [ ] GUI qui génère une preview dynamiquement et ensuite propose de sauver le pdf (voir notes_ia/googleAIStudio.solutionGUIdynamique.md).
 - [ ] Refactor dans dossier bidul.biduleur/bidul.
+- [x] Champ pour choisir couleur box de dates
+- [ ] Texte poster en blanc si rendu trop foncé
 - [ ] Effet succès solitaire.
 - [ ] Icône
-- [ ] Problème sécurité Windows
+- [x] Problème sécurité Windows
 - [x] Progress bar.
 - [ ] Problème affichage release notes dans release github
 - [ ] Changer framework GUI
