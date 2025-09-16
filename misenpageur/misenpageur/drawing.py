@@ -248,19 +248,18 @@ def _draw_logos_two_columns(c: canvas.Canvas, col_coords: tuple, logos: List[str
 
 def _draw_logos_optimized(c: canvas.Canvas, col_coords: tuple, logo_paths: List[str]):
     """
-    Dessine les logos en trouvant le plus grand facteur d'échelle commun,
-    puis en ajustant chaque logo à l'intérieur de sa boîte allouée pour
-    garantir le respect du ratio d'aspect.
+    Dessine les logos en maximisant leur surface commune et égale,
+    en triant les boîtes pour un meilleur placement et en ajustant
+    chaque logo à l'intérieur de sa boîte allouée.
     """
     x_offset, y_offset, w, h = col_coords
-    if not logo_paths or w <= 0 or h <= 0:
-        return
+    if not logo_paths or w <= 0 or h <= 0: return
 
     padding_mm = 1.0
     padding_pt = mm_to_pt(padding_mm)
 
     logos_data = []
-    # Charger les dimensions réelles (bounding box) des logos (cette partie est correcte)
+    # Charger les dimensions réelles (bounding box) des logos
     for path in logo_paths:
         try:
             with Image.open(path) as img:
@@ -268,37 +267,42 @@ def _draw_logos_optimized(c: canvas.Canvas, col_coords: tuple, logo_paths: List[
                 bbox = img_rgba.getbbox()
                 if bbox:
                     true_w, true_h = bbox[2] - bbox[0], bbox[3] - bbox[1]
-                    logos_data.append(
-                        {'path': path, 'w': true_w, 'h': true_h, 'ratio': true_h / true_w if true_w > 0 else 1})
-                else:
-                    logos_data.append({'path': path, 'w': img.width, 'h': img.height,
-                                       'ratio': img.height / img.width if img.width > 0 else 1})
+                    if true_w > 0 and true_h > 0:
+                        logos_data.append({'path': path, 'w': true_w, 'h': true_h, 'ratio': true_h / true_w})
         except Exception:
             pass
     if not logos_data: return
 
-    # 1. Recherche binaire du meilleur facteur d'échelle (cette partie est correcte)
-    low_scale, high_scale = 0.0, 1.0
+    # 1. Recherche binaire de la surface optimale
+    min_area, max_area = 1.0, w * h
     best_placements = None
 
-    total_area = sum(ld['w'] * ld['h'] for ld in logos_data)
-    if total_area > 0:
-        high_scale = math.sqrt((w * h) / total_area) * 2.0
-
     for _ in range(15):
-        scale = (low_scale + high_scale) / 2
-        if scale == 0: break
+        test_area = (min_area + max_area) / 2
+        if test_area < 1: break
 
         packer = PackerGlobal()
         packer.add_bin(w, h)
 
+        can_pack_all = True
         rectangles_to_add = []
         for logo in logos_data:
-            rect_w = logo['w'] * scale
-            rect_h = logo['h'] * scale
+            rect_w = math.sqrt(test_area / logo['ratio'])
+            rect_h = rect_w * logo['ratio']
             padded_w = rect_w + (2 * padding_pt)
             padded_h = rect_h + (2 * padding_pt)
+
+            if padded_w > w or padded_h > h:
+                can_pack_all = False
+                break
             rectangles_to_add.append({'w': padded_w, 'h': padded_h, 'rid': logo['path']})
+
+        if not can_pack_all:
+            max_area = test_area
+            continue
+
+        # On trie les rectangles du plus grand au plus petit pour un meilleur packing
+        rectangles_to_add.sort(key=lambda r: max(r['w'], r['h']), reverse=True)
 
         for r in rectangles_to_add:
             packer.add_rect(r['w'], r['h'], rid=r['rid'])
@@ -306,41 +310,33 @@ def _draw_logos_optimized(c: canvas.Canvas, col_coords: tuple, logo_paths: List[
 
         if len(packer[0]) == len(logos_data):
             best_placements = packer[0]
-            low_scale = scale
+            min_area = test_area
         else:
-            high_scale = scale
+            max_area = test_area
 
     if not best_placements:
-        print("[WARN] Aucune solution de packing n'a pu être trouvée.")
+        print("[WARN] Aucune solution de packing n'a pu être trouvée. Retour à la méthode simple.")
         _draw_logos_two_columns(c, col_coords, logo_paths, Config())
         return
 
-    # ==================== LOGIQUE DE DESSIN FINALE ET DÉFINITIVE ====================
     # 2. Dessiner chaque logo en l'ajustant à sa boîte allouée
     for rect in best_placements:
         logo_path = rect.rid
         logo_data = next(l for l in logos_data if l['path'] == logo_path)
         logo_ratio = logo_data['ratio']
 
-        # 1. Déterminer la zone de dessin réelle (conteneur)
         available_w = float(rect.width) - (2 * padding_pt)
         available_h = float(rect.height) - (2 * padding_pt)
 
-        if available_w <= 0 or available_h <= 0:
-            continue
+        if available_w <= 0 or available_h <= 0: continue
 
-        # 2. Calculer la taille finale du logo pour qu'il rentre dans le conteneur
-        #    tout en conservant son ratio d'aspect.
         if logo_ratio > (available_h / available_w):
-            # Le logo est plus "grand" que la boîte -> on ajuste à la hauteur
             final_h = available_h
             final_w = final_h / logo_ratio
         else:
-            # Le logo est plus "large" que la boîte -> on ajuste à la largeur
             final_w = available_w
             final_h = final_w * logo_ratio
 
-        # 3. Calculer la position pour centrer le logo dans sa zone de dessin
         available_area_x = x_offset + float(rect.x) + padding_pt
         available_area_y = y_offset + float(rect.y) + padding_pt
 
@@ -355,7 +351,7 @@ def _draw_logos_optimized(c: canvas.Canvas, col_coords: tuple, logo_paths: List[
             c.drawImage(logo_path, logo_x, logo_y, width=final_w, height=final_h, **kwargs)
         except Exception as e:
             print(f"[WARN] Erreur avec le logo {os.path.basename(logo_path)} lors du dessin: {e}")
-    # ==============================================================================
+
 
 def draw_s1(c: canvas.Canvas, S1_coords, logos: list[str], cfg: Config, lay: Layout):
     """
