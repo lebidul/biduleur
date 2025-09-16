@@ -3,6 +3,9 @@
 import os
 import sys
 import tkinter as tk
+import subprocess
+import threading
+import queue
 
 # ==================== DÉBUT DU BLOC DE DÉBOGAGE ====================
 # PyInstaller définit la variable `frozen` à True quand le code s'exécute dans l'exe.
@@ -95,6 +98,7 @@ def _load_cfg_defaults() -> dict:
             "skip_cover": getattr(cfg, "skip_cover", False),
             "date_spacing": str(cfg.date_spaceBefore),
         })
+        if isinstance(cfg.section_1, dict): out["ours_background_png"] = cfg.section_1.get("ours_background_png", "")
         if isinstance(cfg.pdf_layout, dict): out["page_margin_mm"] = cfg.pdf_layout.get("page_margin_mm", 1.0)
         if cfg.date_line.get("enabled", True):
             out["date_separator_type"] = "ligne"
@@ -125,7 +129,7 @@ def _ensure_parent_dir(path: str):
 
 
 def run_pipeline(
-        input_file: str, generate_cover: bool, cover_image: str, ours_md: str, logos_dir: str,
+        input_file: str, generate_cover: bool, cover_image: str, ours_background_png: str, logos_dir: str,
         out_html: str, out_agenda_html: str, out_pdf: str, auteur_couv: str, auteur_couv_url: str,
         page_margin_mm: float, generate_svg: bool, out_svg: str, date_separator_type: str,
         date_spacing: float, poster_design: int, font_size_safety_factor: float,
@@ -148,11 +152,13 @@ def run_pipeline(
         project_root, cfg_path, lay_path = defaults["root"], defaults["config"], defaults["layout"]
         cfg = Config.from_yaml(cfg_path)
 
+        cfg.project_root = project_root
+
         cfg.input_html = out_html
         cfg.skip_cover = not generate_cover
         if out_pdf: cfg.output_pdf = out_pdf
         if (cover_image or "").strip(): cfg.cover_image = cover_image.strip()
-        if (ours_md or "").strip(): cfg.ours_md = ours_md.strip()
+        if (ours_background_png or "").strip(): cfg.section_1['ours_background_png'] = ours_background_png.strip()
         if (logos_dir or "").strip(): cfg.logos_dir = logos_dir.strip()
         if (auteur_couv or "").strip(): cfg.auteur_couv = auteur_couv.strip()
         if (auteur_couv_url or "").strip(): cfg.auteur_couv_url = auteur_couv_url.strip()
@@ -208,6 +214,20 @@ def run_pipeline(
             except OSError:
                 pass
 
+def open_file(filepath):
+    """Ouvre un fichier avec l'application par défaut du système."""
+    if not filepath or not os.path.exists(filepath):
+        print(f"[WARN] Impossible d'ouvrir le fichier, il n'existe pas : {filepath}")
+        return
+    try:
+        if sys.platform == "win32":
+            os.startfile(filepath)
+        elif sys.platform == "darwin": # macOS
+            subprocess.run(["open", filepath])
+        else: # Linux
+            subprocess.run(["xdg-open", filepath])
+    except Exception as e:
+        messagebox.showwarning("Ouverture impossible", f"Impossible d'ouvrir le fichier automatiquement:\n{e}")
 
 def main():
     root = tk.Tk()
@@ -219,7 +239,7 @@ def main():
 
     # --- Variables Tkinter ---
     input_var = tk.StringVar()
-    ours_var = tk.StringVar(value=cfg_defaults.get("ours_md", ""))
+    ours_png_var = tk.StringVar(value=cfg_defaults.get("ours_background_png", ""))
     logos_var = tk.StringVar(value=cfg_defaults.get("logos_dir", ""))
     generate_cover_var = tk.BooleanVar(value=not cfg_defaults.get("skip_cover", False))
     cover_var = tk.StringVar(value=cfg_defaults.get("cover", ""))
@@ -254,11 +274,10 @@ def main():
                                           filetypes=[("Images", "*.jpg;*.jpeg;*.png;*.tif;*.webp"), ("Tous", "*.*")])
         if path: cover_var.set(path)
 
-    def pick_ours():
-        path = filedialog.askopenfilename(title="Fichier OURS (Markdown)",
-                                          filetypes=[("Markdown", "*.md;*.markdown"), ("Texte", "*.txt"),
-                                                     ("Tous", "*.*")])
-        if path: ours_var.set(path)
+    def pick_ours_png():
+        path = filedialog.askopenfilename(title="Image de fond pour l'Ours (PNG)",
+                                          filetypes=[("Images", "*.png;*.jpg;*.jpeg"), ("Tous", "*.*")])
+        if path: ours_png_var.set(path)
 
     def pick_logos():
         path = filedialog.askdirectory(title="Dossier des logos")
@@ -306,9 +325,9 @@ def main():
     r += 1
     ttk.Separator(main_frame, orient='horizontal').grid(row=r, column=0, columnspan=3, sticky="ew", pady=10)
     r += 1
-    tk.Label(main_frame, text="Ours (Markdown) :").grid(row=r, column=0, sticky="e", padx=5, pady=5)
-    tk.Entry(main_frame, textvariable=ours_var).grid(row=r, column=1, sticky="ew", padx=5, pady=5)
-    tk.Button(main_frame, text="Parcourir…", command=pick_ours).grid(row=r, column=2, padx=5, pady=5)
+    tk.Label(main_frame, text="Ours (Image de fond PNG) :").grid(row=r, column=0, sticky="e", padx=5, pady=5)
+    tk.Entry(main_frame, textvariable=ours_png_var).grid(row=r, column=1, sticky="ew", padx=5, pady=5)
+    tk.Button(main_frame, text="Parcourir…", command=pick_ours_png).grid(row=r, column=2, padx=5, pady=5)
     r += 1
     tk.Label(main_frame, text="Dossier logos :").grid(row=r, column=0, sticky="e", padx=5, pady=5)
     tk.Entry(main_frame, textvariable=logos_var).grid(row=r, column=1, sticky="ew", padx=5, pady=5)
@@ -455,7 +474,12 @@ def main():
 
     status = tk.StringVar(value="Prêt.")
 
-    def run_now():
+    # NOUVEAU : Une file d'attente pour récupérer le résultat du thread de travail
+    result_queue = queue.Queue()
+
+    # NOUVEAU : La fonction qui exécute la tâche lourde
+    def run_pipeline_in_thread():
+        """Wrapper pour exécuter run_pipeline et mettre le résultat dans la queue."""
         inp = input_var.get().strip()
         if not inp:
             messagebox.showerror("Erreur", "Veuillez sélectionner un fichier d’entrée.")
@@ -465,21 +489,15 @@ def main():
             safety_factor_val = float(safety_factor_var.get().strip().replace(',', '.'))
             date_spacing_val = float(date_spacing_var.get().strip().replace(',', '.'))
         except ValueError:
-            messagebox.showerror("Erreur",
-                                 "La marge, l'espacement et le facteur de sécurité doivent être des nombres valides.")
+            result_queue.put(
+                (False, "La marge, l'espacement et le facteur de sécurité doivent être des nombres valides."))
             return
-        poster_title = poster_title_var.get().strip()
-        if not poster_title:
-            messagebox.showerror("Erreur", "Le titre du poster est obligatoire.")
-            return
-        cuca_value = cucaracha_value_var.get().strip()
-        status.set("Traitement en cours…")
-        root.update_idletasks()
+
         ok, msg = run_pipeline(
             input_file=inp,
             generate_cover=generate_cover_var.get(),
             cover_image=cover_var.get().strip(),
-            ours_md=ours_var.get().strip(),
+            ours_background_png=ours_png_var.get().strip(),
             logos_dir=logos_var.get().strip(),
             out_html=html_var.get().strip(),
             out_agenda_html=agenda_var.get().strip(),
@@ -490,27 +508,75 @@ def main():
             generate_svg=generate_svg_var.get(),
             out_svg=svg_var.get().strip(),
             date_separator_type=date_separator_var.get(),
-            date_spacing=date_spacing_val,
+            date_spacing=float(date_spacing_var.get().strip().replace(',', '.')),
             poster_design=poster_design_var.get(),
-            font_size_safety_factor=safety_factor_val,
+            font_size_safety_factor=float(safety_factor_var.get().strip().replace(',', '.')),
             background_alpha=alpha_var.get(),
-            poster_title=poster_title,
+            poster_title=poster_title_var.get().strip(),
             cucaracha_type=cucaracha_type_var.get(),
-            cucaracha_value=cuca_value,
+            cucaracha_value=cucaracha_value_var.get().strip(),
             cucaracha_text_font=cucaracha_font_var.get()
         )
-        if ok:
-            messagebox.showinfo("Génération Terminée", msg)
-            status.set("Terminé avec succès.")
-        else:
-            messagebox.showerror("Erreur", msg)
-            status.set("Échec.")
+        result_queue.put((ok, msg))
 
+    # NOUVEAU : La fonction qui vérifie si le thread est terminé
+    def check_thread_and_get_results():
+        """Vérifie la queue pour le résultat. Si le thread est en cours, se replanifie."""
+        try:
+            # Essayer de récupérer le résultat sans bloquer
+            ok, msg = result_queue.get(block=False)
+
+            # Si on arrive ici, le thread est terminé
+            progress_bar.stop()
+            run_button.config(state=tk.NORMAL)
+
+            if ok:
+                messagebox.showinfo("Génération Terminée", msg)
+                status.set("Terminé avec succès.")
+                pdf_path = pdf_var.get().strip()
+                if pdf_path and os.path.exists(pdf_path):
+                    # MODIFIÉ : On demande à l'utilisateur avant d'ouvrir
+                    if messagebox.askyesno("Ouvrir le fichier ?", "Voulez-vous ouvrir le PDF généré maintenant ?"):
+                        open_file(pdf_path)
+            else:
+                messagebox.showerror("Erreur", msg)
+                status.set("Échec.")
+
+        except queue.Empty:
+            # Si la queue est vide, le thread n'a pas fini. On revérifie dans 100ms.
+            root.after(100, check_thread_and_get_results)
+
+    # MODIFIÉ : run_now lance maintenant le thread et la vérification
+    def run_now():
+        inp = input_var.get().strip()
+        if not inp:
+            messagebox.showerror("Erreur", "Veuillez sélectionner un fichier d’entrée.")
+            return
+
+        status.set("Traitement en cours…")
+        progress_bar.start()
+        run_button.config(state=tk.DISABLED)
+
+        # Créer et démarrer le thread de travail
+        thread = threading.Thread(target=run_pipeline_in_thread)
+        thread.daemon = True  # Permet à l'application de se fermer même si le thread tourne
+        thread.start()
+
+        # Lancer la première vérification
+        root.after(100, check_thread_and_get_results)
+
+    # --- Widgets de la fin de l'interface ---
     action_frame = ttk.Frame(root, padding="10")
     action_frame.grid(row=1, column=0, sticky="ew")
     action_frame.columnconfigure(0, weight=1)
-    tk.Button(action_frame, text="Lancer la Génération", command=run_now, bg="#4CAF50", fg="white",
-              font=("Arial", 12, "bold")).pack(pady=10, ipady=5)
+
+    progress_bar = ttk.Progressbar(action_frame, mode='indeterminate')
+    progress_bar.pack(fill=tk.X, padx=5, pady=(0, 5))
+
+    run_button = tk.Button(action_frame, text="Lancer la Génération", command=run_now, bg="#4CAF50", fg="white",
+                           font=("Arial", 12, "bold"))
+    run_button.pack(pady=10, ipady=5)
+
     status_bar = tk.Label(root, textvariable=status, bd=1, relief=tk.SUNKEN, anchor=tk.W, padx=10, pady=5,
                           font=("Arial", 10))
     status_bar.grid(row=2, column=0, sticky="ew")
