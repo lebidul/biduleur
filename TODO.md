@@ -18,7 +18,8 @@
 - [ ] GUI qui génère une preview dynamiquement et ensuite propose de sauver le pdf (voir notes_ia/googleAIStudio.solutionGUIdynamique.md).
 - [ ] Refactor dans dossier bidul.biduleur/bidul.
 - [x] Champ pour choisir couleur box de dates
-- [ ] Texte poster en blanc si rendu trop foncé
+- [x] Texte poster en blanc si rendu trop foncé
+- [ ] Ajouter logique de texte gris si poster moyennement foncé
 - [ ] Effet succès solitaire.
 - [ ] Icône
 - [x] Problème sécurité Windows
