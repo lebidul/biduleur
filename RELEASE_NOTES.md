@@ -1,4 +1,24 @@
 ---
+# Bidul v1.2.3 - Fiabilisation du Build et Interface Responsive
+
+Cette version de maintenance est cruciale car elle se concentre sur la stabilisation de l'application Windows (`.exe`) et améliore l'ergonomie de l'interface graphique pour une expérience utilisateur plus fluide.
+
+## ✨ Améliorations de l'Interface Graphique (GUI)
+
+*   **Interface "Responsive" avec Barre de Défilement** : La fenêtre de l'application peut désormais être redimensionnée sans casser la mise en page. Si la hauteur de la fenêtre devient insuffisante pour afficher tous les paramètres, une barre de défilement verticale apparaît automatiquement, permettant un accès facile à toutes les options.
+*   **Correction du Layout** : Des bugs visuels mineurs, comme un champ "Dossier logos" dupliqué et un positionnement incorrect du champ de marge, ont été corrigés pour une interface plus propre et plus logique.
+
+## 🔧 Corrections du Build Windows (`.exe`)
+
+Cette version corrige plusieurs bugs critiques qui n'apparaissaient que dans la version "standalone" de l'application :
+*   **Correction des Erreurs de Traitement** : Un `TypeError` qui pouvait survenir lors du lancement du processus depuis l'interface a été résolu.
+
+## ⚙️ Pour les Développeuses et Développeurs
+
+*   **Fiabilisation du Workflow de Release** : Le script de la GitHub Action a été amélioré pour extraire et afficher correctement les notes de version spécifiques à chaque nouvelle release sur l'interface de GitHub.
+
+---
+
 # Bidul v1.2.2 - Stabilisation du Build Windows et Corrections
 
 Cette version de maintenance se concentre sur la résolution de bugs critiques qui apparaissaient spécifiquement dans l'exécutable Windows (`.exe`) généré via GitHub Actions. L'application est désormais beaucoup plus stable et fiable en mode "standalone".

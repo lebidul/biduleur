@@ -90,13 +90,27 @@ jobs:
         shell: pwsh
         run: |
           $notes_file = "RELEASE_NOTES.md"
-          $body = "Release pour la version ${{ env.VERSION }}"
+          $version = "${{ env.VERSION }}"
+          $release_body = "Pas de notes de version trouvées pour la v$version."
+
           if (Test-Path $notes_file) {
-            $body = Get-Content -Path $notes_file -Raw
+            $content = Get-Content -Path $notes_file -Raw
+            
+            # Expression régulière pour trouver le contenu entre le titre de la version actuelle
+            # et le prochain titre de version (ou la fin du fichier).
+            # (?s) active le mode "dotall" pour que '.' corresponde aussi aux sauts de ligne.
+            $pattern = "(?s)# Bidul v$version(.*?)(?=# Bidul v|\z)"
+            $match = [regex]::Match($content, $pattern)
+            
+            if ($match.Success) {
+              # On prend le premier groupe capturé et on nettoie les espaces superflus.
+              $release_body = $match.Groups[1].Value.Trim()
+            }
           }
-          # Échappement pour le passage à l'étape suivante
-          $body = $body.Replace('%', '%25').Replace("`n", '%0A').Replace("`r", '%0D')
-          echo "body=$body" | Out-File -FilePath $env:GITHUB_OUTPUT
+          
+          # L'échappement pour les multilignes est crucial pour la sortie
+          $release_body = $release_body.Replace('%', '%25').Replace("`n", '%0A').Replace("`r", '%0D')
+          echo "body=$release_body" | Out-File -FilePath $env:GITHUB_OUTPUT
 
       - name: Create Release
         if: github.event_name == 'push'
