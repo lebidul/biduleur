@@ -17,36 +17,31 @@ from .pdfbuild import build_pdf
 
 def _post_process_svg(svg_path: Path, expected_event_count: int):
     """
-    Corrige les puces en identifiant le glyphe par fréquence ET par forme,
-    puis en remplaçant sa définition par un carré parfait.
+    Corrige les puces en utilisant une heuristique géométrique :
+    1. Filtre par fréquence.
+    2. Analyse le chemin ('d' attribute) du glyphe pour exclure les courbes.
+    3. Remplace la définition du glyphe trouvé par un carré parfait.
     """
     if not svg_path.exists() or expected_event_count == 0:
         return
 
-    print(f"[INFO] Post-traitement de {svg_path.name} (attend {expected_event_count} puces)...")
+    print(f"[INFO] Post-traitement de {svg_path.name} (attend ~{expected_event_count} puces)...")
 
     try:
         content = svg_path.read_text(encoding="utf-8")
-
-        # 1. Compter la fréquence de chaque glyphe utilisé
         glyph_ids_used = re.findall(r'xlink:href="#(glyph\d+-\d+)"', content)
-        if not glyph_ids_used:
-            print("[WARN] Aucune référence de glyphe (<use>) trouvée.")
-            return
+        if not glyph_ids_used: return
 
         glyph_counts = Counter(glyph_ids_used)
-        print(f"[INFO] Fréquences des glyphes trouvés : {glyph_counts}")
-
-        # 2. Parser le SVG pour pouvoir inspecter la géométrie
         parser = etree.XMLParser(remove_blank_text=True)
         root = etree.fromstring(content.encode('utf-8'), parser)
         ns = {'svg': 'http://www.w3.org/2000/svg'}
 
-        # ==================== NOUVELLE LOGIQUE DE DÉTECTION ====================
+        # ==================== NOUVELLE LOGIQUE DE DÉTECTION GÉOMÉTRIQUE ====================
 
-        # 3. Trouver les candidats qui ont la bonne fréquence
+        # 1. Trouver les candidats qui ont la bonne fréquence
         candidate_ids = []
-        tolerance = 5  # On accepte une différence de 5
+        tolerance = 2
         for glyph_id, count in glyph_counts.items():
             if abs(count - expected_event_count) <= tolerance:
                 candidate_ids.append(glyph_id)
@@ -59,36 +54,35 @@ def _post_process_svg(svg_path: Path, expected_event_count: int):
 
         glyph_id_to_replace = None
 
-        # 4. Parmi les candidats, trouver celui qui a la forme d'un rectangle
+        # 2. Parmi les candidats, trouver celui dont le chemin ne contient pas de courbes
+        curve_commands = ['c', 's', 'q', 't', 'a']
+
         for glyph_id in candidate_ids:
-            glyph_def_list = root.xpath(f'//*[local-name()="symbol" or local-name()="g"][@id="{glyph_id}"]',
-                                        namespaces=ns)
-            if not glyph_def_list: continue
+            # On cherche directement le chemin à l'intérieur du symbole
+            path_list = root.xpath(f'//svg:symbol[@id="{glyph_id}"]/svg:path', namespaces=ns)
 
-            glyph_def = glyph_def_list[0]
-            paths = glyph_def.xpath('svg:path', namespaces=ns)
+            if not path_list: continue
 
-            if len(paths) == 1:
-                path = paths[0]
-                d_attr = path.get('d', '').lower()
+            path = path_list[0]
+            d_attr = path.get('d', '').lower()  # On passe en minuscule pour attraper C, S, Q...
 
-                # Heuristique de forme : pas de courbes (c,s,q,t,a)
-                if not any(cmd in d_attr for cmd in ['c', 's', 'q', 't', 'a']):
-                    glyph_id_to_replace = glyph_id
-                    print(f"[INFO] Glyphe de puce confirmé par sa forme : {glyph_id_to_replace}")
-                    break  # On a trouvé notre puce, on sort de la boucle
+            # Si le chemin ne contient AUCUNE des commandes de courbe, c'est notre homme !
+            if not any(cmd in d_attr for cmd in curve_commands):
+                glyph_id_to_replace = glyph_id
+                print(f"[INFO] Glyphe de puce confirmé par sa géométrie (pas de courbes) : {glyph_id_to_replace}")
+                break  # On a trouvé, on sort de la boucle
 
         if not glyph_id_to_replace:
-            print("[WARN] Aucun des glyphes candidats n'avait la forme d'un rectangle simple.")
+            print("[WARN] Aucun des glyphes candidats n'avait la forme géométrique d'une puce.")
             return
 
-        # =======================================================================
+        # =================================================================================
 
-        # 5. Remplacer la définition du glyphe identifié
-        # ... (cette partie est identique à la version précédente)
+        # 3. Remplacer la définition du glyphe identifié
         pattern = re.compile(fr'(<(?:symbol|g)[^>]*?id="{glyph_id_to_replace}"[^>]*?>)(.*?)(</(?:symbol|g)>)',
                              re.DOTALL)
-        new_geometry = '<rect x="0" y="-4" width="4" height="4" fill="white" stroke="black" stroke-width="0.8"/>'
+        # On définit un carré blanc avec une bordure noire
+        new_geometry = '<path d="M0 -4 H4 V0 H0 Z" fill="white" stroke="black" stroke-width="0.8"/>'
         match = pattern.search(content)
 
         if match:
@@ -99,10 +93,6 @@ def _post_process_svg(svg_path: Path, expected_event_count: int):
             if num_replacements > 0:
                 svg_path.write_text(content, encoding="utf-8")
                 print(f"[INFO] Définition du glyphe '{glyph_id_to_replace}' corrigée avec succès.")
-            else:
-                print(f"[WARN] Le glyphe a été identifié mais sa définition n'a pas pu être remplacée.")
-        else:
-            print(f"[WARN] Impossible de trouver le bloc de définition pour le glyphe '{glyph_id_to_replace}'.")
 
     except Exception as e:
         print(f"[WARN] Échec du post-traitement pour {svg_path.name}: {e}")
@@ -125,8 +115,10 @@ def build_svg(project_root: str, cfg: Config, layout: Layout, out_path: str, con
         output_dir = Path(out_path).parent
         output_prefix = Path(out_path).stem
 
-        pdf2svg_executable = "pdf2svg"
-        command = [pdf2svg_executable, temp_pdf_path, str(output_dir / f"{output_prefix}_%d.svg"), "all"]
+        # pdf2svg_executable = "pdf2svg"
+        executable_name = "pdf2svg.exe"
+        path_to_executable = os.path.join(project_root, "bin", "win64", executable_name)
+        command = [executable_name, temp_pdf_path, str(output_dir / f"{output_prefix}_%d.svg"), "all"]
 
         print(f"[INFO] Lancement de la conversion SVG...")
         subprocess.run(command, capture_output=True, text=True, check=True)

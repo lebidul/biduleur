@@ -13,7 +13,7 @@ output_pdf: "misenpageur/bidul/bidul_prototype.pdf"      # chemin du PDF génér
 logos_dir: "misenpageur/assets/logos"   # dossier contenant jusqu'à 10 logos
 cover_image: "misenpageur/assets/couv/couverture.png"  # image de couverture
 ours_md: "misenpageur/assets/ours/ours.md"   # fichier texte constant (ours)
-nobr_file: "misenpageur/assets/textes/nobr.txt" # fichier avec les strings insécables
+ours_svg: "misenpageur/assets/ours/ours_template.svg"
 
 # =========================
 # Paramètres typographiques
@@ -118,10 +118,17 @@ section_1:
   ours_font_name: "Arial"      # Police de l'ours
   ours_font_size: 7.0            # Taille de la police de l'ours
   ours_line_spacing: 1.3       # Interlignage (ex: 1.2 = 120%)
+  ours_background_png: "misenpageur/assets/ours/ours_template.png"
   # Configuration titre du QR code
   qr_code_title: "Agenda culturel"
   qr_code_title_font_name: "Arial-Bold"
   qr_code_title_font_size: 9
+  # --- Zone pour l'Auteur ---
+  auteur_pos_x_mm: 25
+  auteur_pos_y_mm: 47
+  auteur_font_name: "Arial-Bold" # Choisissez une police simple et standard
+  auteur_font_size: 9
+  auteur_align: "center"
 
   # Configuration du QR Code
   qr_code_value: "https://www.lebidul.com" # L'URL ou le texte du QR code
@@ -131,6 +138,16 @@ section_1:
   additional_box_height_mm: 35 # Hauteur de la "boîte additionnelle" sous les logos
   logo_box_bottom_margin_mm: 0 # Marge entre la zone des logos et la boîte additionnelle
 
+  ours_hyperlinks:
+    - href: "https://www.facebook.com/LeBidul"
+      # [x_mm, y_mm, largeur_mm, hauteur_mm] depuis le bas-gauche de la colonne
+      rect_mm: [5, 88, 11, 5]
+
+    - href: "https://www.instagram.com/le_bidul_72"
+      rect_mm: [21, 88, 15, 5]
+
+    - href: "http://www.lebidul.com"
+      rect_mm: [5, 83, 15, 5]
 
 # Configuration de la boîte "Cucaracha" (anciennement additional_box)
 cucaracha_box:
