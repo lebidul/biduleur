@@ -8,9 +8,10 @@
 - [x] Icône.
 - [ ] Unit tests.
 - [ ] Taille fenêtre dynamique
-- [ ] Champs paths par défaut depuis build github
-- [ ] Dossier logos dupliqué
-- [x] Améliorer les informations à afficher après création des fichiers.
+- [ ] Export dans 1 seul svg
+- [ ] Hyperlinks sponsors
+- [x] Champs paths par défaut depuis build github
+- [x] Dossier logos dupliqué
 
 ## Priorité Moyenne
 - [ ] Ajout helpers.
@@ -20,6 +21,7 @@
 - [ ] Icône
 - [ ] Problème sécurité Windows
 - [x] Progress bar.
+- [ ] Problème affichage release notes dans release github
 
 ## Documentation
 - [ ] Rédiger un guide utilisateur pour expliquer comment utiliser le module.
