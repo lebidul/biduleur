@@ -24,7 +24,7 @@ from .textflow import (
 )
 from .utils import mm_to_pt
 
-from PIL import Image
+from PIL import Image, ImageStat
 from reportlab.lib.colors import HexColor
 from reportlab.pdfbase.pdfmetrics import getFont
 from reportlab.pdfgen import canvas
@@ -40,6 +40,46 @@ MM_PER_INCH = 25.4
 def _pp_get(cfg, key, default=None):
     pp = getattr(cfg, "prepress", {}) or {}
     return pp.get(key, default)
+
+
+def _analyze_image_brightness(
+        image_path: str,
+        threshold: int = 128,
+        transparency: float = 0.0  # 0.0 = image opaque, 1.0 = image invisible
+) -> str:
+    """
+    Analyse la luminosité d'une image en tenant compte d'un voile blanc
+    semi-transparent dont l'opacité est définie par 'transparency'.
+    """
+    if not image_path or not os.path.exists(image_path):
+        return 'light'
+    try:
+        with Image.open(image_path) as img:
+            img_l = img.convert('L')
+            width, height = img_l.size
+            zone = (width * 0.2, height * 0.2, width * 0.8, height * 0.8)
+            cropped_img = img_l.crop(zone)
+            avg_brightness_original = ImageStat.Stat(cropped_img).mean[0]
+
+            # La transparence est l'opacité du voile blanc.
+            # L'opacité de l'image est (1 - transparence).
+            white_overlay_opacity = transparency
+            image_opacity = 1.0 - transparency
+
+            # Formule de mélange : (opacité_voile * couleur_voile) + (opacité_image * couleur_image)
+            final_brightness = (white_overlay_opacity * 255) + (image_opacity * avg_brightness_original)
+
+            print(f"[INFO] Luminosité originale: {avg_brightness_original:.1f}, "
+                  f"Après voile (transparence={transparency:.2f}): {final_brightness:.1f}, "
+                  f"Seuil: {threshold}")
+
+            # On utilise la condition qui a du sens physiquement :
+            # si la luminosité finale est basse, le fond est sombre.
+            return 'dark' if final_brightness < threshold else 'light'
+
+    except Exception as e:
+        print(f"[WARN] Impossible d'analyser la luminosité de l'image : {e}")
+        return 'light'
 
 
 def _effective_dpi(img_px_w: int, img_px_h: int, placed_w_pt: float, placed_h_pt: float) -> float:
@@ -519,6 +559,7 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
 
     # --- RENDU PAGE 3 (POSTER) ---
     poster_cfg = _read_poster_config(cfg)
+    poster_cfg_dict = cfg.poster # On récupère le dictionnaire
     best_fs_poster = poster_cfg.font_size_min
 
     if poster_cfg.enabled:
@@ -527,7 +568,16 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
         S7 = {name: sec for name, sec in S.items() if sec.page == 3}
 
         # --- Logique de Design ---
-        if poster_cfg.design == 1:
+        poster_text_color = poster_cfg_dict.get("text_color_light_bg", "#000000")
+
+        if poster_cfg.design == 1 and poster_cfg_dict.get("text_color_auto", False):
+            threshold = poster_cfg_dict.get("brightness_threshold", 128)
+            transparency_value = poster_cfg_dict.get("background_image_alpha", 0.0)
+            background_type = _analyze_image_brightness(cover_path, threshold, transparency_value)
+
+            if background_type == 'dark':
+                poster_text_color = poster_cfg_dict.get("text_color_dark_bg", "#FFFFFF")
+                print("[INFO] Fond sombre détecté, la police du poster passe en blanc.")
             if cover_path:
                 # 1. Dessiner l'image de fond
                 kwargs = {'mask': 'auto'} if not isinstance(c, SVGCanvas) else {}
@@ -543,6 +593,7 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
                 c.rect(0, 0, layout.page.width, layout.page.height, stroke=0, fill=1)
                 c.restoreState()
                 # =========================================================================
+
             poster_frames = [S7["S7_Col1"], S7["S7_Col2_Full"], S7["S7_Col3"]]
         else:
             if cover_path:
@@ -625,7 +676,8 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
             if measure_poster_fit_at_fs(
                 c, poster_frames, poster_paras,
                 cfg.font_name, mid, cfg.leading_ratio, bullet_cfg,
-                poster_cfg  # On passe la configuration du poster
+                poster_cfg,
+                poster_text_color  # On passe la configuration du poster
             ):
                 best_fs_poster, lo = mid, mid
             else:
@@ -641,7 +693,8 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
         draw_poster_text_in_frames(
             c, poster_frames, poster_paras,
             cfg.font_name, final_fs_poster, cfg.leading_ratio, bullet_cfg,
-            poster_cfg  # On passe la configuration du poster
+            poster_cfg,
+            poster_text_color  # On passe la configuration du poster
         )
 
     # --- Affichage final ---

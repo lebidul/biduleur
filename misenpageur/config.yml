@@ -189,6 +189,15 @@ poster:
   font_size_safety_factor: 0.951
   date_spaceBefore: 3
   date_spaceAfter: 3
+  # Activer/désactiver la fonctionnalité
+  text_color_auto: true
+  # Couleur à utiliser sur fond sombre (généralement blanc)
+  text_color_dark_bg: "#FFFFFF"
+  # Couleur à utiliser sur fond clair (généralement noir)
+  text_color_light_bg: "#000000"
+  # Seuil de luminosité (0=noir, 255=blanc).
+  # Si la moyenne est en dessous de cette valeur, le fond est considéré "sombre".
+  brightness_threshold: 120
 
 packing_strategy:
   # Choix de l'algorithme. Options possibles :

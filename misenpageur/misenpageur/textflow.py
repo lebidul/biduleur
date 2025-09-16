@@ -281,13 +281,15 @@ def measure_poster_fit_at_fs(
         c: canvas.Canvas, frames: List[Section], paras_text: List[str],
         font_name: str, font_size: float, leading_ratio: float,
         bullet_cfg: BulletConfig,
-        poster_cfg: PosterConfig  # Nouvel argument
+        poster_cfg: PosterConfig,
+        text_color: str = "#000000"
 ) -> bool:
     """
     Simule le remplissage des cadres en calculant la hauteur de chaque paragraphe,
     en incluant l'espacement spécifique du poster pour les dates.
     """
     base_style = paragraph_style(font_name, font_size, leading_ratio)
+    base_style.textColor = HexColor(text_color)
     para_idx = 0
     num_paras = len(paras_text)
     for section in frames:
@@ -320,13 +322,15 @@ def draw_poster_text_in_frames(
         c: canvas.Canvas, frames: List[Section], paras_text: List[str],
         font_name: str, font_size: float, leading_ratio: float,
         bullet_cfg: BulletConfig,
-        poster_cfg: PosterConfig  # Nouvel argument
+        poster_cfg: PosterConfig,
+        text_color: str = "#000000"
 ):
     """
     Dessine le texte dans une série de cadres, en insérant des espaces
     verticaux (Spacers) avant et après les dates.
     """
     base_style = paragraph_style(font_name, font_size, leading_ratio)
+    base_style.textColor = HexColor(text_color)
     story = []
     for raw in paras_text:
         kind = "EVENT" if _is_event(raw) else "DATE"
