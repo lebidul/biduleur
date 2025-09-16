@@ -23,7 +23,7 @@ datas = [
 
 # On n'a plus besoin de `hiddenimports` pour nos modules,
 # car ils seront trouvés directement comme des dossiers.
-hiddenimports = ['svglib', 'lxml', 'lxml._elementpath', 'pandas', 'openpyxl']
+hiddenimports = ['svglib', 'lxml', 'lxml._elementpath', 'pandas', 'openpyxl', 'rectpack']
 # =============================================================
 
 binaries = []
