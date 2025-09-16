@@ -203,3 +203,33 @@ packing_strategy:
   # 'HEIGHT'  : Du plus haut au moins haut.
   # 'WIDTH'   : Du plus large au moins large.
   sort_algo: 'AREA'
+
+logo_hyperlinks:
+- image: "BlueZinc.png"
+  href: "https://www.facebook.com/bluezincbar/?locale=fr_FR"
+- image: "BrasserieSeptante-Deux.png"
+  href: "https://www.brasserieseptantedeux.com/"
+- image: "Bulle.png"
+  href: "https://www.librairie-bulle.fr/"
+- image: "LaCaveDePedro.png"
+  href: "https://www.cavedepedro.com/"
+- image: "LaPiraterie.png"
+  href: "https://www.lacorderaide.com/"
+- image: "LeBarouf.png"
+  href: "https://www.facebook.com/barouf.lemans/"
+- image: "LeLezard.png"
+  href: "https://www.facebook.com/p/le-lezard-bar-100055389711041/"
+- image: "LeLocalABieres.png"
+  href: "https://www.le-local-a-bieres.fr/"
+- image: "LeMansLaVille.png"
+  href: "https://www.lemans.fr/"
+- image: "LePilierRouge.png"
+  href: "https://www.facebook.com/p/Bar-Tabac-Le-Pilier-Rouge-100078241743190/"
+- image: "RadioAlpa.png                                                                                                                                                            "
+  href: "https://radioalpa.com/"
+- image: "Superforma.png"
+  href: "https://superforma.fr/"
+- image: "SyncopeProd.png"
+  href: "https://www.facebook.com/p/Syncope-Prod-100009027701073/"
+- image: "UnikMusic.png"
+  href: "https://www.facebook.com/unikmusicshop/?locale=fr_FR"

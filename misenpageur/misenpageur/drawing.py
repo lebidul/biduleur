@@ -218,6 +218,10 @@ def _draw_logos_two_columns(c: canvas.Canvas, col_coords: tuple, logos: List[str
 
     if not logos or zone_h <= 0: return
 
+    # 1. Créer le dictionnaire de recherche pour les liens (identique à l'autre fonction)
+    links_map = {os.path.basename(link.get('image', '')): link.get('href')
+                 for link in getattr(cfg, 'logo_hyperlinks', [])}
+
     num_logos = len(logos)
     cols, rows = 2, (num_logos + 1) // 2
     if rows == 0: return
@@ -251,6 +255,17 @@ def _draw_logos_two_columns(c: canvas.Canvas, col_coords: tuple, logos: List[str
 
             kwargs = {'mask': 'auto'} if not isinstance(c, SVGCanvas) else {}
             c.drawImage(image_to_draw, logo_x, logo_y, width=w_fit, height=h_fit, **kwargs)
+
+            # 2. Vérifier si un lien existe pour ce logo et le dessiner
+            logo_basename = os.path.basename(logo_path)
+            url = links_map.get(logo_basename)
+
+            if url:
+                # Créer le rectangle pour le lien invisible
+                link_rect = (logo_x, logo_y, logo_x + w_fit, logo_y + h_fit)
+                c.linkURL(url, link_rect, relative=0, thickness=0)
+                # print(f"[INFO] Lien créé pour '{logo_basename}' vers '{url}'") # Optionnel
+
         except Exception as e:
             print(f"[WARN] Erreur avec le logo {os.path.basename(logo_path)}: {e}")
 
@@ -346,7 +361,12 @@ def _draw_logos_optimized(c: canvas.Canvas, col_coords: tuple, logo_paths: List[
         _draw_logos_two_columns(c, col_coords, logo_paths, Config())
         return
 
-    # 2. Dessiner les logos en utilisant la surface optimale et les positions trouvées
+    # 4. Créer un dictionnaire de recherche pour un accès rapide aux liens
+    #    (plus efficace qu'une recherche dans une boucle)
+    links_map = {os.path.basename(link.get('image', '')): link.get('href')
+                 for link in getattr(cfg, 'logo_hyperlinks', [])}
+
+    # 5. Dessiner les logos en utilisant la surface optimale et les positions trouvées
     final_area = min_area
 
     for rect in best_placements:
@@ -368,6 +388,16 @@ def _draw_logos_optimized(c: canvas.Canvas, col_coords: tuple, logo_paths: List[
             c.drawImage(logo_path, logo_x, logo_y, width=final_w, height=final_h, **kwargs)
         except Exception as e:
             print(f"[WARN] Erreur avec le logo {os.path.basename(logo_path)} lors du dessin: {e}")
+
+        # 3. Vérifier si un lien existe pour ce logo et le dessiner
+        logo_basename = os.path.basename(logo_path)
+        url = links_map.get(logo_basename)
+
+        if url:
+            # Créer le rectangle pour le lien invisible
+            link_rect = (logo_x, logo_y, logo_x + final_w, logo_y + final_h)
+            c.linkURL(url, link_rect, relative=0, thickness=0)
+            print(f"[INFO] Lien créé pour '{logo_basename}' vers '{url}'")
 
 
 def draw_s1(c: canvas.Canvas, S1_coords, logos: list[str], cfg: Config, lay: Layout):
