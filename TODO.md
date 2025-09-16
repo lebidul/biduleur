@@ -22,7 +22,7 @@
 - [ ] Ajouter logique de texte gris si poster moyennement foncé
 - [ ] Effet succès solitaire.
 - [ ] Icône
-- [x] Problème sécurité Windows
+- [ ] Problème sécurité Windows
 - [x] Progress bar.
 - [ ] Problème affichage release notes dans release github
 - [ ] Changer framework GUI

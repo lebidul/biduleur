@@ -1,5 +1,25 @@
 ---
 
+# Bidul v1.2.5 - Couleur de Police Automatique et Finalisation
+
+Cette version introduit une nouvelle fonctionnalité intelligente pour le design du poster et finalise les améliorations de l'interface graphique et de la logique de placement des logos.
+
+## ✨ Nouveautés
+
+*   **Couleur de Police Automatique pour le Poster** : Lors de l'utilisation du design "Image en fond" pour le poster, l'application analyse désormais la luminosité de la zone centrale de l'image. Si le fond est détecté comme étant majoritairement sombre, la couleur de la police de l'agenda passe **automatiquement en blanc** pour garantir une lisibilité optimale. Cette fonctionnalité est entièrement configurable (`config.yml`).
+
+## 🔧 Améliorations et Corrections
+
+*   **Prise en Compte de la Transparence** : L'algorithme d'analyse de la luminosité simule désormais l'effet du voile blanc semi-transparent appliqué sur l'image, garantissant une détection de couleur précise et fiable, conforme au rendu final.
+*   **Finalisation de l'Algorithme de Packing** : L'algorithme de répartition optimisée des logos a été stabilisé pour corriger les bugs de placement (chevauchement, débordement) et de ratio d'aspect, tout en assurant une disposition dense et harmonieuse.
+*   **Correction de Bugs de Régression** : Le bug qui faisait disparaître la `cucaracha_box` lors de l'utilisation de la répartition optimisée des logos a été corrigé.
+
+## ⚙️ Pour les Développeuses et Développeurs
+
+*   **Analyse d'Image avec Pillow** : La nouvelle fonctionnalité de couleur automatique utilise la bibliothèque `Pillow` (`ImageStat`) pour calculer la luminosité moyenne d'une zone d'image, y compris après une simulation de composition alpha.
+
+---
+
 # Bidul v1.2.4 - Liens sur les Logos et Personnalisation des Dates
 
 Cette version enrichit considérablement les possibilités de personnalisation et l'interactivité des documents PDF générés, en ajoutant des fonctionnalités très demandées.
