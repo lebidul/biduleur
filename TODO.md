@@ -7,14 +7,21 @@
 - [x] Build release process.
 - [x] Icône.
 - [ ] Unit tests.
-- [x] Améliorer les informations à afficher après création des fichiers.
+- [ ] Taille fenêtre dynamique
+- [ ] Export dans 1 seul svg
+- [ ] Hyperlinks sponsors
+- [x] Champs paths par défaut depuis build github
+- [x] Dossier logos dupliqué
 
 ## Priorité Moyenne
 - [ ] Ajout helpers.
 - [ ] GUI qui génère une preview dynamiquement et ensuite propose de sauver le pdf (voir notes_ia/googleAIStudio.solutionGUIdynamique.md).
 - [ ] Refactor dans dossier bidul.biduleur/bidul.
 - [ ] Effet succès solitaire.
+- [ ] Icône
+- [ ] Problème sécurité Windows
 - [x] Progress bar.
+- [ ] Problème affichage release notes dans release github
 
 ## Documentation
 - [ ] Rédiger un guide utilisateur pour expliquer comment utiliser le module.

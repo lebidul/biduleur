@@ -42,17 +42,17 @@ import importlib.resources as res
 from biduleur.csv_utils import parse_bidul
 from biduleur.format_utils import output_html_file
 
-# --- import misenpageur (PDF) ---
-try:
-    from misenpageur.misenpageur.config import Config
-    from misenpageur.misenpageur.layout import Layout
-    from misenpageur.misenpageur.pdfbuild import build_pdf
-    from misenpageur.misenpageur.svgbuild import build_svg
-    from misenpageur.misenpageur.layout_builder import build_layout_with_margins
-except Exception as e:
-    _IMPORT_ERR = e
-else:
-    _IMPORT_ERR = None
+# # --- import misenpageur (PDF) ---
+# try:
+#     from misenpageur.misenpageur.config import Config
+#     from misenpageur.misenpageur.layout import Layout
+#     from misenpageur.misenpageur.pdfbuild import build_pdf
+#     from misenpageur.misenpageur.svgbuild import build_svg
+#     from misenpageur.misenpageur.layout_builder import build_layout_with_margins
+# except Exception as e:
+#     _IMPORT_ERR = e
+# else:
+#     _IMPORT_ERR = None
 
 
 def _default_paths_from_input(input_file: str) -> dict:
@@ -66,18 +66,40 @@ def _default_paths_from_input(input_file: str) -> dict:
         "svg": str(folder / f"{base}.svg"),
     }
 
+def get_resource_path(relative_path):
+    """
+    Retourne le chemin absolu vers une ressource, fonctionne en mode dev et packagé.
+    """
+    if getattr(sys, 'frozen', False):
+        # Si l'application est "frozen" (packagée par PyInstaller)
+        # sys._MEIPASS est le dossier temporaire où tout est décompressé.
+        base_path = getattr(sys, '_MEIPASS')
+    else:
+        # En mode développement, la base est le dossier du script gui.py
+        base_path = os.path.dirname(os.path.abspath(__file__))
+
+    return os.path.join(base_path, relative_path)
+
 
 def _project_defaults() -> dict:
-    # On suppose que ce script est à la racine du projet, à côté de 'misenpageur'
-    repo_root = Path(__file__).resolve().parent
-    cfg = repo_root / "misenpageur" / "config.yml"
-    lay = repo_root / "misenpageur" / "layout.yml"
+    """
+    Définit les chemins par défaut pour les fichiers de config et layout.
+    Utilise get_resource_path pour être compatible avec PyInstaller.
+    """
+    # En mode packagé, la racine du projet est le dossier temporaire _MEIPASS
+    repo_root = get_resource_path('.')
+
+    # Les fichiers de config sont maintenant relatifs à cet emplacement
+    cfg = get_resource_path(os.path.join("misenpageur", "config.yml"))
+    lay = get_resource_path(os.path.join("misenpageur", "layout.yml"))
+
     return {"root": str(repo_root), "config": str(cfg), "layout": str(lay)}
 
 
 def _load_cfg_defaults() -> dict:
+    # On définit d'abord les valeurs par défaut au cas où tout échouerait.
     out = {
-        "cover": "", "ours_md": "", "logos_dir": "", "auteur_couv": "",
+        "cover": "", "ours_background_png": "", "logos_dir": "", "auteur_couv": "",
         "auteur_couv_url": "", "skip_cover": False,
         "page_margin_mm": 1.0,
         "date_separator_type": "ligne", "date_spacing": "4",
@@ -85,13 +107,19 @@ def _load_cfg_defaults() -> dict:
         "background_alpha": 0.85, "poster_title": "",
         "cucaracha_type": "none", "cucaracha_value": "", "cucaracha_text_font": "Arial"
     }
-    if _IMPORT_ERR: return out
+
+    # On essaie de lire les vraies valeurs par défaut depuis le config.yml
     try:
+        # On tente l'import de Config uniquement ici.
+        from misenpageur.misenpageur.config import Config
+
         defaults = _project_defaults()
         cfg = Config.from_yaml(defaults["config"])
+
+        # Le reste de la logique est inchangé, mais maintenant elle est
+        # protégée par le bloc try...except.
         out.update({
             "cover": cfg.cover_image or "",
-            "ours_md": cfg.ours_md or "",
             "logos_dir": cfg.logos_dir or "",
             "auteur_couv": getattr(cfg, "auteur_couv", "") or "",
             "auteur_couv_url": getattr(cfg, "auteur_couv_url", "") or "",
@@ -120,7 +148,11 @@ def _load_cfg_defaults() -> dict:
                 "cucaracha_text_font": cfg.cucaracha_box.get("text_font_name", "Arial")
             })
     except Exception as e:
+        # Si l'import ou la lecture du fichier échoue, on affiche un avertissement
+        # mais l'application peut continuer avec les valeurs par défaut.
         print(f"[WARN] Erreur lors de la lecture des défauts depuis config.yml : {e}")
+        # On ne fait rien d'autre, la fonction retournera le 'out' initial.
+
     return out
 
 
@@ -136,8 +168,17 @@ def run_pipeline(
         background_alpha: float, poster_title: str, cucaracha_type: str, 
         cucaracha_value: str, cucaracha_text_font: str, logos_layout: str
 ) -> tuple[bool, str]:
-    if _IMPORT_ERR:
-        return False, f"Imports misenpageur impossibles : {repr(_IMPORT_ERR)}"
+    try:
+        from misenpageur.misenpageur.config import Config
+        from misenpageur.misenpageur.layout import Layout
+        from misenpageur.misenpageur.pdfbuild import build_pdf
+        from misenpageur.misenpageur.svgbuild import build_svg
+        from misenpageur.misenpageur.layout_builder import build_layout_with_margins
+    except Exception as e:
+        import traceback
+        # On retourne une erreur claire si l'import échoue
+        return False, f"Erreur critique: Impossible de charger le module 'misenpageur'.\n\nDétails:\n{type(e).__name__}: {e}\n\n{traceback.format_exc()}"
+
     final_layout_path = None
     report = {}
     try:
@@ -333,13 +374,6 @@ def main():
     tk.Entry(main_frame, textvariable=ours_png_var).grid(row=r, column=1, sticky="ew", padx=5, pady=5)
     tk.Button(main_frame, text="Parcourir…", command=pick_ours_png).grid(row=r, column=2, padx=5, pady=5)
     r += 1
-    tk.Label(main_frame, text="Dossier logos :").grid(row=r, column=0, sticky="e", padx=5, pady=5)
-    tk.Entry(main_frame, textvariable=logos_var).grid(row=r, column=1, sticky="ew", padx=5, pady=5)
-    tk.Button(main_frame, text="Parcourir…", command=pick_logos).grid(row=r, column=2, padx=5, pady=5)
-    tk.Label(main_frame, text="Dossier logos :").grid(row=r, column=0, sticky="e", padx=5, pady=5)
-    tk.Entry(main_frame, textvariable=logos_var).grid(row=r, column=1, sticky="ew", padx=5, pady=5)
-    tk.Button(main_frame, text="Parcourir…", command=pick_logos).grid(row=r, column=2, padx=5, pady=5)
-    r += 1
 
     # 1. On crée un grand LabelFrame pour TOUT ce qui concerne les logos.
     logos_frame = ttk.LabelFrame(main_frame, text="Paramètres des Logos", padding="10")
@@ -531,7 +565,7 @@ def main():
     result_queue = queue.Queue()
 
     # NOUVEAU : La fonction qui exécute la tâche lourde
-    def run_pipeline_in_thread():
+    def run_pipeline_in_thread(margin_val, safety_factor_val, date_spacing_val, logos_padding_val, poster_title_val, cuca_value_val):
         """Wrapper pour exécuter run_pipeline et mettre le résultat dans la queue."""
         inp = input_var.get().strip()
         if not inp:
@@ -553,7 +587,7 @@ def main():
             ours_background_png=ours_png_var.get().strip(),
             logos_dir=logos_var.get().strip(),
             logos_layout=logos_layout_var.get(),
-            logos_padding_mm=logos_padding_val,
+            logos_padding_mm=logos_padding_val, # <-- On utilise la valeur passée en argument
             out_html=html_var.get().strip(),
             out_agenda_html=agenda_var.get().strip(),
             out_pdf=pdf_var.get().strip(),
@@ -563,13 +597,13 @@ def main():
             generate_svg=generate_svg_var.get(),
             out_svg=svg_var.get().strip(),
             date_separator_type=date_separator_var.get(),
-            date_spacing=float(date_spacing_var.get().strip().replace(',', '.')),
+            date_spacing=date_spacing_val,
             poster_design=poster_design_var.get(),
-            font_size_safety_factor=float(safety_factor_var.get().strip().replace(',', '.')),
+            font_size_safety_factor=safety_factor_val,
             background_alpha=alpha_var.get(),
-            poster_title=poster_title_var.get().strip(),
+            poster_title=poster_title_val,
             cucaracha_type=cucaracha_type_var.get(),
-            cucaracha_value=cucaracha_value_var.get().strip(),
+            cucaracha_value=cuca_value_val,
             cucaracha_text_font=cucaracha_font_var.get()
         )
         result_queue.put((ok, msg))
@@ -608,13 +642,37 @@ def main():
             messagebox.showerror("Erreur", "Veuillez sélectionner un fichier d’entrée.")
             return
 
+        try:
+            margin_val = float(margin_var.get().strip().replace(',', '.'))
+            safety_factor_val = float(safety_factor_var.get().strip().replace(',', '.'))
+            date_spacing_val = float(date_spacing_var.get().strip().replace(',', '.'))
+            logos_padding_val = float(logos_padding_var.get().strip().replace(',', '.'))
+        except ValueError:
+            messagebox.showerror("Erreur",
+                                 "La marge, l'espacement, le facteur de sécurité et la marge des logos doivent être des nombres valides.")
+            return
+
+        poster_title_val = poster_title_var.get().strip()
+        if not poster_title_val:
+            # On pourrait le rendre optionnel, mais pour l'instant on le garde obligatoire
+            messagebox.showerror("Erreur", "Le titre du poster est obligatoire.")
+            return
+
+        cuca_value_val = cucaracha_value_var.get().strip()
+
         status.set("Traitement en cours…")
         progress_bar.start()
         run_button.config(state=tk.DISABLED)
 
-        # Créer et démarrer le thread de travail
-        thread = threading.Thread(target=run_pipeline_in_thread)
-        thread.daemon = True  # Permet à l'application de se fermer même si le thread tourne
+        # Créer et démarrer le thread de travail en lui passant les arguments
+        thread = threading.Thread(
+            target=run_pipeline_in_thread,
+            args=(
+                margin_val, safety_factor_val, date_spacing_val,
+                logos_padding_val, poster_title_val, cuca_value_val
+            )
+        )
+        thread.daemon = True
         thread.start()
 
         # Lancer la première vérification
