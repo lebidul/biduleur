@@ -272,15 +272,31 @@ def open_file(filepath):
     except Exception as e:
         messagebox.showwarning("Ouverture impossible", f"Impossible d'ouvrir le fichier automatiquement:\n{e}")
 
+
 def main():
+    """
+    Initialise et lance l'interface graphique principale de l'application.
+
+    Cette fonction configure la fenêtre, met en place une structure de contenu
+    scrollable, crée tous les widgets de l'interface, et gère la logique
+    d'exécution des tâches en arrière-plan (threading).
+    """
+
+    # --- 1. Configuration de la Fenêtre Principale ---
     root = tk.Tk()
     root.title("Bidul – Pipeline XLS/CSV → HTMLs → PDF")
-    root.minsize(900, 900)
-    root.columnconfigure(0, weight=1)
+    root.geometry("900x900")  # Taille de départ
 
+    # Configure la grille de la fenêtre principale pour qu'elle s'étende
+    root.columnconfigure(0, weight=1)
+    root.rowconfigure(0, weight=1)  # La zone scrollable prendra toute la hauteur
+    root.rowconfigure(1, weight=0)  # La barre d'action reste en bas
+    root.rowconfigure(2, weight=0)  # La barre de statut reste en bas
+
+    # --- 2. Chargement des configurations et initialisation des variables ---
     cfg_defaults = _load_cfg_defaults()
 
-    # --- Variables Tkinter ---
+    # Déclaration de toutes les variables Tkinter qui contiendront l'état de l'interface
     input_var = tk.StringVar()
     ours_png_var = tk.StringVar(value=cfg_defaults.get("ours_background_png", ""))
     logos_var = tk.StringVar(value=cfg_defaults.get("logos_dir", ""))
@@ -349,11 +365,49 @@ def main():
         except Exception as e:
             messagebox.showerror("Erreur", f"Impossible d'enregistrer le modèle : {e}")
 
-    main_frame = ttk.Frame(root, padding="10")
-    main_frame.grid(row=0, column=0, sticky="nsew")
-    main_frame.columnconfigure(1, weight=1)
-    r = 0
+    # --- 4. Mise en place de la structure scrollable ---
+    # Cette structure est essentielle pour la responsivité.
+    container = ttk.Frame(root)
+    container.grid(row=0, column=0, sticky="nsew")
+    container.rowconfigure(0, weight=1)
+    container.columnconfigure(0, weight=1)
 
+    canvas = tk.Canvas(container)
+    scrollbar = ttk.Scrollbar(container, orient="vertical", command=canvas.yview)
+    scrollable_frame = ttk.Frame(canvas)
+
+    canvas.configure(yscrollcommand=scrollbar.set)
+    canvas.grid(row=0, column=0, sticky="nsew")
+    scrollbar.grid(row=0, column=1, sticky="ns")
+
+    canvas_frame_id = canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+
+    def on_frame_configure(event):
+        """Met à jour la région de scroll quand la taille du contenu change."""
+        canvas.configure(scrollregion=canvas.bbox("all"))
+
+    def on_canvas_configure(event):
+        """Ajuste la largeur du contenu à la largeur de la fenêtre."""
+        canvas.itemconfig(canvas_frame_id, width=event.width)
+
+    def on_mousewheel(event):
+        """Permet de scroller avec la molette de la souris."""
+        scroll_amount = -1 * (event.delta // 120)
+        canvas.yview_scroll(scroll_amount, "units")
+
+    scrollable_frame.bind("<Configure>", on_frame_configure)
+    canvas.bind("<Configure>", on_canvas_configure)
+    root.bind_all("<MouseWheel>", on_mousewheel)
+    root.bind_all("<Button-4>", lambda e: on_mousewheel(type('obj', (object,), {'delta': 120})()))
+    root.bind_all("<Button-5>", lambda e: on_mousewheel(type('obj', (object,), {'delta': -120})()))
+
+    # --- 5. Création des widgets de l'interface ---
+    # Tous les widgets de formulaire sont placés dans le 'scrollable_frame'.
+    main_frame = scrollable_frame
+    main_frame.columnconfigure(1, weight=1)
+    r = 0  # Compteur de ligne pour la grille principale du contenu
+
+    # Section: Fichier d'entrée
     tk.Label(main_frame, text="Fichier d’entrée (CSV / XLS) :").grid(row=r, column=0, sticky="e", padx=5, pady=5)
     tk.Entry(main_frame, textvariable=input_var).grid(row=r, column=1, sticky="ew", padx=5, pady=5)
     tk.Button(main_frame, text="Parcourir…", command=pick_input).grid(row=r, column=2, padx=5, pady=5)
@@ -370,58 +424,51 @@ def main():
     r += 1
     ttk.Separator(main_frame, orient='horizontal').grid(row=r, column=0, columnspan=3, sticky="ew", pady=10)
     r += 1
+
+    # Section: Ours
     tk.Label(main_frame, text="Ours (Image de fond PNG) :").grid(row=r, column=0, sticky="e", padx=5, pady=5)
     tk.Entry(main_frame, textvariable=ours_png_var).grid(row=r, column=1, sticky="ew", padx=5, pady=5)
     tk.Button(main_frame, text="Parcourir…", command=pick_ours_png).grid(row=r, column=2, padx=5, pady=5)
     r += 1
 
-    # 1. On crée un grand LabelFrame pour TOUT ce qui concerne les logos.
+    # Section: Paramètres des Logos (Structurée correctement)
     logos_frame = ttk.LabelFrame(main_frame, text="Paramètres des Logos", padding="10")
     logos_frame.grid(row=r, column=0, columnspan=3, sticky="ew", pady=10)
     logos_frame.columnconfigure(1, weight=1)
+    r += 1
 
-    # On utilise un compteur de ligne local 'lr' pour ce frame
-    lr = 0
-
-    # 2. Widgets à l'intérieur de ce nouveau frame
+    lr = 0  # Compteur de ligne local pour l'intérieur du 'logos_frame'
     tk.Label(logos_frame, text="Dossier logos :").grid(row=lr, column=0, sticky="e", padx=5, pady=5)
     tk.Entry(logos_frame, textvariable=logos_var).grid(row=lr, column=1, sticky="ew", padx=5, pady=5)
     tk.Button(logos_frame, text="Parcourir…", command=pick_logos).grid(row=lr, column=2, padx=5, pady=5)
     lr += 1
-
     tk.Label(logos_frame, text="Répartition :").grid(row=lr, column=0, sticky="e", padx=5, pady=5)
     logos_layout_radios = ttk.Frame(logos_frame)
     logos_layout_radios.grid(row=lr, column=1, columnspan=2, sticky="w")
 
-    # 3. Le widget de la marge est maintenant créé ici, mais pas encore placé
     logos_padding_label = tk.Label(logos_frame, text="Marge (mm) :")
     logos_padding_entry = tk.Entry(logos_frame, textvariable=logos_padding_var, width=10)
 
-    # 4. La fonction de visibilité place/retire les widgets de la marge à la bonne ligne
     def toggle_padding_widget(*args):
+        """Affiche ou cache le champ de marge en fonction du choix de répartition."""
         if logos_layout_var.get() == "optimise":
-            # On place le label et l'entry sur la ligne suivante (lr+1)
             logos_padding_label.grid(row=lr + 1, column=0, sticky="e", padx=5, pady=5)
             logos_padding_entry.grid(row=lr + 1, column=1, sticky="w")
         else:
             logos_padding_label.grid_remove()
             logos_padding_entry.grid_remove()
 
-    # 5. Les boutons radio appellent maintenant la fonction de visibilité
     tk.Radiobutton(logos_layout_radios, text="2 Colonnes", variable=logos_layout_var, value="colonnes",
                    command=toggle_padding_widget).pack(side=tk.LEFT, padx=5)
     tk.Radiobutton(logos_layout_radios, text="Optimisée", variable=logos_layout_var, value="optimise",
                    command=toggle_padding_widget).pack(side=tk.LEFT, padx=5)
-
-    # On met à jour le compteur de ligne principal
-    r += 1
-
-    # On appelle la fonction une fois au démarrage
     toggle_padding_widget()
 
-
+    # Section: Cucaracha
     cucaracha_frame = ttk.LabelFrame(main_frame, text="Boîte 'Cucaracha'", padding="10")
     cucaracha_frame.grid(row=r, column=0, columnspan=3, sticky="ew", pady=10)
+    r += 1
+
     cucaracha_frame.columnconfigure(1, weight=1)
     cucaracha_text_entry = tk.Entry(cucaracha_frame, textvariable=cucaracha_value_var)
     cucaracha_font_label = tk.Label(cucaracha_frame, text="Police :")
@@ -456,6 +503,7 @@ def main():
     r += 1
     cover_frame = ttk.LabelFrame(main_frame, text="Informations de couverture", padding="10")
     cover_frame.grid(row=r, column=0, columnspan=3, sticky="ew", pady=10)
+    r += 1
     cover_frame.columnconfigure(1, weight=1)
     tk.Checkbutton(cover_frame, text="Avec couv' (générer la page de couverture)", variable=generate_cover_var).grid(
         row=0, column=0, columnspan=3, sticky="w", pady=2)
@@ -531,7 +579,7 @@ def main():
     output_frame = ttk.LabelFrame(main_frame, text="Fichiers de sortie", padding="10")
     output_frame.grid(row=r, column=0, columnspan=3, sticky="ew", pady=10)
     output_frame.columnconfigure(1, weight=1)
-    tk.Label(output_frame, text="HTML (biduleur) :").grid(row=0, column=0, sticky="e", padx=5, pady=5)
+    tk.Label(output_frame, text="HTML (biduleur/moulinette) :").grid(row=0, column=0, sticky="e", padx=5, pady=5)
     tk.Entry(output_frame, textvariable=html_var).grid(row=0, column=1, sticky="ew", padx=5, pady=5)
     tk.Button(output_frame, text="…", width=3,
               command=lambda: pick_save(html_var, "HTML", ".html", [("HTML", "*.html")])).grid(row=0, column=2, padx=5,
@@ -541,7 +589,7 @@ def main():
     tk.Button(output_frame, text="…", width=3,
               command=lambda: pick_save(agenda_var, "HTML Agenda", ".html", [("HTML", "*.html")])).grid(row=1, column=2,
                                                                                                         padx=5, pady=5)
-    tk.Label(output_frame, text="PDF (misenpageur) :").grid(row=2, column=0, sticky="e", padx=5, pady=5)
+    tk.Label(output_frame, text="PDF (le Bidul) :").grid(row=2, column=0, sticky="e", padx=5, pady=5)
     tk.Entry(output_frame, textvariable=pdf_var).grid(row=2, column=1, sticky="ew", padx=5, pady=5)
     tk.Button(output_frame, text="…", width=3,
               command=lambda: pick_save(pdf_var, "PDF", ".pdf", [("PDF", "*.pdf")])).grid(row=2, column=2, padx=5,
@@ -559,9 +607,8 @@ def main():
                                                                                                          column=2,
                                                                                                          padx=5, pady=5)
 
+    # --- 6. Logique d'exécution (Threading) ---
     status = tk.StringVar(value="Prêt.")
-
-    # NOUVEAU : Une file d'attente pour récupérer le résultat du thread de travail
     result_queue = queue.Queue()
 
     # NOUVEAU : La fonction qui exécute la tâche lourde
@@ -678,7 +725,8 @@ def main():
         # Lancer la première vérification
         root.after(100, check_thread_and_get_results)
 
-    # --- Widgets de la fin de l'interface ---
+    # --- 7. Barre d'actions et de statut (fixe) ---
+    # Ces widgets sont enfants de 'root' pour ne pas scroller.
     action_frame = ttk.Frame(root, padding="10")
     action_frame.grid(row=1, column=0, sticky="ew")
     action_frame.columnconfigure(0, weight=1)
@@ -686,13 +734,13 @@ def main():
     progress_bar = ttk.Progressbar(action_frame, mode='indeterminate')
     progress_bar.pack(fill=tk.X, padx=5, pady=(0, 5))
 
-    run_button = tk.Button(action_frame, text="Lancer la Génération", command=run_now, bg="#4CAF50", fg="white",
-                           font=("Arial", 12, "bold"))
+    run_button = tk.Button(action_frame, text="Lancer la Génération", command=run_now, bg="#4CAF50", fg="white", font=("Arial", 12, "bold"))
     run_button.pack(pady=10, ipady=5)
 
-    status_bar = tk.Label(root, textvariable=status, bd=1, relief=tk.SUNKEN, anchor=tk.W, padx=10, pady=5,
-                          font=("Arial", 10))
+    status_bar = tk.Label(root, textvariable=status, bd=1, relief=tk.SUNKEN, anchor=tk.W, padx=10, pady=5, font=("Arial", 10))
     status_bar.grid(row=2, column=0, sticky="ew")
+
+    # --- 8. Lancement de l'application ---
     root.mainloop()
 
 

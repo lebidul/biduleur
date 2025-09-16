@@ -7,7 +7,7 @@
 - [x] Build release process.
 - [x] Icône.
 - [ ] Unit tests.
-- [ ] Taille fenêtre dynamique
+- [x] Taille fenêtre dynamique
 - [ ] Export dans 1 seul svg
 - [ ] Hyperlinks sponsors
 - [x] Champs paths par défaut depuis build github
@@ -22,6 +22,7 @@
 - [ ] Problème sécurité Windows
 - [x] Progress bar.
 - [ ] Problème affichage release notes dans release github
+- [ ] Changer framework GUI
 
 ## Documentation
 - [ ] Rédiger un guide utilisateur pour expliquer comment utiliser le module.
