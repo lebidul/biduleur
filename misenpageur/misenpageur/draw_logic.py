@@ -22,6 +22,7 @@ from .textflow import (
     plan_pair_with_split, measure_poster_fit_at_fs, draw_poster_text_in_frames,
     _is_event, _mk_style_for_kind, _mk_text_for_kind
 )
+from .utils import mm_to_pt
 
 from PIL import Image
 from reportlab.lib.colors import HexColor
@@ -31,15 +32,10 @@ from reportlab.platypus import Paragraph
 import qrcode
 from reportlab.lib.utils import ImageReader
 from reportlab.graphics.renderSVG import SVGCanvas
+import xml.etree.ElementTree as ET
 
-# ... (toutes les fonctions helper de mm_to_pt à _inject_auteur_in_ours sont identiques à votre version) ...
 PT_PER_INCH = 72.0
 MM_PER_INCH = 25.4
-
-
-def mm_to_pt(mm: float) -> float:
-    return mm * PT_PER_INCH / MM_PER_INCH
-
 
 def _pp_get(cfg, key, default=None):
     pp = getattr(cfg, "prepress", {}) or {}
@@ -234,54 +230,41 @@ def _xml_escape(s: str) -> str:
             .replace("'", "&#39;"))
 
 
-def _inject_auteur_in_ours(ours_text: str, auteur: str, url: str, max_len: int = 47) -> str:
+def _prepare_ours_svg_by_id(svg_template_content: str, auteur: str, url: str) -> str:
     """
-    Met à jour la ligne 'Visuel : ...' dans l’ours :
-      - Incruste 'auteur' (optionnellement cliquable) en respectant une longueur
-        visible max (prefixe 'Visuel : ' + auteur ≤ max_len).
-      - Si la ligne 'Visuel :' n’existe pas, on l’ajoute en fin d’ours.
-      - Si 'auteur' est vide, on garde simplement 'Visuel :' (sans nom).
-    Remarque : on ne touche qu’à la *première* ligne commençant par 'Visuel :'.
+    Injecte le nom de l'auteur dans un élément SVG identifié par son id.
+    C'est une méthode plus robuste que le remplacement de chaîne.
     """
-    prefix = "Visuel : "
     auteur = (auteur or "").strip()
-    url = (url or "").strip()
 
-    # borner la longueur visible (prefix + auteur)
-    if auteur:
-        visible_total = len(prefix) + len(auteur)
-        if visible_total > max_len:
-            cutoff = max_len - len(prefix)
-            auteur = auteur[:max(0, cutoff)]
+    # Enregistrer l'espace de nom SVG pour les recherches
+    ET.register_namespace('', "http://www.w3.org/2000/svg")
 
-    # fabriquer le segment auteur (avec lien si fourni)
-    if not auteur:
-        replacement = prefix.strip()
-    else:
-        if url:
-            # ReportLab comprend <a href="...">...</a> dans Paragraph
-            replacement = f'{prefix}<a href="{_xml_escape(url)}">{_xml_escape(auteur)}</a>'
+    try:
+        # Parser le contenu SVG depuis la chaîne de caractères
+        root = ET.fromstring(svg_template_content)
+
+        # Le namespace est crucial pour find()
+        namespace = {'svg': 'http://www.w3.org/2000/svg'}
+
+        # Trouver l'élément avec l'id 'auteur-placeholder'
+        # La syntaxe .// recherche dans tout l'arbre
+        target_element = root.find(".//*[@id='auteur-placeholder']", namespace)
+
+        if target_element is not None:
+            # On modifie le texte de l'élément.
+            # S'il y a des <tspan> à l'intérieur, il faut cibler le bon.
+            # Pour un texte simple, ceci suffit.
+            target_element.text = auteur
         else:
-            replacement = prefix + _xml_escape(auteur)
+            print("[WARN] L'élément avec id='auteur-placeholder' n'a pas été trouvé dans le SVG.")
 
-    lines = ours_text.splitlines()
+        # Re-sérialiser l'arbre XML en une chaîne de caractères
+        return ET.tostring(root, encoding='unicode')
 
-    # 1) si on trouve une ligne 'Visuel : ...', on remplace
-    for i, ln in enumerate(lines):
-        if ln.strip().startswith("Visuel :"):
-            lines[i] = replacement
-            return "\n".join(lines)
-
-    # 2) sinon, si l’ours contient explicitement "@Steph", on remplace ce token
-    #    par le segment auteur (sans dupliquer 'Visuel : ') si la ligne ne commence pas déjà par 'Visuel :'.
-    #    (Cas de compat rétro si le fichier n’a pas la ligne normalisée.)
-    if "@Steph" in ours_text:
-        repl = _xml_escape(auteur) if not url else f'<a href="{_xml_escape(url)}">{_xml_escape(auteur)}</a>'
-        return ours_text.replace("@Steph", repl)
-
-    # 3) à défaut, on ajoute une ligne à la fin
-    lines.append(replacement)
-    return "\n".join(lines)
+    except ET.ParseError as e:
+        print(f"[ERROR] Erreur de parsing du SVG : {e}")
+        return svg_template_content  # Retourne l'original en cas d'erreur
 
 
 # -----------------------------------------------------------------
@@ -462,10 +445,6 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
     if nobr_list:
         paras = [_apply_non_breaking_strings(p, nobr_list) for p in paras]
 
-    ours_text = read_text(os.path.join(project_root, cfg.ours_md))
-    ours_text = _apply_non_breaking_strings(ours_text, nobr_list)
-    ours_text = _inject_auteur_in_ours(ours_text, cfg.auteur_couv, cfg.auteur_couv_url)
-
     logos = list_images(os.path.join(project_root, cfg.logos_dir))
     cover_path = os.path.join(project_root, cfg.cover_image)
 
@@ -524,7 +503,7 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
     report["event_counts_per_page"] = {1: events_p1, 2: events_p2, 3: events_p3}
 
     # --- RENDU PAGE 1 & 2 ---
-    draw_s1(c, S["S1"], ours_text, logos, cfg, layout)
+    draw_s1(c, S["S1"], logos, cfg, layout)
     if not cfg.skip_cover:
         prepped_cover = _prepare_cover_for_print(cover_path, S["S2"].w, S["S2"].h, cfg) # cover_path est déjà absolu
         draw_s2_cover(c, S["S2"], prepped_cover, cfg.inner_padding)

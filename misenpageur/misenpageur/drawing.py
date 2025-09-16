@@ -10,15 +10,19 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 from reportlab.platypus import Paragraph, Frame
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.utils import ImageReader
 from reportlab.lib.colors import grey
 from reportlab.pdfbase import pdfmetrics
+
+from svglib.svglib import svg2rlg
+from reportlab.graphics import renderPDF, renderSVG
 from reportlab.graphics.renderSVG import SVGCanvas
 
 from .fonts import register_arial
 from .layout import Layout, Section
 from .config import Config
+from .utils import mm_to_pt
 
 
 def list_images(path: str, max_images: int = 100) -> List[str]:
@@ -70,72 +74,104 @@ def draw_paragraph(c: canvas.Canvas, p: Paragraph, x: float, y: float):
     c.restoreState()
 
 
-def _draw_ours_column(c: canvas.Canvas, col_coords: tuple, ours_text: str, cfg: Config):
+def _draw_ours_column(c: canvas.Canvas, col_coords: tuple, cfg: Config):
+    """
+    Dessine la colonne "ours" en utilisant une image de fond PNG
+    et en ajoutant les éléments dynamiques (auteur, QR code, hyperlinks).
+    """
     x, y, w, h = col_coords
     s1_cfg = cfg.section_1
-    border_width = s1_cfg.get('ours_border_width', 0.5)
-    if border_width > 0:
-        c.setLineWidth(border_width)
-        c.setStrokeColor(grey)
-        c.rect(x, y, w, h)
+    project_root = getattr(cfg, 'project_root', '.')
 
-    qr_code_size = s1_cfg['qr_code_height_mm'] * mm
-    padding = 2 * mm
-    max_qr_size = w - (2 * padding)
-    if qr_code_size > max_qr_size:
-        qr_code_size = max_qr_size
-
-    qr_gen = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_L, box_size=10, border=0)
-    qr_gen.add_data(s1_cfg['qr_code_value'])
-    qr_gen.make(fit=True)
-    img_pillow = qr_gen.make_image(fill_color="black", back_color="white")
-
-    # ==================== CORRECTION : GESTION DU TYPE DE CANVAS ====================
-    if isinstance(c, SVGCanvas):
-        image_to_draw = img_pillow  # Le SVGCanvas veut l'objet Pillow
+    # 1. Dessin de l'image de fond
+    bg_path = os.path.join(project_root, s1_cfg['ours_background_png'])
+    if os.path.exists(bg_path):
+        c.drawImage(bg_path, x, y, width=w, height=h, preserveAspectRatio=True, anchor='c', mask='auto')
     else:
-        buffer = io.BytesIO()
-        img_pillow.save(buffer, format='PNG')
-        buffer.seek(0)
-        image_to_draw = ImageReader(buffer)  # Le canvas PDF veut un ImageReader
+        print(f"[WARN] Image de fond de l'ours introuvable : {bg_path}")
 
+    # 2. Dessin du nom de l'auteur
+    auteur_text = getattr(cfg, 'auteur_couv', '')
+    if auteur_text:
+        # Récupérer les paramètres depuis la config
+        auteur_url = getattr(cfg, 'auteur_couv_url', '')
+        font_name = s1_cfg.get('auteur_font_name', 'Helvetica')
+        font_size = s1_cfg.get('auteur_font_size', 9)
+        align = s1_cfg.get('auteur_align', 'left')
+
+        # Définir les coordonnées et la police
+        abs_pos_x = x + mm_to_pt(s1_cfg.get('auteur_pos_x_mm', 0))
+        abs_pos_y = y + mm_to_pt(s1_cfg.get('auteur_pos_y_mm', 0))
+        c.setFont(font_name, font_size)
+        c.setFillColorRGB(0, 0, 0)
+
+        # Dessiner le texte en fonction de l'alignement
+        if align == 'center':
+            c.drawCentredString(abs_pos_x, abs_pos_y, auteur_text)
+        elif align == 'right':
+            c.drawRightString(abs_pos_x, abs_pos_y, auteur_text)
+        else:  # left
+            c.drawString(abs_pos_x, abs_pos_y, auteur_text)
+
+        # ==================== AJOUT DE LA GESTION DE L'URL ====================
+        if auteur_url:
+            # Mesurer la largeur du texte pour créer un rectangle de lien précis
+            text_width = c.stringWidth(auteur_text, font_name, font_size)
+
+            # La hauteur du lien est approximativement la taille de la police
+            link_height = font_size
+
+            # Calculer le coin bas-gauche du rectangle de lien en fonction de l'alignement
+            if align == 'center':
+                x1 = abs_pos_x - (text_width / 2)
+            elif align == 'right':
+                x1 = abs_pos_x - text_width
+            else:  # left
+                x1 = abs_pos_x
+
+            # Le y de la ligne de base du texte est en bas, donc c'est notre y1
+            y1 = abs_pos_y
+
+            # Définir le rectangle (x1, y1, x2, y2)
+            link_rect = (x1, y1, x1 + text_width, y1 + link_height)
+
+            # Dessiner le lien invisible
+            c.linkURL(auteur_url, link_rect, relative=0, thickness=0)
+            print(f"[INFO] Lien pour l'auteur '{auteur_text}' créé vers '{auteur_url}'")
+
+    # 3. Dessin des rectangles de lien invisibles
+    hyperlinks = s1_cfg.get('ours_hyperlinks', [])
+    for link in hyperlinks:
+        href, rect_mm = link.get('href'), link.get('rect_mm')
+        if not href or not rect_mm or len(rect_mm) != 4: continue
+        rel_x_pt, rel_y_pt, rel_w_pt, rel_h_pt = [mm_to_pt(v) for v in rect_mm]
+        abs_x1, abs_y1 = x + rel_x_pt, y + rel_y_pt
+        c.linkURL(href, (abs_x1, abs_y1, abs_x1 + rel_w_pt, abs_y1 + rel_h_pt), relative=0, thickness=0)
+
+    # 4. Dessin du QR Code
+    qr_code_size = mm_to_pt(s1_cfg.get('qr_code_height_mm', 25))
+    padding = mm_to_pt(2)
     qr_x_pos = x + (w - qr_code_size) / 2
     qr_y_pos = y + padding
 
-    kwargs = {'mask': 'auto'} if not isinstance(c, SVGCanvas) else {}
-    c.drawImage(image_to_draw, qr_x_pos, qr_y_pos, width=qr_code_size, height=qr_code_size, **kwargs)
-    # ==============================================================================
+    qr_gen = qrcode.QRCode(version=1, border=0)
+    qr_gen.add_data(s1_cfg['qr_code_value'])
+    qr_gen.make(fit=True)
+    buffer = io.BytesIO()
+    qr_gen.make_image(fill_color="black", back_color="white").save(buffer, format='PNG')
+    buffer.seek(0)
 
-    title_text = s1_cfg.get('qr_code_title', "Agenda culturel")
-    styles = getSampleStyleSheet()
-    title_style = ParagraphStyle('OursTitle', parent=styles['Normal'],
-                                 fontName=s1_cfg.get('qr_code_title_font_name', 'Arial-Bold'),
-                                 fontSize=s1_cfg.get('qr_code_title_font_size', 9),
-                                 leading=s1_cfg.get('qr_code_title_font_size', 9) * 1.2, alignment=TA_CENTER)
-    title_p = Paragraph(title_text, title_style)
-    title_w, title_h = title_p.wrapOn(c, w - 2 * padding, h)
-    title_y_pos = y + qr_code_size + padding + (2 * mm)
+    c.drawImage(ImageReader(buffer), qr_x_pos, qr_y_pos, width=qr_code_size, height=qr_code_size, mask='auto')
 
-    draw_paragraph(c, title_p, x + padding, title_y_pos)
-
-    ours_style = ParagraphStyle('OursText', parent=styles['Normal'], fontName=s1_cfg['ours_font_name'],
-                                fontSize=s1_cfg['ours_font_size'],
-                                leading=s1_cfg['ours_font_size'] * s1_cfg['ours_line_spacing'], alignment=TA_CENTER)
-
-    if isinstance(c, SVGCanvas):
-        # Logique simplifiée pour le SVG
-        y_pos = y + h - title_h - (7 * mm)
-        c.setFont(ours_style.fontName, ours_style.fontSize)
-        for line in ours_text.split('\n'):
-            if line.strip():
-                c.drawCentredString(x + w / 2, y_pos, line.strip())
-                y_pos -= ours_style.leading
-    else:
-        # Logique standard pour le PDF avec Frame
-        story = [Paragraph(line.strip(), ours_style) for line in ours_text.split('\n') if line.strip()]
-        frame_x, frame_y, frame_w, frame_h = x, title_y_pos + title_h, w, h - (title_y_pos + title_h - y)
-        frame = Frame(frame_x, frame_y, frame_w, frame_h, topPadding=5 * mm, showBoundary=0)
-        frame.addFromList(story, c)
+    # Titre du QR Code
+    title_text = s1_cfg.get('qr_code_title', "")
+    if title_text:
+        title_style = ParagraphStyle('OursTitle', fontName=s1_cfg.get('qr_code_title_font_name', 'Helvetica-Bold'),
+                                     fontSize=9, alignment=TA_CENTER)
+        title_p = Paragraph(title_text, title_style)
+        title_w, title_h = title_p.wrapOn(c, w - 2 * padding, h)
+        title_y_pos = qr_y_pos + qr_code_size + mm_to_pt(1)
+        title_p.drawOn(c, x + padding, title_y_pos)
 
 
 def _draw_logos_column(c: canvas.Canvas, col_coords: tuple, logos: List[str], cfg: Config):
@@ -199,16 +235,24 @@ def _draw_logos_column(c: canvas.Canvas, col_coords: tuple, logos: List[str], cf
             print(f"[WARN] Erreur avec le logo {os.path.basename(logo_path)}: {e}")
 
 
-def draw_s1(c: canvas.Canvas, S1_coords, ours_text: str, logos: List[str], cfg: Config, lay: Layout):
+def draw_s1(c: canvas.Canvas, S1_coords, logos: list[str], cfg: Config, lay: Layout):
+    """
+    Dessine la section S1 en la divisant en une colonne pour les logos
+    et une colonne pour l'ours (dessiné en mode PNG Hybride).
+    """
     register_arial()
     x, y, w, h = S1_coords.x, S1_coords.y, S1_coords.w, S1_coords.h
+
     split_ratio = lay.s1_split.get('logos_ratio', 0.5)
     logos_col_width = w * split_ratio
     ours_col_width = w - logos_col_width
+
     logos_col_coords = (x, y, logos_col_width, h)
     ours_col_coords = (x + logos_col_width, y, ours_col_width, h)
+
     _draw_logos_column(c, logos_col_coords, logos, cfg)
-    _draw_ours_column(c, ours_col_coords, ours_text, cfg)
+    # L'appel n'a plus besoin de passer de données SVG
+    _draw_ours_column(c, ours_col_coords, cfg)
 
 
 def draw_s2_cover(c: canvas.Canvas, S2_coords, image_path: str, inner_pad: float):

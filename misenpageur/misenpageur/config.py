@@ -41,6 +41,7 @@ class Config:
     auteur_couv_url: Optional[str] = None
     logos_dir: str = "assets/logos"
     ours_md: str = "assets/ours/ours.md"
+    ours_svg: str = "assets/ours/ours_template.svg"
     nobr_file: Optional[str] = None
 
     # --- Font & Layout ---
