@@ -17,7 +17,7 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.graphics.renderSVG import SVGCanvas
 import math
 import rectpack
-from rectpack import float2dec, PackerGlobal
+from rectpack import float2dec, PackerGlobal, PackerBFF, PackerBNF
 
 from .fonts import register_arial
 from .layout import Layout, Section
@@ -187,7 +187,7 @@ def _draw_logos_column(c: canvas.Canvas, col_coords: tuple, logos: List[str], cf
     content_value = c_cfg.get("content_value", "")
 
     cucaracha_h = 0
-    if content_type != "none" and content_value.strip():
+    if content_type != "none":
         cucaracha_h = c_cfg.get("height_mm", 35) * mm
 
     # 2. Définir les zones pour les logos et la cucaracha_box
@@ -206,8 +206,9 @@ def _draw_logos_column(c: canvas.Canvas, col_coords: tuple, logos: List[str], cf
     # 4. Appeler la bonne fonction de dessin pour la zone des logos
     layout_type = getattr(cfg, "logos_layout", "colonnes")
     if layout_type == "optimise" and logos and logo_zone_h > 0:
-        _draw_logos_optimized(c, logo_zone_coords, logos)
-    elif logo_zone_h > 0:  # Fallback sur la méthode à 2 colonnes
+        # On passe cfg pour lire la stratégie de packing
+        _draw_logos_optimized(c, logo_zone_coords, logos, cfg)
+    elif logo_zone_h > 0:
         _draw_logos_two_columns(c, logo_zone_coords, logos, cfg)
 
 
@@ -254,19 +255,18 @@ def _draw_logos_two_columns(c: canvas.Canvas, col_coords: tuple, logos: List[str
             print(f"[WARN] Erreur avec le logo {os.path.basename(logo_path)}: {e}")
 
 
-def _draw_logos_optimized(c: canvas.Canvas, col_coords: tuple, logo_paths: List[str]):
+def _draw_logos_optimized(c: canvas.Canvas, col_coords: tuple, logo_paths: List[str], cfg: Config):
     """
-    Dessine les logos en maximisant leur surface commune et égale, en
-    désactivant la rotation des rectangles pour garantir la stabilité.
+    Dessine les logos en utilisant une stratégie de packing et de tri
+    configurable pour un meilleur contrôle esthétique.
     """
     x_offset, y_offset, w, h = col_coords
     if not logo_paths or w <= 0 or h <= 0: return
 
-    padding_mm = 2.0
+    padding_mm = 1.2
     padding_pt = mm_to_pt(padding_mm)
 
     logos_data = []
-    # Charger les dimensions réelles (bounding box) des logos (cette partie est correcte)
     for path in logo_paths:
         try:
             with Image.open(path) as img:
@@ -280,7 +280,12 @@ def _draw_logos_optimized(c: canvas.Canvas, col_coords: tuple, logo_paths: List[
             pass
     if not logos_data: return
 
-    # 1. Recherche binaire de la surface optimale
+    # 1. Lire la stratégie directement depuis l'objet config
+    strategy = cfg.packing_strategy
+    algo_choice = strategy.algorithm
+    sort_choice = strategy.sort_algo
+
+    # Recherche binaire de la surface optimale
     min_area, max_area = 1.0, w * h
     best_placements = None
 
@@ -288,8 +293,13 @@ def _draw_logos_optimized(c: canvas.Canvas, col_coords: tuple, logo_paths: List[
         test_area = (min_area + max_area) / 2
         if test_area < 1: break
 
-        # On instancie le packer en lui interdisant de faire pivoter les rectangles.
-        packer = PackerGlobal(rotation=False)
+        # 2. Choisir le bon algorithme et FORCER rotation=False
+        if algo_choice == 'BFF':
+            packer = PackerBFF(rotation=False)
+        elif algo_choice == 'BNF':
+            packer = PackerBNF(rotation=False)
+        else:
+            packer = PackerGlobal(rotation=False)
 
         packer.add_bin(w, h)
 
@@ -310,7 +320,15 @@ def _draw_logos_optimized(c: canvas.Canvas, col_coords: tuple, logo_paths: List[
             max_area = test_area
             continue
 
-        rectangles_to_add.sort(key=lambda r: max(r['w'], r['h']), reverse=True)
+        # 3. Appliquer la bonne méthode de tri
+        if sort_choice == 'AREA':
+            rectangles_to_add.sort(key=lambda r: r['w'] * r['h'], reverse=True)
+        elif sort_choice == 'HEIGHT':
+            rectangles_to_add.sort(key=lambda r: r['h'], reverse=True)
+        elif sort_choice == 'WIDTH':
+            rectangles_to_add.sort(key=lambda r: r['w'], reverse=True)
+        else:  # MAXSIDE (défaut)
+            rectangles_to_add.sort(key=lambda r: max(r['w'], r['h']), reverse=True)
 
         for r in rectangles_to_add:
             packer.add_rect(r['w'], r['h'], rid=r['rid'])
@@ -435,8 +453,8 @@ def _draw_cucaracha_box(c: canvas.Canvas, box_coords: tuple, cfg: Config):
     x, y, w, h = box_coords
     c_cfg = cfg.cucaracha_box
     content_type = c_cfg.get("content_type", "none")
-    content_value = c_cfg.get("content_value", "")
-    if content_type == "none" or not content_value.strip(): return
+    content_value = c_cfg.get("content_value", ".")
+    if content_type == "none": return
 
     c.saveState()
     title = c_cfg.get("title", "Cucaracha")

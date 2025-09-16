@@ -155,7 +155,7 @@ cucaracha_box:
   content_type: "text"
 
   # Valeur du contenu (chemin de l'image ou texte brut)
-  content_value: "a"
+  content_value: ""
 
   # Paramètres du titre
   title: "Cucaracha"
@@ -189,3 +189,17 @@ poster:
   font_size_safety_factor: 0.951
   date_spaceBefore: 3
   date_spaceAfter: 3
+
+packing_strategy:
+  # Choix de l'algorithme. Options possibles :
+  # 'Global' : Le plus intelligent, essaie tout (bon par défaut).
+  # 'BFF' : Best Fit First. Essaie de trouver l'espace le plus juste.
+  # 'BNF' : Best Next Fit. Plus rapide, bon pour les remplissages de type "étagère".
+  algorithm: 'Global'
+
+  # Comment trier les logos avant de les donner au packer. Options :
+  # 'AREA'    : Du plus grand au plus petit (surface). Très efficace.
+  # 'MAXSIDE' : Du plus "grand" au plus "petit" (basé sur la plus grande dimension, largeur ou hauteur).
+  # 'HEIGHT'  : Du plus haut au moins haut.
+  # 'WIDTH'   : Du plus large au moins large.
+  sort_algo: 'AREA'
