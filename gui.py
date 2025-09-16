@@ -565,7 +565,7 @@ def main():
     result_queue = queue.Queue()
 
     # NOUVEAU : La fonction qui exécute la tâche lourde
-    def run_pipeline_in_thread():
+    def run_pipeline_in_thread(margin_val, safety_factor_val, date_spacing_val, logos_padding_val, poster_title_val, cuca_value_val):
         """Wrapper pour exécuter run_pipeline et mettre le résultat dans la queue."""
         inp = input_var.get().strip()
         if not inp:
@@ -587,7 +587,7 @@ def main():
             ours_background_png=ours_png_var.get().strip(),
             logos_dir=logos_var.get().strip(),
             logos_layout=logos_layout_var.get(),
-            logos_padding_mm=logos_padding_var.get(),
+            logos_padding_mm=logos_padding_val, # <-- On utilise la valeur passée en argument
             out_html=html_var.get().strip(),
             out_agenda_html=agenda_var.get().strip(),
             out_pdf=pdf_var.get().strip(),
@@ -597,13 +597,13 @@ def main():
             generate_svg=generate_svg_var.get(),
             out_svg=svg_var.get().strip(),
             date_separator_type=date_separator_var.get(),
-            date_spacing=float(date_spacing_var.get().strip().replace(',', '.')),
+            date_spacing=date_spacing_val,
             poster_design=poster_design_var.get(),
-            font_size_safety_factor=float(safety_factor_var.get().strip().replace(',', '.')),
+            font_size_safety_factor=safety_factor_val,
             background_alpha=alpha_var.get(),
-            poster_title=poster_title_var.get().strip(),
+            poster_title=poster_title_val,
             cucaracha_type=cucaracha_type_var.get(),
-            cucaracha_value=cucaracha_value_var.get().strip(),
+            cucaracha_value=cuca_value_val,
             cucaracha_text_font=cucaracha_font_var.get()
         )
         result_queue.put((ok, msg))
@@ -642,13 +642,37 @@ def main():
             messagebox.showerror("Erreur", "Veuillez sélectionner un fichier d’entrée.")
             return
 
+        try:
+            margin_val = float(margin_var.get().strip().replace(',', '.'))
+            safety_factor_val = float(safety_factor_var.get().strip().replace(',', '.'))
+            date_spacing_val = float(date_spacing_var.get().strip().replace(',', '.'))
+            logos_padding_val = float(logos_padding_var.get().strip().replace(',', '.'))
+        except ValueError:
+            messagebox.showerror("Erreur",
+                                 "La marge, l'espacement, le facteur de sécurité et la marge des logos doivent être des nombres valides.")
+            return
+
+        poster_title_val = poster_title_var.get().strip()
+        if not poster_title_val:
+            # On pourrait le rendre optionnel, mais pour l'instant on le garde obligatoire
+            messagebox.showerror("Erreur", "Le titre du poster est obligatoire.")
+            return
+
+        cuca_value_val = cucaracha_value_var.get().strip()
+
         status.set("Traitement en cours…")
         progress_bar.start()
         run_button.config(state=tk.DISABLED)
 
-        # Créer et démarrer le thread de travail
-        thread = threading.Thread(target=run_pipeline_in_thread)
-        thread.daemon = True  # Permet à l'application de se fermer même si le thread tourne
+        # Créer et démarrer le thread de travail en lui passant les arguments
+        thread = threading.Thread(
+            target=run_pipeline_in_thread,
+            args=(
+                margin_val, safety_factor_val, date_spacing_val,
+                logos_padding_val, poster_title_val, cuca_value_val
+            )
+        )
+        thread.daemon = True
         thread.start()
 
         # Lancer la première vérification
