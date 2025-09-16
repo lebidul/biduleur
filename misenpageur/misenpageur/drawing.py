@@ -176,35 +176,45 @@ def _draw_ours_column(c: canvas.Canvas, col_coords: tuple, cfg: Config):
 # --- FONCTION PRINCIPALE (ROUTEUR) ---
 def _draw_logos_column(c: canvas.Canvas, col_coords: tuple, logos: List[str], cfg: Config):
     """
-    Routeur qui appelle la bonne fonction de dessin des logos en fonction de la config.
+    Gère la colonne des logos : dessine d'abord la cucaracha_box si elle existe,
+    puis utilise l'espace restant pour dessiner les logos avec la méthode choisie.
     """
+    x, y, w, h = col_coords
+
+    # 1. Vérifier et calculer la hauteur de la cucaracha_box
+    c_cfg = getattr(cfg, "cucaracha_box", {}) or {}
+    content_type = c_cfg.get("content_type", "none")
+    content_value = c_cfg.get("content_value", "")
+
+    cucaracha_h = 0
+    if content_type != "none" and content_value.strip():
+        cucaracha_h = c_cfg.get("height_mm", 35) * mm
+
+    # 2. Définir les zones pour les logos et la cucaracha_box
+    logo_zone_h = h - cucaracha_h
+    # La zone des logos est en haut, la cucaracha en bas
+    logo_zone_coords = (x, y + cucaracha_h, w, logo_zone_h)
+
+    # 3. Dessiner la cucaracha_box si nécessaire
+    if cucaracha_h > 0:
+        cucaracha_box_coords = (x, y, w, cucaracha_h)
+        _draw_cucaracha_box(c, cucaracha_box_coords, cfg)
+        # On ajoute une petite marge entre les deux zones
+        logo_zone_h -= (2 * mm)  # Marge de 2mm
+        logo_zone_coords = (x, y + cucaracha_h + (2 * mm), w, logo_zone_h)
+
+    # 4. Appeler la bonne fonction de dessin pour la zone des logos
     layout_type = getattr(cfg, "logos_layout", "colonnes")
-    if layout_type == "optimise" and logos:
-        _draw_logos_optimized(c, col_coords, logos)
-    else:
-        _draw_logos_two_columns(c, col_coords, logos, cfg)
+    if layout_type == "optimise" and logos and logo_zone_h > 0:
+        _draw_logos_optimized(c, logo_zone_coords, logos)
+    elif logo_zone_h > 0:  # Fallback sur la méthode à 2 colonnes
+        _draw_logos_two_columns(c, logo_zone_coords, logos, cfg)
 
 
 def _draw_logos_two_columns(c: canvas.Canvas, col_coords: tuple, logos: List[str], cfg: Config):
-    x, y, w, h = col_coords
-    c_cfg = cfg.cucaracha_box
-    content_type = c_cfg.get("content_type", "none")
+    """Dessine les logos sur 2 colonnes fixes dans l'espace fourni."""
+    zone_x, zone_y, zone_w, zone_h = col_coords
 
-    if content_type != "none":
-        cucaracha_h = c_cfg.get("height_mm", 35) * mm
-    else:
-        cucaracha_h = 0
-
-    logo_margin = 2 * mm
-    logos_h = h - cucaracha_h - logo_margin if cucaracha_h > 0 else h
-
-    cucaracha_box_coords = (x, y, w, cucaracha_h)
-    logo_zone_coords = (x, y + cucaracha_h + logo_margin if cucaracha_h > 0 else y, w, logos_h)
-
-    if cucaracha_h > 0:
-        _draw_cucaracha_box(c, cucaracha_box_coords, cfg)
-
-    zone_x, zone_y, zone_w, zone_h = logo_zone_coords
     if not logos or zone_h <= 0: return
 
     num_logos = len(logos)
@@ -219,7 +229,6 @@ def _draw_logos_two_columns(c: canvas.Canvas, col_coords: tuple, logos: List[str
         col = i % cols
         cell_x, cell_y = zone_x + col * cell_w, zone_y + row * cell_h
         try:
-            # ==================== CORRECTION : GESTION DU TYPE DE CANVAS ====================
             if isinstance(c, SVGCanvas):
                 image_to_draw = Image.open(logo_path)
             else:
@@ -229,7 +238,6 @@ def _draw_logos_two_columns(c: canvas.Canvas, col_coords: tuple, logos: List[str
             img_reader = ImageReader(logo_path)
             img_w, img_h = img_reader.getSize()
             aspect = img_h / img_w if img_w > 0 else 1
-            # ==============================================================================
 
             w_fit = cell_w - (2 * padding)
             h_fit = w_fit * aspect
@@ -472,7 +480,6 @@ def _draw_cucaracha_box(c: canvas.Canvas, box_coords: tuple, cfg: Config):
     elif content_type == "image":
         if os.path.exists(content_value):
             try:
-                # ==================== CORRECTION : GESTION DU TYPE DE CANVAS ====================
                 if isinstance(c, SVGCanvas):
                     image_to_draw = Image.open(content_value)
                 else:
@@ -481,7 +488,6 @@ def _draw_cucaracha_box(c: canvas.Canvas, box_coords: tuple, cfg: Config):
                 img_reader = ImageReader(content_value)
                 img_w, img_h = img_reader.getSize()
                 aspect = img_h / img_w if img_w > 0 else 1
-                # ==============================================================================
 
                 w_fit = content_w
                 h_fit = w_fit * aspect
