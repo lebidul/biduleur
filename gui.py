@@ -97,8 +97,9 @@ def _project_defaults() -> dict:
 
 
 def _load_cfg_defaults() -> dict:
+    # On définit d'abord les valeurs par défaut au cas où tout échouerait.
     out = {
-        "cover": "", "ours_md": "", "logos_dir": "", "auteur_couv": "",
+        "cover": "", "ours_background_png": "", "logos_dir": "", "auteur_couv": "",
         "auteur_couv_url": "", "skip_cover": False,
         "page_margin_mm": 1.0,
         "date_separator_type": "ligne", "date_spacing": "4",
@@ -106,13 +107,19 @@ def _load_cfg_defaults() -> dict:
         "background_alpha": 0.85, "poster_title": "",
         "cucaracha_type": "none", "cucaracha_value": "", "cucaracha_text_font": "Arial"
     }
-    if _IMPORT_ERR: return out
+
+    # On essaie de lire les vraies valeurs par défaut depuis le config.yml
     try:
+        # On tente l'import de Config uniquement ici.
+        from misenpageur.misenpageur.config import Config
+
         defaults = _project_defaults()
         cfg = Config.from_yaml(defaults["config"])
+
+        # Le reste de la logique est inchangé, mais maintenant elle est
+        # protégée par le bloc try...except.
         out.update({
             "cover": cfg.cover_image or "",
-            "ours_md": cfg.ours_md or "",
             "logos_dir": cfg.logos_dir or "",
             "auteur_couv": getattr(cfg, "auteur_couv", "") or "",
             "auteur_couv_url": getattr(cfg, "auteur_couv_url", "") or "",
@@ -141,7 +148,11 @@ def _load_cfg_defaults() -> dict:
                 "cucaracha_text_font": cfg.cucaracha_box.get("text_font_name", "Arial")
             })
     except Exception as e:
+        # Si l'import ou la lecture du fichier échoue, on affiche un avertissement
+        # mais l'application peut continuer avec les valeurs par défaut.
         print(f"[WARN] Erreur lors de la lecture des défauts depuis config.yml : {e}")
+        # On ne fait rien d'autre, la fonction retournera le 'out' initial.
+
     return out
 
 
