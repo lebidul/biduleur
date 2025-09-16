@@ -42,17 +42,17 @@ import importlib.resources as res
 from biduleur.csv_utils import parse_bidul
 from biduleur.format_utils import output_html_file
 
-# --- import misenpageur (PDF) ---
-try:
-    from misenpageur.misenpageur.config import Config
-    from misenpageur.misenpageur.layout import Layout
-    from misenpageur.misenpageur.pdfbuild import build_pdf
-    from misenpageur.misenpageur.svgbuild import build_svg
-    from misenpageur.misenpageur.layout_builder import build_layout_with_margins
-except Exception as e:
-    _IMPORT_ERR = e
-else:
-    _IMPORT_ERR = None
+# # --- import misenpageur (PDF) ---
+# try:
+#     from misenpageur.misenpageur.config import Config
+#     from misenpageur.misenpageur.layout import Layout
+#     from misenpageur.misenpageur.pdfbuild import build_pdf
+#     from misenpageur.misenpageur.svgbuild import build_svg
+#     from misenpageur.misenpageur.layout_builder import build_layout_with_margins
+# except Exception as e:
+#     _IMPORT_ERR = e
+# else:
+#     _IMPORT_ERR = None
 
 
 def _default_paths_from_input(input_file: str) -> dict:
@@ -66,12 +66,33 @@ def _default_paths_from_input(input_file: str) -> dict:
         "svg": str(folder / f"{base}.svg"),
     }
 
+def get_resource_path(relative_path):
+    """
+    Retourne le chemin absolu vers une ressource, fonctionne en mode dev et packagé.
+    """
+    if getattr(sys, 'frozen', False):
+        # Si l'application est "frozen" (packagée par PyInstaller)
+        # sys._MEIPASS est le dossier temporaire où tout est décompressé.
+        base_path = getattr(sys, '_MEIPASS')
+    else:
+        # En mode développement, la base est le dossier du script gui.py
+        base_path = os.path.dirname(os.path.abspath(__file__))
+
+    return os.path.join(base_path, relative_path)
+
 
 def _project_defaults() -> dict:
-    # On suppose que ce script est à la racine du projet, à côté de 'misenpageur'
-    repo_root = Path(__file__).resolve().parent
-    cfg = repo_root / "misenpageur" / "config.yml"
-    lay = repo_root / "misenpageur" / "layout.yml"
+    """
+    Définit les chemins par défaut pour les fichiers de config et layout.
+    Utilise get_resource_path pour être compatible avec PyInstaller.
+    """
+    # En mode packagé, la racine du projet est le dossier temporaire _MEIPASS
+    repo_root = get_resource_path('.')
+
+    # Les fichiers de config sont maintenant relatifs à cet emplacement
+    cfg = get_resource_path(os.path.join("misenpageur", "config.yml"))
+    lay = get_resource_path(os.path.join("misenpageur", "layout.yml"))
+
     return {"root": str(repo_root), "config": str(cfg), "layout": str(lay)}
 
 
@@ -136,8 +157,17 @@ def run_pipeline(
         background_alpha: float, poster_title: str, cucaracha_type: str, 
         cucaracha_value: str, cucaracha_text_font: str, logos_layout: str
 ) -> tuple[bool, str]:
-    if _IMPORT_ERR:
-        return False, f"Imports misenpageur impossibles : {repr(_IMPORT_ERR)}"
+    try:
+        from misenpageur.misenpageur.config import Config
+        from misenpageur.misenpageur.layout import Layout
+        from misenpageur.misenpageur.pdfbuild import build_pdf
+        from misenpageur.misenpageur.svgbuild import build_svg
+        from misenpageur.misenpageur.layout_builder import build_layout_with_margins
+    except Exception as e:
+        import traceback
+        # On retourne une erreur claire si l'import échoue
+        return False, f"Erreur critique: Impossible de charger le module 'misenpageur'.\n\nDétails:\n{type(e).__name__}: {e}\n\n{traceback.format_exc()}"
+
     final_layout_path = None
     report = {}
     try:
@@ -332,13 +362,6 @@ def main():
     tk.Label(main_frame, text="Ours (Image de fond PNG) :").grid(row=r, column=0, sticky="e", padx=5, pady=5)
     tk.Entry(main_frame, textvariable=ours_png_var).grid(row=r, column=1, sticky="ew", padx=5, pady=5)
     tk.Button(main_frame, text="Parcourir…", command=pick_ours_png).grid(row=r, column=2, padx=5, pady=5)
-    r += 1
-    tk.Label(main_frame, text="Dossier logos :").grid(row=r, column=0, sticky="e", padx=5, pady=5)
-    tk.Entry(main_frame, textvariable=logos_var).grid(row=r, column=1, sticky="ew", padx=5, pady=5)
-    tk.Button(main_frame, text="Parcourir…", command=pick_logos).grid(row=r, column=2, padx=5, pady=5)
-    tk.Label(main_frame, text="Dossier logos :").grid(row=r, column=0, sticky="e", padx=5, pady=5)
-    tk.Entry(main_frame, textvariable=logos_var).grid(row=r, column=1, sticky="ew", padx=5, pady=5)
-    tk.Button(main_frame, text="Parcourir…", command=pick_logos).grid(row=r, column=2, padx=5, pady=5)
     r += 1
 
     # 1. On crée un grand LabelFrame pour TOUT ce qui concerne les logos.
@@ -553,7 +576,7 @@ def main():
             ours_background_png=ours_png_var.get().strip(),
             logos_dir=logos_var.get().strip(),
             logos_layout=logos_layout_var.get(),
-            logos_padding_mm=logos_padding_val,
+            logos_padding_mm=logos_padding_var.get(),
             out_html=html_var.get().strip(),
             out_agenda_html=agenda_var.get().strip(),
             out_pdf=pdf_var.get().strip(),

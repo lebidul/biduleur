@@ -7,6 +7,9 @@
 - [x] Build release process.
 - [x] Icône.
 - [ ] Unit tests.
+- [ ] Taille fenêtre dynamique
+- [ ] Champs paths par défaut depuis build github
+- [ ] Dossier logos dupliqué
 - [x] Améliorer les informations à afficher après création des fichiers.
 
 ## Priorité Moyenne
@@ -14,6 +17,8 @@
 - [ ] GUI qui génère une preview dynamiquement et ensuite propose de sauver le pdf (voir notes_ia/googleAIStudio.solutionGUIdynamique.md).
 - [ ] Refactor dans dossier bidul.biduleur/bidul.
 - [ ] Effet succès solitaire.
+- [ ] Icône
+- [ ] Problème sécurité Windows
 - [x] Progress bar.
 
 ## Documentation
