@@ -256,18 +256,17 @@ def _draw_logos_two_columns(c: canvas.Canvas, col_coords: tuple, logos: List[str
 
 def _draw_logos_optimized(c: canvas.Canvas, col_coords: tuple, logo_paths: List[str]):
     """
-    Dessine les logos en maximisant leur surface commune et égale,
-    en triant les boîtes pour un meilleur placement et en ajustant
-    chaque logo à l'intérieur de sa boîte allouée.
+    Dessine les logos en maximisant leur surface commune et égale, en
+    désactivant la rotation des rectangles pour garantir la stabilité.
     """
     x_offset, y_offset, w, h = col_coords
     if not logo_paths or w <= 0 or h <= 0: return
 
-    padding_mm = 1.0
+    padding_mm = 2.0
     padding_pt = mm_to_pt(padding_mm)
 
     logos_data = []
-    # Charger les dimensions réelles (bounding box) des logos
+    # Charger les dimensions réelles (bounding box) des logos (cette partie est correcte)
     for path in logo_paths:
         try:
             with Image.open(path) as img:
@@ -289,7 +288,9 @@ def _draw_logos_optimized(c: canvas.Canvas, col_coords: tuple, logo_paths: List[
         test_area = (min_area + max_area) / 2
         if test_area < 1: break
 
-        packer = PackerGlobal()
+        # On instancie le packer en lui interdisant de faire pivoter les rectangles.
+        packer = PackerGlobal(rotation=False)
+
         packer.add_bin(w, h)
 
         can_pack_all = True
@@ -309,7 +310,6 @@ def _draw_logos_optimized(c: canvas.Canvas, col_coords: tuple, logo_paths: List[
             max_area = test_area
             continue
 
-        # On trie les rectangles du plus grand au plus petit pour un meilleur packing
         rectangles_to_add.sort(key=lambda r: max(r['w'], r['h']), reverse=True)
 
         for r in rectangles_to_add:
@@ -323,36 +323,26 @@ def _draw_logos_optimized(c: canvas.Canvas, col_coords: tuple, logo_paths: List[
             max_area = test_area
 
     if not best_placements:
-        print("[WARN] Aucune solution de packing n'a pu être trouvée. Retour à la méthode simple.")
+        print("[WARN] Aucune solution de packing n'a pu être trouvée.")
         _draw_logos_two_columns(c, col_coords, logo_paths, Config())
         return
 
-    # 2. Dessiner chaque logo en l'ajustant à sa boîte allouée
+    # 2. Dessiner les logos en utilisant la surface optimale et les positions trouvées
+    final_area = min_area
+
     for rect in best_placements:
         logo_path = rect.rid
         logo_data = next(l for l in logos_data if l['path'] == logo_path)
         logo_ratio = logo_data['ratio']
 
-        available_w = float(rect.width) - (2 * padding_pt)
-        available_h = float(rect.height) - (2 * padding_pt)
+        # Calculer la taille finale à partir de la surface optimale.
+        # C'est la garantie que tous les logos auront la même surface et le bon ratio.
+        final_w = math.sqrt(final_area / logo_ratio)
+        final_h = final_w * logo_ratio
 
-        if available_w <= 0 or available_h <= 0: continue
-
-        if logo_ratio > (available_h / available_w):
-            final_h = available_h
-            final_w = final_h / logo_ratio
-        else:
-            final_w = available_w
-            final_h = final_w * logo_ratio
-
-        available_area_x = x_offset + float(rect.x) + padding_pt
-        available_area_y = y_offset + float(rect.y) + padding_pt
-
-        centering_offset_x = (available_w - final_w) / 2
-        centering_offset_y = (available_h - final_h) / 2
-
-        logo_x = available_area_x + centering_offset_x
-        logo_y = available_area_y + centering_offset_y
+        # Positionner le logo à l'intérieur de la boîte que le packer a trouvée.
+        logo_x = x_offset + float(rect.x) + padding_pt
+        logo_y = y_offset + float(rect.y) + padding_pt
 
         try:
             kwargs = {'mask': 'auto'} if not isinstance(c, SVGCanvas) else {}
