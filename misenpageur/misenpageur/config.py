@@ -40,6 +40,7 @@ class Config:
     auteur_couv: Optional[str] = None
     auteur_couv_url: Optional[str] = None
     logos_dir: str = "assets/logos"
+    logos_layout: str = "colonnes"
     ours_md: str = "assets/ours/ours.md"
     ours_svg: str = "assets/ours/ours_template.svg"
     nobr_file: Optional[str] = None

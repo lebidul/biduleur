@@ -47,6 +47,14 @@ def make_parser() -> argparse.ArgumentParser:
     p.add_argument("--auteur-couv", default="", help="Crédit visuel de couverture (remplace @Steph dans l’ours)")
     p.add_argument("--auteur-couv-url", default="", help="URL associée au crédit visuel (hyperlien)")
 
+    # Paramètres layout des logos
+    p.add_argument(
+        "--logos-layout",
+        default="colonnes",
+        choices=["colonnes", "optimise"],
+        help="Type de répartition pour les logos : 'colonnes' (2 colonnes fixes) ou 'optimise' (packing)."
+    )
+
     return p
 
 
@@ -67,11 +75,8 @@ def main(argv: list[str] | None = None) -> int:
     from misenpageur.misenpageur.layout import Layout  # si tu as un loader de layout
     from misenpageur.misenpageur.layout_builder import build_layout_with_margins
 
-    # Charger configuration + layout
-    final_layout_path = None
-
     import traceback
-
+    # Charger configuration + layout
     final_layout_path = None
     try:
         cfg = Config.from_yaml(str(cfg_path))
@@ -95,6 +100,8 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.auteur_couv != "":     cfg.auteur_couv = args.auteur_couv
         if args.auteur_couv_url != "": cfg.auteur_couv_url = args.auteur_couv_url
+
+        cfg.logos_layout = args.logos_layout
 
         if not args.out and not args.svg:
             print("[ERR] Au moins une sortie (--out pour le PDF ou --svg) est requise.")

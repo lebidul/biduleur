@@ -14,10 +14,10 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.utils import ImageReader
 from reportlab.lib.colors import grey
 from reportlab.pdfbase import pdfmetrics
-
-from svglib.svglib import svg2rlg
-from reportlab.graphics import renderPDF, renderSVG
 from reportlab.graphics.renderSVG import SVGCanvas
+import math
+import rectpack
+from rectpack import float2dec, PackerGlobal
 
 from .fonts import register_arial
 from .layout import Layout, Section
@@ -173,8 +173,19 @@ def _draw_ours_column(c: canvas.Canvas, col_coords: tuple, cfg: Config):
         title_y_pos = qr_y_pos + qr_code_size + mm_to_pt(1)
         title_p.drawOn(c, x + padding, title_y_pos)
 
-
+# --- FONCTION PRINCIPALE (ROUTEUR) ---
 def _draw_logos_column(c: canvas.Canvas, col_coords: tuple, logos: List[str], cfg: Config):
+    """
+    Routeur qui appelle la bonne fonction de dessin des logos en fonction de la config.
+    """
+    layout_type = getattr(cfg, "logos_layout", "colonnes")
+    if layout_type == "optimise" and logos:
+        _draw_logos_optimized(c, col_coords, logos)
+    else:
+        _draw_logos_two_columns(c, col_coords, logos, cfg)
+
+
+def _draw_logos_two_columns(c: canvas.Canvas, col_coords: tuple, logos: List[str], cfg: Config):
     x, y, w, h = col_coords
     c_cfg = cfg.cucaracha_box
     content_type = c_cfg.get("content_type", "none")
@@ -233,6 +244,91 @@ def _draw_logos_column(c: canvas.Canvas, col_coords: tuple, logos: List[str], cf
             c.drawImage(image_to_draw, logo_x, logo_y, width=w_fit, height=h_fit, **kwargs)
         except Exception as e:
             print(f"[WARN] Erreur avec le logo {os.path.basename(logo_path)}: {e}")
+
+def _draw_logos_optimized(c: canvas.Canvas, col_coords: tuple, logo_paths: List[str]):
+    """
+    Dessine les logos en trouvant le plus grand facteur d'échelle commun
+    et en se basant sur les résultats directs du packer pour le dessin.
+    """
+    x_offset, y_offset, w, h = col_coords
+    if not logo_paths or w <= 0 or h <= 0:
+        return
+
+    padding_mm = 1.0
+    padding_pt = mm_to_pt(padding_mm)
+
+    logos_data = []
+    for path in logo_paths:
+        try:
+            with Image.open(path) as img:
+                logos_data.append({'path': path, 'w': img.width, 'h': img.height, 'ratio': img.height / img.width})
+        except Exception:
+            pass
+    if not logos_data: return
+
+    # 1. Recherche binaire du meilleur facteur d'échelle (cette partie est correcte)
+    low_scale, high_scale = 0.0, 1.0
+    best_placements = None
+
+    total_area = sum(ld['w'] * ld['h'] for ld in logos_data)
+    if total_area > 0:
+        high_scale = math.sqrt((w * h) / total_area) * 2.0  # Marge de sécurité
+
+    for _ in range(15):
+        scale = (low_scale + high_scale) / 2
+        if scale == 0: break
+
+        packer = PackerGlobal()
+        packer.add_bin(w, h)
+
+        rectangles_to_add = []
+        for logo in logos_data:
+            rect_w = logo['w'] * scale
+            rect_h = logo['h'] * scale
+            padded_w = rect_w + (2 * padding_pt)
+            padded_h = rect_h + (2 * padding_pt)
+            rectangles_to_add.append({'w': padded_w, 'h': padded_h, 'rid': logo['path']})
+
+        for r in rectangles_to_add:
+            packer.add_rect(r['w'], r['h'], rid=r['rid'])
+
+        packer.pack()
+
+        if len(packer[0]) == len(logos_data):
+            best_placements = packer[0]
+            low_scale = scale
+        else:
+            high_scale = scale
+
+    if not best_placements:
+        print("[WARN] Aucune solution de packing n'a pu être trouvée. Retour à la méthode simple.")
+        _draw_logos_two_columns(c, col_coords, logo_paths, Config())
+        return
+
+    # ==================== CORRECTION DÉFINITIVE DE LA LOGIQUE DE DESSIN ====================
+    # 2. Dessiner les logos en se basant UNIQUEMENT sur les résultats du packer
+    for rect in best_placements:
+        logo_path = rect.rid
+        logo_data = next(l for l in logos_data if l['path'] == logo_path)
+
+        # La taille de la boîte "paddée" que le packer a réussi à placer
+        placed_padded_w = float(rect.width)
+
+        # On en déduit la taille du logo réel en retirant la marge
+        final_w = placed_padded_w - (2 * padding_pt)
+
+        # On calcule la hauteur en utilisant le ratio original pour une perfection garantie
+        final_h = final_w * logo_data['ratio']
+
+        # On positionne ce logo à l'intérieur de la boîte que le packer a trouvée
+        logo_x = x_offset + float(rect.x) + padding_pt
+        logo_y = y_offset + float(rect.y) + padding_pt
+
+        try:
+            kwargs = {'mask': 'auto'} if not isinstance(c, SVGCanvas) else {}
+            c.drawImage(logo_path, logo_x, logo_y, width=final_w, height=final_h, **kwargs)
+        except Exception as e:
+            print(f"[WARN] Erreur avec le logo {os.path.basename(logo_path)} lors du dessin: {e}")
 
 
 def draw_s1(c: canvas.Canvas, S1_coords, logos: list[str], cfg: Config, lay: Layout):

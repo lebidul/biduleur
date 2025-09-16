@@ -134,7 +134,7 @@ def run_pipeline(
         page_margin_mm: float, generate_svg: bool, out_svg: str, date_separator_type: str,
         date_spacing: float, poster_design: int, font_size_safety_factor: float,
         background_alpha: float, poster_title: str, cucaracha_type: str,
-        cucaracha_value: str, cucaracha_text_font: str
+        cucaracha_value: str, cucaracha_text_font: str, logos_layout: str
 ) -> tuple[bool, str]:
     if _IMPORT_ERR:
         return False, f"Imports misenpageur impossibles : {repr(_IMPORT_ERR)}"
@@ -163,6 +163,7 @@ def run_pipeline(
         if (auteur_couv or "").strip(): cfg.auteur_couv = auteur_couv.strip()
         if (auteur_couv_url or "").strip(): cfg.auteur_couv_url = auteur_couv_url.strip()
         cfg.pdf_layout['page_margin_mm'] = page_margin_mm
+        cfg.logos_layout = logos_layout
         cfg.date_line['enabled'] = (date_separator_type == "ligne")
         cfg.date_box['enabled'] = (date_separator_type == "box")
         cfg.date_spaceBefore = date_spacing
@@ -257,6 +258,7 @@ def main():
     cucaracha_font_var = tk.StringVar(value=cfg_defaults.get("cucaracha_text_font", "Arial"))
     html_var, agenda_var, pdf_var, svg_var = tk.StringVar(), tk.StringVar(), tk.StringVar(), tk.StringVar()
     generate_svg_var = tk.BooleanVar(value=True)
+    logos_layout_var = tk.StringVar(value="colonnes")
 
     def pick_input():
         file_path = filedialog.askopenfilename(title="Sélectionner l’entrée (CSV / XLS / XLSX)",
@@ -332,6 +334,15 @@ def main():
     tk.Label(main_frame, text="Dossier logos :").grid(row=r, column=0, sticky="e", padx=5, pady=5)
     tk.Entry(main_frame, textvariable=logos_var).grid(row=r, column=1, sticky="ew", padx=5, pady=5)
     tk.Button(main_frame, text="Parcourir…", command=pick_logos).grid(row=r, column=2, padx=5, pady=5)
+    tk.Label(main_frame, text="Dossier logos :").grid(row=r, column=0, sticky="e", padx=5, pady=5)
+    tk.Entry(main_frame, textvariable=logos_var).grid(row=r, column=1, sticky="ew", padx=5, pady=5)
+    tk.Button(main_frame, text="Parcourir…", command=pick_logos).grid(row=r, column=2, padx=5, pady=5)
+    r += 1
+    logos_layout_frame = ttk.Frame(main_frame)
+    logos_layout_frame.grid(row=r, column=1, columnspan=2, sticky="w", padx=5, pady=(0, 10))
+    tk.Label(logos_layout_frame, text="Répartition des logos :").pack(side=tk.LEFT, anchor=tk.W)
+    tk.Radiobutton(logos_layout_frame, text="2 Colonnes", variable=logos_layout_var, value="colonnes").pack(side=tk.LEFT, padx=5)
+    tk.Radiobutton(logos_layout_frame, text="Optimisée", variable=logos_layout_var, value="optimise").pack(side=tk.LEFT, padx=5)
     r += 1
     cucaracha_frame = ttk.LabelFrame(main_frame, text="Boîte 'Cucaracha'", padding="10")
     cucaracha_frame.grid(row=r, column=0, columnspan=3, sticky="ew", pady=10)
@@ -499,6 +510,7 @@ def main():
             cover_image=cover_var.get().strip(),
             ours_background_png=ours_png_var.get().strip(),
             logos_dir=logos_var.get().strip(),
+            logos_layout=logos_layout_var.get(),
             out_html=html_var.get().strip(),
             out_agenda_html=agenda_var.get().strip(),
             out_pdf=pdf_var.get().strip(),
