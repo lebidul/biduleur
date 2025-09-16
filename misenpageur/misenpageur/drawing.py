@@ -263,7 +263,8 @@ def _draw_logos_optimized(c: canvas.Canvas, col_coords: tuple, logo_paths: List[
     x_offset, y_offset, w, h = col_coords
     if not logo_paths or w <= 0 or h <= 0: return
 
-    padding_mm = 1.2
+    # On lit la marge depuis l'objet de configuration
+    padding_mm = getattr(cfg, 'logos_padding_mm', 1.0)
     padding_pt = mm_to_pt(padding_mm)
 
     logos_data = []

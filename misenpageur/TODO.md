@@ -25,7 +25,7 @@
 - [x] Amélioration lisibilité v2 (ex. ligne pour dates).
 - [ ] Réduire espace puce premier caractère event.
 - [ ] Réduire taille de la puce par rapport font-Size.
-- [ ] Solution algorithme de "packing" (ou "bin packing") pour une répartition plus fluide des logos.
+- [x] Solution algorithme de "packing" (ou "bin packing") pour une répartition plus fluide des logos.
 - [ ] Générer 2 pdfs en sortie, un pour impression et un pdf pour version digitale (avec ou sans hyperlink) (ajouter à bidul.gui).
 - [ ] Intégration du workflow dans page admin de wordpress.
 - [x] Options d’hyphénation pour rendre des strings insécables.

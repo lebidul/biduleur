@@ -132,8 +132,8 @@ def run_pipeline(
         input_file: str, generate_cover: bool, cover_image: str, ours_background_png: str, logos_dir: str,
         out_html: str, out_agenda_html: str, out_pdf: str, auteur_couv: str, auteur_couv_url: str,
         page_margin_mm: float, generate_svg: bool, out_svg: str, date_separator_type: str,
-        date_spacing: float, poster_design: int, font_size_safety_factor: float,
-        background_alpha: float, poster_title: str, cucaracha_type: str,
+        date_spacing: float, poster_design: int, font_size_safety_factor: float, logos_padding_mm: float,
+        background_alpha: float, poster_title: str, cucaracha_type: str, 
         cucaracha_value: str, cucaracha_text_font: str, logos_layout: str
 ) -> tuple[bool, str]:
     if _IMPORT_ERR:
@@ -164,6 +164,7 @@ def run_pipeline(
         if (auteur_couv_url or "").strip(): cfg.auteur_couv_url = auteur_couv_url.strip()
         cfg.pdf_layout['page_margin_mm'] = page_margin_mm
         cfg.logos_layout = logos_layout
+        cfg.logos_padding_mm = logos_padding_mm
         cfg.date_line['enabled'] = (date_separator_type == "ligne")
         cfg.date_box['enabled'] = (date_separator_type == "box")
         cfg.date_spaceBefore = date_spacing
@@ -259,6 +260,7 @@ def main():
     html_var, agenda_var, pdf_var, svg_var = tk.StringVar(), tk.StringVar(), tk.StringVar(), tk.StringVar()
     generate_svg_var = tk.BooleanVar(value=True)
     logos_layout_var = tk.StringVar(value="colonnes")
+    logos_padding_var = tk.StringVar(value="1.0")
 
     def pick_input():
         file_path = filedialog.askopenfilename(title="Sélectionner l’entrée (CSV / XLS / XLSX)",
@@ -338,12 +340,52 @@ def main():
     tk.Entry(main_frame, textvariable=logos_var).grid(row=r, column=1, sticky="ew", padx=5, pady=5)
     tk.Button(main_frame, text="Parcourir…", command=pick_logos).grid(row=r, column=2, padx=5, pady=5)
     r += 1
-    logos_layout_frame = ttk.Frame(main_frame)
-    logos_layout_frame.grid(row=r, column=1, columnspan=2, sticky="w", padx=5, pady=(0, 10))
-    tk.Label(logos_layout_frame, text="Répartition des logos :").pack(side=tk.LEFT, anchor=tk.W)
-    tk.Radiobutton(logos_layout_frame, text="2 Colonnes", variable=logos_layout_var, value="colonnes").pack(side=tk.LEFT, padx=5)
-    tk.Radiobutton(logos_layout_frame, text="Optimisée", variable=logos_layout_var, value="optimise").pack(side=tk.LEFT, padx=5)
+
+    # 1. On crée un grand LabelFrame pour TOUT ce qui concerne les logos.
+    logos_frame = ttk.LabelFrame(main_frame, text="Paramètres des Logos", padding="10")
+    logos_frame.grid(row=r, column=0, columnspan=3, sticky="ew", pady=10)
+    logos_frame.columnconfigure(1, weight=1)
+
+    # On utilise un compteur de ligne local 'lr' pour ce frame
+    lr = 0
+
+    # 2. Widgets à l'intérieur de ce nouveau frame
+    tk.Label(logos_frame, text="Dossier logos :").grid(row=lr, column=0, sticky="e", padx=5, pady=5)
+    tk.Entry(logos_frame, textvariable=logos_var).grid(row=lr, column=1, sticky="ew", padx=5, pady=5)
+    tk.Button(logos_frame, text="Parcourir…", command=pick_logos).grid(row=lr, column=2, padx=5, pady=5)
+    lr += 1
+
+    tk.Label(logos_frame, text="Répartition :").grid(row=lr, column=0, sticky="e", padx=5, pady=5)
+    logos_layout_radios = ttk.Frame(logos_frame)
+    logos_layout_radios.grid(row=lr, column=1, columnspan=2, sticky="w")
+
+    # 3. Le widget de la marge est maintenant créé ici, mais pas encore placé
+    logos_padding_label = tk.Label(logos_frame, text="Marge (mm) :")
+    logos_padding_entry = tk.Entry(logos_frame, textvariable=logos_padding_var, width=10)
+
+    # 4. La fonction de visibilité place/retire les widgets de la marge à la bonne ligne
+    def toggle_padding_widget(*args):
+        if logos_layout_var.get() == "optimise":
+            # On place le label et l'entry sur la ligne suivante (lr+1)
+            logos_padding_label.grid(row=lr + 1, column=0, sticky="e", padx=5, pady=5)
+            logos_padding_entry.grid(row=lr + 1, column=1, sticky="w")
+        else:
+            logos_padding_label.grid_remove()
+            logos_padding_entry.grid_remove()
+
+    # 5. Les boutons radio appellent maintenant la fonction de visibilité
+    tk.Radiobutton(logos_layout_radios, text="2 Colonnes", variable=logos_layout_var, value="colonnes",
+                   command=toggle_padding_widget).pack(side=tk.LEFT, padx=5)
+    tk.Radiobutton(logos_layout_radios, text="Optimisée", variable=logos_layout_var, value="optimise",
+                   command=toggle_padding_widget).pack(side=tk.LEFT, padx=5)
+
+    # On met à jour le compteur de ligne principal
     r += 1
+
+    # On appelle la fonction une fois au démarrage
+    toggle_padding_widget()
+
+
     cucaracha_frame = ttk.LabelFrame(main_frame, text="Boîte 'Cucaracha'", padding="10")
     cucaracha_frame.grid(row=r, column=0, columnspan=3, sticky="ew", pady=10)
     cucaracha_frame.columnconfigure(1, weight=1)
@@ -511,6 +553,7 @@ def main():
             ours_background_png=ours_png_var.get().strip(),
             logos_dir=logos_var.get().strip(),
             logos_layout=logos_layout_var.get(),
+            logos_padding_mm=logos_padding_val,
             out_html=html_var.get().strip(),
             out_agenda_html=agenda_var.get().strip(),
             out_pdf=pdf_var.get().strip(),

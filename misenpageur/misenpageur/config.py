@@ -48,6 +48,7 @@ class Config:
     auteur_couv_url: Optional[str] = None
     logos_dir: str = "assets/logos"
     logos_layout: str = "colonnes"
+    logos_padding_mm: float = 1.0 # Marge en mm pour le layout optimisé
     ours_md: str = "assets/ours/ours.md"
     ours_svg: str = "assets/ours/ours_template.svg"
     nobr_file: Optional[str] = None
