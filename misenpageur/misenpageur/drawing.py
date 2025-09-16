@@ -245,10 +245,12 @@ def _draw_logos_two_columns(c: canvas.Canvas, col_coords: tuple, logos: List[str
         except Exception as e:
             print(f"[WARN] Erreur avec le logo {os.path.basename(logo_path)}: {e}")
 
+
 def _draw_logos_optimized(c: canvas.Canvas, col_coords: tuple, logo_paths: List[str]):
     """
-    Dessine les logos en trouvant le plus grand facteur d'échelle commun
-    et en se basant sur les résultats directs du packer pour le dessin.
+    Dessine les logos en trouvant le plus grand facteur d'échelle commun,
+    puis en ajustant chaque logo à l'intérieur de sa boîte allouée pour
+    garantir le respect du ratio d'aspect.
     """
     x_offset, y_offset, w, h = col_coords
     if not logo_paths or w <= 0 or h <= 0:
@@ -258,10 +260,19 @@ def _draw_logos_optimized(c: canvas.Canvas, col_coords: tuple, logo_paths: List[
     padding_pt = mm_to_pt(padding_mm)
 
     logos_data = []
+    # Charger les dimensions réelles (bounding box) des logos (cette partie est correcte)
     for path in logo_paths:
         try:
             with Image.open(path) as img:
-                logos_data.append({'path': path, 'w': img.width, 'h': img.height, 'ratio': img.height / img.width})
+                img_rgba = img.convert("RGBA")
+                bbox = img_rgba.getbbox()
+                if bbox:
+                    true_w, true_h = bbox[2] - bbox[0], bbox[3] - bbox[1]
+                    logos_data.append(
+                        {'path': path, 'w': true_w, 'h': true_h, 'ratio': true_h / true_w if true_w > 0 else 1})
+                else:
+                    logos_data.append({'path': path, 'w': img.width, 'h': img.height,
+                                       'ratio': img.height / img.width if img.width > 0 else 1})
         except Exception:
             pass
     if not logos_data: return
@@ -272,7 +283,7 @@ def _draw_logos_optimized(c: canvas.Canvas, col_coords: tuple, logo_paths: List[
 
     total_area = sum(ld['w'] * ld['h'] for ld in logos_data)
     if total_area > 0:
-        high_scale = math.sqrt((w * h) / total_area) * 2.0  # Marge de sécurité
+        high_scale = math.sqrt((w * h) / total_area) * 2.0
 
     for _ in range(15):
         scale = (low_scale + high_scale) / 2
@@ -291,7 +302,6 @@ def _draw_logos_optimized(c: canvas.Canvas, col_coords: tuple, logo_paths: List[
 
         for r in rectangles_to_add:
             packer.add_rect(r['w'], r['h'], rid=r['rid'])
-
         packer.pack()
 
         if len(packer[0]) == len(logos_data):
@@ -301,35 +311,51 @@ def _draw_logos_optimized(c: canvas.Canvas, col_coords: tuple, logo_paths: List[
             high_scale = scale
 
     if not best_placements:
-        print("[WARN] Aucune solution de packing n'a pu être trouvée. Retour à la méthode simple.")
+        print("[WARN] Aucune solution de packing n'a pu être trouvée.")
         _draw_logos_two_columns(c, col_coords, logo_paths, Config())
         return
 
-    # ==================== CORRECTION DÉFINITIVE DE LA LOGIQUE DE DESSIN ====================
-    # 2. Dessiner les logos en se basant UNIQUEMENT sur les résultats du packer
+    # ==================== LOGIQUE DE DESSIN FINALE ET DÉFINITIVE ====================
+    # 2. Dessiner chaque logo en l'ajustant à sa boîte allouée
     for rect in best_placements:
         logo_path = rect.rid
         logo_data = next(l for l in logos_data if l['path'] == logo_path)
+        logo_ratio = logo_data['ratio']
 
-        # La taille de la boîte "paddée" que le packer a réussi à placer
-        placed_padded_w = float(rect.width)
+        # 1. Déterminer la zone de dessin réelle (conteneur)
+        available_w = float(rect.width) - (2 * padding_pt)
+        available_h = float(rect.height) - (2 * padding_pt)
 
-        # On en déduit la taille du logo réel en retirant la marge
-        final_w = placed_padded_w - (2 * padding_pt)
+        if available_w <= 0 or available_h <= 0:
+            continue
 
-        # On calcule la hauteur en utilisant le ratio original pour une perfection garantie
-        final_h = final_w * logo_data['ratio']
+        # 2. Calculer la taille finale du logo pour qu'il rentre dans le conteneur
+        #    tout en conservant son ratio d'aspect.
+        if logo_ratio > (available_h / available_w):
+            # Le logo est plus "grand" que la boîte -> on ajuste à la hauteur
+            final_h = available_h
+            final_w = final_h / logo_ratio
+        else:
+            # Le logo est plus "large" que la boîte -> on ajuste à la largeur
+            final_w = available_w
+            final_h = final_w * logo_ratio
 
-        # On positionne ce logo à l'intérieur de la boîte que le packer a trouvée
-        logo_x = x_offset + float(rect.x) + padding_pt
-        logo_y = y_offset + float(rect.y) + padding_pt
+        # 3. Calculer la position pour centrer le logo dans sa zone de dessin
+        available_area_x = x_offset + float(rect.x) + padding_pt
+        available_area_y = y_offset + float(rect.y) + padding_pt
+
+        centering_offset_x = (available_w - final_w) / 2
+        centering_offset_y = (available_h - final_h) / 2
+
+        logo_x = available_area_x + centering_offset_x
+        logo_y = available_area_y + centering_offset_y
 
         try:
             kwargs = {'mask': 'auto'} if not isinstance(c, SVGCanvas) else {}
             c.drawImage(logo_path, logo_x, logo_y, width=final_w, height=final_h, **kwargs)
         except Exception as e:
             print(f"[WARN] Erreur avec le logo {os.path.basename(logo_path)} lors du dessin: {e}")
-
+    # ==============================================================================
 
 def draw_s1(c: canvas.Canvas, S1_coords, logos: list[str], cfg: Config, lay: Layout):
     """
