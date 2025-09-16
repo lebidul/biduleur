@@ -14,10 +14,10 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.utils import ImageReader
 from reportlab.lib.colors import grey
 from reportlab.pdfbase import pdfmetrics
-
-from svglib.svglib import svg2rlg
-from reportlab.graphics import renderPDF, renderSVG
 from reportlab.graphics.renderSVG import SVGCanvas
+import math
+import rectpack
+from rectpack import float2dec, PackerGlobal, PackerBFF, PackerBNF
 
 from .fonts import register_arial
 from .layout import Layout, Section
@@ -173,27 +173,49 @@ def _draw_ours_column(c: canvas.Canvas, col_coords: tuple, cfg: Config):
         title_y_pos = qr_y_pos + qr_code_size + mm_to_pt(1)
         title_p.drawOn(c, x + padding, title_y_pos)
 
-
+# --- FONCTION PRINCIPALE (ROUTEUR) ---
 def _draw_logos_column(c: canvas.Canvas, col_coords: tuple, logos: List[str], cfg: Config):
+    """
+    Gère la colonne des logos : dessine d'abord la cucaracha_box si elle existe,
+    puis utilise l'espace restant pour dessiner les logos avec la méthode choisie.
+    """
     x, y, w, h = col_coords
-    c_cfg = cfg.cucaracha_box
-    content_type = c_cfg.get("content_type", "none")
 
+    # 1. Vérifier et calculer la hauteur de la cucaracha_box
+    c_cfg = getattr(cfg, "cucaracha_box", {}) or {}
+    content_type = c_cfg.get("content_type", "none")
+    content_value = c_cfg.get("content_value", "")
+
+    cucaracha_h = 0
     if content_type != "none":
         cucaracha_h = c_cfg.get("height_mm", 35) * mm
-    else:
-        cucaracha_h = 0
 
-    logo_margin = 2 * mm
-    logos_h = h - cucaracha_h - logo_margin if cucaracha_h > 0 else h
+    # 2. Définir les zones pour les logos et la cucaracha_box
+    logo_zone_h = h - cucaracha_h
+    # La zone des logos est en haut, la cucaracha en bas
+    logo_zone_coords = (x, y + cucaracha_h, w, logo_zone_h)
 
-    cucaracha_box_coords = (x, y, w, cucaracha_h)
-    logo_zone_coords = (x, y + cucaracha_h + logo_margin if cucaracha_h > 0 else y, w, logos_h)
-
+    # 3. Dessiner la cucaracha_box si nécessaire
     if cucaracha_h > 0:
+        cucaracha_box_coords = (x, y, w, cucaracha_h)
         _draw_cucaracha_box(c, cucaracha_box_coords, cfg)
+        # On ajoute une petite marge entre les deux zones
+        logo_zone_h -= (2 * mm)  # Marge de 2mm
+        logo_zone_coords = (x, y + cucaracha_h + (2 * mm), w, logo_zone_h)
 
-    zone_x, zone_y, zone_w, zone_h = logo_zone_coords
+    # 4. Appeler la bonne fonction de dessin pour la zone des logos
+    layout_type = getattr(cfg, "logos_layout", "colonnes")
+    if layout_type == "optimise" and logos and logo_zone_h > 0:
+        # On passe cfg pour lire la stratégie de packing
+        _draw_logos_optimized(c, logo_zone_coords, logos, cfg)
+    elif logo_zone_h > 0:
+        _draw_logos_two_columns(c, logo_zone_coords, logos, cfg)
+
+
+def _draw_logos_two_columns(c: canvas.Canvas, col_coords: tuple, logos: List[str], cfg: Config):
+    """Dessine les logos sur 2 colonnes fixes dans l'espace fourni."""
+    zone_x, zone_y, zone_w, zone_h = col_coords
+
     if not logos or zone_h <= 0: return
 
     num_logos = len(logos)
@@ -208,7 +230,6 @@ def _draw_logos_column(c: canvas.Canvas, col_coords: tuple, logos: List[str], cf
         col = i % cols
         cell_x, cell_y = zone_x + col * cell_w, zone_y + row * cell_h
         try:
-            # ==================== CORRECTION : GESTION DU TYPE DE CANVAS ====================
             if isinstance(c, SVGCanvas):
                 image_to_draw = Image.open(logo_path)
             else:
@@ -218,7 +239,6 @@ def _draw_logos_column(c: canvas.Canvas, col_coords: tuple, logos: List[str], cf
             img_reader = ImageReader(logo_path)
             img_w, img_h = img_reader.getSize()
             aspect = img_h / img_w if img_w > 0 else 1
-            # ==============================================================================
 
             w_fit = cell_w - (2 * padding)
             h_fit = w_fit * aspect
@@ -233,6 +253,121 @@ def _draw_logos_column(c: canvas.Canvas, col_coords: tuple, logos: List[str], cf
             c.drawImage(image_to_draw, logo_x, logo_y, width=w_fit, height=h_fit, **kwargs)
         except Exception as e:
             print(f"[WARN] Erreur avec le logo {os.path.basename(logo_path)}: {e}")
+
+
+def _draw_logos_optimized(c: canvas.Canvas, col_coords: tuple, logo_paths: List[str], cfg: Config):
+    """
+    Dessine les logos en utilisant une stratégie de packing et de tri
+    configurable pour un meilleur contrôle esthétique.
+    """
+    x_offset, y_offset, w, h = col_coords
+    if not logo_paths or w <= 0 or h <= 0: return
+
+    # On lit la marge depuis l'objet de configuration
+    padding_mm = getattr(cfg, 'logos_padding_mm', 1.0)
+    padding_pt = mm_to_pt(padding_mm)
+
+    logos_data = []
+    for path in logo_paths:
+        try:
+            with Image.open(path) as img:
+                img_rgba = img.convert("RGBA")
+                bbox = img_rgba.getbbox()
+                if bbox:
+                    true_w, true_h = bbox[2] - bbox[0], bbox[3] - bbox[1]
+                    if true_w > 0 and true_h > 0:
+                        logos_data.append({'path': path, 'w': true_w, 'h': true_h, 'ratio': true_h / true_w})
+        except Exception:
+            pass
+    if not logos_data: return
+
+    # 1. Lire la stratégie directement depuis l'objet config
+    strategy = cfg.packing_strategy
+    algo_choice = strategy.algorithm
+    sort_choice = strategy.sort_algo
+
+    # Recherche binaire de la surface optimale
+    min_area, max_area = 1.0, w * h
+    best_placements = None
+
+    for _ in range(15):
+        test_area = (min_area + max_area) / 2
+        if test_area < 1: break
+
+        # 2. Choisir le bon algorithme et FORCER rotation=False
+        if algo_choice == 'BFF':
+            packer = PackerBFF(rotation=False)
+        elif algo_choice == 'BNF':
+            packer = PackerBNF(rotation=False)
+        else:
+            packer = PackerGlobal(rotation=False)
+
+        packer.add_bin(w, h)
+
+        can_pack_all = True
+        rectangles_to_add = []
+        for logo in logos_data:
+            rect_w = math.sqrt(test_area / logo['ratio'])
+            rect_h = rect_w * logo['ratio']
+            padded_w = rect_w + (2 * padding_pt)
+            padded_h = rect_h + (2 * padding_pt)
+
+            if padded_w > w or padded_h > h:
+                can_pack_all = False
+                break
+            rectangles_to_add.append({'w': padded_w, 'h': padded_h, 'rid': logo['path']})
+
+        if not can_pack_all:
+            max_area = test_area
+            continue
+
+        # 3. Appliquer la bonne méthode de tri
+        if sort_choice == 'AREA':
+            rectangles_to_add.sort(key=lambda r: r['w'] * r['h'], reverse=True)
+        elif sort_choice == 'HEIGHT':
+            rectangles_to_add.sort(key=lambda r: r['h'], reverse=True)
+        elif sort_choice == 'WIDTH':
+            rectangles_to_add.sort(key=lambda r: r['w'], reverse=True)
+        else:  # MAXSIDE (défaut)
+            rectangles_to_add.sort(key=lambda r: max(r['w'], r['h']), reverse=True)
+
+        for r in rectangles_to_add:
+            packer.add_rect(r['w'], r['h'], rid=r['rid'])
+        packer.pack()
+
+        if len(packer[0]) == len(logos_data):
+            best_placements = packer[0]
+            min_area = test_area
+        else:
+            max_area = test_area
+
+    if not best_placements:
+        print("[WARN] Aucune solution de packing n'a pu être trouvée.")
+        _draw_logos_two_columns(c, col_coords, logo_paths, Config())
+        return
+
+    # 2. Dessiner les logos en utilisant la surface optimale et les positions trouvées
+    final_area = min_area
+
+    for rect in best_placements:
+        logo_path = rect.rid
+        logo_data = next(l for l in logos_data if l['path'] == logo_path)
+        logo_ratio = logo_data['ratio']
+
+        # Calculer la taille finale à partir de la surface optimale.
+        # C'est la garantie que tous les logos auront la même surface et le bon ratio.
+        final_w = math.sqrt(final_area / logo_ratio)
+        final_h = final_w * logo_ratio
+
+        # Positionner le logo à l'intérieur de la boîte que le packer a trouvée.
+        logo_x = x_offset + float(rect.x) + padding_pt
+        logo_y = y_offset + float(rect.y) + padding_pt
+
+        try:
+            kwargs = {'mask': 'auto'} if not isinstance(c, SVGCanvas) else {}
+            c.drawImage(logo_path, logo_x, logo_y, width=final_w, height=final_h, **kwargs)
+        except Exception as e:
+            print(f"[WARN] Erreur avec le logo {os.path.basename(logo_path)} lors du dessin: {e}")
 
 
 def draw_s1(c: canvas.Canvas, S1_coords, logos: list[str], cfg: Config, lay: Layout):
@@ -319,8 +454,8 @@ def _draw_cucaracha_box(c: canvas.Canvas, box_coords: tuple, cfg: Config):
     x, y, w, h = box_coords
     c_cfg = cfg.cucaracha_box
     content_type = c_cfg.get("content_type", "none")
-    content_value = c_cfg.get("content_value", "")
-    if content_type == "none" or not content_value.strip(): return
+    content_value = c_cfg.get("content_value", ".")
+    if content_type == "none": return
 
     c.saveState()
     title = c_cfg.get("title", "Cucaracha")
@@ -354,7 +489,6 @@ def _draw_cucaracha_box(c: canvas.Canvas, box_coords: tuple, cfg: Config):
     elif content_type == "image":
         if os.path.exists(content_value):
             try:
-                # ==================== CORRECTION : GESTION DU TYPE DE CANVAS ====================
                 if isinstance(c, SVGCanvas):
                     image_to_draw = Image.open(content_value)
                 else:
@@ -363,7 +497,6 @@ def _draw_cucaracha_box(c: canvas.Canvas, box_coords: tuple, cfg: Config):
                 img_reader = ImageReader(content_value)
                 img_w, img_h = img_reader.getSize()
                 aspect = img_h / img_w if img_w > 0 else 1
-                # ==============================================================================
 
                 w_fit = content_w
                 h_fit = w_fit * aspect

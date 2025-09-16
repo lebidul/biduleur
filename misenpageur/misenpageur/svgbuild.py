@@ -115,10 +115,13 @@ def build_svg(project_root: str, cfg: Config, layout: Layout, out_path: str, con
         output_dir = Path(out_path).parent
         output_prefix = Path(out_path).stem
 
-        # pdf2svg_executable = "pdf2svg"
-        executable_name = "pdf2svg.exe"
+        executable_name = "pdf2svg.exe"  # Le nom de base ne change pas
         path_to_executable = os.path.join(project_root, "bin", "win64", executable_name)
-        command = [executable_name, temp_pdf_path, str(output_dir / f"{output_prefix}_%d.svg"), "all"]
+
+        # ==================== LA CORRECTION EST ICI ====================
+        # On utilise le chemin complet 'path_to_executable' et non plus 'executable_name'
+        command = [path_to_executable, temp_pdf_path, str(output_dir / f"{output_prefix}_%d.svg"), "all"]
+        # =============================================================
 
         print(f"[INFO] Lancement de la conversion SVG...")
         subprocess.run(command, capture_output=True, text=True, check=True)

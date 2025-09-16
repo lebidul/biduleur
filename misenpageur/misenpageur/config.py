@@ -31,6 +31,13 @@ class PosterConfig:
     date_spaceBefore: float = 2.0
     date_spaceAfter: float = 2.0
 
+# ==================== NOUVEAU DATACLASS POUR LA STRATÉGIE DE PACKING ====================
+@dataclass
+class PackingStrategy:
+    """Définit la stratégie à utiliser pour l'arrangement des logos."""
+    algorithm: str = 'Global'  # 'Global', 'BFF', 'BNF'
+    sort_algo: str = 'AREA'    # 'AREA', 'MAXSIDE', 'HEIGHT', 'WIDTH'
+
 @dataclass
 class Config:
     # --- Paths ---
@@ -40,6 +47,8 @@ class Config:
     auteur_couv: Optional[str] = None
     auteur_couv_url: Optional[str] = None
     logos_dir: str = "assets/logos"
+    logos_layout: str = "colonnes"
+    logos_padding_mm: float = 1.0 # Marge en mm pour le layout optimisé
     ours_md: str = "assets/ours/ours.md"
     ours_svg: str = "assets/ours/ours_template.svg"
     nobr_file: Optional[str] = None
@@ -64,6 +73,9 @@ class Config:
     event_hanging_indent: float = 10.0
     bullet_text_indent: float = -3.0
 
+    # On initialise avec les valeurs par défaut du dataclass PackingStrategy
+    packing_strategy: PackingStrategy = field(default_factory=PackingStrategy)
+
     # --- Dictionnaires pour les configs complexes ---
     date_box: Dict[str, Any] = field(default_factory=dict)
     date_line: Dict[str, Any] = field(default_factory=dict)
@@ -82,6 +94,8 @@ class Config:
         try:
             with open(path, 'r', encoding='utf-8') as f:
                 data = yaml.safe_load(f) or {}
+            if 'packing_strategy' in data and isinstance(data['packing_strategy'], dict):
+                data['packing_strategy'] = PackingStrategy(**data['packing_strategy'])
             return cls.from_dict(data)
         except FileNotFoundError:
             print(f"[WARN] Fichier de configuration introuvable : {path}. Utilisation des valeurs par défaut.")
