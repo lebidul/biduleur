@@ -1,3 +1,4 @@
+
 ---
 
 # Bidul v1.2.5 - Couleur de Police Automatique et Finalisation
@@ -11,8 +12,6 @@ Cette version introduit une nouvelle fonctionnalité intelligente pour le design
 ## 🔧 Améliorations et Corrections
 
 *   **Prise en Compte de la Transparence** : L'algorithme d'analyse de la luminosité simule désormais l'effet du voile blanc semi-transparent appliqué sur l'image, garantissant une détection de couleur précise et fiable, conforme au rendu final.
-*   **Finalisation de l'Algorithme de Packing** : L'algorithme de répartition optimisée des logos a été stabilisé pour corriger les bugs de placement (chevauchement, débordement) et de ratio d'aspect, tout en assurant une disposition dense et harmonieuse.
-*   **Correction de Bugs de Régression** : Le bug qui faisait disparaître la `cucaracha_box` lors de l'utilisation de la répartition optimisée des logos a été corrigé.
 
 ## ⚙️ Pour les Développeuses et Développeurs
 

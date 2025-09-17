@@ -20,6 +20,7 @@
 - [x] Champ pour choisir couleur box de dates
 - [x] Texte poster en blanc si rendu trop foncé
 - [ ] Ajouter logique de texte gris si poster moyennement foncé
+- [ ] Image de fond dans GUI
 - [ ] Effet succès solitaire.
 - [ ] Icône
 - [ ] Problème sécurité Windows

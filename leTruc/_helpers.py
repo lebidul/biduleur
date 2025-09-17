@@ -1,0 +1,272 @@
+# leTruc/_helpers.py
+import os
+import sys
+from pathlib import Path
+from tkinter import messagebox, filedialog
+import subprocess
+import importlib.resources as res
+
+from biduleur.csv_utils import parse_bidul
+from biduleur.format_utils import output_html_file
+
+# Pour garder app.py propre, nous avons déplacé les fonctions "utilitaires" qui ne sont pas des méthodes de la classe dans un fichier séparé.
+
+# Cette fonction est utilisée par `run_pipeline` et `_load_cfg_defaults`
+def get_resource_path(relative_path):
+    """
+    Retourne le chemin absolu vers une ressource, fonctionne en mode dev et packagé.
+    """
+    if getattr(sys, 'frozen', False):
+        # Si l'application est "frozen" (packagée par PyInstaller)
+        # sys._MEIPASS est le dossier temporaire où tout est décompressé.
+        base_path = getattr(sys, '_MEIPASS')
+    else:
+        # En mode développement, la base est le dossier du script app.py
+        base_path = os.path.dirname(os.path.abspath(__file__))
+
+    return os.path.join(base_path, relative_path)
+
+
+def _ensure_parent_dir(path: str):
+    if path: Path(path).parent.mkdir(parents=True, exist_ok=True)
+
+
+# Cette fonction est utilisée par `_load_cfg_defaults`
+def _project_defaults():
+    """
+    Définit les chemins par défaut pour les fichiers de config et layout.
+    Utilise get_resource_path pour être compatible avec PyInstaller.
+    """
+    # En mode packagé, la racine du projet est le dossier temporaire _MEIPASS
+    repo_root = get_resource_path('..')
+
+    # Les fichiers de config sont maintenant relatifs à cet emplacement
+    cfg = get_resource_path(os.path.join("../misenpageur", "config.yml"))
+    lay = get_resource_path(os.path.join("../misenpageur", "layout.yml"))
+
+    return {"root": str(repo_root), "config": str(cfg), "layout": str(lay)}
+
+# Cette fonction est utilisée par le constructeur de l'Application
+def _load_cfg_defaults() -> dict:
+    """
+    Charge les valeurs par défaut depuis le fichier config.yml.
+    En cas d'échec, retourne un dictionnaire de valeurs sûres codées en dur.
+    """
+    # On définit d'abord les valeurs de secours au cas où tout échouerait.
+    out = {
+        "cover": "",
+        "ours_background_png": "",
+        "logos_dir": "",
+        "auteur_couv": "",
+        "auteur_couv_url": "",
+        "skip_cover": False,
+        "page_margin_mm": 1.0,
+        "date_separator_type": "ligne",
+        "date_spacing": "4",
+        "poster_design": 0,
+        "font_size_safety_factor": 0.98,
+        "background_alpha": 0.85,
+        "poster_title": "",
+        "cucaracha_type": "none",
+        "cucaracha_value": "",
+        "cucaracha_text_font": "Arial"
+    }
+
+    # On essaie de lire les vraies valeurs par défaut depuis le config.yml
+    try:
+        # On tente l'import de Config uniquement ici.
+        from misenpageur.misenpageur.config import Config
+
+        # On récupère les chemins par défaut (qui sont compatibles PyInstaller)
+        defaults = _project_defaults()
+        cfg_path = defaults.get("config")
+
+        if not cfg_path or not os.path.exists(cfg_path):
+            print(f"[WARN] Fichier de configuration par défaut introuvable : {cfg_path}")
+            return out  # Retourne les valeurs de secours
+
+        cfg = Config.from_yaml(cfg_path)
+
+        # Si la lecture réussit, on met à jour notre dictionnaire 'out'
+        out.update({
+            "cover": cfg.cover_image or "",
+            "logos_dir": cfg.logos_dir or "",
+            "auteur_couv": getattr(cfg, "auteur_couv", "") or "",
+            "auteur_couv_url": getattr(cfg, "auteur_couv_url", "") or "",
+            "skip_cover": getattr(cfg, "skip_cover", False),
+            "date_spacing": str(cfg.date_spaceBefore),
+        })
+        if isinstance(cfg.section_1, dict):
+            out["ours_background_png"] = cfg.section_1.get("ours_background_png", "")
+        if isinstance(cfg.pdf_layout, dict):
+            out["page_margin_mm"] = cfg.pdf_layout.get("page_margin_mm", 1.0)
+        if cfg.date_line.get("enabled", True):
+            out["date_separator_type"] = "ligne"
+        elif cfg.date_box.get("enabled", False):
+            out["date_separator_type"] = "box"
+        else:
+            out["date_separator_type"] = "aucun"
+        if isinstance(cfg.poster, dict):
+            out.update({
+                "poster_design": cfg.poster.get("design", 0),
+                "font_size_safety_factor": cfg.poster.get("font_size_safety_factor", 0.98),
+                "background_alpha": cfg.poster.get("background_image_alpha", 0.85),
+                "poster_title": cfg.poster.get("title", "")
+            })
+        if isinstance(cfg.cucaracha_box, dict):
+            out.update({
+                "cucaracha_type": cfg.cucaracha_box.get("content_type", "none"),
+                "cucaracha_value": cfg.cucaracha_box.get("content_value", ""),
+                "cucaracha_text_font": cfg.cucaracha_box.get("text_font_name", "Arial")
+            })
+    except Exception as e:
+        # Si l'import ou la lecture du fichier échoue, on affiche un avertissement
+        # mais l'application peut continuer avec les valeurs par défaut.
+        print(f"[WARN] Erreur lors de la lecture des défauts depuis config.yml : {e}")
+        # On ne fait rien d'autre, la fonction retournera le 'out' initial.
+
+    return out
+
+
+def save_embedded_template(filename, title):
+    ext = os.path.splitext(filename)[1].lower()
+    ftypes = [("Excel", "*.xlsx")] if ext == '.xlsx' else [("CSV", "*.csv")]
+    target = filedialog.asksaveasfilename(title=title, defaultextension=ext, filetypes=ftypes, initialfile=filename)
+    if not target: return
+    try:
+        data = res.files('biduleur.templates').joinpath(filename).read_bytes()
+        with open(target, "wb") as f:
+            f.write(data)
+        messagebox.showinfo("Modèle enregistré", f"Fichier enregistré ici :\n{target}")
+    except Exception as e:
+        messagebox.showerror("Erreur", f"Impossible d'enregistrer le modèle : {e}")
+
+
+# Cette fonction est utilisée par le thread
+def run_pipeline(
+        input_file: str, generate_cover: bool, cover_image: str, ours_background_png: str, logos_dir: str,
+        out_html: str, out_agenda_html: str, out_pdf: str, auteur_couv: str, auteur_couv_url: str,
+        page_margin_mm: float, generate_svg: bool, out_svg: str, date_separator_type: str,
+        date_spacing: float, poster_design: int, font_size_safety_factor: float, logos_padding_mm: float,
+        background_alpha: float, poster_title: str, cucaracha_type: str,
+        cucaracha_value: str, cucaracha_text_font: str, logos_layout: str,
+        date_box_border_color: str, date_box_back_color: str
+) -> tuple[bool, str]:
+    try:
+        from misenpageur.misenpageur.config import Config
+        from misenpageur.misenpageur.layout import Layout
+        from misenpageur.misenpageur.pdfbuild import build_pdf
+        from misenpageur.misenpageur.svgbuild import build_svg
+        from misenpageur.misenpageur.layout_builder import build_layout_with_margins
+    except Exception as e:
+        import traceback
+        # On retourne une erreur claire si l'import échoue
+        return False, f"Erreur critique: Impossible de charger le module 'misenpageur'.\n\nDétails:\n{type(e).__name__}: {e}\n\n{traceback.format_exc()}"
+
+    final_layout_path = None
+    report = {}
+    try:
+        for p in (out_html, out_agenda_html, out_pdf, out_svg):
+            if p: _ensure_parent_dir(p)
+
+        html_body_bidul, html_body_agenda, number_of_lines = parse_bidul(input_file)
+        output_html_file(html_body_bidul, original_file_name=input_file, output_filename=out_html)
+        output_html_file(html_body_agenda, original_file_name=input_file, output_filename=out_agenda_html)
+
+        defaults = _project_defaults()
+        project_root, cfg_path, lay_path = defaults["root"], defaults["config"], defaults["layout"]
+        cfg = Config.from_yaml(cfg_path)
+
+        cfg.project_root = project_root
+
+        cfg.input_html = out_html
+        cfg.skip_cover = not generate_cover
+        if out_pdf: cfg.output_pdf = out_pdf
+        if (cover_image or "").strip(): cfg.cover_image = cover_image.strip()
+        if (ours_background_png or "").strip(): cfg.section_1['ours_background_png'] = ours_background_png.strip()
+        if (logos_dir or "").strip(): cfg.logos_dir = logos_dir.strip()
+        if (auteur_couv or "").strip(): cfg.auteur_couv = auteur_couv.strip()
+        if (auteur_couv_url or "").strip(): cfg.auteur_couv_url = auteur_couv_url.strip()
+        cfg.pdf_layout['page_margin_mm'] = page_margin_mm
+        cfg.logos_layout = logos_layout
+        cfg.logos_padding_mm = logos_padding_mm
+        cfg.date_line['enabled'] = (date_separator_type == "ligne")
+        cfg.date_box['enabled'] = (date_separator_type == "box")
+        if cfg.date_box['enabled']:
+            cfg.date_box['border_color'] = date_box_border_color
+            cfg.date_box['back_color'] = date_box_back_color
+        cfg.date_spaceBefore = date_spacing
+        cfg.date_spaceAfter = date_spacing
+        cfg.poster['design'] = poster_design
+        cfg.poster['font_size_safety_factor'] = font_size_safety_factor
+        cfg.poster['background_image_alpha'] = background_alpha
+        cfg.poster['title'] = poster_title
+        cfg.cucaracha_box['content_type'] = cucaracha_type
+        cfg.cucaracha_box['content_value'] = cucaracha_value
+        cfg.cucaracha_box['text_font_name'] = cucaracha_text_font
+
+        final_layout_path = build_layout_with_margins(lay_path, cfg)
+        lay = Layout.from_yaml(final_layout_path)
+
+        if out_pdf:
+            report = build_pdf(project_root, cfg, lay, out_pdf, cfg_path)
+        if generate_svg and out_svg:
+            if not report:
+                report = build_pdf(project_root, cfg, lay, os.devnull, cfg_path)
+            build_svg(project_root, cfg, lay, out_svg, cfg_path)
+
+        summary_lines = [
+            f"Fichier d'entrée : {os.path.basename(input_file)}", "-" * 40, "Fichiers de sortie créés :"
+        ]
+        if out_html: summary_lines.append(f"  - HTML: {out_html}")
+        if out_agenda_html: summary_lines.append(f"  - HTML (Agenda): {out_agenda_html}")
+        if out_pdf: summary_lines.append(f"  - PDF: {out_pdf}")
+        if generate_svg and out_svg: summary_lines.append(f"  - SVG (éditable): {out_svg}")
+        summary_lines.append("\n" + "-" * 40)
+        summary_lines.append(f"Nombre d'événements traités : {number_of_lines}")
+        fs_main = report.get("font_size_main")
+        if fs_main: summary_lines.append(f"Taille de police (pages 1-2): {fs_main:.2f} pt")
+        fs_poster = report.get("font_size_poster_final")
+        if fs_poster:
+            fs_poster_opt = report.get("font_size_poster_optimal", 0)
+            summary_lines.append(
+                f"Taille de police (poster)    : {fs_poster:.2f} pt (optimale: {fs_poster_opt:.2f} pt)")
+
+        return True, "\n".join(summary_lines)
+
+    except Exception as e:
+        import traceback
+        return False, f"{type(e).__name__}: {e}\n\n{traceback.format_exc()}"
+    finally:
+        if final_layout_path and os.path.exists(final_layout_path) and Path(final_layout_path).name.endswith(".yml"):
+            try:
+                os.remove(final_layout_path)
+            except OSError:
+                pass
+
+# Cette fonction est utilisée à la fin du run
+def open_file(filepath):
+    """Ouvre un fichier avec l'application par défaut du système."""
+    if not filepath or not os.path.exists(filepath):
+        print(f"[WARN] Impossible d'ouvrir le fichier, il n'existe pas : {filepath}")
+        return
+    try:
+        if sys.platform == "win32":
+            os.startfile(filepath)
+        elif sys.platform == "darwin": # macOS
+            subprocess.run(["open", filepath])
+        else: # Linux
+            subprocess.run(["xdg-open", filepath])
+    except Exception as e:
+        messagebox.showwarning("Ouverture impossible", f"Impossible d'ouvrir le fichier automatiquement:\n{e}")
+
+def _default_paths_from_input(input_file: str) -> dict:
+    input_path = Path(input_file)
+    base = input_path.stem
+    folder = input_path.parent
+    return {
+        "html": str(folder / f"{base}.html"),
+        "agenda_html": str(folder / f"{base}.agenda.html"),
+        "pdf": str(folder / f"{base}.pdf"),
+        "svg": str(folder / f"{base}.svg"),
+    }
