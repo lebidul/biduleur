@@ -10,7 +10,7 @@
 - [x] Taille fenêtre dynamique
 - [ ] Export dans 1 seul svg
 - [ ] Dans ours l'auteur et les hyperlinks ne suivent pas le .png dans le cas dúne margin
-- [ ] Capturer erreur si pdf déjà ouvert et impossible à sauvegarder
+- [x] Capturer erreur si pdf déjà ouvert et impossible à sauvegarder
 - [x] Hyperlinks sponsors
 - [x] Enlever border date box
 - [x] Champs paths par défaut depuis build github
@@ -26,7 +26,7 @@
 - [ ] Image de fond dans GUI
 - [ ] Effet succès solitaire.
 - [ ] Icône
-- [ ] Problème sécurité Windows
+- [x] Problème sécurité Windows
 - [x] Progress bar.
 - [ ] Problème affichage release notes dans release github
 - [ ] Changer framework GUI
