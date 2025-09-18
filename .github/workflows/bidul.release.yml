@@ -61,16 +61,45 @@ jobs:
         shell: pwsh
         run: |
           $version = "${{ env.VERSION }}"
-          $sourceFolder = "dist/bidul"
+          $sourceFolder = "dist/bidul" # Le dossier créé par PyInstaller
           $zipFileName = "bidul-${version}-win64.zip"
           
-          # Copie des fichiers additionnels (README, etc.)
+          # --- Création du fichier README.txt ---
+          # On utilise un "here-string" (@"..."@) pour un texte multi-lignes propre.
+          $readmeContent = @"
+          ==================================================
+          Bidul v$version - Instructions d'Installation
+          ==================================================
+
+          Merci d'avoir téléchargé Bidul !
+
+          --- IMPORTANT : Avertissement de Sécurité Windows ---
+
+          La première fois que vous lancerez `bidul.exe`, Windows affichera
+          probablement un écran bleu "Windows a protégé votre ordinateur".
+          
+          C'est un comportement normal pour les nouvelles applications.
+          
+          Pour lancer l'application, suivez ces deux étapes :
+          
+          1. Cliquez sur le lien "Informations complémentaires" (ou "More info").
+          2. Cliquez sur le nouveau bouton "Exécuter quand même" (ou "Run anyway")
+             qui apparaîtra.
+
+          L'application se lancera alors normalement.
+          
+          "@
+          
+          # On écrit le contenu dans un fichier README.txt à l'intérieur du dossier à zipper.
+          $readmeContent | Out-File -FilePath "$sourceFolder\README.txt" -Encoding utf8
+          
+          # --- Copie des notes de version (inchangé) ---
           if (Test-Path "RELEASE_NOTES.md") {
-            Copy-Item -Path "RELEASE_NOTES.md" -Destination "$sourceFolder/"
+            Copy-Item -Path "RELEASE_NOTES.md" -Destination "$sourceFolder\"
           }
           
-          # Création de l'archive
-          Compress-Archive -Path "$sourceFolder/*" -DestinationPath $zipFileName -Force
+          # --- Création de l'archive ZIP (inchangé) ---
+          Compress-Archive -Path "$sourceFolder\*" -DestinationPath $zipFileName -Force
           
           echo "zip_name=$zipFileName" | Out-File -FilePath $env:GITHUB_OUTPUT
 

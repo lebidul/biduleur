@@ -5,6 +5,7 @@ from pathlib import Path
 from tkinter import messagebox, filedialog
 import subprocess
 import importlib.resources as res
+import tempfile
 
 from biduleur.csv_utils import parse_bidul
 from biduleur.format_utils import output_html_file
@@ -231,7 +232,17 @@ def run_pipeline(
         if out_html: summary_lines.append(f"  - HTML: {out_html}")
         if out_agenda_html: summary_lines.append(f"  - HTML (Agenda): {out_agenda_html}")
         if out_pdf: summary_lines.append(f"  - PDF: {out_pdf}")
-        if generate_svg and out_svg: summary_lines.append(f"  - SVG (éditable): {out_svg}")
+        if generate_svg and out_svg:
+            if not report:
+                # Créer un PDF temporaire pour la conversion SVG
+                with tempfile.NamedTemporaryFile(delete=True, suffix=".pdf", mode='w+b') as tmp:
+                    temp_pdf_path = tmp.name
+                    report = build_pdf(project_root, cfg, lay, temp_pdf_path, cfg_path)
+                    # La conversion SVG se fera à partir de ce PDF temporaire
+                    build_svg(project_root, cfg, lay, out_svg, cfg_path, temp_pdf_path_override=temp_pdf_path)
+            else:
+                 build_svg(project_root, cfg, lay, out_svg, cfg_path)
+
         summary_lines.append("\n" + "-" * 40)
         summary_lines.append(f"Nombre d'événements traités : {number_of_lines}")
         fs_main = report.get("font_size_main")
@@ -244,9 +255,21 @@ def run_pipeline(
 
         return True, "\n".join(summary_lines)
 
+    except PermissionError as e:
+        # On intercepte SPÉCIFIQUEMENT l'erreur de permission
+        # On extrait le nom du fichier qui cause le problème
+        locked_file = e.filename or "un fichier de sortie"
+        user_message = (
+            f"Impossible d'écrire le fichier suivant :\n\n"
+            f"{os.path.basename(locked_file)}\n\n"
+            f"Veuillez vous assurer que le fichier n'est pas ouvert dans un autre programme (comme Adobe Reader) et réessayez."
+        )
+        return False, user_message
+
     except Exception as e:
         import traceback
         return False, f"{type(e).__name__}: {e}\n\n{traceback.format_exc()}"
+
     finally:
         if final_layout_path and os.path.exists(final_layout_path) and Path(final_layout_path).name.endswith(".yml"):
             try:
