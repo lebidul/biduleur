@@ -28,7 +28,7 @@
 - [ ] Icône
 - [x] Problème sécurité Windows
 - [x] Progress bar.
-- [ ] Problème affichage release notes dans release github
+- [x] Problème affichage release notes dans release github
 - [ ] Changer framework GUI
 
 ## Documentation
