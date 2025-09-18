@@ -333,8 +333,10 @@ def _simulate_allocation_at_fs(
 
 
 def _read_date_box_config(cfg: Config) -> DateBoxConfig:
-    """Lit date_box depuis cfg, qu'il soit un dict, un Mapping (OmegaConf, etc.)
-    ou un objet-namespace avec attributs. Fallback sur les clés à plat."""
+    """
+    Lit la configuration de la 'date_box' depuis l'objet Config.
+    Cette version force la largeur de la bordure à 0 pour la désactiver.
+    """
 
     def as_bool(v, default=False):
         if v is None: return default
@@ -352,9 +354,9 @@ def _read_date_box_config(cfg: Config) -> DateBoxConfig:
     def get_from_block(b, key, default=None):
         if b is None:
             return default
-        if isinstance(b, Mapping):
+        if isinstance(b, Mapping):  # Compatible avec les dictionnaires
             return b.get(key, default)
-        # objet type namespace (SimpleNamespace, Box, etc.)
+        # Compatible avec les objets (dataclasses, etc.)
         return getattr(b, key, default)
 
     block = getattr(cfg, "date_box", None)
@@ -363,17 +365,18 @@ def _read_date_box_config(cfg: Config) -> DateBoxConfig:
         return DateBoxConfig(
             enabled=as_bool(get_from_block(block, "enabled"), False),
             padding=as_float(get_from_block(block, "padding"), 2.0),
-            border_width=as_float(get_from_block(block, "border_width"), 0.5),
-            border_color=get_from_block(block, "border_color", "#000000"),
+            border_width=0,
+            border_color=None,
             back_color=get_from_block(block, "back_color", None),
         )
 
-    # Fallback : clés à plat
+    # Fallback pour les anciennes configurations (clés à plat)
+    # On applique la même logique de forcer la bordure à 0.
     return DateBoxConfig(
         enabled=as_bool(getattr(cfg, "date_box_enabled", False), False),
         padding=as_float(getattr(cfg, "date_box_padding", 2.0), 2.0),
-        border_width=as_float(getattr(cfg, "date_box_border_width", 0.5), 0.5),
-        border_color=getattr(cfg, "date_box_border_color", "#000000"),
+        border_width=0,  # Forcer ici aussi
+        border_color=None,
         back_color=getattr(cfg, "date_box_back_color", None),
     )
 

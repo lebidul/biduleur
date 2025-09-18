@@ -91,25 +91,22 @@ jobs:
         run: |
           $notes_file = "RELEASE_NOTES.md"
           $version = "${{ env.VERSION }}"
-          $output_file = "current_release_notes.md" # Fichier de sortie temporaire
+          $output_file = "current_release_notes.md"
           $release_body = "Pas de notes de version trouvées pour la v$version."
 
           if (Test-Path $notes_file) {
             $content = Get-Content -Path $notes_file -Raw
             
-            # La regex reste la même, elle est correcte
             $pattern = "(?s)# Bidul v$version(.*?)(?=# Bidul v|\z)"
             $match = [regex]::Match($content, $pattern)
             
             if ($match.Success) {
-              $release_body = $match.Groups.Value.Trim()
+              # On cible explicitement le groupe de capture #1.
+              $release_body = $match.Groups[1].Value.Trim()
             }
           }
           
-          # On écrit le contenu propre dans le fichier temporaire
           Set-Content -Path $output_file -Value $release_body -Encoding utf8
-          
-          # On définit le chemin du fichier comme une sortie de l'étape
           echo "notes_path=$output_file" | Out-File -FilePath $env:GITHUB_OUTPUT
 
       - name: Create Release
@@ -119,5 +116,4 @@ jobs:
           name: Bidul v${{ env.VERSION }}
           tag_name: ${{ github.ref_name }}
           files: ${{ steps.package.outputs.zip_name }}
-          # On utilise 'body_path' pour lire directement le fichier
           body_path: ${{ steps.get_release_notes.outputs.notes_path }}
