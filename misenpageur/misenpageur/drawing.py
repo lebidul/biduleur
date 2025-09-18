@@ -150,7 +150,7 @@ def _draw_ours_column(c: canvas.Canvas, col_coords: tuple, cfg: Config):
 
     # 4. Dessin du QR Code
     qr_code_size = mm_to_pt(s1_cfg.get('qr_code_height_mm', 25))
-    padding = mm_to_pt(2)
+    padding = mm_to_pt(2.5)
     qr_x_pos = x + (w - qr_code_size) / 2
     qr_y_pos = y + padding
 

@@ -4,18 +4,16 @@ import os
 from tkinter import filedialog, messagebox, colorchooser
 
 # On importe les helpers qui contiennent la logique "métier"
-from ._helpers import _default_paths_from_input, save_embedded_template
+from ._helpers import _default_paths_from_input, save_embedded_template, open_file
 
 
 def assign_all(app):
     """
     Fonction principale qui assigne toutes les fonctions de callback
     aux widgets et variables de l'application.
-
-    Args:
-        app: L'instance principale de la classe Application.
     """
-    # --- Assignation des commandes aux boutons ---
+
+    # --- Assignation des commandes aux boutons "Parcourir...", "Enregistrer...", etc. ---
     app.input_button.config(command=lambda: on_pick_input(app))
     app.csv_template_button.config(
         command=lambda: save_embedded_template('tapage_template.csv', "Enregistrer le modèle CSV"))
@@ -40,12 +38,23 @@ def assign_all(app):
     app.svg_save_button.config(
         command=lambda: on_pick_save(app.svg_var, "Enregistrer le SVG", ".svg", [("SVG", "*.svg")]))
 
+    # Assigner la commande au bouton principal
+    app.run_button.config(command=app._on_run)
+
+    app.back_color_btn.config(command=lambda: on_pick_color(app.date_box_back_color_var))
+
     # --- Liaison des variables aux fonctions de "toggle" ---
     app.logos_layout_var.trace_add("write", lambda *args: on_toggle_padding_widget(app))
     app.cucaracha_type_var.trace_add("write", lambda *args: on_toggle_cucaracha_widgets(app))
     app.date_separator_var.trace_add("write", lambda *args: on_toggle_date_sep_options(app))
     app.poster_design_var.trace_add("write", lambda *args: on_toggle_alpha_slider(app))
     app.alpha_var.trace_add("write", lambda *args: on_update_alpha_label(app))
+
+    # On ne trace plus la variable de la couleur de bordure.
+    app.date_box_back_color_var.trace_add(
+        "write",
+        lambda *args: app.back_color_preview.config(bg=app.date_box_back_color_var.get())
+    )
 
     # --- Appels initiaux pour définir l'état de l'interface au démarrage ---
     on_toggle_padding_widget(app)
@@ -90,12 +99,12 @@ def on_pick_save(string_var, title, ext, filetypes):
     if path: string_var.set(path)
 
 
-def on_pick_color(color_var, preview_widget):
-    """Ouvre le sélecteur de couleur et met à jour la variable et l'aperçu."""
-    _, color_hex = colorchooser.askcolor(initialcolor=color_var.get())
+def on_pick_color(color_var):
+    """Ouvre le sélecteur de couleur et met à jour la variable."""
+    initial_color = color_var.get()
+    _, color_hex = colorchooser.askcolor(initialcolor=initial_color)
     if color_hex:
         color_var.set(color_hex)
-        preview_widget.config(bg=color_hex)
 
 
 # --- Fonctions de visibilité conditionnelle ("toggle") ---

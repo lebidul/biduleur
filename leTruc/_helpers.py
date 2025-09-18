@@ -145,12 +145,12 @@ def save_embedded_template(filename, title):
 # Cette fonction est utilisée par le thread
 def run_pipeline(
         input_file: str, generate_cover: bool, cover_image: str, ours_background_png: str, logos_dir: str,
+        logos_layout: str, logos_padding_mm: float, date_box_back_color: str,
         out_html: str, out_agenda_html: str, out_pdf: str, auteur_couv: str, auteur_couv_url: str,
         page_margin_mm: float, generate_svg: bool, out_svg: str, date_separator_type: str,
-        date_spacing: float, poster_design: int, font_size_safety_factor: float, logos_padding_mm: float,
+        date_spacing: float, poster_design: int, font_size_safety_factor: float,
         background_alpha: float, poster_title: str, cucaracha_type: str,
-        cucaracha_value: str, cucaracha_text_font: str, logos_layout: str,
-        date_box_border_color: str, date_box_back_color: str
+        cucaracha_value: str, cucaracha_text_font: str
 ) -> tuple[bool, str]:
     try:
         from misenpageur.misenpageur.config import Config
@@ -193,7 +193,6 @@ def run_pipeline(
         cfg.date_line['enabled'] = (date_separator_type == "ligne")
         cfg.date_box['enabled'] = (date_separator_type == "box")
         if cfg.date_box['enabled']:
-            cfg.date_box['border_color'] = date_box_border_color
             cfg.date_box['back_color'] = date_box_back_color
         cfg.date_spaceBefore = date_spacing
         cfg.date_spaceAfter = date_spacing

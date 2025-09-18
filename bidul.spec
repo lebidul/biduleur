@@ -4,7 +4,7 @@ from PyInstaller.building.build_main import Analysis, PYZ, EXE, COLLECT
 
 BASE_DIR = os.getcwd()
 
-entry_script = os.path.join(BASE_DIR, 'gui.py')
+entry_script = os.path.join(BASE_DIR, 'leTruc/main.py')
 ICON_PATH = os.path.join(BASE_DIR, 'biduleur.ico')
 VERSION_FILE = os.path.join(BASE_DIR, 'bidul_version_info.txt')
 
@@ -18,6 +18,7 @@ datas = [
     ('biduleur/templates', 'biduleur/templates'),
     ('bin/win64', 'bin/win64'),
     ('biduleur', 'biduleur'), # Copier le dossier biduleur
+    ('biduleur/templates', 'biduleur/templates')
     ('misenpageur', 'misenpageur') # Copier le dossier misenpageur
 ]
 

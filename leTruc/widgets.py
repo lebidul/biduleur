@@ -190,20 +190,15 @@ def _create_date_sep_section(parent, app, ui_row):
     # Création du cadre de couleur (sera géré par un callback)
     app.date_box_colors_frame = ttk.Frame(date_sep_frame)
 
-    # Création des widgets à l'intérieur du cadre de couleur
-    tk.Label(app.date_box_colors_frame, text="Couleur bordure:").grid(row=0, column=0, sticky="w")
-    app.border_color_preview = tk.Label(app.date_box_colors_frame, text="    ", bg=app.date_box_border_color_var.get(),
-                                        relief="sunken")
-    app.border_color_preview.grid(row=0, column=1, sticky="w", padx=(5, 0))
-    app.border_color_btn = tk.Button(app.date_box_colors_frame, text="…", width=3)
-    app.border_color_btn.grid(row=0, column=2, sticky="w", padx=(2, 10))
-
-    tk.Label(app.date_box_colors_frame, text="Couleur fond:").grid(row=0, column=3, sticky="w")
-    app.back_color_preview = tk.Label(app.date_box_colors_frame, text="    ", bg=app.date_box_back_color_var.get(),
-                                      relief="sunken")
-    app.back_color_preview.grid(row=0, column=4, sticky="w", padx=(5, 0))
+    # --- Widgets pour la couleur de fond (on garde) ---
+    app.back_color_label = tk.Label(app.date_box_colors_frame, text="Couleur de fond :")
+    app.back_color_preview = tk.Label(app.date_box_colors_frame, text="    ", bg=app.date_box_back_color_var.get(), relief="sunken")
     app.back_color_btn = tk.Button(app.date_box_colors_frame, text="…", width=3)
-    app.back_color_btn.grid(row=0, column=5, sticky="w", padx=2)
+
+    # Placer les widgets de couleur de fond dans leur grille
+    app.back_color_label.grid(row=0, column=0, sticky="w", padx=(0, 5))
+    app.back_color_preview.grid(row=0, column=1, sticky="w")
+    app.back_color_btn.grid(row=0, column=2, sticky="w", padx=5)
 
     app.date_box_colors_row = lr  # On stocke la ligne pour le callback
 

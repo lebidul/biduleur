@@ -1,5 +1,23 @@
 
 ---
+# Bidul v1.2.6 - Refactorisation de l'Interface Graphique
+
+Cette version est principalement technique et se concentre sur une refactorisation majeure de l'interface graphique (GUI). L'objectif était d'améliorer la structure du code pour le rendre plus propre, plus maintenable et plus facile à faire évoluer à l'avenir, tout en corrigeant les derniers bugs d'interaction.
+
+## ✨ Améliorations de l'Interface Graphique (GUI)
+
+*   **Finalisation de la `Date Box`** : Le dernier bug lié au séparateur de dates de type "Box" a été corrigé. Le sélecteur de couleur pour le fond de la boîte s'affiche désormais correctement et la couleur choisie est bien appliquée dans le PDF final.
+*   **Interface Simplifiée** : L'option de personnalisation de la couleur de la *bordure* de la `date box` a été retirée pour simplifier l'interface. Les boîtes sont maintenant toujours dessinées sans bordure.
+
+## ⚙️ Pour les Développeuses et Développeurs
+
+*   **Refactorisation Complète du GUI** : Tout le code de l'interface a été restructuré en suivant les meilleures pratiques :
+    *   **Architecture Modulaire** : Le code est maintenant divisé en plusieurs fichiers avec des responsabilités uniques (`app.py` pour la structure, `widgets.py` pour le visuel, `callbacks.py` pour la logique), ce qui remplace l'ancien fichier monolithique `gui.py`.
+    *   **Structure Orientée Objet** : L'interface est désormais gérée par une classe `Application`, ce qui permet une meilleure gestion de l'état et une organisation du code plus claire.
+*   **Fiabilisation du Build (`.spec`)** : Le fichier de configuration de PyInstaller (`bidul.spec`) a été mis à jour pour s'adapter à la nouvelle structure de fichiers du GUI, garantissant que les builds Windows fonctionnent correctement.
+
+---
+
 
 # Bidul v1.2.5 - Couleur de Police Automatique et Finalisation
 

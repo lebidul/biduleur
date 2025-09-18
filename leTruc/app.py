@@ -77,7 +77,6 @@ class Application(tk.Tk):
         # --- Variables pour les séparateurs de dates ---
         self.date_separator_var = tk.StringVar(value=self.cfg_defaults.get("date_separator_type", "ligne"))
         self.date_spacing_var = tk.StringVar(value=self.cfg_defaults.get("date_spacing", "4"))
-        self.date_box_border_color_var = tk.StringVar(value="#000000")
         self.date_box_back_color_var = tk.StringVar(value="#FFFFFF")
 
         # --- Variables pour le poster ---
@@ -149,65 +148,70 @@ class Application(tk.Tk):
             return
 
         try:
-            # On stocke les valeurs validées dans des attributs temporaires
-            self.validated_margin = float(self.margin_var.get().strip().replace(',', '.'))
-            self.validated_safety_factor = float(self.safety_factor_var.get().strip().replace(',', '.'))
-            self.validated_date_spacing = float(self.date_spacing_var.get().strip().replace(',', '.'))
-            self.validated_logos_padding = float(self.logos_padding_var.get().strip().replace(',', '.'))
-            self.validated_poster_title = self.poster_title_var.get().strip()
-            self.validated_cucaracha_value = self.cucaracha_value_var.get().strip()
+            # On valide toutes les entrées numériques en une seule fois
+            validated_args = {
+                'margin_val': float(self.margin_var.get().strip().replace(',', '.')),
+                'safety_factor_val': float(self.safety_factor_var.get().strip().replace(',', '.')),
+                'date_spacing_val': float(self.date_spacing_var.get().strip().replace(',', '.')),
+                'logos_padding_val': float(self.logos_padding_var.get().strip().replace(',', '.'))
+            }
         except ValueError:
-            messagebox.showerror("Erreur",
-                                 "Les champs numériques (marges, espacement, facteur) doivent être des nombres valides.")
+            messagebox.showerror("Erreur", "Les champs numériques (marges, espacement, etc.) doivent être valides.")
             return
 
-        if not self.validated_poster_title:
+        validated_args['poster_title_val'] = self.poster_title_var.get().strip()
+        if not validated_args['poster_title_val']:
             messagebox.showerror("Erreur", "Le titre du poster est obligatoire.")
             return
+
+        validated_args['cuca_value_val'] = self.cucaracha_value_var.get().strip()
 
         self.status_var.set("Traitement en cours…")
         self.progress_bar.start()
         self.run_button.config(state=tk.DISABLED)
 
-        # Créer et démarrer le thread de travail
-        thread = threading.Thread(target=self._run_pipeline_in_thread)
+        # Créer et démarrer le thread de travail en lui passant le dictionnaire des arguments validés
+        thread = threading.Thread(target=self._run_pipeline_in_thread, args=(validated_args,))
         thread.daemon = True
         thread.start()
 
-        # Lancer la première vérification du résultat
         self.after(100, self._check_thread_for_results)
 
-    def _run_pipeline_in_thread(self):
+    def _run_pipeline_in_thread(self, validated_args):
         """
         Wrapper qui exécute la fonction de traitement lourde 'run_pipeline'.
         Cette méthode s'exécute dans un thread séparé.
         """
+        # On utilise le helper _helpers.run_pipeline qui a été importé
+        from ._helpers import run_pipeline
+
         ok, msg = run_pipeline(
+            # On passe les arguments en utilisant les clés du dictionnaire
+            # pour éviter toute erreur d'ordre.
             input_file=self.input_var.get().strip(),
             generate_cover=self.generate_cover_var.get(),
             cover_image=self.cover_var.get().strip(),
             ours_background_png=self.ours_png_var.get().strip(),
             logos_dir=self.logos_var.get().strip(),
             logos_layout=self.logos_layout_var.get(),
-            logos_padding_mm=self.validated_logos_padding,
+            logos_padding_mm=validated_args['logos_padding_val'],
             out_html=self.html_var.get().strip(),
             out_agenda_html=self.agenda_var.get().strip(),
             out_pdf=self.pdf_var.get().strip(),
             auteur_couv=self.auteur_var.get().strip(),
             auteur_couv_url=self.auteur_url_var.get().strip(),
-            page_margin_mm=self.validated_margin,
+            page_margin_mm=validated_args['margin_val'],
             generate_svg=self.generate_svg_var.get(),
             out_svg=self.svg_var.get().strip(),
             date_separator_type=self.date_separator_var.get(),
-            date_spacing=self.validated_date_spacing,
+            date_spacing=validated_args['date_spacing_val'],
             poster_design=self.poster_design_var.get(),
-            font_size_safety_factor=self.validated_safety_factor,
+            font_size_safety_factor=validated_args['safety_factor_val'],
             background_alpha=self.alpha_var.get(),
-            poster_title=self.validated_poster_title,
+            poster_title=validated_args['poster_title_val'],
             cucaracha_type=self.cucaracha_type_var.get(),
-            cucaracha_value=self.validated_cucaracha_value,
+            cucaracha_value=validated_args['cuca_value_val'],
             cucaracha_text_font=self.cucaracha_font_var.get(),
-            date_box_border_color=self.date_box_border_color_var.get(),
             date_box_back_color=self.date_box_back_color_var.get()
         )
         self.result_queue.put((ok, msg))
@@ -236,6 +240,7 @@ class Application(tk.Tk):
 
         except queue.Empty:
             self.after(100, self._check_thread_for_results)
+
     # --- Méthodes pour la gestion du Canvas (Callbacks internes) ---
 
     def _on_frame_configure(self, event):
