@@ -1,5 +1,20 @@
 
 ---
+# Bidul v1.2.7 - Amélioration de l'Expérience Utilisateur et de la Distribution
+
+Cette version se concentre sur l'amélioration de l'expérience utilisateur lors de l'installation et de l'utilisation de l'application, en apportant des corrections importantes à la gestion des erreurs et à la distribution.
+
+## ✨ Améliorations
+
+*   **Gestion de l'Erreur "Fichier Ouvert"** : L'application ne plante plus avec une erreur technique si l'utilisateur essaie de générer un PDF qui est déjà ouvert dans un autre programme (comme Adobe Reader). Une boîte de dialogue claire s'affiche désormais, demandant à l'utilisateur de fermer le fichier avant de continuer.
+*   **Ajout d'un Fichier `README.txt` à la Release** : L'archive `.zip` de la release contient maintenant un fichier `README.txt` avec des instructions claires pour les nouveaux utilisateurs. Il explique notamment comment contourner l'avertissement de sécurité "Microsoft Defender SmartScreen" qui peut apparaître au premier lancement.
+
+## ⚙️ Pour les Développeuses et Développeurs
+
+*   **Gestion de `PermissionError`** : La logique de traitement principal (`run_pipeline`) intercepte désormais spécifiquement l'exception `PermissionError` pour la transformer en un message d'erreur compréhensible pour l'utilisateur.
+*   **Création Automatisée du `README.txt`** : Le workflow GitHub Actions a été mis à jour pour générer et inclure dynamiquement le fichier `README.txt` dans l'archive de la release à chaque build.
+
+---
 # Bidul v1.2.6 - Refactorisation de l'Interface Graphique
 
 Cette version est principalement technique et se concentre sur une refactorisation majeure de l'interface graphique (GUI). L'objectif était d'améliorer la structure du code pour le rendre plus propre, plus maintenable et plus facile à faire évoluer à l'avenir, tout en corrigeant les derniers bugs d'interaction.
