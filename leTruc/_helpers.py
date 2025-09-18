@@ -17,12 +17,12 @@ def get_resource_path(relative_path):
     Retourne le chemin absolu vers une ressource, fonctionne en mode dev et packagé.
     """
     if getattr(sys, 'frozen', False):
-        # Si l'application est "frozen" (packagée par PyInstaller)
-        # sys._MEIPASS est le dossier temporaire où tout est décompressé.
+        # En mode packagé, la base est le dossier où tout est décompressé.
         base_path = getattr(sys, '_MEIPASS')
     else:
-        # En mode développement, la base est le dossier du script app.py
-        base_path = os.path.dirname(os.path.abspath(__file__))
+        # En mode développement, on remonte d'un niveau depuis le dossier `leTruc`
+        # pour trouver la vraie racine du projet.
+        base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
     return os.path.join(base_path, relative_path)
 
@@ -32,19 +32,17 @@ def _ensure_parent_dir(path: str):
 
 
 # Cette fonction est utilisée par `_load_cfg_defaults`
-def _project_defaults():
+def _project_defaults() -> dict:
     """
     Définit les chemins par défaut pour les fichiers de config et layout.
-    Utilise get_resource_path pour être compatible avec PyInstaller.
     """
-    # En mode packagé, la racine du projet est le dossier temporaire _MEIPASS
-    repo_root = get_resource_path('..')
+    # get_resource_path nous donne maintenant la bonne racine dans les deux modes.
+    repo_root = get_resource_path('.')
 
-    # Les fichiers de config sont maintenant relatifs à cet emplacement
-    cfg = get_resource_path(os.path.join("../misenpageur", "config.yml"))
-    lay = get_resource_path(os.path.join("../misenpageur", "layout.yml"))
+    cfg = os.path.join(repo_root, "misenpageur", "config.yml")
+    lay = os.path.join(repo_root, "misenpageur", "layout.yml")
 
-    return {"root": str(repo_root), "config": str(cfg), "layout": str(lay)}
+    return {"root": repo_root, "config": cfg, "layout": lay}
 
 # Cette fonction est utilisée par le constructeur de l'Application
 def _load_cfg_defaults() -> dict:
@@ -87,17 +85,30 @@ def _load_cfg_defaults() -> dict:
 
         cfg = Config.from_yaml(cfg_path)
 
+        # ==================== CORRECTION POUR LES CHEMINS RELATIFS ====================
+        # On récupère le chemin racine des ressources (le dossier _MEIPASS dans le build)
+        resource_root = get_resource_path('.')
+
+        def make_abs_path(rel_path):
+            """Helper pour transformer un chemin relatif en chemin absolu."""
+            if not rel_path or os.path.isabs(rel_path):
+                return rel_path
+            # On joint le chemin relatif à la racine des ressources
+            return os.path.join(resource_root, rel_path)
+
         # Si la lecture réussit, on met à jour notre dictionnaire 'out'
         out.update({
-            "cover": cfg.cover_image or "",
-            "logos_dir": cfg.logos_dir or "",
+            # On applique la conversion sur tous les chemins
+            "cover": make_abs_path(cfg.cover_image or ""),
+            "logos_dir": make_abs_path(cfg.logos_dir or ""),
+
             "auteur_couv": getattr(cfg, "auteur_couv", "") or "",
             "auteur_couv_url": getattr(cfg, "auteur_couv_url", "") or "",
             "skip_cover": getattr(cfg, "skip_cover", False),
             "date_spacing": str(cfg.date_spaceBefore),
         })
         if isinstance(cfg.section_1, dict):
-            out["ours_background_png"] = cfg.section_1.get("ours_background_png", "")
+            out["ours_background_png"] = make_abs_path(cfg.section_1.get("ours_background_png", ""))
         if isinstance(cfg.pdf_layout, dict):
             out["page_margin_mm"] = cfg.pdf_layout.get("page_margin_mm", 1.0)
         if cfg.date_line.get("enabled", True):
