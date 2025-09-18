@@ -18,7 +18,7 @@ datas = [
     ('biduleur/templates', 'biduleur/templates'),
     ('bin/win64', 'bin/win64'),
     ('biduleur', 'biduleur'), # Copier le dossier biduleur
-    ('biduleur/templates', 'biduleur/templates')
+    ('biduleur/templates', 'biduleur/templates'),
     ('misenpageur', 'misenpageur') # Copier le dossier misenpageur
 ]
 
