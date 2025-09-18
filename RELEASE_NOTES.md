@@ -9,6 +9,10 @@ Cette version est principalement technique et se concentre sur une refactorisati
 *   **Finalisation de la `Date Box`** : Le dernier bug lié au séparateur de dates de type "Box" a été corrigé. Le sélecteur de couleur pour le fond de la boîte s'affiche désormais correctement et la couleur choisie est bien appliquée dans le PDF final.
 *   **Interface Simplifiée** : L'option de personnalisation de la couleur de la *bordure* de la `date box` a été retirée pour simplifier l'interface. Les boîtes sont maintenant toujours dessinées sans bordure.
 
+## 🔧 Corrections
+
+*   **Fichiers manquants ajoutés** : Logos, modèles (.cv, .xls) 
+
 ## ⚙️ Pour les Développeuses et Développeurs
 
 *   **Refactorisation Complète du GUI** : Tout le code de l'interface a été restructuré en suivant les meilleures pratiques :
