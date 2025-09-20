@@ -141,13 +141,13 @@ section_1:
   ours_hyperlinks:
     - href: "https://www.facebook.com/LeBidul"
       # [x_mm, y_mm, largeur_mm, hauteur_mm] depuis le bas-gauche de la colonne
-      rect_mm: [6, 88, 11, 5]
+      rect_mm: [6, 87, 12, 5]
 
     - href: "https://www.instagram.com/le_bidul_72"
-      rect_mm: [30, 88, 15, 5]
+      rect_mm: [30, 87, 16, 5]
 
     - href: "http://www.lebidul.com"
-      rect_mm: [6, 83, 15, 5]
+      rect_mm: [6, 81, 16, 5]
 
 # Configuration de la boîte "Cucaracha" (anciennement additional_box)
 cucaracha_box:

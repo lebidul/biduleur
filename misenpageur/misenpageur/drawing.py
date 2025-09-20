@@ -76,102 +76,122 @@ def draw_paragraph(c: canvas.Canvas, p: Paragraph, x: float, y: float):
 
 def _draw_ours_column(c: canvas.Canvas, col_coords: tuple, cfg: Config):
     """
-    Dessine la colonne "ours" en utilisant une image de fond PNG
-    et en ajoutant les éléments dynamiques (auteur, QR code, hyperlinks).
+    Dessine la colonne "ours" et adapte la position ET la taille de tous ses
+    éléments en calculant un ratio d'échelle.
     """
-    x, y, w, h = col_coords
+    x_col, y_col, w_col, h_col = col_coords
     s1_cfg = cfg.section_1
     project_root = getattr(cfg, 'project_root', '.')
 
-    # 1. Dessin de l'image de fond
-    bg_path = os.path.join(project_root, s1_cfg['ours_background_png'])
+    # 1. Dimensions de référence (inchangées)
+    REF_COL_WIDTH = 297.63 * 0.5
+    REF_COL_HEIGHT = 420.94
+
+    # 2. Ratios d'échelle (inchangés)
+    scale_x = w_col / REF_COL_WIDTH if REF_COL_WIDTH > 0 else 1.0
+    scale_y = h_col / REF_COL_HEIGHT if REF_COL_HEIGHT > 0 else 1.0
+
+    # 3. Dessin de l'image de fond (inchangé)
+    bg_path = os.path.join(project_root, s1_cfg.get('ours_background_png', ''))
     if os.path.exists(bg_path):
-        c.drawImage(bg_path, x, y, width=w, height=h, preserveAspectRatio=True, anchor='c', mask='auto')
-    else:
-        print(f"[WARN] Image de fond de l'ours introuvable : {bg_path}")
+        c.drawImage(bg_path, x_col, y_col, width=w_col, height=h_col, preserveAspectRatio=True, anchor='c', mask='auto')
 
-    # 2. Dessin du nom de l'auteur
+    # 4. Dessin du nom de l'auteur et de son lien (avec mise à l'échelle)
     auteur_text = getattr(cfg, 'auteur_couv', '')
-    if auteur_text:
-        # Récupérer les paramètres depuis la config
-        auteur_url = getattr(cfg, 'auteur_couv_url', '')
+    if auteur_text and 'auteur_pos_x_mm' in s1_cfg:
+        # On met à l'échelle la police en se basant sur le ratio vertical (le plus contraignant)
+        font_size = s1_cfg.get('auteur_font_size', 9) * scale_y
         font_name = s1_cfg.get('auteur_font_name', 'Helvetica')
-        font_size = s1_cfg.get('auteur_font_size', 9)
-        align = s1_cfg.get('auteur_align', 'left')
+        align = s1_cfg.get('auteur_align', 'center')
 
-        # Définir les coordonnées et la police
-        abs_pos_x = x + mm_to_pt(s1_cfg.get('auteur_pos_x_mm', 0))
-        abs_pos_y = y + mm_to_pt(s1_cfg.get('auteur_pos_y_mm', 0))
+        ref_pos_x_pt = mm_to_pt(s1_cfg.get('auteur_pos_x_mm', 0))
+        ref_pos_y_pt = mm_to_pt(s1_cfg.get('auteur_pos_y_mm', 0))
+
+        abs_pos_x = x_col + (ref_pos_x_pt * scale_x)
+        abs_pos_y = y_col + (ref_pos_y_pt * scale_y)
+
         c.setFont(font_name, font_size)
         c.setFillColorRGB(0, 0, 0)
 
-        # Dessiner le texte en fonction de l'alignement
         if align == 'center':
             c.drawCentredString(abs_pos_x, abs_pos_y, auteur_text)
         elif align == 'right':
             c.drawRightString(abs_pos_x, abs_pos_y, auteur_text)
-        else:  # left
+        else:
             c.drawString(abs_pos_x, abs_pos_y, auteur_text)
 
-        # ==================== AJOUT DE LA GESTION DE L'URL ====================
+        auteur_url = getattr(cfg, 'auteur_couv_url', '')
         if auteur_url:
-            # Mesurer la largeur du texte pour créer un rectangle de lien précis
             text_width = c.stringWidth(auteur_text, font_name, font_size)
-
-            # La hauteur du lien est approximativement la taille de la police
-            link_height = font_size
-
-            # Calculer le coin bas-gauche du rectangle de lien en fonction de l'alignement
+            link_height = font_size * 1.2
             if align == 'center':
                 x1 = abs_pos_x - (text_width / 2)
             elif align == 'right':
                 x1 = abs_pos_x - text_width
-            else:  # left
+            else:
                 x1 = abs_pos_x
-
-            # Le y de la ligne de base du texte est en bas, donc c'est notre y1
-            y1 = abs_pos_y
-
-            # Définir le rectangle (x1, y1, x2, y2)
+            y1 = abs_pos_y - (font_size * 0.2)
             link_rect = (x1, y1, x1 + text_width, y1 + link_height)
-
-            # Dessiner le lien invisible
             c.linkURL(auteur_url, link_rect, relative=0, thickness=0)
-            print(f"[INFO] Lien pour l'auteur '{auteur_text}' créé vers '{auteur_url}'")
 
-    # 3. Dessin des rectangles de lien invisibles
-    hyperlinks = s1_cfg.get('ours_hyperlinks', [])
-    for link in hyperlinks:
-        href, rect_mm = link.get('href'), link.get('rect_mm')
-        if not href or not rect_mm or len(rect_mm) != 4: continue
-        rel_x_pt, rel_y_pt, rel_w_pt, rel_h_pt = [mm_to_pt(v) for v in rect_mm]
-        abs_x1, abs_y1 = x + rel_x_pt, y + rel_y_pt
-        c.linkURL(href, (abs_x1, abs_y1, abs_x1 + rel_w_pt, abs_y1 + rel_h_pt), relative=0, thickness=0)
+    # 5. Dessin des rectangles de lien de l'ours (avec mise à l'échelle)
+    ours_hyperlinks = s1_cfg.get('ours_hyperlinks', [])
+    for link in ours_hyperlinks:
+        if 'rect_mm' in link and 'href' in link:
+            ref_x, ref_y, ref_w, ref_h = [mm_to_pt(v) for v in link['rect_mm']]
 
-    # 4. Dessin du QR Code
-    qr_code_size = mm_to_pt(s1_cfg.get('qr_code_height_mm', 25))
-    padding = mm_to_pt(2.5)
-    qr_x_pos = x + (w - qr_code_size) / 2
-    qr_y_pos = y + padding
+            rel_x = ref_x * scale_x
+            rel_y = ref_y * scale_y
+            link_w = ref_w * scale_x
+            link_h = ref_h * scale_y
 
+            abs_x1 = x_col + rel_x
+            abs_y1 = y_col + rel_y
+            abs_x2 = abs_x1 + link_w
+            abs_y2 = abs_y1 + link_h
+
+            c.linkURL(link['href'], (abs_x1, abs_y1, abs_x2, abs_y2), relative=0, thickness=0)
+
+    # 6. Dessin du QR Code et de son titre (avec mise à l'échelle)
+    qr_code_size_ref_pt = mm_to_pt(s1_cfg.get('qr_code_height_mm', 25))
+    # La taille d'un carré doit être mise à l'échelle par le plus petit des deux ratios
+    qr_scale = min(scale_x, scale_y)
+    qr_code_size_pt = qr_code_size_ref_pt * qr_scale
+
+    padding_ref_pt = mm_to_pt(2.5)
+    # Le padding vertical est mis à l'échelle verticalement, etc.
+    padding_x_pt = padding_ref_pt * scale_x
+    padding_y_pt = padding_ref_pt * scale_y
+
+    qr_x_pos = x_col + (w_col - qr_code_size_pt) / 2
+    qr_y_pos = y_col + padding_y_pt
+
+    # On utilise cfg.section_1 pour être cohérent
+    qr_value = s1_cfg.get('qr_code_value', '')
     qr_gen = qrcode.QRCode(version=1, border=0)
-    qr_gen.add_data(s1_cfg['qr_code_value'])
+    qr_gen.add_data(qr_value)
     qr_gen.make(fit=True)
     buffer = io.BytesIO()
     qr_gen.make_image(fill_color="black", back_color="white").save(buffer, format='PNG')
     buffer.seek(0)
 
-    c.drawImage(ImageReader(buffer), qr_x_pos, qr_y_pos, width=qr_code_size, height=qr_code_size, mask='auto')
+    c.drawImage(ImageReader(buffer), qr_x_pos, qr_y_pos, width=qr_code_size_pt, height=qr_code_size_pt, mask='auto')
 
-    # Titre du QR Code
     title_text = s1_cfg.get('qr_code_title', "")
     if title_text:
-        title_style = ParagraphStyle('OursTitle', fontName=s1_cfg.get('qr_code_title_font_name', 'Helvetica-Bold'),
-                                     fontSize=9, alignment=TA_CENTER)
-        title_p = Paragraph(title_text, title_style)
-        title_w, title_h = title_p.wrapOn(c, w - 2 * padding, h)
-        title_y_pos = qr_y_pos + qr_code_size + mm_to_pt(1)
-        title_p.drawOn(c, x + padding, title_y_pos)
+        # La police est mise à l'échelle par le ratio vertical
+        title_font_size = s1_cfg.get('qr_code_title_font_size', 9) * scale_y
+        title_font_name = s1_cfg.get('qr_code_title_font_name', 'Helvetica-Bold')
+        title_style = ParagraphStyle('OursTitle', fontName=title_font_name, fontSize=title_font_size, alignment=TA_CENTER)
+        p = Paragraph(title_text, title_style)
+
+        p_w, p_h = p.wrapOn(c, w_col, h_col)
+
+        title_x_pos = x_col + (w_col - p_w) / 2
+        # L'espacement est mis à l'échelle verticalement
+        title_y_pos = qr_y_pos + qr_code_size_pt + (mm_to_pt(1) * scale_y)
+
+        p.drawOn(c, title_x_pos, title_y_pos)
 
 # --- FONCTION PRINCIPALE (ROUTEUR) ---
 def _draw_logos_column(c: canvas.Canvas, col_coords: tuple, logos: List[str], cfg: Config):
@@ -400,25 +420,26 @@ def _draw_logos_optimized(c: canvas.Canvas, col_coords: tuple, logo_paths: List[
             print(f"[INFO] Lien créé pour '{logo_basename}' vers '{url}'")
 
 
-def draw_s1(c: canvas.Canvas, S1_coords, logos: list[str], cfg: Config, lay: Layout):
+def draw_s1(c: canvas.Canvas, S1_coords, logos: List[str], cfg: Config, lay: Layout):
     """
-    Dessine la section S1 en la divisant en une colonne pour les logos
-    et une colonne pour l'ours (dessiné en mode PNG Hybride).
+    Divise la section S1 et passe les coordonnées absolues de chaque
+    colonne aux fonctions de dessin respectives.
     """
     register_arial()
-    x, y, w, h = S1_coords.x, S1_coords.y, S1_coords.w, S1_coords.h
+    x_sec, y_sec, w_sec, h_sec = S1_coords.x, S1_coords.y, S1_coords.w, S1_coords.h
 
+    # Calcul de la division des deux colonnes (inchangé)
     split_ratio = lay.s1_split.get('logos_ratio', 0.5)
-    logos_col_width = w * split_ratio
-    ours_col_width = w - logos_col_width
+    logos_col_width = w_sec * split_ratio
+    ours_col_width = w_sec - logos_col_width
 
-    logos_col_coords = (x, y, logos_col_width, h)
-    ours_col_coords = (x + logos_col_width, y, ours_col_width, h)
+    # Calcul des coordonnées absolues de chaque colonne sur la page
+    logos_col_coords = (x_sec, y_sec, logos_col_width, h_sec)
+    ours_col_coords = (x_sec + logos_col_width, y_sec, ours_col_width, h_sec)
 
+    # On passe ces coordonnées absolues aux fonctions de dessin
     _draw_logos_column(c, logos_col_coords, logos, cfg)
-    # L'appel n'a plus besoin de passer de données SVG
     _draw_ours_column(c, ours_col_coords, cfg)
-
 
 def draw_s2_cover(c: canvas.Canvas, S2_coords, image_path: str, inner_pad: float):
     x, y, w, h = S2_coords.x, S2_coords.y, S2_coords.w, S2_coords.h
