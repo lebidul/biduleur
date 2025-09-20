@@ -75,7 +75,7 @@ jobs:
 
           --- IMPORTANT : Avertissement de Sécurité Windows ---
 
-          La première fois que vous lancerez `bidul.exe`, Windows affichera
+          La première fois que vous lancerez bidul.exe, Windows affichera
           probablement un écran bleu "Windows a protégé votre ordinateur".
           
           C'est un comportement normal pour les nouvelles applications.
@@ -131,7 +131,7 @@ jobs:
             
             if ($match.Success) {
               # On cible explicitement le groupe de capture #1.
-              $release_body = $match.Groups[1].Value.Trim()
+              $release_body = $match.Value.Trim()
             }
           }
           
