@@ -6,7 +6,6 @@
 - [x] Fichier release notes
 - [x] Build release process.
 - [x] Icône.
-- [ ] Unit tests.
 - [x] Taille fenêtre dynamique
 - [ ] Export dans 1 seul svg
 - [ ] Dans ours l'auteur et les hyperlinks ne suivent pas le .png dans le cas dúne margin

@@ -1,5 +1,29 @@
 
 ---
+
+# Bidul v1.2.8 - Amélioration du Layout Dynamique et Prévisualisation d'Images
+
+Cette version apporte des corrections majeures à la gestion des marges dynamiques et améliore considérablement l'ergonomie de l'interface graphique avec l'ajout d'aperçus pour les images.
+
+## ✨ Nouveautés et Améliorations de l'Interface (GUI)
+
+*   **Prévisualisation des Images (Thumbnails)** : L'interface graphique affiche désormais une miniature (thumbnail) pour les champs d'images (Ours, Couverture, Cucaracha).
+    *   Les aperçus se chargent automatiquement au démarrage de l'application si des chemins par défaut sont définis.
+    *   La miniature se met à jour instantanément lorsque l'utilisateur sélectionne un nouveau fichier image, offrant un retour visuel immédiat.
+
+## 🔧 Améliorations et Corrections du Rendu PDF
+
+*   **Correction Majeure du Positionnement avec Marge** : Le bug critique qui empêchait les éléments de la colonne "Ours" (texte de l'auteur, hyperliens) de se déplacer correctement lors de l'application d'une marge globale a été résolu.
+*   **Mise à l'échelle Homothétique** : La logique de dessin a été entièrement revue pour garantir que tous les éléments de l'ours (texte, QR code, espacements) sont non seulement repositionnés mais aussi redimensionnés proportionnellement à la taille de la colonne. Le rendu reste ainsi visuellement cohérent, quelle que soit la marge appliquée.
+
+## ⚙️ Pour les Développeuses et Développeurs
+
+*   **Logique de Positionnement Robuste** : Le calcul des coordonnées dans `drawing.py` a été refactorisé pour utiliser un système de ratio d'échelle basé sur des dimensions de référence. Cela garantit que tous les éléments enfants d'une section s'adaptent de manière prévisible aux changements de taille de leur parent.
+*   **Intégration de Pillow dans le GUI** : La nouvelle fonctionnalité de prévisualisation d'images utilise la bibliothèque `Pillow` (`Image` et `ImageTk`) pour créer et afficher les miniatures directement dans l'interface Tkinter.
+*   **Nettoyage** : Fichier workflow github pour le misenpageur enlevé car devenu inutile.
+
+---
+
 # Bidul v1.2.7 - Amélioration de l'Expérience Utilisateur et de la Distribution
 
 Cette version se concentre sur l'amélioration de l'expérience utilisateur lors de l'installation et de l'utilisation de l'application, en apportant des corrections importantes à la gestion des erreurs et à la distribution.

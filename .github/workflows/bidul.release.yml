@@ -131,7 +131,7 @@ jobs:
             
             if ($match.Success) {
               # On cible explicitement le groupe de capture #1.
-              $release_body = $match.Groups[1].Value.Trim()
+              $release_body = $match.Value.Trim()
             }
           }
           

@@ -64,12 +64,25 @@ def _create_input_section(parent, app, ui_row):
 def _create_ours_section(parent, app, ui_row):
     """Crée la section pour l'image de fond de l'ours."""
     r = ui_row['r']
-    tk.Label(parent, text="Ours (Image de fond PNG) :").grid(row=r, column=0, sticky="e", padx=5, pady=5)
-    tk.Entry(parent, textvariable=app.ours_png_var).grid(row=r, column=1, sticky="ew", padx=5, pady=5)
-    app.ours_button = tk.Button(parent, text="Parcourir…")
-    app.ours_button.grid(row=r, column=2, padx=5, pady=5)
+
+    # On utilise un LabelFrame pour un meilleur regroupement visuel
+    ours_frame = ttk.LabelFrame(parent, text="Ours", padding="10")
+    ours_frame.grid(row=r, column=0, columnspan=3, sticky="ew", pady=10)
+    ours_frame.columnconfigure(1, weight=1)
+
+    # Ligne 0 du LabelFrame
+    tk.Label(ours_frame, text="Image de fond (PNG) :").grid(row=0, column=0, sticky="e", padx=5, pady=5)
+    tk.Entry(ours_frame, textvariable=app.ours_png_var).grid(row=0, column=1, sticky="ew", padx=5, pady=5)
+    app.ours_button = tk.Button(ours_frame, text="Parcourir…")
+    app.ours_button.grid(row=0, column=2, padx=5, pady=5)
+
+    # Ligne 1 du LabelFrame : Widget pour l'aperçu
+    app.ours_preview = tk.Label(ours_frame, text="Aucun aperçu", relief="sunken", padx=5, pady=5)
+    app.ours_preview.grid(row=1, column=1, sticky="w", pady=(5, 0), padx=5)
+
     r += 1
     ui_row['r'] = r
+
 
 
 def _create_logos_section(parent, app, ui_row):
@@ -113,13 +126,15 @@ def _create_cucaracha_section(parent, app, ui_row):
     cucaracha_frame.grid(row=r, column=0, columnspan=3, sticky="ew", pady=10)
     cucaracha_frame.columnconfigure(1, weight=1)
 
-    # Création et stockage de tous les widgets qui peuvent être cachés
+    # Création et stockage de TOUS les widgets conditionnels
     app.cucaracha_text_entry = tk.Entry(cucaracha_frame, textvariable=app.cucaracha_value_var)
     app.cucaracha_font_label = tk.Label(cucaracha_frame, text="Police :")
     app.cucaracha_font_combo = ttk.Combobox(cucaracha_frame, textvariable=app.cucaracha_font_var,
                                             values=["Arial", "Helvetica", "Times", "Courier"], state="readonly")
     app.cucaracha_image_entry = tk.Entry(cucaracha_frame, textvariable=app.cucaracha_value_var)
     app.cucaracha_image_button = tk.Button(cucaracha_frame, text="Parcourir…")
+    # On crée le widget d'aperçu mais on ne le place pas
+    app.cucaracha_preview = tk.Label(cucaracha_frame, text="Aucun aperçu", relief="sunken", padx=5, pady=5)
 
     # Création des boutons radio
     radio_frame = ttk.Frame(cucaracha_frame)
@@ -139,20 +154,30 @@ def _create_cover_section(parent, app, ui_row):
     cover_frame.grid(row=r, column=0, columnspan=3, sticky="ew", pady=10)
     cover_frame.columnconfigure(1, weight=1)
 
+    # Ligne 0
     tk.Checkbutton(cover_frame, text="Avec couv' (générer la page de couverture)",
                    variable=app.generate_cover_var).grid(row=0, column=0, columnspan=3, sticky="w", pady=2)
+
+    # Ligne 1
     tk.Label(cover_frame, text="Image de Couverture :").grid(row=1, column=0, sticky="e", padx=5, pady=5)
     tk.Entry(cover_frame, textvariable=app.cover_var).grid(row=1, column=1, sticky="ew", padx=5, pady=5)
     app.cover_button = tk.Button(cover_frame, text="Parcourir…")
     app.cover_button.grid(row=1, column=2, padx=5, pady=5)
-    tk.Label(cover_frame, text="Auteur Couverture :").grid(row=2, column=0, sticky="e", padx=5, pady=5)
-    tk.Entry(cover_frame, textvariable=app.auteur_var).grid(row=2, column=1, columnspan=2, sticky="ew", padx=5, pady=5)
-    tk.Label(cover_frame, text="URL auteur couverture :").grid(row=3, column=0, sticky="e", padx=5, pady=5)
-    tk.Entry(cover_frame, textvariable=app.auteur_url_var).grid(row=3, column=1, columnspan=2, sticky="ew", padx=5,
+
+    # Ligne 2 : Widget pour l'aperçu
+    app.cover_preview = tk.Label(cover_frame, text="Aucun aperçu", relief="sunken", padx=5, pady=5)
+    app.cover_preview.grid(row=2, column=1, sticky="w", pady=(5, 0), padx=5)
+
+    # Lignes suivantes (décalées)
+    tk.Label(cover_frame, text="Auteur Couverture :").grid(row=3, column=0, sticky="e", padx=5, pady=5)
+    tk.Entry(cover_frame, textvariable=app.auteur_var).grid(row=3, column=1, columnspan=2, sticky="ew", padx=5, pady=5)
+    tk.Label(cover_frame, text="URL auteur couverture :").grid(row=4, column=0, sticky="e", padx=5, pady=5)
+    tk.Entry(cover_frame, textvariable=app.auteur_url_var).grid(row=4, column=1, columnspan=2, sticky="ew", padx=5,
                                                                 pady=5)
 
     r += 1
     ui_row['r'] = r
+
 
 
 def _create_page_layout_section(parent, app, ui_row):

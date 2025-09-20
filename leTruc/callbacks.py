@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 import os
 from tkinter import filedialog, messagebox, colorchooser
+from PIL import Image, ImageTk
 
 # On importe les helpers qui contiennent la logique "métier"
 from ._helpers import _default_paths_from_input, save_embedded_template, open_file
@@ -20,16 +21,22 @@ def assign_all(app):
     app.xlsx_template_button.config(
         command=lambda: save_embedded_template('tapage_template.xlsx', "Enregistrer le modèle XLSX"))
 
-    app.ours_button.config(command=lambda: on_pick_file(app.ours_png_var, "Image de fond pour l'Ours (PNG)",
-                                                        [("Images", "*.png;*.jpg;*.jpeg"), ("Tous", "*.*")]))
+    app.ours_button.config(command=lambda: on_pick_image_with_preview(app, app.ours_png_var,
+                                                                      app.ours_preview,
+                                                                      "Image de fond pour l'Ours (PNG)",
+                                                                      [("Images", "*.png;*.jpg;*.jpeg"),
+                                                                       ("Tous", "*.*")]))
     app.logos_button.config(command=lambda: on_pick_directory(app.logos_var, "Dossier des logos"))
 
-    app.cucaracha_image_button.config(
-        command=lambda: on_pick_file(app.cucaracha_value_var, "Choisir une image", [("Images", "*.jpg *.jpeg *.png")]))
+    app.cucaracha_image_button.config(command=lambda: on_pick_image_with_preview(app, app.cucaracha_value_var,
+                                                                                 app.cucaracha_preview,
+                                                                                 "Choisir une image",
+                                                                                 [("Images", "*.jpg *.jpeg *.png")]))
 
-    app.cover_button.config(command=lambda: on_pick_file(app.cover_var, "Image de couverture",
-                                                         [("Images", "*.jpg;*.jpeg;*.png;*.tif;*.webp"),
-                                                          ("Tous", "*.*")]))
+    app.cover_button.config(command=lambda: on_pick_image_with_preview(app, app.cover_var, app.cover_preview,
+                                                                       "Image de couverture",
+                                                                       [("Images", "*.jpg;*.jpeg;*.png;*.tif;*.webp"),
+                                                                        ("Tous", "*.*")]))
 
     app.html_save_button.config(command=lambda: on_pick_save(app.html_var, "HTML", ".html", [("HTML", "*.html")]))
     app.agenda_save_button.config(
@@ -63,6 +70,11 @@ def assign_all(app):
     on_toggle_alpha_slider(app)
     on_update_alpha_label(app)
 
+    print("[INFO] Mise à jour des aperçus d'images au démarrage...")
+    # On met à jour l'aperçu de l'ours si une valeur existe
+    _update_preview(app.ours_png_var.get(), app.ours_preview)
+    # On met à jour l'aperçu de la couverture si une valeur existe
+    _update_preview(app.cover_var.get(), app.cover_preview)
 
 # --- Fonctions de sélection de fichiers/dossiers ---
 
@@ -107,6 +119,37 @@ def on_pick_color(color_var):
         color_var.set(color_hex)
 
 
+def on_pick_image_with_preview(app, string_var, preview_widget, title, filetypes):
+    """
+    Ouvre une boîte de dialogue pour choisir un fichier image, met à jour la
+    variable et affiche une miniature dans le widget d'aperçu.
+    """
+    path = filedialog.askopenfilename(title=title, filetypes=filetypes)
+    if not path:
+        return
+
+    string_var.set(path)
+    _update_preview(path, preview_widget)
+
+    try:
+        # Créer la miniature avec Pillow
+        with Image.open(path) as img:
+            # On définit la taille maximale de la miniature
+            img.thumbnail((150, 150))
+            # Convertir l'image Pillow en image Tkinter
+            tk_image = ImageTk.PhotoImage(img)
+
+            # Mettre à jour le widget d'aperçu
+            preview_widget.config(image=tk_image, text="")  # On retire le texte "Aucune image"
+            # Garder une référence à l'image pour éviter qu'elle soit effacée !
+            preview_widget.image = tk_image
+
+    except Exception as e:
+        # Si le fichier n'est pas une image valide, on affiche une erreur
+        preview_widget.config(image=None, text=f"Erreur: {e}")
+        preview_widget.image = None
+
+
 # --- Fonctions de visibilité conditionnelle ("toggle") ---
 
 def on_toggle_padding_widget(app):
@@ -124,7 +167,7 @@ def on_toggle_cucaracha_widgets(app):
     """Affiche ou cache les options de la boîte Cucaracha."""
     widgets_to_hide = [
         app.cucaracha_text_entry, app.cucaracha_font_label, app.cucaracha_font_combo,
-        app.cucaracha_image_entry, app.cucaracha_image_button
+        app.cucaracha_image_entry, app.cucaracha_image_button, app.cucaracha_preview
     ]
     for widget in widgets_to_hide:
         widget.grid_remove()
@@ -137,6 +180,7 @@ def on_toggle_cucaracha_widgets(app):
     elif ctype == "image":
         app.cucaracha_image_entry.grid(row=1, column=0, columnspan=2, sticky="ew", pady=5)
         app.cucaracha_image_button.grid(row=1, column=2, padx=5)
+        app.cucaracha_preview.grid(row=2, column=1, sticky="w", pady=5)
 
 
 def on_toggle_date_sep_options(app):
@@ -162,3 +206,32 @@ def on_toggle_alpha_slider(app):
 def on_update_alpha_label(app):
     """Met à jour le label de pourcentage du slider."""
     app.alpha_value_label.config(text=f"{int(app.alpha_var.get() * 100)}%")
+
+
+def _update_preview(path, preview_widget):
+    """
+    Met à jour un widget d'aperçu avec une miniature de l'image spécifiée.
+
+    Args:
+        path (str): Le chemin vers le fichier image.
+        preview_widget (tk.Label): Le widget Label à mettre à jour.
+    """
+    if not path or not os.path.exists(path):
+        preview_widget.config(image=None, text="Aucune image")
+        preview_widget.image = None
+        return
+
+    try:
+        # Créer la miniature avec Pillow
+        with Image.open(path) as img:
+            img.thumbnail((150, 150))
+            tk_image = ImageTk.PhotoImage(img)
+
+            # Mettre à jour le widget d'aperçu
+            preview_widget.config(image=tk_image, text="")
+            preview_widget.image = tk_image
+    except Exception as e:
+        # Si le fichier n'est pas une image valide
+        preview_widget.config(image=None, text="Fichier invalide")
+        preview_widget.image = None
+        print(f"[WARN] Impossible de créer la miniature pour {path}: {e}")
