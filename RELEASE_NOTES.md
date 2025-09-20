@@ -20,7 +20,7 @@ Cette version apporte des corrections majeures à la gestion des marges dynamiqu
 
 *   **Logique de Positionnement Robuste** : Le calcul des coordonnées dans `drawing.py` a été refactorisé pour utiliser un système de ratio d'échelle basé sur des dimensions de référence. Cela garantit que tous les éléments enfants d'une section s'adaptent de manière prévisible aux changements de taille de leur parent.
 *   **Intégration de Pillow dans le GUI** : La nouvelle fonctionnalité de prévisualisation d'images utilise la bibliothèque `Pillow` (`Image` et `ImageTk`) pour créer et afficher les miniatures directement dans l'interface Tkinter.
-*   **Nettoyage** : Fichier workflow github pour le misenpageur enlevé car devenu inutile.
+*   **Nettoyage** : On enlève le trigger sur push du github workflow config file du misenpageur.
 
 ---
 
