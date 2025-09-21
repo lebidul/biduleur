@@ -31,16 +31,20 @@ class VictoryWindow(tk.Toplevel):
         except Exception as e:
             print(f"[WARN] Impossible de charger l'icône : {e}")
 
-        # --- AJUSTEMENT : Positionnement décalé vers la droite ---
+        # 1. On s'assure que la géométrie du parent est à jour
         parent.update_idletasks()
         parent_x = parent.winfo_x()
         parent_y = parent.winfo_y()
         parent_w = parent.winfo_width()
         parent_h = parent.winfo_height()
-        # On se positionne par rapport au coin bas-droit du parent
-        final_x = parent_x + parent_w - width - 10 # 10px de marge
-        final_y = parent_y + (parent_h - height) // 2 # Centré verticalement
-        self.geometry(f"+{final_x}+{final_y}")
+
+        # 2. On calcule la position finale
+        # final_x = parent_x + parent_w - width - 10
+        final_x = parent_x + parent_w - width + 200
+        final_y = parent_y + (parent_h - height) // 2
+
+        # 3. On applique la taille ET la position en UN SEUL appel
+        self.geometry(f"{width}x{height}+{final_x}+{final_y}")
 
         self.canvas = tk.Canvas(self, bg=self.background_color, highlightthickness=0)
         self.canvas.pack(fill=tk.BOTH, expand=True)
