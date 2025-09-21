@@ -9,7 +9,8 @@ from . import widgets
 from . import callbacks
 
 # Importe les helpers globaux
-from ._helpers import _load_cfg_defaults, run_pipeline
+from ._helpers import _load_cfg_defaults
+from .victory import VictoryWindow
 
 
 class Application(tk.Tk):
@@ -228,8 +229,9 @@ class Application(tk.Tk):
             self.run_button.config(state=tk.NORMAL)
 
             if ok:
-                messagebox.showinfo("Génération Terminée", msg)
+                VictoryWindow(self, summary_text=msg)
                 self.status_var.set("Terminé avec succès.")
+
                 pdf_path = self.pdf_var.get().strip()
                 if pdf_path and os.path.exists(pdf_path):
                     if messagebox.askyesno("Ouvrir le fichier ?", "Voulez-vous ouvrir le PDF généré maintenant ?"):
