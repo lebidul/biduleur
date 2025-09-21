@@ -9,8 +9,6 @@ from pathlib import Path
 from typing import List, Tuple
 from collections.abc import Mapping
 
-
-# --- Imports des modules internes du projet ---
 from .config import Config, BulletConfig, PosterConfig, DateBoxConfig, DateLineConfig
 from .layout import Layout, Section
 from .html_utils import extract_paragraphs_from_html
@@ -258,9 +256,6 @@ def read_text(path: str) -> str:
         return ""
     with open(path, "r", encoding="utf-8") as f:
         return f.read()
-
-
-# ---------- AJOUT : helpers injection auteur dans l'ours ----------
 
 def _xml_escape(s: str) -> str:
     return (s.replace("&", "&amp;")
@@ -635,7 +630,6 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
         c.setFillColorRGB(1, 1, 1)  # Blanc
         c.setFont(poster_cfg.font_name_title, poster_cfg.font_size_title)
 
-        # ==================== CORRECTION DU CENTRAGE VERTICAL ====================
         # On récupère les informations de la police
         font = getFont(poster_cfg.font_name_title)
 
@@ -650,11 +644,9 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
         # Calcul de la position y pour un centrage visuel parfait
         # On positionne la ligne de base pour que la hauteur de capitale soit centrée dans la hauteur du cadre.
         center_y = s_title.y + (s_title.h / 2) - (cap_height / 2)
-        # =========================================================================
 
         c.drawCentredString(center_x, center_y, poster_cfg.title)
         c.restoreState()
-        # =================================================================
 
         s_qr = S7["S7_QRCode"]
         qr_gen = qrcode.QRCode(version=1, border=1)

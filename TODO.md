@@ -8,8 +8,7 @@
 - [x] Icône.
 - [x] Taille fenêtre dynamique
 - [x] Export dans 1 seul svg -> pas possible
-- [ ] Dans ours l'auteur et les hyperlinks ne suivent pas le .png dans le cas dúne margin
-- [ ] Créér fichier couv.png comme partie de l'export 
+- [x] Créér fichier couv.png comme partie de l'export -> c'est complétement con, on fournit déjà la couv.. 
 - [x] Capturer erreur si pdf déjà ouvert et impossible à sauvegarder
 - [x] Hyperlinks sponsors
 - [x] Enlever border date box
@@ -24,6 +23,7 @@
 - [x] Texte poster en blanc si rendu trop foncé
 - [ ] Ajouter logique de texte gris si poster moyennement foncé
 - [ ] Image de fond dans GUI
+- [ ] Dans ours l'auteur et les hyperlinks ne suivent pas le .png dans le cas d'une margin (marche bien actuellement avec une marge < 4mm))
 - [x] Effet succès solitaire.
 - [x] Icône
 - [x] Problème sécurité Windows

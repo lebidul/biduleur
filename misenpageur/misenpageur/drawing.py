@@ -452,14 +452,12 @@ def draw_s2_cover(c: canvas.Canvas, S2_coords, image_path: str, inner_pad: float
         c.restoreState()
         return
 
-    # ==================== CORRECTION : GESTION DU TYPE DE CANVAS ====================
     if isinstance(c, SVGCanvas):
         image_to_draw = Image.open(image_path)
     else:
         image_to_draw = image_path
     kwargs = {'mask': 'auto'} if not isinstance(c, SVGCanvas) else {}
     c.drawImage(image_to_draw, x, y, w, h, preserveAspectRatio=True, anchor='c', **kwargs)
-    # ==============================================================================
 
 
 def draw_poster_logos(c: canvas.Canvas, s_coords: Section, logos: List[str]):
@@ -473,7 +471,6 @@ def draw_poster_logos(c: canvas.Canvas, s_coords: Section, logos: List[str]):
     for i, logo_path in enumerate(logos):
         cell_x = x + i * cell_w
         try:
-            # ==================== CORRECTION : GESTION DU TYPE DE CANVAS ====================
             if isinstance(c, SVGCanvas):
                 image_to_draw = Image.open(logo_path)
             else:
@@ -482,7 +479,6 @@ def draw_poster_logos(c: canvas.Canvas, s_coords: Section, logos: List[str]):
             img_reader = ImageReader(logo_path)
             img_w, img_h = img_reader.getSize()
             aspect = img_h / img_w if img_w > 0 else 1
-            # ==============================================================================
 
             box_w = cell_w - (2 * padding)
             box_h = h - (2 * padding)
