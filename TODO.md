@@ -7,8 +7,9 @@
 - [x] Build release process.
 - [x] Icône.
 - [x] Taille fenêtre dynamique
-- [ ] Export dans 1 seul svg
+- [x] Export dans 1 seul svg -> pas possible
 - [ ] Dans ours l'auteur et les hyperlinks ne suivent pas le .png dans le cas dúne margin
+- [ ] Créér fichier couv.png comme partie de l'export 
 - [x] Capturer erreur si pdf déjà ouvert et impossible à sauvegarder
 - [x] Hyperlinks sponsors
 - [x] Enlever border date box
@@ -23,11 +24,11 @@
 - [x] Texte poster en blanc si rendu trop foncé
 - [ ] Ajouter logique de texte gris si poster moyennement foncé
 - [ ] Image de fond dans GUI
-- [ ] Effet succès solitaire.
+- [x] Effet succès solitaire.
 - [ ] Icône
 - [x] Problème sécurité Windows
 - [x] Progress bar.
-- [ ] Problème affichage release notes dans release github
+- [x] Problème affichage release notes dans release github
 - [ ] Changer framework GUI
 
 ## Documentation

@@ -1,6 +1,19 @@
 
 ---
 
+# Bidul v1.2.9 - Ajout d'une effet ouaaais dans le cas où le bidul est créé
+
+Cette version ajoute une touche finale amusante et gratifiante à l'expérience utilisateur, ainsi que les dernières corrections sur la mise en page dynamique des hyperliens.
+
+## ✨ Nouveautés
+
+*   **Animation "Solitaire" de Fin de Génération** : Pour célébrer une génération de PDF réussie, une nouvelle fenêtre "Victoire !" s'affiche. Elle présente le résumé du traitement sur un fond d'animation de cartes rebondissantes, un clin d'œil à l'effet classique de Windows Solitaire.
+    *   L'animation utilise plusieurs images de cartes différentes pour plus de variété visuelle.
+    *   Les paramètres (couleur de fond, taille, etc.) sont facilement personnalisables dans le code.
+
+
+---
+
 # Bidul v1.2.8 - Amélioration du Layout Dynamique et Prévisualisation d'Images
 
 Cette version apporte des corrections majeures à la gestion des marges dynamiques et améliore considérablement l'ergonomie de l'interface graphique avec l'ajout d'aperçus pour les images.

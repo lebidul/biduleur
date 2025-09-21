@@ -19,7 +19,8 @@ datas = [
     ('bin/win64', 'bin/win64'),
     ('biduleur', 'biduleur'), # Copier le dossier biduleur
     ('biduleur/templates', 'biduleur/templates'),
-    ('misenpageur', 'misenpageur') # Copier le dossier misenpageur
+    ('misenpageur', 'misenpageur'), # Copier le dossier misenpageur
+    ('leTruc/assets', 'leTruc/assets')
 ]
 
 # On n'a plus besoin de `hiddenimports` pour nos modules,
