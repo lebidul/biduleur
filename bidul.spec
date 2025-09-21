@@ -20,7 +20,7 @@ datas = [
     ('biduleur', 'biduleur'), # Copier le dossier biduleur
     ('biduleur/templates', 'biduleur/templates'),
     ('misenpageur', 'misenpageur'), # Copier le dossier misenpageur
-    ('leTruc/assets', 'misenpageur/assets')
+    ('leTruc/assets', 'leTruc/assets')
 ]
 
 # On n'a plus besoin de `hiddenimports` pour nos modules,
