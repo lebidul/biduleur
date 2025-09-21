@@ -1,5 +1,26 @@
 
 ---
+# Bidul v1.2.10 - Améliorations Esthétiques Finales
+
+Cette version se concentre sur le peaufinage de l'expérience utilisateur, en apportant des améliorations esthétiques à l'interface graphique et à la nouvelle fenêtre d'animation de victoire.
+
+## ✨ Améliorations
+
+*   **Animation de Victoire Améliorée** : L'animation "Solitaire" de fin de génération a été affinée pour un effet visuel plus agréable :
+    *   La fenêtre de victoire apparaît désormais dans le coin inférieur droit de l'application principale, au lieu du centre.
+    *   Les cartes animées apparaissent maintenant plus haut hors de l'écran, créant un effet de "pluie" plus prononcé.
+    *   La vitesse des cartes a été légèrement réduite pour une animation plus douce.
+*   **Ergonomie de la Fenêtre de Victoire** :
+    *   Un bouton "Fermer", aligné à droite, a été ajouté à la fenêtre de résumé pour une fermeture plus intuitive.
+    *   La taille de la fenêtre et du résumé a été ajustée pour un meilleur confort de lecture.
+*   **Icônes d'Application** : La fenêtre principale et la fenêtre de victoire ont désormais leur propre icône, renforçant l'identité visuelle de l'application.
+
+## 🔧 Corrections du Build Windows (`.exe`)
+
+*   **Correction du Chargement des Assets** : Un bug qui empêchait le chargement des images de l'animation (les cartes) et des icônes dans la version "standalone" a été corrigé. Le fichier de configuration de PyInstaller (`bidul.spec`) a été mis à jour pour embarquer correctement le dossier `leTruc/assets`.
+
+---
+
 
 # Bidul v1.2.9 - Ajout d'une effet ouaaais dans le cas où le bidul est créé
 
