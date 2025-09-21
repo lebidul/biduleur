@@ -9,7 +9,7 @@ from . import widgets
 from . import callbacks
 
 # Importe les helpers globaux
-from ._helpers import _load_cfg_defaults
+from ._helpers import _load_cfg_defaults, get_resource_path
 from .victory import VictoryWindow
 
 
@@ -29,6 +29,12 @@ class Application(tk.Tk):
         self.geometry("900x900")
         self.columnconfigure(0, weight=1)
         self.rowconfigure(0, weight=1)
+
+        try:
+            icon_path = get_resource_path("leTruc/assets/LesArtsServices.ico")
+            self.iconbitmap(icon_path)
+        except Exception as e:
+            print(f"[WARN] Impossible de charger l'icône de l'application : {e}")
 
         # 2. INITIALISER D'ABORD les données et les variables
         self.cfg_defaults = _load_cfg_defaults()

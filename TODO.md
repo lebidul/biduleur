@@ -25,7 +25,7 @@
 - [ ] Ajouter logique de texte gris si poster moyennement foncé
 - [ ] Image de fond dans GUI
 - [x] Effet succès solitaire.
-- [ ] Icône
+- [x] Icône
 - [x] Problème sécurité Windows
 - [x] Progress bar.
 - [x] Problème affichage release notes dans release github
