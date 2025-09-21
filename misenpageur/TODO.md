@@ -29,7 +29,7 @@
 - [ ] Générer 2 pdfs en sortie, un pour impression et un pdf pour version digitale (avec ou sans hyperlink) (ajouter à bidul.gui).
 - [ ] Intégration du workflow dans page admin de wordpress.
 - [x] Options d’hyphénation pour rendre des strings insécables.
-- [ ] Enlever toutes les références `SVGCanvas` dans `draw_logic` et `drawing`.
+- [x] Enlever toutes les références `SVGCanvas` dans `draw_logic` et `drawing`.
 
 
 

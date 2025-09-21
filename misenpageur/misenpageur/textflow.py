@@ -44,7 +44,6 @@ def _mk_style_for_kind(base: ParagraphStyle, kind: str,
                        bullet_cfg: BulletConfig,
                        date_box: DateBoxConfig) -> ParagraphStyle:
     if kind == "EVENT":
-        # ==================== LA CORRECTION EST ICI (1/2) ====================
         # On utilise un simple `leftIndent`. C'est lui qui contrôle la position
         # de TOUT le texte (ligne 1, 2, 3...).
         # On retire `firstLineIndent`.
@@ -337,7 +336,6 @@ def draw_poster_text_in_frames(
         st = _mk_style_for_kind(base_style, kind, bullet_cfg, DateBoxConfig())
         txt, bullet = _mk_text_for_kind(raw, kind, bullet_cfg)
 
-        # ==================== LA CORRECTION EST ICI ====================
         # Si c'est une date, on ajoute des objets Spacer à la story
         if kind == "DATE":
             story.append(Spacer(1, poster_cfg.date_spaceBefore))
@@ -346,7 +344,6 @@ def draw_poster_text_in_frames(
 
         if kind == "DATE":
             story.append(Spacer(1, poster_cfg.date_spaceAfter))
-        # =============================================================
 
     for section in frames:
         if not story: break
