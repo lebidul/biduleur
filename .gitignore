@@ -42,3 +42,10 @@ Thumbs.db
 venv
 node_modules
 
+# Fichiers sensibles à ne jamais envoyer sur GitHub
+.env
+gcp_creds.json
+instagram_session.json
+
+# Dossiers générés
+output_images/

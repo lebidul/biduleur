@@ -192,7 +192,7 @@ def gui_mode():
 def cli_mode():
     """Mode ligne de commande pour l'IDE."""
     if len(sys.argv) < 2:
-        print("Usage: python main.py <fichier_entrée> [fichier_sortie_bidul] [fichier_sortie_agenda]")
+        print("Usage: python main.v0.py <fichier_entrée> [fichier_sortie_bidul] [fichier_sortie_agenda]")
         print("Types de fichiers supportés : CSV, XLS, XLSX")
         sys.exit(1)
     input_file = sys.argv[1]

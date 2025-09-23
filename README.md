@@ -119,7 +119,7 @@ Le layout final du PDF est généré dynamiquement. Le fichier `layout.yml` sert
 Pour produire le PDF à partir d’un HTML déjà généré :
 
 ```bash
-python misenpageur/main.py \
+python misenpageur/main.v0.py \
   --root . \
   --config misenpageur/config.yml \
   --layout misenpageur/layout.yml \
@@ -153,7 +153,7 @@ Options utiles :
 2.  Lancer Misenpageur (CLI) :
 
 ```bash
-python misenpageur/main.py \
+python misenpageur/main.v0.py \
   --root . \
   --config misenpageur/config.yml \
   --layout misenpageur/layout.yml \

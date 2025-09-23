@@ -1,0 +1,50 @@
+# .github/workflows/publisher.cron.yml
+
+name: Publication Instagram Journalière
+
+on:
+  # Déclenche le workflow tous les jours à 10h UTC (12h heure de Paris)
+  schedule:
+    - cron: '0 10 * * *'
+
+  # Permet de lancer manuellement le workflow depuis l'onglet "Actions" de GitHub
+  workflow_dispatch:
+
+jobs:
+  publish_post:
+    name: Générer et publier le post Instagram du jour
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v4
+
+      - name: Mise en place de Python 3.9
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+
+      - name: Installation des dépendances
+        run: pip install -r requirements.txt
+
+      - name: Exécution du script de publication
+        env:
+          # Secrets pour Google Sheets
+          GCP_CREDS: ${{ secrets.GCP_CREDS }}
+
+          # Secrets pour Instagram
+          INSTAGRAM_USERNAME: ${{ secrets.INSTAGRAM_USERNAME }}
+          INSTAGRAM_PASSWORD: ${{ secrets.INSTAGRAM_PASSWORD }}
+
+          # Secrets pour l'envoi d'e-mail via Gmail
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
+        run: |
+          # Crée le fichier de credentials Google à partir du secret
+          echo "$GCP_CREDS" > gcp_creds.json
+          
+          # Lance le module publisher avec le format "actuel"
+          python -m publisher.main actuel

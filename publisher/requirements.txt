@@ -1,0 +1,14 @@
+# --- Dépendances pour le module Publisher ---
+
+# Pour interagir avec l'API Google Sheets
+gspread
+oauth2client
+
+# Pour convertir le HTML en image
+html2image
+
+# Pour interagir avec l'API non-officielle d'Instagram
+instagrapi
+
+# Recommandé pour la gestion des variables d'environnement en local
+python-dotenv
