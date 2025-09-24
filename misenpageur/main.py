@@ -1,4 +1,4 @@
-# misenpageur/main.py
+# misenpageur/main.v0.py
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 import argparse

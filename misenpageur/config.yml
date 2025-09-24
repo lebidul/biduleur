@@ -25,7 +25,7 @@ font_name: "Arial Narrow"
 
 # Taille de police : min/max autorisées pour le shrink
 font_size_min: 5
-font_size_max: 12.0
+font_size_max: 30.0
 
 # Ratio entre taille et interligne (leading = font_size * leading_ratio)
 leading_ratio: 1.12

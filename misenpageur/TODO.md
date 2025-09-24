@@ -19,6 +19,7 @@
 - [ ] Intégrer nouveaux logos de Gaelle.
 - [x] Enlever watermark pdf2svg dans svg outputs.
 - [ ] Améliorer visuel QR code.
+- [ ] Empêcher qu'une date (ligne date) commence à la fin d'une section
 
 ## Priorité Moyenne
 - [x] Amélioration lisibilité finale (ex. caractère de bullet point comme paramètre, cadre pour date)
