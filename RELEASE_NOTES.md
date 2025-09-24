@@ -1,5 +1,14 @@
 
 ---
+# Bidul v1.2.11 - Changement minime
+
+## ✨ Améliorations
+
+*   Augmentation de la taille de police max de 12 à 30 pour pouvoir mettre en page des biduls (généralement de test) avec très peu de dates
+
+---
+
+
 # Bidul v1.2.10 - Améliorations Esthétiques Finales
 
 Cette version se concentre sur le peaufinage de l'expérience utilisateur, en apportant des améliorations esthétiques à l'interface graphique et à la nouvelle fenêtre d'animation de victoire.
