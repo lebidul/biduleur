@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import io
 import subprocess
 from pathlib import Path
@@ -105,19 +106,35 @@ def _load_nobr_list_from_file(path: str) -> List[str]:
                 nobr_list.append(line)
     return nobr_list
 
+
 def _apply_non_breaking_strings(text: str, non_breaking: List[str]) -> str:
-    """Remplace les espaces par des espaces insécables pour les chaînes spécifiées."""
+    """
+    Rend les phrases spécifiées insécables en remplaçant leurs espaces
+    par des espaces insécables, tout en préservant les traits d'union.
+    La recherche est flexible (casse, espaces multiples, tirets).
+    """
     if not non_breaking:
         return text
 
-    # On trie par longueur (du plus long au plus court) pour éviter les remplacements partiels
-    # ex: remplacer "SAM SAUVAGE EXPERIENCE" avant "SAM SAUVAGE"
     for phrase in sorted(non_breaking, key=len, reverse=True):
-        if phrase in text:
-            # Créer la version avec des espaces insécables
-            unbreakable_phrase = phrase.replace(" ", "\u00A0")
-            # Remplacer dans le texte principal
-            text = text.replace(phrase, unbreakable_phrase)
+        # 1. On crée un pattern qui trouve la phrase, qu'elle soit
+        #    écrite avec des espaces ou des tirets dans le texte source.
+        #    Ex: "La Chapelle-Saint-Aubin" -> "La[\s-]+Chapelle-Saint-Aubin"
+        pattern_words = [re.escape(word) for word in re.split(r'([\s-]+)', phrase)]
+        pattern = ''.join(pattern_words).replace(r'\ ', r'\s+').replace(r'\-', r'[\s-]+')
+
+        # 2. On définit la fonction de remplacement.
+        def replacer(match):
+            """
+            Prend le texte trouvé et ne remplace QUE ses espaces par des
+            espaces insécables, en laissant les tirets intacts.
+            """
+            found_text = match.group(0)
+            # On ne remplace que les espaces. Les tirets sont préservés.
+            return found_text.replace(" ", "\u00A0")
+
+        # 3. On applique le remplacement.
+        text, _ = re.subn(pattern, replacer, text, flags=re.IGNORECASE)
 
     return text
 
@@ -478,7 +495,12 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
 
     nobr_list = []
     if cfg.nobr_file:
-        nobr_list = _load_nobr_list_from_file(os.path.join(project_root, cfg.nobr_file))
+        # 1. On construit le chemin absolu en joignant le project_root
+        #    et le chemin relatif de la configuration.
+        nobr_file_path = os.path.join(project_root, cfg.nobr_file)
+
+        # 2. On passe ce chemin absolu à la fonction de chargement.
+        nobr_list = _load_nobr_list_from_file(nobr_file_path)
 
     if nobr_list:
         paras = [_apply_non_breaking_strings(p, nobr_list) for p in paras]

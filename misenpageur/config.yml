@@ -12,6 +12,7 @@ output_pdf: "misenpageur/bidul/bidul_prototype.pdf"      # chemin du PDF génér
 
 logos_dir: "misenpageur/assets/logos"   # dossier contenant jusqu'à 10 logos
 cover_image: "misenpageur/assets/couv/couverture.png"  # image de couverture
+nobr_file: "misenpageur/assets/textes/nobr.txt"
 ours_md: "misenpageur/assets/ours/ours.md"   # fichier texte constant (ours)
 ours_svg: "misenpageur/assets/ours/ours_template.svg"
 
