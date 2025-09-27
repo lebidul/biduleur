@@ -47,7 +47,7 @@ def fmt_link(*links: str) -> str:
     formatted_links = ""
     for link in links:
         if link:
-            formatted_links += f"- <a href=\"{link}\" target=\"_blank\">{link}</a>"
+            formatted_links += f" - <a href=\"{link}\" target=\"_blank\">{link}</a>"
     return formatted_links
 
 def fmt_heure(heure: str) -> str:
