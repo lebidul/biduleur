@@ -14,6 +14,7 @@
 - [x] Enlever border date box
 - [x] Champs paths par défaut depuis build github
 - [x] Dossier logos dupliqué
+- [ ] Revoir optimisation de l'espace (remplacement de string si ca fait gagner une ligne, S4 pas remplie jusqu'au bout)
 
 ## Priorité Moyenne
 - [ ] Ajout helpers.
