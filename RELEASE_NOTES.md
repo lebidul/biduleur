@@ -1,12 +1,22 @@
 
 ---
-# Bidul v1.2.11 - Changement minime
+# Bidul v2.12 - Amélioration de la Césure et de la Typographie
 
-## ✨ Améliorations
+Cette version se concentre sur l'amélioration de la qualité typographique des textes générés, en résolvant des problèmes de césure (sauts de ligne) indésirables pour les noms propres et les expressions composées.
 
-*   Augmentation de la taille de police max de 12 à 30 pour pouvoir mettre en page des biduls (généralement de test) avec très peu de dates
+## 🔧 Améliorations et Corrections
+
+*   **Gestion Avancée de l'Insécabilité** : La logique qui empêche les sauts de ligne inopportuns a été entièrement revue pour être plus intelligente et plus robuste.
+    *   **Prise en charge des traits d'union** : Les noms composés avec des traits d'union (ex: "La Chapelle-Saint-Aubin") sont maintenant correctement traités pour éviter d'être coupés.
+    *   **Recherche Flexible** : L'algorithme est désormais insensible aux variations d'espacement (espaces multiples) et à la casse (majuscules/minuscules), garantissant que les règles d'insécabilité définies dans le fichier `nobr.txt` sont appliquées de manière fiable.
+*   **Correction du bug du "glyphe manquant"** : Une solution précédente qui remplaçait les traits d'union par un caractère spécial (`\u2011`) a été abandonnée car elle causait des problèmes d'affichage avec certaines polices. La nouvelle méthode garantit un rendu visuel parfait tout en assurant l'insécabilité.
+
+## ⚙️ Pour les Développeuses et Développeurs
+
+*   **Logique `_apply_non_breaking_strings` Revue** : La fonction a été refactorée pour utiliser des expressions régulières (`re.sub` avec une fonction `replacer`). Cette approche permet de trouver des correspondances de manière flexible dans le texte source et d'appliquer des remplacements intelligents (transformer les espaces en espaces insécables `\u00A0` tout en préservant les traits d'union).
 
 ---
+
 
 
 # Bidul v1.2.10 - Améliorations Esthétiques Finales
