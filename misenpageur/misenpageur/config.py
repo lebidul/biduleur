@@ -52,7 +52,7 @@ class Config:
     logo_hyperlinks: List[Dict[str, str]] = field(default_factory=list)
     ours_md: str = "assets/ours/ours.md"
     ours_svg: str = "assets/ours/ours_template.svg"
-    nobr_file: Optional[str] = None
+    nobr_file: str = "assets/textes/nobr.txt"
 
     # --- Font & Layout ---
     font_name: str = "ArialNarrow"

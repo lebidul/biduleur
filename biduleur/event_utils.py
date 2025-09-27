@@ -65,8 +65,12 @@ def parse_bidul_event(event: Dict, current_date: str = None) -> Tuple[str, str, 
     ville_str = capfirst(ville) if ville else ''
     lieu_str = capfirst(lieu) if lieu else ''
 
+    # Créez d'abord le bloc heure/prix
+    heure_prix_block = f"{heure}{prix}"
+    heure_prix_insecable = heure_prix_block.replace(" ", "\u00A0")
+
     # Construction des lignes de sortie
-    string_event_bidul = f"{evenement_str}{artistes_styles_str}{lieu_str}{ville_str}{heure}{prix}"
+    string_event_bidul = f"{evenement_str}{artistes_styles_str}{lieu_str}{ville_str}{heure_prix_insecable}"
     # string_event_agenda = f"&ensp;&##9643 {evenement_str}{artistes_styles_str}{event_lieu_str}{ville_str}{heure}{prix}{liens}"
     string_event_agenda = f"&ensp;&##9643 {evenement_str}{artistes_styles_str}{event_lieu_str}{ville_str}{heure}{prix}"
     string_event_bidul_post = (

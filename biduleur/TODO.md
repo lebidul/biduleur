@@ -12,7 +12,8 @@
 - [ ] Optimiser les performances du tri pour les fichiers CSV volumineux.
 - [x] Ajouter fichiers templates au gui.
 - [x] Ajouter des logs pour faciliter le débogage.
-- - [ ] Générer 2 pdfs en sortie, un pour impression et un pdf pour version digitale
+- [ ] Pouvoir parser vieux et nouveaux templates
+- [ ] Générer 2 pdfs en sortie, un pour impression et un pdf pour version digitale
 - [ ] Documenter les cas d'erreur possibles dans la docstring de `parse_bidul`.
 - [ ] Ajouter une interface en ligne de commande (CLI) pour le traitement par lots.
 

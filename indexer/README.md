@@ -31,7 +31,7 @@ pip install pytesseract pdf2image langdetect pyspellchecker pymupdf pillow openc
 Depuis le dossier `ocr_pipeline/`, exécutez :
 
 ```bash
-python main.py
+python main.v0.py
 ```
 
 Paramètres dans `main.py` :
