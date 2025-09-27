@@ -1,6 +1,6 @@
 
 ---
-# Bidul v2.12 - Amélioration de la Césure et de la Typographie
+# Bidul v1.2.12 - Amélioration de la Césure et de la Typographie
 
 Cette version se concentre sur l'amélioration de la qualité typographique des textes générés, en résolvant des problèmes de césure (sauts de ligne) indésirables pour les noms propres et les expressions composées.
 
