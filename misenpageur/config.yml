@@ -255,6 +255,8 @@ stories:
   width: 1080
   height: 1920
   agenda_font_name: "Arial Narrow" # Mettre un nom de police valide
-  agenda_font_size: 35
+  agenda_font_size: 18
   text_color: "#62d92f"
   background_color: "#000000"
+  margin: 30                 # Marge plus petite (40px de chaque côté)
+  line_spacing_ratio: 2.0   # Interligne plus grand (120%)

@@ -73,6 +73,15 @@ class Application(tk.Tk):
         self.generate_stories_var = tk.BooleanVar(value=self.cfg_defaults.get("stories_enabled", True))
         self.stories_output_var = tk.StringVar()
 
+        # --- Variables pour la section Stories ---
+        self.stories_font_name_var = tk.StringVar(value=self.cfg_defaults.get("stories_font_name", "Arial"))
+        self.stories_font_size_var = tk.StringVar(value=str(self.cfg_defaults.get("stories_font_size", "45")))
+        self.stories_font_color_var = tk.StringVar(value=self.cfg_defaults.get("stories_font_color", "#000000"))
+        self.stories_bg_type_var = tk.StringVar(value=self.cfg_defaults.get("stories_bg_type", "color"))
+        self.stories_bg_color_var = tk.StringVar(value=self.cfg_defaults.get("stories_bg_color", "#FFFFFF"))
+        self.stories_bg_image_var = tk.StringVar(value=self.cfg_defaults.get("stories_bg_image", ""))
+        self.stories_alpha_var = tk.DoubleVar(value=self.cfg_defaults.get("stories_alpha", 0.5))
+
         # --- Variables pour les options de couverture ---
         self.generate_cover_var = tk.BooleanVar(value=not self.cfg_defaults.get("skip_cover", False))
         self.auteur_var = tk.StringVar(value=self.cfg_defaults.get("auteur_couv", ""))
@@ -177,6 +186,7 @@ class Application(tk.Tk):
             return
 
         validated_args['cuca_value_val'] = self.cucaracha_value_var.get().strip()
+        validated_args['stories_font_size_val'] = int(self.stories_font_size_var.get().strip())
 
         self.status_var.set("Traitement en cours…")
         self.progress_bar.start()
@@ -228,7 +238,14 @@ class Application(tk.Tk):
             cucaracha_type=self.cucaracha_type_var.get(),
             cucaracha_value=validated_args['cuca_value_val'],
             cucaracha_text_font=self.cucaracha_font_var.get(),
-            date_box_back_color=self.date_box_back_color_var.get()
+            date_box_back_color=self.date_box_back_color_var.get(),
+            stories_font_name=self.stories_font_name_var.get(),
+            stories_font_size=validated_args['stories_font_size_val'],
+            stories_font_color=self.stories_font_color_var.get(),
+            stories_bg_type=self.stories_bg_type_var.get(),
+            stories_bg_color=self.stories_bg_color_var.get(),
+            stories_bg_image=self.stories_bg_image_var.get().strip(),
+            stories_alpha=self.stories_alpha_var.get()
         )
         self.result_queue.put((ok, msg))
 

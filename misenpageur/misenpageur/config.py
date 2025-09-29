@@ -143,3 +143,8 @@ class StoryConfig:
     agenda_font_size: int = 40
     background_color: str = "#FFFFFF"
     text_color: str = "#000000"
+    background_type: str = "color"
+    background_image: Optional[str] = None
+    background_image_alpha: float = 0.5
+    margin: int = 60  # Marge horizontale en pixels
+    line_spacing_ratio: float = 1.2  # Ratio de l'interligne (1.2 = 120%)

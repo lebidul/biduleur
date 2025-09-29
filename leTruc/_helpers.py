@@ -137,6 +137,13 @@ def _load_cfg_defaults() -> dict:
         out["font_size_mode"] = getattr(cfg, "font_size_mode", "auto")
         out["font_size_forced"] = getattr(cfg, "font_size_forced", 10.0)
 
+        if isinstance(cfg.stories, dict):
+            out["stories_enabled"] = cfg.stories.get("enabled", True)
+            out["stories_font_name"] = cfg.stories.get("agenda_font_name", "Arial")
+            out["stories_font_size"] = cfg.stories.get("agenda_font_size", 45)
+            out["stories_font_color"] = cfg.stories.get("text_color", "#000000")
+            out["stories_bg_color"] = cfg.stories.get("background_color", "#FFFFFF")
+
     except Exception as e:
         # Si l'import ou la lecture du fichier échoue, on affiche un avertissement
         # mais l'application peut continuer avec les valeurs par défaut.
@@ -170,7 +177,10 @@ def run_pipeline(
         background_alpha: float, poster_title: str, cucaracha_type: str,
         cucaracha_value: str, cucaracha_text_font: str,
         generate_stories: bool, stories_output_dir: str,
-        font_size_mode: str, font_size_forced: float
+        font_size_mode: str, font_size_forced: float,
+        stories_font_name: str, stories_font_size: int, stories_font_color: str,
+        stories_bg_type: str, stories_bg_color: str, stories_bg_image: str,
+        stories_alpha: float
 ) -> tuple[bool, str]:
     try:
         from misenpageur.misenpageur.config import Config
@@ -231,6 +241,13 @@ def run_pipeline(
         cfg.stories['enabled'] = generate_stories
         if stories_output_dir:
             cfg.stories['output_dir'] = stories_output_dir
+        cfg.stories['agenda_font_name'] = stories_font_name
+        cfg.stories['agenda_font_size'] = stories_font_size
+        cfg.stories['text_color'] = stories_font_color
+        cfg.stories['background_color'] = stories_bg_color
+        cfg.stories['background_image_alpha'] = stories_alpha
+        cfg.stories['background_type'] = stories_bg_type
+        cfg.stories['background_image'] = stories_bg_image
 
         final_layout_path = build_layout_with_margins(lay_path, cfg)
         lay = Layout.from_yaml(final_layout_path)
