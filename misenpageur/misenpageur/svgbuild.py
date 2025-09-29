@@ -8,6 +8,7 @@ import os
 import re
 from pathlib import Path
 from collections import Counter
+from typing import List
 
 from lxml import etree
 from .config import Config
@@ -98,7 +99,7 @@ def _post_process_svg(svg_path: Path, expected_event_count: int):
         print(f"[WARN] Échec du post-traitement pour {svg_path.name}: {e}")
 
 
-def build_svg(project_root: str, cfg: Config, layout: Layout, out_path: str, config_path: str) -> dict:
+def build_svg(project_root: str, cfg: Config, layout: Layout, out_path: str, config_path: str, paras: List[str]) -> dict:
     """
     Génère un SVG par page en convertissant un PDF temporaire, puis
     applique un post-traitement pour corriger les glyphes de puce.
@@ -109,7 +110,7 @@ def build_svg(project_root: str, cfg: Config, layout: Layout, out_path: str, con
         temp_pdf_path = tmp.name
 
     try:
-        report = build_pdf(project_root, cfg, layout, temp_pdf_path, config_path)
+        report = build_pdf(project_root, cfg, layout, temp_pdf_path, config_path, paras)
         event_counts = report.get("event_counts_per_page", {})
 
         output_dir = Path(out_path).parent

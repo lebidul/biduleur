@@ -35,6 +35,7 @@ def create_all(app):
     _create_page_layout_section(main_frame, app, ui_row)
     _create_date_sep_section(main_frame, app, ui_row)
     _create_poster_section(main_frame, app, ui_row)
+    _create_stories_section(main_frame, app, ui_row)
     _create_output_section(main_frame, app, ui_row)
 
 
@@ -179,7 +180,6 @@ def _create_cover_section(parent, app, ui_row):
     ui_row['r'] = r
 
 
-
 def _create_page_layout_section(parent, app, ui_row):
     """Crée la section pour la mise en page globale."""
     r = ui_row['r']
@@ -187,8 +187,31 @@ def _create_page_layout_section(parent, app, ui_row):
     page_layout_frame.grid(row=r, column=0, columnspan=3, sticky="ew", pady=10)
     page_layout_frame.columnconfigure(1, weight=1)
 
-    tk.Label(page_layout_frame, text="Marge globale (mm) :").grid(row=0, column=0, sticky="w", padx=5, pady=5)
-    tk.Entry(page_layout_frame, textvariable=app.margin_var, width=10).grid(row=0, column=1, sticky="w", padx=5, pady=5)
+    # On utilise un compteur de ligne local pour ce frame
+    lr = 0
+
+    tk.Label(page_layout_frame, text="Marge globale (mm) :").grid(row=lr, column=0, sticky="w", padx=5, pady=5)
+    tk.Entry(page_layout_frame, textvariable=app.margin_var, width=10).grid(row=lr, column=1, sticky="w", padx=5,
+                                                                            pady=5)
+    lr += 1
+
+    # --- Taille de police ---
+    tk.Label(page_layout_frame, text="Taille de police :").grid(row=lr, column=0, sticky="w", padx=5, pady=5)
+    font_mode_frame = ttk.Frame(page_layout_frame)
+    font_mode_frame.grid(row=lr, column=1, columnspan=2, sticky="w")
+
+    tk.Radiobutton(font_mode_frame, text="Automatique", variable=app.font_size_mode_var, value="auto").pack(
+        side=tk.LEFT, padx=5)
+    tk.Radiobutton(font_mode_frame, text="Forcée", variable=app.font_size_mode_var, value="force").pack(side=tk.LEFT,
+                                                                                                        padx=5)
+    lr += 1
+
+    # Création des widgets conditionnels (mais on ne les place pas encore)
+    app.font_size_forced_label = tk.Label(page_layout_frame, text="Taille forcée (pt) :")
+    app.font_size_forced_entry = tk.Entry(page_layout_frame, textvariable=app.font_size_forced_var, width=10)
+
+    # On stocke la ligne où ils devront apparaître pour le callback
+    app.font_size_forced_row = lr
 
     r += 1
     ui_row['r'] = r
@@ -273,6 +296,78 @@ def _create_poster_section(parent, app, ui_row):
     ui_row['r'] = r
 
 
+def _create_stories_section(parent, app, ui_row):
+    """Crée la section pour les paramètres des Stories Instagram."""
+    r = ui_row['r']
+    stories_frame = ttk.LabelFrame(parent, text="Préparation de la story Instagram", padding="10")
+    stories_frame.grid(row=r, column=0, columnspan=3, sticky="ew", pady=10)
+    stories_frame.columnconfigure(1, weight=1)
+
+    lr = 0  # Ligne locale
+
+    # --- Police ---
+    tk.Label(stories_frame, text="Police :").grid(row=lr, column=0, sticky="w", padx=5, pady=5)
+    font_frame = ttk.Frame(stories_frame)
+    font_frame.grid(row=lr, column=1, sticky="w")
+    ttk.Combobox(font_frame, textvariable=app.stories_font_name_var,
+                 values=["Arial", "Helvetica", "Times New Roman", "Verdana", "Impact"],
+                 state="readonly", width=15).pack(side=tk.LEFT, padx=5)
+    tk.Label(font_frame, text="Taille (pt) :").pack(side=tk.LEFT, padx=(10, 5))
+    tk.Entry(font_frame, textvariable=app.stories_font_size_var, width=5).pack(side=tk.LEFT)
+    lr += 1
+
+    # --- Couleur de la police ---
+    tk.Label(stories_frame, text="Couleur de la police :").grid(row=lr, column=0, sticky="w", padx=5, pady=5)
+    font_color_frame = ttk.Frame(stories_frame)
+    font_color_frame.grid(row=lr, column=1, sticky="w")
+    app.stories_font_color_preview = tk.Label(font_color_frame, text="    ", bg=app.stories_font_color_var.get(),
+                                              relief="sunken")
+    app.stories_font_color_preview.pack(side=tk.LEFT, padx=5)
+    app.stories_font_color_button = tk.Button(font_color_frame, text="Choisir…")
+    app.stories_font_color_button.pack(side=tk.LEFT)
+    lr += 1
+
+    # --- Type de fond ---
+    tk.Label(stories_frame, text="Fond :").grid(row=lr, column=0, sticky="w", padx=5, pady=5)
+    bg_type_frame = ttk.Frame(stories_frame)
+    bg_type_frame.grid(row=lr, column=1, sticky="w")
+    tk.Radiobutton(bg_type_frame, text="Couleur unie", variable=app.stories_bg_type_var, value="color").pack(
+        side=tk.LEFT, padx=5)
+    tk.Radiobutton(bg_type_frame, text="Image", variable=app.stories_bg_type_var, value="image").pack(side=tk.LEFT,
+                                                                                                      padx=5)
+    lr += 1
+
+    # --- Widgets conditionnels pour le fond ---
+    app.stories_bg_row = lr
+
+    # Cadre pour la couleur
+    app.stories_bg_color_frame = ttk.Frame(stories_frame)
+    app.stories_bg_color_preview = tk.Label(app.stories_bg_color_frame, text="    ", bg=app.stories_bg_color_var.get(),
+                                            relief="sunken")
+    app.stories_bg_color_preview.pack(side=tk.LEFT, padx=5)
+    app.stories_bg_color_button = tk.Button(app.stories_bg_color_frame, text="Choisir…")
+    app.stories_bg_color_button.pack(side=tk.LEFT)
+
+    # Cadre pour l'image
+    app.stories_bg_image_frame = ttk.Frame(stories_frame)
+    tk.Entry(app.stories_bg_image_frame, textvariable=app.stories_bg_image_var, width=40).pack(side=tk.LEFT, fill=tk.X,
+                                                                                               expand=True)
+    app.stories_bg_image_button = tk.Button(app.stories_bg_image_frame, text="Parcourir…")
+    app.stories_bg_image_button.pack(side=tk.LEFT, padx=5)
+
+    # Cadre pour le slider alpha (partagé par l'image)
+    app.stories_alpha_frame = ttk.Frame(stories_frame)
+    tk.Label(app.stories_alpha_frame, text="Transparence du voile :").pack(side=tk.LEFT, padx=5)
+    ttk.Scale(app.stories_alpha_frame, from_=0.0, to=1.0, orient=tk.HORIZONTAL, variable=app.stories_alpha_var).pack(
+        side=tk.LEFT, fill=tk.X, expand=True)
+    app.stories_alpha_value_label = ttk.Label(app.stories_alpha_frame,
+                                              text=f"{int(app.stories_alpha_var.get() * 100)}%")
+    app.stories_alpha_value_label.pack(side=tk.LEFT, padx=(5, 0))
+
+    r += 1
+    ui_row['r'] = r
+
+
 def _create_output_section(parent, app, ui_row):
     """Crée la section pour les fichiers de sortie."""
     r = ui_row['r']
@@ -305,6 +400,14 @@ def _create_output_section(parent, app, ui_row):
     tk.Entry(output_frame, textvariable=app.svg_var).grid(row=4, column=1, sticky="ew", padx=5, pady=5)
     app.svg_save_button = tk.Button(output_frame, text="…", width=3)
     app.svg_save_button.grid(row=4, column=2, padx=5, pady=5)
+
+    # Stories
+    tk.Checkbutton(output_frame, text="Générer les images pour les Stories Instagram", variable=app.generate_stories_var).grid(
+        row=5, column=0, columnspan=3, sticky="w", padx=5, pady=5)
+    tk.Label(output_frame, text="Dossier Stories :").grid(row=6, column=0, sticky="e", padx=5, pady=5)
+    tk.Entry(output_frame, textvariable=app.stories_output_var).grid(row=6, column=1, sticky="ew", padx=5, pady=5)
+    app.stories_output_button = tk.Button(output_frame, text="…", width=3)
+    app.stories_output_button.grid(row=6, column=2, padx=5, pady=5)
 
     r += 1
     ui_row['r'] = r

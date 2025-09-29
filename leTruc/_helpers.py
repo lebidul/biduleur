@@ -9,6 +9,9 @@ import tempfile
 
 from biduleur.csv_utils import parse_bidul
 from biduleur.format_utils import output_html_file
+from misenpageur.misenpageur.html_utils import extract_paragraphs_from_html
+from misenpageur.misenpageur.image_builder import generate_story_images
+from misenpageur.misenpageur.draw_logic import read_text
 
 # Pour garder app.py propre, nous avons déplacé les fonctions "utilitaires" qui ne sont pas des méthodes de la classe dans un fichier séparé.
 
@@ -131,6 +134,16 @@ def _load_cfg_defaults() -> dict:
                 "cucaracha_value": cfg.cucaracha_box.get("content_value", ""),
                 "cucaracha_text_font": cfg.cucaracha_box.get("text_font_name", "Arial")
             })
+        out["font_size_mode"] = getattr(cfg, "font_size_mode", "auto")
+        out["font_size_forced"] = getattr(cfg, "font_size_forced", 10.0)
+
+        if isinstance(cfg.stories, dict):
+            out["stories_enabled"] = cfg.stories.get("enabled", True)
+            out["stories_font_name"] = cfg.stories.get("agenda_font_name", "Arial")
+            out["stories_font_size"] = cfg.stories.get("agenda_font_size", 45)
+            out["stories_font_color"] = cfg.stories.get("text_color", "#000000")
+            out["stories_bg_color"] = cfg.stories.get("background_color", "#FFFFFF")
+
     except Exception as e:
         # Si l'import ou la lecture du fichier échoue, on affiche un avertissement
         # mais l'application peut continuer avec les valeurs par défaut.
@@ -162,7 +175,12 @@ def run_pipeline(
         page_margin_mm: float, generate_svg: bool, out_svg: str, date_separator_type: str,
         date_spacing: float, poster_design: int, font_size_safety_factor: float,
         background_alpha: float, poster_title: str, cucaracha_type: str,
-        cucaracha_value: str, cucaracha_text_font: str
+        cucaracha_value: str, cucaracha_text_font: str,
+        generate_stories: bool, stories_output_dir: str,
+        font_size_mode: str, font_size_forced: float,
+        stories_font_name: str, stories_font_size: int, stories_font_color: str,
+        stories_bg_type: str, stories_bg_color: str, stories_bg_image: str,
+        stories_alpha: float
 ) -> tuple[bool, str]:
     try:
         from misenpageur.misenpageur.config import Config
@@ -185,6 +203,9 @@ def run_pipeline(
         output_html_file(html_body_bidul, original_file_name=input_file, output_filename=out_html)
         output_html_file(html_body_agenda, original_file_name=input_file, output_filename=out_agenda_html)
 
+        html_text = read_text(out_html)
+        paras = extract_paragraphs_from_html(html_text)
+
         defaults = _project_defaults()
         project_root, cfg_path, lay_path = defaults["root"], defaults["config"], defaults["layout"]
         cfg = Config.from_yaml(cfg_path)
@@ -200,6 +221,8 @@ def run_pipeline(
         if (auteur_couv or "").strip(): cfg.auteur_couv = auteur_couv.strip()
         if (auteur_couv_url or "").strip(): cfg.auteur_couv_url = auteur_couv_url.strip()
         cfg.pdf_layout['page_margin_mm'] = page_margin_mm
+        cfg.font_size_mode = font_size_mode
+        cfg.font_size_forced = font_size_forced
         cfg.logos_layout = logos_layout
         cfg.logos_padding_mm = logos_padding_mm
         cfg.date_line['enabled'] = (date_separator_type == "ligne")
@@ -215,16 +238,28 @@ def run_pipeline(
         cfg.cucaracha_box['content_type'] = cucaracha_type
         cfg.cucaracha_box['content_value'] = cucaracha_value
         cfg.cucaracha_box['text_font_name'] = cucaracha_text_font
+        cfg.stories['enabled'] = generate_stories
+        if stories_output_dir:
+            cfg.stories['output_dir'] = stories_output_dir
+        cfg.stories['agenda_font_name'] = stories_font_name
+        cfg.stories['agenda_font_size'] = stories_font_size
+        cfg.stories['text_color'] = stories_font_color
+        cfg.stories['background_color'] = stories_bg_color
+        cfg.stories['background_image_alpha'] = stories_alpha
+        cfg.stories['background_type'] = stories_bg_type
+        cfg.stories['background_image'] = stories_bg_image
 
         final_layout_path = build_layout_with_margins(lay_path, cfg)
         lay = Layout.from_yaml(final_layout_path)
 
         if out_pdf:
-            report = build_pdf(project_root, cfg, lay, out_pdf, cfg_path)
+            report = build_pdf(project_root, cfg, lay, out_pdf, cfg_path, paras)
         if generate_svg and out_svg:
             if not report:
-                report = build_pdf(project_root, cfg, lay, os.devnull, cfg_path)
-            build_svg(project_root, cfg, lay, out_svg, cfg_path)
+                report = build_pdf(project_root, cfg, lay, os.devnull, cfg_path, paras)
+            build_svg(project_root, cfg, lay, out_svg, cfg_path, paras)
+        if generate_stories:
+            generate_story_images(project_root, cfg, paras)
 
         summary_lines = [
             f"Fichier d'entrée : {os.path.basename(input_file)}", "-" * 40, "Fichiers de sortie créés :"
@@ -232,16 +267,8 @@ def run_pipeline(
         if out_html: summary_lines.append(f"  - HTML: {out_html}")
         if out_agenda_html: summary_lines.append(f"  - HTML (Agenda): {out_agenda_html}")
         if out_pdf: summary_lines.append(f"  - PDF: {out_pdf}")
-        if generate_svg and out_svg:
-            if not report:
-                # Créer un PDF temporaire pour la conversion SVG
-                with tempfile.NamedTemporaryFile(delete=True, suffix=".pdf", mode='w+b') as tmp:
-                    temp_pdf_path = tmp.name
-                    report = build_pdf(project_root, cfg, lay, temp_pdf_path, cfg_path)
-                    # La conversion SVG se fera à partir de ce PDF temporaire
-                    build_svg(project_root, cfg, lay, out_svg, cfg_path, temp_pdf_path_override=temp_pdf_path)
-            else:
-                 build_svg(project_root, cfg, lay, out_svg, cfg_path)
+        if generate_svg and out_svg: summary_lines.append(f"  - SVG: {out_svg}")
+        if generate_stories and stories_output_dir: summary_lines.append(f"  - Stories: {stories_output_dir}")
 
         summary_lines.append("\n" + "-" * 40)
         summary_lines.append(f"Nombre d'événements traités : {number_of_lines}")
@@ -302,4 +329,5 @@ def _default_paths_from_input(input_file: str) -> dict:
         "agenda_html": str(folder / f"{base}.agenda.html"),
         "pdf": str(folder / f"{base}.pdf"),
         "svg": str(folder / f"{base}.svg"),
+        "stories_output": str(folder / "stories")
     }

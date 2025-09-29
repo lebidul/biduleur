@@ -21,6 +21,7 @@ from .textflow import (
     plan_pair_with_split, measure_poster_fit_at_fs, draw_poster_text_in_frames,
     _is_event, _mk_style_for_kind, _mk_text_for_kind
 )
+from .image_builder import generate_story_images
 from .utils import mm_to_pt
 
 from PIL import Image, ImageStat
@@ -460,7 +461,7 @@ def _create_poster_story(
     return story
 
 
-def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path: str) -> dict:
+def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path: str, paras: List[str]) -> dict:
     """
     Fonction de dessin principale, agnostique au format de sortie (PDF, SVG, etc.).
     Prend un 'canvas' ReportLab en entrée et y dessine toutes les pages.
@@ -488,10 +489,6 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
         # Le chemin est relatif, on le joint au dossier du fichier de config
         config_dir = Path(config_path).parent
         return str((config_dir / p).resolve())
-
-    # --- Inputs et contenus (Utilisation de os.path.join) ---
-    html_text = read_text(os.path.join(project_root, cfg.input_html))
-    paras = extract_paragraphs_from_html(html_text)
 
     nobr_list = []
     if cfg.nobr_file:
@@ -522,20 +519,28 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
     date_line = _read_date_line_config(cfg)
 
     # --- Calcul taille de police & Planification du texte pour pages 1 & 2 ---
-    order_fs = ["S5", "S6", "S3", "S4"]
-    lo, hi = cfg.font_size_min, cfg.font_size_max
-    best_fs = lo
-    for _ in range(10):
-        mid = (lo + hi) / 2.0
-        style_mid = paragraph_style(cfg.font_name, mid, cfg.leading_ratio)
-        spacing_mid = SpacingPolicy(spacing_cfg, style_mid.leading)
-        _, tot = _simulate_allocation_at_fs(c, S, order_fs, paras, cfg.font_name, mid, cfg.leading_ratio,
-                                            cfg.inner_padding, spacing_mid, bullet_cfg, date_box)
-        if tot >= len(paras):
-            best_fs, lo = mid, mid
-        else:
-            hi = mid
-        if abs(hi - lo) < 0.1: break
+    best_fs = 0.0
+
+    if getattr(cfg, 'font_size_mode', 'auto') == 'force':
+        best_fs = getattr(cfg, 'font_size_forced', 10.0)
+        print(f"[INFO] Utilisation de la taille de police forcée : {best_fs:.2f} pt")
+    else:
+        # On exécute la recherche binaire uniquement en mode "auto"
+        order_fs = ["S5", "S6", "S3", "S4"]
+        lo, hi = cfg.font_size_min, cfg.font_size_max
+        best_fs = lo
+        for _ in range(10):
+            mid = (lo + hi) / 2.0
+            style_mid = paragraph_style(cfg.font_name, mid, cfg.leading_ratio)
+            spacing_mid = SpacingPolicy(spacing_cfg, style_mid.leading)
+            _, tot = _simulate_allocation_at_fs(c, S, order_fs, paras, cfg.font_name, mid, cfg.leading_ratio,
+                                                cfg.inner_padding, spacing_mid, bullet_cfg, date_box)
+            if tot >= len(paras):
+                best_fs, lo = mid, mid
+            else:
+                hi = mid
+            if abs(hi - lo) < 0.1: break
+        print(f"[INFO] Taille de police optimale calculée : {best_fs:.2f} pt")
 
     spacing_policy = SpacingPolicy(spacing_cfg, paragraph_style(cfg.font_name, best_fs, cfg.leading_ratio).leading)
     s5_full, s5_tail, s6_prelude, s6_full, rest_after_p2 = plan_pair_with_split(

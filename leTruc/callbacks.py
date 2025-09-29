@@ -44,18 +44,30 @@ def assign_all(app):
     app.pdf_save_button.config(command=lambda: on_pick_save(app.pdf_var, "PDF", ".pdf", [("PDF", "*.pdf")]))
     app.svg_save_button.config(
         command=lambda: on_pick_save(app.svg_var, "Enregistrer le SVG", ".svg", [("SVG", "*.svg")]))
+    app.stories_output_button.config(
+        command=lambda: on_pick_directory(app.stories_output_var, "Choisir le dossier de sortie pour les Stories"))
 
     # Assigner la commande au bouton principal
     app.run_button.config(command=app._on_run)
 
     app.back_color_btn.config(command=lambda: on_pick_color(app.date_box_back_color_var))
 
+    app.stories_font_color_button.config(command=lambda: on_pick_color(app.stories_font_color_var))
+    app.stories_bg_color_button.config(command=lambda: on_pick_color(app.stories_bg_color_var))
+    app.stories_bg_image_button.config(
+        command=lambda: on_pick_file(app.stories_bg_image_var, "Choisir une image de fond", [("Images", "*.jpg *.jpeg *.png")]))
+
     # --- Liaison des variables aux fonctions de "toggle" ---
     app.logos_layout_var.trace_add("write", lambda *args: on_toggle_padding_widget(app))
+    app.font_size_mode_var.trace_add("write", lambda *args: on_toggle_font_size_widgets(app))
     app.cucaracha_type_var.trace_add("write", lambda *args: on_toggle_cucaracha_widgets(app))
     app.date_separator_var.trace_add("write", lambda *args: on_toggle_date_sep_options(app))
     app.poster_design_var.trace_add("write", lambda *args: on_toggle_alpha_slider(app))
     app.alpha_var.trace_add("write", lambda *args: on_update_alpha_label(app))
+    app.stories_bg_type_var.trace_add("write", lambda *args: on_toggle_stories_bg_widgets(app))
+    app.stories_alpha_var.trace_add("write", lambda *args: on_update_stories_alpha_label(app))
+    app.stories_font_color_var.trace_add("write", lambda *args: app.stories_font_color_preview.config(bg=app.stories_font_color_var.get()))
+    app.stories_bg_color_var.trace_add("write", lambda *args: app.stories_bg_color_preview.config(bg=app.stories_bg_color_var.get()))
 
     # On ne trace plus la variable de la couleur de bordure.
     app.date_box_back_color_var.trace_add(
@@ -65,6 +77,9 @@ def assign_all(app):
 
     # --- Appels initiaux pour définir l'état de l'interface au démarrage ---
     on_toggle_padding_widget(app)
+    on_toggle_font_size_widgets(app)
+    on_toggle_stories_bg_widgets(app)
+    on_update_stories_alpha_label(app)
     on_toggle_cucaracha_widgets(app)
     on_toggle_date_sep_options(app)
     on_toggle_alpha_slider(app)
@@ -91,6 +106,7 @@ def on_pick_input(app):
     app.agenda_var.set(d["agenda_html"])
     app.pdf_var.set(d["pdf"])
     app.svg_var.set(d["svg"])
+    app.stories_output_var.set(d["stories_output"])
 
 
 def on_pick_file(string_var, title, filetypes):
@@ -161,6 +177,42 @@ def on_toggle_padding_widget(app):
     else:
         app.logos_padding_label.grid_remove()
         app.logos_padding_entry.grid_remove()
+
+
+def on_toggle_font_size_widgets(app):
+    """Affiche ou cache le champ de saisie pour la taille de police forcée."""
+    lr = app.font_size_forced_row
+    label = app.font_size_forced_label
+    entry = app.font_size_forced_entry
+
+    if app.font_size_mode_var.get() == "force":
+        label.grid(row=lr, column=0, sticky="w", padx=5, pady=5)
+        entry.grid(row=lr, column=1, sticky="w", padx=5, pady=5)
+    else:
+        label.grid_remove()
+        entry.grid_remove()
+
+
+def on_toggle_stories_bg_widgets(app):
+    """Affiche soit le sélecteur de couleur, soit le sélecteur d'image."""
+    row = app.stories_bg_row
+
+    # Cacher tout d'abord
+    app.stories_bg_color_frame.grid_remove()
+    app.stories_bg_image_frame.grid_remove()
+    app.stories_alpha_frame.grid_remove()
+
+    if app.stories_bg_type_var.get() == "color":
+        app.stories_bg_color_frame.grid(row=row, column=1, sticky="w", padx=5, pady=5)
+    else:  # "image"
+        app.stories_bg_image_frame.grid(row=row, column=1, sticky="ew", padx=5, pady=5)
+        # Le slider de transparence n'a de sens que pour l'image
+        app.stories_alpha_frame.grid(row=row + 1, column=1, sticky="ew", padx=5, pady=5)
+
+
+def on_update_stories_alpha_label(app):
+    """Met à jour le label de pourcentage du slider alpha des stories."""
+    app.stories_alpha_value_label.config(text=f"{int(app.stories_alpha_var.get() * 100)}%")
 
 
 def on_toggle_cucaracha_widgets(app):

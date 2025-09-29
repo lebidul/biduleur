@@ -15,6 +15,9 @@ try:
     from misenpageur.misenpageur.pdfbuild import build_pdf
     from misenpageur.misenpageur.svgbuild import build_svg
     from misenpageur.misenpageur.layout_builder import build_layout_with_margins
+    from misenpageur.misenpageur.draw_logic import read_text
+    from misenpageur.misenpageur.html_utils import extract_paragraphs_from_html
+    from misenpageur.misenpageur.image_builder import generate_story_images
 except (ModuleNotFoundError, ImportError):
     # Fallback
     from misenpageur.config import Config
@@ -22,6 +25,9 @@ except (ModuleNotFoundError, ImportError):
     from misenpageur.pdfbuild import build_pdf
     from misenpageur.svgbuild import build_svg
     from misenpageur.layout_builder import build_layout_with_margins
+    from misenpageur.draw_logic import read_text
+    from misenpageur.html_utils import extract_paragraphs_from_html
+    from misenpageur.image_builder import generate_story_images
 
 def make_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
@@ -114,6 +120,11 @@ def main(argv: list[str] | None = None) -> int:
         # La config peut aussi spécifier output_pdf ; on favorise l'argument CLI
         cfg.output_pdf = str(out_pdf)
 
+        # 1. Lire et préparer le contenu UNE SEULE FOIS
+        html_path = os.path.join(project_root, cfg.input_html)
+        html_text = read_text(html_path)
+        paras = extract_paragraphs_from_html(html_text)
+
         import traceback
 
         try:
@@ -122,18 +133,24 @@ def main(argv: list[str] | None = None) -> int:
             out_pdf.parent.mkdir(parents=True, exist_ok=True)
             cfg.output_pdf = str(out_pdf)
             # On passe le project_root
-            build_pdf(str(project_root), cfg, lay, str(out_pdf), cfg_path)
+            build_pdf(str(project_root), cfg, lay, str(out_pdf), cfg_path, paras)
 
             # --- Générer le SVG (si demandé) ---
             if args.svg:
                 out_svg = Path(args.svg).resolve()
                 out_svg.parent.mkdir(parents=True, exist_ok=True)
                 # On passe le project_root
-                build_svg(str(project_root), cfg, lay, str(out_svg), cfg_path)
+                build_svg(str(project_root), cfg, lay, str(out_svg), cfg_path, paras)
+
+            # --- Générer les images Stories (si demandé) ---
+            # On récupère la config des stories depuis l'objet cfg
+            if cfg.stories.get("enabled", False):
+                generate_story_images(str(project_root), cfg, paras)
         except Exception as e:
             print("[ERR] Échec build PDF :", e)
             traceback.print_exc()
             return 2
+
 
     finally:
         # --- Ce bloc s'exécute toujours, même en cas d'erreur ---

@@ -70,6 +70,17 @@ class Application(tk.Tk):
         self.agenda_var = tk.StringVar()
         self.pdf_var = tk.StringVar()
         self.svg_var = tk.StringVar()
+        self.generate_stories_var = tk.BooleanVar(value=self.cfg_defaults.get("stories_enabled", True))
+        self.stories_output_var = tk.StringVar()
+
+        # --- Variables pour la section Stories ---
+        self.stories_font_name_var = tk.StringVar(value=self.cfg_defaults.get("stories_font_name", "Arial"))
+        self.stories_font_size_var = tk.StringVar(value=str(self.cfg_defaults.get("stories_font_size", "45")))
+        self.stories_font_color_var = tk.StringVar(value=self.cfg_defaults.get("stories_font_color", "#000000"))
+        self.stories_bg_type_var = tk.StringVar(value=self.cfg_defaults.get("stories_bg_type", "color"))
+        self.stories_bg_color_var = tk.StringVar(value=self.cfg_defaults.get("stories_bg_color", "#FFFFFF"))
+        self.stories_bg_image_var = tk.StringVar(value=self.cfg_defaults.get("stories_bg_image", ""))
+        self.stories_alpha_var = tk.DoubleVar(value=self.cfg_defaults.get("stories_alpha", 0.5))
 
         # --- Variables pour les options de couverture ---
         self.generate_cover_var = tk.BooleanVar(value=not self.cfg_defaults.get("skip_cover", False))
@@ -80,6 +91,8 @@ class Application(tk.Tk):
         self.margin_var = tk.StringVar(value=str(self.cfg_defaults.get("page_margin_mm", "1.0")))
         self.logos_layout_var = tk.StringVar(value="colonnes")
         self.logos_padding_var = tk.StringVar(value="1.0")
+        self.font_size_mode_var = tk.StringVar(value=self.cfg_defaults.get("font_size_mode", "auto"))
+        self.font_size_forced_var = tk.StringVar(value=str(self.cfg_defaults.get("font_size_forced", "10.0")))
 
         # --- Variables pour les séparateurs de dates ---
         self.date_separator_var = tk.StringVar(value=self.cfg_defaults.get("date_separator_type", "ligne"))
@@ -160,7 +173,8 @@ class Application(tk.Tk):
                 'margin_val': float(self.margin_var.get().strip().replace(',', '.')),
                 'safety_factor_val': float(self.safety_factor_var.get().strip().replace(',', '.')),
                 'date_spacing_val': float(self.date_spacing_var.get().strip().replace(',', '.')),
-                'logos_padding_val': float(self.logos_padding_var.get().strip().replace(',', '.'))
+                'logos_padding_val': float(self.logos_padding_var.get().strip().replace(',', '.')),
+                'font_size_forced_val': float(self.font_size_forced_var.get().strip().replace(',', '.'))
             }
         except ValueError:
             messagebox.showerror("Erreur", "Les champs numériques (marges, espacement, etc.) doivent être valides.")
@@ -172,6 +186,7 @@ class Application(tk.Tk):
             return
 
         validated_args['cuca_value_val'] = self.cucaracha_value_var.get().strip()
+        validated_args['stories_font_size_val'] = int(self.stories_font_size_var.get().strip())
 
         self.status_var.set("Traitement en cours…")
         self.progress_bar.start()
@@ -208,8 +223,12 @@ class Application(tk.Tk):
             auteur_couv=self.auteur_var.get().strip(),
             auteur_couv_url=self.auteur_url_var.get().strip(),
             page_margin_mm=validated_args['margin_val'],
+            font_size_mode=self.font_size_mode_var.get(),
+            font_size_forced=validated_args['font_size_forced_val'],
             generate_svg=self.generate_svg_var.get(),
             out_svg=self.svg_var.get().strip(),
+            generate_stories=self.generate_stories_var.get(),
+            stories_output_dir=self.stories_output_var.get().strip(),
             date_separator_type=self.date_separator_var.get(),
             date_spacing=validated_args['date_spacing_val'],
             poster_design=self.poster_design_var.get(),
@@ -219,7 +238,14 @@ class Application(tk.Tk):
             cucaracha_type=self.cucaracha_type_var.get(),
             cucaracha_value=validated_args['cuca_value_val'],
             cucaracha_text_font=self.cucaracha_font_var.get(),
-            date_box_back_color=self.date_box_back_color_var.get()
+            date_box_back_color=self.date_box_back_color_var.get(),
+            stories_font_name=self.stories_font_name_var.get(),
+            stories_font_size=validated_args['stories_font_size_val'],
+            stories_font_color=self.stories_font_color_var.get(),
+            stories_bg_type=self.stories_bg_type_var.get(),
+            stories_bg_color=self.stories_bg_color_var.get(),
+            stories_bg_image=self.stories_bg_image_var.get().strip(),
+            stories_alpha=self.stories_alpha_var.get()
         )
         self.result_queue.put((ok, msg))
 
