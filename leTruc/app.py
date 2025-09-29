@@ -70,6 +70,8 @@ class Application(tk.Tk):
         self.agenda_var = tk.StringVar()
         self.pdf_var = tk.StringVar()
         self.svg_var = tk.StringVar()
+        self.generate_stories_var = tk.BooleanVar(value=self.cfg_defaults.get("stories_enabled", True))
+        self.stories_output_var = tk.StringVar()
 
         # --- Variables pour les options de couverture ---
         self.generate_cover_var = tk.BooleanVar(value=not self.cfg_defaults.get("skip_cover", False))
@@ -210,6 +212,8 @@ class Application(tk.Tk):
             page_margin_mm=validated_args['margin_val'],
             generate_svg=self.generate_svg_var.get(),
             out_svg=self.svg_var.get().strip(),
+            generate_stories=self.generate_stories_var.get(),
+            stories_output_dir=self.stories_output_var.get().strip(),
             date_separator_type=self.date_separator_var.get(),
             date_spacing=validated_args['date_spacing_val'],
             poster_design=self.poster_design_var.get(),

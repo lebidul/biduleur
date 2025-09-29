@@ -24,7 +24,6 @@ class VictoryWindow(tk.Toplevel):
         self.geometry(f"{width}x{height}")
         self.title("Génération Terminée !")
 
-        # --- AJUSTEMENT : Icône de la fenêtre ---
         try:
             icon_path = get_resource_path("leTruc/assets/LesArtsServices.ico")
             self.iconbitmap(icon_path)
@@ -75,7 +74,7 @@ class VictoryWindow(tk.Toplevel):
         # On crée le widget Text. Son parent est le canvas.
         summary_widget = tk.Text(
             self.canvas,
-            height=12,  # Hauteur en nombre de lignes de texte
+            height=16,  # Hauteur en nombre de lignes de texte
             padx=15,
             pady=15,
             font=("Segoe UI", 9) if sys.platform == "win32" else ("Arial", 10),

@@ -461,7 +461,7 @@ def _create_poster_story(
     return story
 
 
-def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path: str) -> dict:
+def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path: str, paras: List[str]) -> dict:
     """
     Fonction de dessin principale, agnostique au format de sortie (PDF, SVG, etc.).
     Prend un 'canvas' ReportLab en entrée et y dessine toutes les pages.
@@ -489,10 +489,6 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
         # Le chemin est relatif, on le joint au dossier du fichier de config
         config_dir = Path(config_path).parent
         return str((config_dir / p).resolve())
-
-    # --- Inputs et contenus (Utilisation de os.path.join) ---
-    html_text = read_text(os.path.join(project_root, cfg.input_html))
-    paras = extract_paragraphs_from_html(html_text)
 
     nobr_list = []
     if cfg.nobr_file:
@@ -730,7 +726,5 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
         print(f"Taille de police (poster)    : {best_fs_poster * poster_cfg.font_size_safety_factor:.2f} pt (optimale: {best_fs_poster:.2f})")
     print(f"Paragraphes non placés      : {len(rest_after_p1)}")
     print("-" * 20)
-
-    generate_story_images(project_root, cfg, paras)
 
     return report

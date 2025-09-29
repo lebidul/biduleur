@@ -28,8 +28,8 @@ font_name: "Arial Narrow"
 font_size_min: 5
 font_size_max: 30.0
 
-#font_size_mode: auto  # ou "force"
-font_size_mode: force  # ou "force"
+font_size_mode: auto  # ou "force"
+#font_size_mode: force  # ou "force"
 font_size_forced: 7.9
 
 # Ratio entre taille et interligne (leading = font_size * leading_ratio)

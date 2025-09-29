@@ -44,6 +44,8 @@ def assign_all(app):
     app.pdf_save_button.config(command=lambda: on_pick_save(app.pdf_var, "PDF", ".pdf", [("PDF", "*.pdf")]))
     app.svg_save_button.config(
         command=lambda: on_pick_save(app.svg_var, "Enregistrer le SVG", ".svg", [("SVG", "*.svg")]))
+    app.stories_output_button.config(
+        command=lambda: on_pick_directory(app.stories_output_var, "Choisir le dossier de sortie pour les Stories"))
 
     # Assigner la commande au bouton principal
     app.run_button.config(command=app._on_run)
@@ -91,6 +93,7 @@ def on_pick_input(app):
     app.agenda_var.set(d["agenda_html"])
     app.pdf_var.set(d["pdf"])
     app.svg_var.set(d["svg"])
+    app.stories_output_var.set(d["stories_output"])
 
 
 def on_pick_file(string_var, title, filetypes):
