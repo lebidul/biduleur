@@ -1,5 +1,21 @@
 
 ---
+# Bidul v1.2.13 - Prise en charge des Hyperliens dans l'Agenda
+
+Cette version introduit une nouvelle fonctionnalité majeure pour l'interactivité des documents PDF : la reconnaissance automatique des hyperliens présents dans les données sources.
+
+## ✨ Nouveautés
+
+*   **Mise en format des données info (colonne `En Bref`)** : Le moteur de mise en page (`misenpageur`) met désormais en forme les informations info de la manière suivante: Valeurs de la colonne `FESTOCHE\nEVENEMENT ` en gras, infos de la colonne `STYLE \nFESTOCHE / EVENEMENT ` en mode tyle (parenthèse + italique) puis comprend les valuers de la colonne `NOM SPECTACLE 1 ( SV )` comme urls. 
+*   **Hyperliens dans l'Agenda** : Le moteur de mise en page (`misenpageur`) reconnaît désormais les balises de lien HTML (`<a href="...">`) présentes dans les descriptions d'événements. Si vos fichiers `.xls` ou `.csv` contiennent des liens, ils seront automatiquement transformés en **liens cliquables** dans le PDF final, ainsi que dans le poster.
+
+## ⚙️ Pour les Développeuses et Développeurs
+
+*   **Amélioration du Parsing HTML** : La fonction `extract_paragraphs_from_html` a été entièrement revue. Elle utilise désormais la bibliothèque `BeautifulSoup4` pour parser le HTML. Au lieu d'extraire uniquement le texte brut, elle préserve les balises de formatage simples (`<a>`, `<strong>`, `<i>`, etc.) que le moteur `Paragraph` de ReportLab sait interpréter.
+*   **Nouvelle Dépendance** : La bibliothèque `beautifulsoup4` a été ajoutée aux dépendances du projet.
+
+---
+
 # Bidul v1.2.12 - Amélioration de la Césure et de la Typographie
 
 Cette version se concentre sur l'amélioration de la qualité typographique des textes générés, en résolvant des problèmes de césure (sauts de ligne) indésirables pour les noms propres et les expressions composées.

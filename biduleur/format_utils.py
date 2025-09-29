@@ -47,7 +47,7 @@ def fmt_link(*links: str) -> str:
     formatted_links = ""
     for link in links:
         if link:
-            formatted_links += f", <a href=\"{link}\" target=\"_blank\">lien</a>"
+            formatted_links += f" - <a href=\"{link}\" target=\"_blank\">{link}</a>"
     return formatted_links
 
 def fmt_heure(heure: str) -> str:
@@ -84,6 +84,11 @@ def format_evenement(evenement: str, style_evenement: str) -> str:
     if not evenement or str(evenement).lower().strip() in ("", "nan"):
         return ""
     return f"{evenement}{format_style(style_evenement)} // "
+
+def format_info(info: str, description_info: str, url_info: str) -> str:
+    if not info or str(info).lower().strip() in ("", "nan"):
+        return ""
+    return f"<strong>{info}</strong>{format_style(description_info)}{fmt_link(url_info)}"
 
 def format_lieu(lieu: str) -> str:
     if not lieu or lieu == "Le Mans" or str(lieu).lower().strip() in ("", "nan") or isinstance(lieu, int):
