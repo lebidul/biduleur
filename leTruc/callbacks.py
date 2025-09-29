@@ -54,6 +54,7 @@ def assign_all(app):
 
     # --- Liaison des variables aux fonctions de "toggle" ---
     app.logos_layout_var.trace_add("write", lambda *args: on_toggle_padding_widget(app))
+    app.font_size_mode_var.trace_add("write", lambda *args: on_toggle_font_size_widgets(app))
     app.cucaracha_type_var.trace_add("write", lambda *args: on_toggle_cucaracha_widgets(app))
     app.date_separator_var.trace_add("write", lambda *args: on_toggle_date_sep_options(app))
     app.poster_design_var.trace_add("write", lambda *args: on_toggle_alpha_slider(app))
@@ -67,6 +68,7 @@ def assign_all(app):
 
     # --- Appels initiaux pour définir l'état de l'interface au démarrage ---
     on_toggle_padding_widget(app)
+    on_toggle_font_size_widgets(app)
     on_toggle_cucaracha_widgets(app)
     on_toggle_date_sep_options(app)
     on_toggle_alpha_slider(app)
@@ -164,6 +166,20 @@ def on_toggle_padding_widget(app):
     else:
         app.logos_padding_label.grid_remove()
         app.logos_padding_entry.grid_remove()
+
+
+def on_toggle_font_size_widgets(app):
+    """Affiche ou cache le champ de saisie pour la taille de police forcée."""
+    lr = app.font_size_forced_row
+    label = app.font_size_forced_label
+    entry = app.font_size_forced_entry
+
+    if app.font_size_mode_var.get() == "force":
+        label.grid(row=lr, column=0, sticky="w", padx=5, pady=5)
+        entry.grid(row=lr, column=1, sticky="w", padx=5, pady=5)
+    else:
+        label.grid_remove()
+        entry.grid_remove()
 
 
 def on_toggle_cucaracha_widgets(app):

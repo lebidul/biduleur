@@ -134,6 +134,9 @@ def _load_cfg_defaults() -> dict:
                 "cucaracha_value": cfg.cucaracha_box.get("content_value", ""),
                 "cucaracha_text_font": cfg.cucaracha_box.get("text_font_name", "Arial")
             })
+        out["font_size_mode"] = getattr(cfg, "font_size_mode", "auto")
+        out["font_size_forced"] = getattr(cfg, "font_size_forced", 10.0)
+
     except Exception as e:
         # Si l'import ou la lecture du fichier échoue, on affiche un avertissement
         # mais l'application peut continuer avec les valeurs par défaut.
@@ -166,7 +169,8 @@ def run_pipeline(
         date_spacing: float, poster_design: int, font_size_safety_factor: float,
         background_alpha: float, poster_title: str, cucaracha_type: str,
         cucaracha_value: str, cucaracha_text_font: str,
-        generate_stories: bool, stories_output_dir: str
+        generate_stories: bool, stories_output_dir: str,
+        font_size_mode: str, font_size_forced: float
 ) -> tuple[bool, str]:
     try:
         from misenpageur.misenpageur.config import Config
@@ -207,6 +211,8 @@ def run_pipeline(
         if (auteur_couv or "").strip(): cfg.auteur_couv = auteur_couv.strip()
         if (auteur_couv_url or "").strip(): cfg.auteur_couv_url = auteur_couv_url.strip()
         cfg.pdf_layout['page_margin_mm'] = page_margin_mm
+        cfg.font_size_mode = font_size_mode
+        cfg.font_size_forced = font_size_forced
         cfg.logos_layout = logos_layout
         cfg.logos_padding_mm = logos_padding_mm
         cfg.date_line['enabled'] = (date_separator_type == "ligne")

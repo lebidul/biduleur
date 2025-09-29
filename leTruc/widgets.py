@@ -179,7 +179,6 @@ def _create_cover_section(parent, app, ui_row):
     ui_row['r'] = r
 
 
-
 def _create_page_layout_section(parent, app, ui_row):
     """Crée la section pour la mise en page globale."""
     r = ui_row['r']
@@ -187,8 +186,31 @@ def _create_page_layout_section(parent, app, ui_row):
     page_layout_frame.grid(row=r, column=0, columnspan=3, sticky="ew", pady=10)
     page_layout_frame.columnconfigure(1, weight=1)
 
-    tk.Label(page_layout_frame, text="Marge globale (mm) :").grid(row=0, column=0, sticky="w", padx=5, pady=5)
-    tk.Entry(page_layout_frame, textvariable=app.margin_var, width=10).grid(row=0, column=1, sticky="w", padx=5, pady=5)
+    # On utilise un compteur de ligne local pour ce frame
+    lr = 0
+
+    tk.Label(page_layout_frame, text="Marge globale (mm) :").grid(row=lr, column=0, sticky="w", padx=5, pady=5)
+    tk.Entry(page_layout_frame, textvariable=app.margin_var, width=10).grid(row=lr, column=1, sticky="w", padx=5,
+                                                                            pady=5)
+    lr += 1
+
+    # --- Taille de police ---
+    tk.Label(page_layout_frame, text="Taille de police :").grid(row=lr, column=0, sticky="w", padx=5, pady=5)
+    font_mode_frame = ttk.Frame(page_layout_frame)
+    font_mode_frame.grid(row=lr, column=1, columnspan=2, sticky="w")
+
+    tk.Radiobutton(font_mode_frame, text="Automatique", variable=app.font_size_mode_var, value="auto").pack(
+        side=tk.LEFT, padx=5)
+    tk.Radiobutton(font_mode_frame, text="Forcée", variable=app.font_size_mode_var, value="force").pack(side=tk.LEFT,
+                                                                                                        padx=5)
+    lr += 1
+
+    # Création des widgets conditionnels (mais on ne les place pas encore)
+    app.font_size_forced_label = tk.Label(page_layout_frame, text="Taille forcée (pt) :")
+    app.font_size_forced_entry = tk.Entry(page_layout_frame, textvariable=app.font_size_forced_var, width=10)
+
+    # On stocke la ligne où ils devront apparaître pour le callback
+    app.font_size_forced_row = lr
 
     r += 1
     ui_row['r'] = r

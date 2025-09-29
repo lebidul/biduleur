@@ -20,6 +20,7 @@
 - [x] Générer photos post instagram pour le bidul du mois
 - [ ] Sélectionner dossier output pour svg (nom des fichiers par défaut) comme la story instagram
 - [ ] Ajouter au FE fine tuning pour posts instagram (backend color ou image (+ transparency), font, font color)
+- [ ] Cucaracha: ajout de saut de ligne dans texte. perte italique si non arial
 
 ## Priorité Moyenne
 - [ ] Ajout helpers.

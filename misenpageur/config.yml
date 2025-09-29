@@ -167,13 +167,14 @@ cucaracha_box:
   title_font_name: "Arial-BoldItalic"
   title_font_size: 8
 
-  text_font_name: "Arial"
-  text_font_size: 10
+  text_font_name: "Helvetica"
+#  text_font_name: "Arial"
+  text_font_size: 8
   text_style: "italic" # "normal" ou "italic"
   text_align: "center"   # "left", "center", ou "right"
 
   # Hauteur de la boîte en mm (si le contenu n'est pas "none")
-  height_mm: 30
+  height_mm: 28
 
 # Impression facultative de la section de couverture
 skip_cover: false

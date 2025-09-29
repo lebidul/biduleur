@@ -82,6 +82,8 @@ class Application(tk.Tk):
         self.margin_var = tk.StringVar(value=str(self.cfg_defaults.get("page_margin_mm", "1.0")))
         self.logos_layout_var = tk.StringVar(value="colonnes")
         self.logos_padding_var = tk.StringVar(value="1.0")
+        self.font_size_mode_var = tk.StringVar(value=self.cfg_defaults.get("font_size_mode", "auto"))
+        self.font_size_forced_var = tk.StringVar(value=str(self.cfg_defaults.get("font_size_forced", "10.0")))
 
         # --- Variables pour les séparateurs de dates ---
         self.date_separator_var = tk.StringVar(value=self.cfg_defaults.get("date_separator_type", "ligne"))
@@ -162,7 +164,8 @@ class Application(tk.Tk):
                 'margin_val': float(self.margin_var.get().strip().replace(',', '.')),
                 'safety_factor_val': float(self.safety_factor_var.get().strip().replace(',', '.')),
                 'date_spacing_val': float(self.date_spacing_var.get().strip().replace(',', '.')),
-                'logos_padding_val': float(self.logos_padding_var.get().strip().replace(',', '.'))
+                'logos_padding_val': float(self.logos_padding_var.get().strip().replace(',', '.')),
+                'font_size_forced_val': float(self.font_size_forced_var.get().strip().replace(',', '.'))
             }
         except ValueError:
             messagebox.showerror("Erreur", "Les champs numériques (marges, espacement, etc.) doivent être valides.")
@@ -210,6 +213,8 @@ class Application(tk.Tk):
             auteur_couv=self.auteur_var.get().strip(),
             auteur_couv_url=self.auteur_url_var.get().strip(),
             page_margin_mm=validated_args['margin_val'],
+            font_size_mode=self.font_size_mode_var.get(),
+            font_size_forced=validated_args['font_size_forced_val'],
             generate_svg=self.generate_svg_var.get(),
             out_svg=self.svg_var.get().strip(),
             generate_stories=self.generate_stories_var.get(),
