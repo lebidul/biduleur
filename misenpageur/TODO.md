@@ -20,7 +20,7 @@
 - [x] Enlever watermark pdf2svg dans svg outputs.
 - [ ] Améliorer visuel QR code.
 - [ ] Empêcher qu'une date (ligne date) commence à la fin d'une section
-- [ ] Déplacer scabilité dans biduleur (sur lieu et ville) ? (autorise moins de flexibiité though)
+- [ ] Déplacer insecabilité dans biduleur (sur lieu et ville) ? (autorise moins de flexibiité though)
 
 ## Priorité Moyenne
 - [x] Amélioration lisibilité finale (ex. caractère de bullet point comme paramètre, cadre pour date)

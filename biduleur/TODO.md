@@ -7,6 +7,7 @@
 - [x] Rendre le Biduleur comme un éxécutable.
 - [ ] Erreur avec fichier csv créé depuis excel (ex. C:\Users\thiba\Desktop\test.bidul\tapage.mardi.matin.2.csv)
 - [ ] Unit tests
+- [ ] Ajouter une config qui permet de définir le style (police, gras, capitale, minuscule, italique, etc...) pour chaque type d'info (lieu, ville, etc..)
 
 ## Priorité Moyenne
 - [ ] Optimiser les performances du tri pour les fichiers CSV volumineux.
