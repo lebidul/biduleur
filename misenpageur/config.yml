@@ -28,6 +28,10 @@ font_name: "Arial Narrow"
 font_size_min: 5
 font_size_max: 30.0
 
+#font_size_mode: auto  # ou "force"
+font_size_mode: force  # ou "force"
+font_size_forced: 7.9
+
 # Ratio entre taille et interligne (leading = font_size * leading_ratio)
 leading_ratio: 1.12
 
@@ -243,3 +247,13 @@ logo_hyperlinks:
   href: "https://www.facebook.com/p/Syncope-Prod-100009027701073/"
 - image: "UnikMusic.png"
   href: "https://www.facebook.com/unikmusicshop/?locale=fr_FR"
+
+stories:
+  enabled: true
+  output_dir: "misenpageur/bidul/stories"
+  width: 1080
+  height: 1920
+  agenda_font_name: "Arial Narrow" # Mettre un nom de police valide
+  agenda_font_size: 35
+  text_color: "#62d92f"
+  background_color: "#000000"

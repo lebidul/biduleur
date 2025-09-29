@@ -56,6 +56,8 @@ class Config:
 
     # --- Font & Layout ---
     font_name: str = "ArialNarrow"
+    font_size_mode: str = "auto"  # "auto" ou "force"
+    font_size_forced: float = 10.0 # Valeur si mode="force"
     font_size_min: float = 8.0
     font_size_max: float = 12.0
     leading_ratio: float = 1.15
@@ -84,6 +86,7 @@ class Config:
     section_1: Dict[str, Any] = field(default_factory=dict)
     pdf_layout: Dict[str, Any] = field(default_factory=dict)
     poster: Dict[str, Any] = field(default_factory=dict)
+    stories: Dict[str, Any] = field(default_factory=dict)
 
     skip_cover: bool = False
 
@@ -126,3 +129,17 @@ class DateLineConfig:
     width: float = 0.5
     color: str = "#000000"
     gap_after_text_mm: float = 3.0
+
+@dataclass
+class StoryConfig:
+    """Configuration pour la génération des images Stories."""
+    enabled: bool = False
+    output_dir: str = "stories"
+    width: int = 1080
+    height: int = 1920
+    cover_font_name: str = "Helvetica-Bold"
+    cover_font_size: int = 80
+    agenda_font_name: str = "Helvetica"
+    agenda_font_size: int = 40
+    background_color: str = "#FFFFFF"
+    text_color: str = "#000000"
