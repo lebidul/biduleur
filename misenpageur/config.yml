@@ -258,5 +258,5 @@ stories:
   agenda_font_size: 18
   text_color: "#62d92f"
   background_color: "#000000"
-  margin: 30                 # Marge plus petite (40px de chaque côté)
-  line_spacing_ratio: 2.0   # Interligne plus grand (120%)
+  margin: 25                # Marge plus petite
+  line_spacing_ratio: 2.0   # Interligne plus grand (200%)
