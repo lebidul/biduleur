@@ -230,3 +230,62 @@ def register_dsnet_stamped() -> bool:
 
     # On enregistre la police sous un nom simple que ReportLab utilisera
     return _register_font("DSNetStamped", font_file)
+
+
+def register_helvetica() -> bool:
+    """Tente d'enregistrer la famille Helvetica standard."""
+    # Helvetica est une police de base de PDF, mais enregistrer les TTF
+    # garantit une meilleure gestion des glyphes et de l'italique/gras.
+    roots = _fonts_roots()
+    variants = {
+        "regular": ["helvetica.ttf", "Helvetica.ttf", "LiberationSans-Regular.ttf"],
+        "bold": ["helveticabd.ttf", "Helvetica-Bold.ttf", "LiberationSans-Bold.ttf"],
+        "italic": ["helveticai.ttf", "Helvetica-Oblique.ttf", "LiberationSans-Italic.ttf"],
+        "bolditalic": ["helveticabi.ttf", "Helvetica-BoldOblique.ttf", "LiberationSans-BoldItalic.ttf"],
+    }
+
+    def find(kind: str) -> Optional[str]:
+        paths = [os.path.join(r, n) for r in roots for n in variants[kind]]
+        return _first_existing(paths)
+
+    reg, b, i, bi = find("regular"), find("bold"), find("italic"), find("bolditalic")
+    if not reg: return False
+    return _register_family_partial("Helvetica", reg, b, i, bi)
+
+
+def register_times() -> bool:
+    """Tente d'enregistrer la famille Times New Roman."""
+    roots = _fonts_roots()
+    variants = {
+        "regular": ["times.ttf", "timesnr.ttf", "Times New Roman.ttf", "LiberationSerif-Regular.ttf"],
+        "bold": ["timesbd.ttf", "Times New Roman Bold.ttf", "LiberationSerif-Bold.ttf"],
+        "italic": ["timesi.ttf", "Times New Roman Italic.ttf", "LiberationSerif-Italic.ttf"],
+        "bolditalic": ["timesbi.ttf", "Times New Roman Bold Italic.ttf", "LiberationSerif-BoldItalic.ttf"],
+    }
+
+    def find(kind: str) -> Optional[str]:
+        paths = [os.path.join(r, n) for r in roots for n in variants[kind]]
+        return _first_existing(paths)
+
+    reg, b, i, bi = find("regular"), find("bold"), find("italic"), find("bolditalic")
+    if not reg: return False
+    return _register_family_partial("Times New Roman", reg, b, i, bi)
+
+
+def register_courier() -> bool:
+    """Tente d'enregistrer la famille Courier New."""
+    roots = _fonts_roots()
+    variants = {
+        "regular": ["cour.ttf", "Courier New.ttf", "LiberationMono-Regular.ttf"],
+        "bold": ["courbd.ttf", "Courier New Bold.ttf", "LiberationMono-Bold.ttf"],
+        "italic": ["couri.ttf", "Courier New Italic.ttf", "LiberationMono-Italic.ttf"],
+        "bolditalic": ["courbi.ttf", "Courier New Bold Italic.ttf", "LiberationMono-BoldItalic.ttf"],
+    }
+
+    def find(kind: str) -> Optional[str]:
+        paths = [os.path.join(r, n) for r in roots for n in variants[kind]]
+        return _first_existing(paths)
+
+    reg, b, i, bi = find("regular"), find("bold"), find("italic"), find("bolditalic")
+    if not reg: return False
+    return _register_family_partial("Courier New", reg, b, i, bi)

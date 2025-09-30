@@ -14,7 +14,8 @@ from .config import Config, BulletConfig, PosterConfig, DateBoxConfig, DateLineC
 from .layout import Layout, Section
 from .html_utils import extract_paragraphs_from_html
 from .drawing import draw_s1, draw_s2_cover, list_images, paragraph_style, draw_poster_logos
-from .fonts import register_arial_narrow, register_dejavu_sans, register_dsnet_stamped
+from .fonts import (register_arial_narrow, register_dejavu_sans, register_dsnet_stamped,
+                    register_arial, register_helvetica, register_times, register_courier)
 from .spacing import SpacingConfig, SpacingPolicy
 from .textflow import (
     measure_fit_at_fs, draw_section_fixed_fs_with_prelude, draw_section_fixed_fs_with_tail,
@@ -470,6 +471,10 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
 
     # --- Polices ---
     register_dsnet_stamped()
+    register_arial()
+    register_helvetica()
+    register_times()
+    register_courier()
     if register_arial_narrow():
         cfg.font_name = "ArialNarrow"
     else:

@@ -1,8 +1,10 @@
 # leTruc/callbacks.py
 # -*- coding: utf-8 -*-
 import os
-from tkinter import filedialog, messagebox, colorchooser
+import tkinter as tk
+from tkinter import filedialog, messagebox, colorchooser, ttk
 from PIL import Image, ImageTk
+
 
 # On importe les helpers qui contiennent la logique "métier"
 from ._helpers import _default_paths_from_input, save_embedded_template, open_file
@@ -217,18 +219,24 @@ def on_update_stories_alpha_label(app):
 
 def on_toggle_cucaracha_widgets(app):
     """Affiche ou cache les options de la boîte Cucaracha."""
+    # On cache maintenant les conteneurs et non plus les widgets individuels
     widgets_to_hide = [
-        app.cucaracha_text_entry, app.cucaracha_font_label, app.cucaracha_font_combo,
-        app.cucaracha_image_entry, app.cucaracha_image_button, app.cucaracha_preview
+        app.cucaracha_text_widget,
+        app.cucaracha_font_frame,  # On cache le cadre entier
+        app.cucaracha_image_entry,
+        app.cucaracha_image_button,
+        app.cucaracha_preview
     ]
     for widget in widgets_to_hide:
         widget.grid_remove()
 
     ctype = app.cucaracha_type_var.get()
     if ctype == "text":
-        app.cucaracha_text_entry.grid(row=1, column=0, columnspan=3, sticky="ew", pady=(5, 0))
-        app.cucaracha_font_label.grid(row=2, column=0, sticky="w", padx=5, pady=5)
-        app.cucaracha_font_combo.grid(row=2, column=1, sticky="w", padx=5)
+        # On affiche la zone de texte
+        app.cucaracha_text_widget.grid(row=1, column=0, columnspan=3, sticky="ew", pady=(5, 0))
+        # Et on affiche le cadre des options de police juste en dessous
+        app.cucaracha_font_frame.grid(row=2, column=0, columnspan=3, sticky="w", padx=5, pady=5)
+
     elif ctype == "image":
         app.cucaracha_image_entry.grid(row=1, column=0, columnspan=2, sticky="ew", pady=5)
         app.cucaracha_image_button.grid(row=1, column=2, padx=5)
