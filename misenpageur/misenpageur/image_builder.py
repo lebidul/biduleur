@@ -64,9 +64,12 @@ def _draw_text_wrapped(
 # --- Fonctions principales ---
 
 def _create_story_cover(cfg: StoryConfig, main_cfg: Config, project_root: str):
+    """Génère l'image de couverture et retourne 1 en cas de succès, 0 sinon."""
     # ... (fonction inchangée)
     cover_path = Path(project_root) / main_cfg.cover_image
-    if not cover_path.exists(): return
+    if not cover_path.exists():
+        print("[WARN] Image de couverture introuvable, la story de couv ne sera pas générée.")
+        return 0 # Retourne 0 car aucun fichier n'a été créé
     background = Image.new("RGB", (cfg.width, cfg.height), color="#000000")
     with Image.open(cover_path) as img:
         img.thumbnail((cfg.width, cfg.height), Image.Resampling.LANCZOS)
@@ -77,6 +80,7 @@ def _create_story_cover(cfg: StoryConfig, main_cfg: Config, project_root: str):
     output_path.parent.mkdir(parents=True, exist_ok=True)
     background.save(output_path, "PNG")
     print(f"[INFO] Story de couverture générée : {output_path}")
+    return 1 # Retourne 1 car le fichier a été créé avec succès
 
 
 def _create_story_agenda(cfg: StoryConfig, paragraphs: List[str]):
@@ -168,13 +172,27 @@ def _create_story_agenda(cfg: StoryConfig, paragraphs: List[str]):
         img.save(output_path, "PNG")
         print(f"[INFO] Story de l'agenda générée : {output_path}")
 
+    return page_num # Retourne le nombre total de pages créées
+
 
 def generate_story_images(project_root: str, cfg: Config, paras: List[str]):
-    # ... (fonction inchangée)
+    """
+    Point d'entrée pour la génération des images.
+    Retourne le nombre total d'images (PNG) créées.
+    """
     story_cfg_dict = cfg.stories
-    if not story_cfg_dict.get("enabled", False): return
+    if not story_cfg_dict.get("enabled", False):
+        return 0 # Retourne 0 si la fonctionnalité est désactivée
+
     story_cfg = StoryConfig(**story_cfg_dict)
+
     print("\n--- Génération des images pour Stories ---")
-    _create_story_cover(story_cfg, cfg, project_root)
-    _create_story_agenda(story_cfg, paras)
+
+    # On capture les valeurs retournées et on les additionne
+    cover_images_created = _create_story_cover(story_cfg, cfg, project_root)
+    agenda_images_created = _create_story_agenda(story_cfg, paras)
+
+    total_images = cover_images_created + agenda_images_created
+
     print("------------------------------------------\n")
+    return total_images  # On retourne le total

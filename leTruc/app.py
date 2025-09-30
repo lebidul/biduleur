@@ -43,8 +43,8 @@ class Application(tk.Tk):
 
         # 3. ENSUITE, CRÉER les conteneurs principaux de l'interface
         self._create_scrollable_area()
-        self._create_action_bar()
-        self._create_status_bar()
+        self._create_action_and_status_bar()
+        self.total_progress_steps = 1
 
         # 4. ENFIN, remplir les conteneurs avec les widgets et leurs callbacks
         widgets.create_all(self)
@@ -137,27 +137,23 @@ class Application(tk.Tk):
         self.scrollable_frame.bind("<Configure>", self._on_frame_configure)
         self.canvas.bind("<Configure>", self._on_canvas_configure)
 
-    def _create_action_bar(self):
-        """Crée la barre d'action fixe en bas (bouton, progress bar)."""
+    def _create_action_and_status_bar(self):
+        """Crée la barre d'action fixe en bas, incluant le label de statut."""
         action_frame = ttk.Frame(self, padding="10")
         action_frame.grid(row=1, column=0, sticky="ew")
         action_frame.columnconfigure(0, weight=1)
 
-        self.progress_bar = ttk.Progressbar(action_frame, mode='indeterminate')
+        # 1. Créer le label de statut et le placer en haut du cadre
+        self.status_label = tk.Label(action_frame, textvariable=self.status_var, font=("Arial", 10))
+        self.status_label.pack(fill=tk.X, padx=5, pady=(0, 5))
+
+        # 2. Changer le mode en 'determinate'
+        self.progress_bar = ttk.Progressbar(action_frame, mode='determinate')
         self.progress_bar.pack(fill=tk.X, padx=5, pady=(0, 5))
 
-        # Le parent du bouton est 'action_frame', pas 'self'.
+        # 3. Le bouton "Lancer" vient en dernier
         self.run_button = tk.Button(action_frame, text="Lancer la Génération", bg="#4CAF50", fg="white", font=("Arial", 12, "bold"))
-
         self.run_button.pack(pady=10, ipady=5)
-
-    def _create_status_bar(self):
-        """Crée la barre de statut fixe tout en bas."""
-        # Le parent de la barre de statut est 'self' (la fenêtre racine),
-        # et elle doit être placée avec .grid() comme ses frères et sœurs.
-        # Nous allons créer le widget et le placer directement ici.
-        status_bar = tk.Label(self, textvariable=self.status_var, bd=1, relief=tk.SUNKEN, anchor=tk.W, padx=10, pady=5, font=("Arial", 10))
-        status_bar.grid(row=2, column=0, sticky="ew")
 
     # --- Méthodes de Callback pour l'exécution ---
 
@@ -206,13 +202,16 @@ class Application(tk.Tk):
         validated_args['stories_font_size_val'] = int(self.stories_font_size_var.get().strip())
 
         self.status_var.set("Traitement en cours…")
-        self.progress_bar.start()
         self.run_button.config(state=tk.DISABLED)
 
         # Créer et démarrer le thread de travail en lui passant le dictionnaire des arguments validés
         thread = threading.Thread(target=self._run_pipeline_in_thread, args=(validated_args,))
         thread.daemon = True
         thread.start()
+
+        # On réinitialise la barre de progression
+        self.progress_bar.config(value=0)
+        self.status_var.set("Démarrage du processus...")
 
         self.after(100, self._check_thread_for_results)
 
@@ -224,7 +223,7 @@ class Application(tk.Tk):
         # On utilise le helper _helpers.run_pipeline qui a été importé
         from ._helpers import run_pipeline
 
-        ok, msg = run_pipeline(
+        run_pipeline(
             # On passe les arguments en utilisant les clés du dictionnaire
             # pour éviter toute erreur d'ordre.
             self.result_queue,
@@ -266,7 +265,6 @@ class Application(tk.Tk):
             stories_bg_image=self.stories_bg_image_var.get().strip(),
             stories_alpha=self.stories_alpha_var.get()
         )
-        self.result_queue.put((ok, msg))
 
     def _check_thread_for_results(self):
         """
@@ -274,20 +272,26 @@ class Application(tk.Tk):
         et met à jour l'interface.
         """
         try:
-            # On traite tous les messages en attente dans la queue
             while not self.result_queue.empty():
-                msg_type, data1, data2 = self.result_queue.get(block=False)
+                message = self.result_queue.get(block=False)
+                msg_type = message[0]
 
-                if msg_type == 'status':
-                    # C'est un message de statut, on met à jour le label
-                    self.status_var.set(data1)
+                if msg_type == 'start':
+                    self.total_progress_steps = message[1]
+                    self.progress_bar.config(maximum=self.total_progress_steps)
+
+                elif msg_type == 'status':
+                    status_text = message[1]
+                    current_step = message[2]
+                    self.status_var.set(status_text)
+                    self.progress_bar.config(value=current_step)
 
                 elif msg_type == 'final':
-                    # C'est le message final, on arrête tout
-                    self.progress_bar.stop()
+                    ok, msg = message[1], message[2]
+
+                    self.progress_bar.config(value=self.total_progress_steps)  # Remplir à 100%
                     self.run_button.config(state=tk.NORMAL)
 
-                    ok, msg = data1, data2
                     if ok:
                         VictoryWindow(self, summary_text=msg)
                         self.status_var.set("Terminé avec succès.")

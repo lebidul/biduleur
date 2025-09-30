@@ -1,5 +1,37 @@
 
+
+# Bidul v1.3.0 - Export pour les Réseaux Sociaux et Personnalisation Avancée
+
+Cette version majeure marque une nouvelle étape pour Bidul, en ouvrant la porte à la création de contenu pour les réseaux sociaux et en offrant un contrôle sans précédent sur la mise en page et le rendu final.
+
+## ✨ Nouveautés
+
+*   **Génération d'Images pour les Stories Instagram** : Bidul peut désormais générer des fichiers `.png` parfaitement optimisés pour les formats verticaux (1080x1920). Une nouvelle section dans l'interface graphique offre un contrôle créatif total sur le rendu :
+    *   **Personnalisation de la police** : Choisissez la police, la taille et la couleur du texte de l'agenda.
+    *   **Fond sur mesure** : Optez pour une couleur de fond unie ou sélectionnez une image de fond personnalisée.
+    *   **Contrôle de la transparence** : Lors de l'utilisation d'une image de fond, un voile blanc semi-transparent peut être appliqué, avec un slider pour en régler l'opacité.
+    *   **Ajustement fin de la mise en page** : Réglez les marges horizontales et l'interligne du texte pour un résultat parfait (dans fichier de configuration).
+
+*   **Boîte "Cucaracha" Multiligne et Personnalisable** : La boîte de contenu personnalisé a été entièrement revue pour plus de flexibilité :
+    *   **Support du texte multiligne** : Le champ de saisie permet désormais d'entrer du texte sur plusieurs lignes avec des sauts de ligne.
+    *   **Taille de police configurable** : Vous pouvez maintenant choisir la taille de la police directement depuis l'interface.
+
+## 🔧 Améliorations et Corrections
+
+*   **Contrôle Manuel de la Taille de Police** : Une nouvelle option "Forcée" dans la section "Mise en Page Globale" vous permet de désactiver le calcul automatique de la taille de police de l'agenda et de définir vous-même une valeur fixe. Si le texte dépasse, il sera simplement tronqué.
+*   **Amélioration du Retour Utilisateur pendant la Génération** : L'expérience de génération a été rendue plus transparente et informative :
+    *   La barre de progression n'est plus une simple animation, elle affiche désormais un **pourcentage réel (de 0 à 100%)** de l'avancement du processus.
+    *   Le texte de statut au-dessus de la barre a été amélioré pour indiquer **précisément l'étape en cours** (ex: "Étape 3/5 : Création du PDF...").
+    *   Pour les stories, le message de statut final indique le **nombre exact d'images `.png` créées**.
+*   **Correction du Bug des Polices Italiques** : Le problème qui empêchait les polices (autres qu'Arial) de s'afficher correctement en italique dans la boîte Cucaracha a été résolu. Le système d'enregistrement des polices a été fiabilisé.
+
+## ⚙️ Pour les Développeuses et Développeurs
+
+*   **Nouveau Moteur de Rendu d'Images avec Pillow** : La génération des stories est gérée par un nouveau module dédié (`misenpageur/image_builder.py`) qui utilise la bibliothèque `Pillow` pour dessiner directement sur des images PNG, indépendamment du moteur PDF ReportLab.
+*   **Communication Asynchrone Améliorée** : Le système de communication entre le thread de travail et l'interface graphique a été refactorisé. La fonction `run_pipeline` envoie désormais des messages de statut structurés via une `queue`, permettant à l'interface de mettre à jour le texte et la barre de progression en temps réel.
+
 ---
+
 # Bidul v1.2.13 - Prise en charge des Hyperliens dans l'Agenda
 
 Cette version introduit une nouvelle fonctionnalité majeure pour l'interactivité des documents PDF : la reconnaissance automatique des hyperliens présents dans les données sources.

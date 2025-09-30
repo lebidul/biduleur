@@ -198,12 +198,28 @@ def run_pipeline(
     final_layout_path = None
     report = {}
     try:
+        status_queue.put(('status', "Préparation...", 0, None))
+
+        # 1. Calculer le nombre total d'étapes à l'avance
+        total_steps = 3  # 3 étapes de base : analyse, HTML, PDF/fin
+        if generate_svg and out_svg:
+            total_steps += 1
+        if generate_stories:
+            total_steps += 1
+
+        # 2. Envoyer un message d'initialisation avec le total
+        status_queue.put(('start', total_steps, None))
+        current_step = 0
+
         for p in (out_html, out_agenda_html, out_pdf, out_svg):
             if p: _ensure_parent_dir(p)
 
-        status_queue.put(('status', "Étape 1/5 : Analyse du fichier d'entrée...", None))
+        current_step += 1
+        status_queue.put(('status', f"Étape {current_step}/{total_steps} : Analyse du fichier...", current_step, None))
         html_body_bidul, html_body_agenda, number_of_lines = parse_bidul(input_file)
-        status_queue.put(('status', "Étape 2/5 : Génération des fichiers HTML...", None))
+
+        current_step += 1
+        status_queue.put(('status', f"Étape {current_step}/{total_steps} : Génération des HTML...", current_step, None))
         output_html_file(html_body_bidul, original_file_name=input_file, output_filename=out_html)
         output_html_file(html_body_agenda, original_file_name=input_file, output_filename=out_agenda_html)
 
@@ -258,16 +274,20 @@ def run_pipeline(
         lay = Layout.from_yaml(final_layout_path)
 
         if out_pdf:
-            status_queue.put(('status', "Étape 3/5 : Création du document PDF...", None))
+            current_step += 1
+            status_queue.put(('status', f"Étape {current_step}/{total_steps} : Création du PDF...", current_step, None))
             report = build_pdf(project_root, cfg, lay, out_pdf, cfg_path, paras)
         if generate_svg and out_svg:
             if not report:
                 report = build_pdf(project_root, cfg, lay, os.devnull, cfg_path, paras)
-            status_queue.put(('status', "Étape 4/5 : Conversion en SVG...", None))
+            current_step += 1
+            status_queue.put(('status', f"Étape {current_step}/{total_steps} : Conversion en SVG...", current_step, None))
             build_svg(project_root, cfg, lay, out_svg, cfg_path, paras)
         if generate_stories:
-            status_queue.put(('status', "Étape 5/5 : Création des images pour les Stories...", None))
-            generate_story_images(project_root, cfg, paras)
+            current_step += 1
+            # Message "en cours"
+            status_queue.put(('status', f"Étape {current_step}/{total_steps} : Création des Stories...", current_step, None))
+            num_stories_created = generate_story_images(project_root, cfg, paras)
 
         status_queue.put(('status', "Finalisation...", None))
 
@@ -289,6 +309,8 @@ def run_pipeline(
             fs_poster_opt = report.get("font_size_poster_optimal", 0)
             summary_lines.append(
                 f"Taille de police (poster)    : {fs_poster:.2f} pt (optimale: {fs_poster_opt:.2f} pt)")
+        if generate_stories and stories_output_dir:
+            summary_lines.append(f"Nombre de fichiers images créés pour la Story: {num_stories_created}")
 
         status_queue.put(('final', True, "\n".join(summary_lines)))
 

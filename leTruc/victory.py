@@ -18,7 +18,7 @@ class VictoryWindow(tk.Toplevel):
 
         # --- Vos paramètres personnalisés ---
         self.background_color = "#d938d3"
-        width, height = 864, 648
+        width, height = 864, 700
         card_thumb_size = (198, 279)
 
         self.geometry(f"{width}x{height}")
