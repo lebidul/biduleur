@@ -109,6 +109,9 @@ class Application(tk.Tk):
         self.cucaracha_type_var = tk.StringVar(value=self.cfg_defaults.get("cucaracha_type", "none"))
         self.cucaracha_value_var = tk.StringVar(value=self.cfg_defaults.get("cucaracha_value", ""))
         self.cucaracha_font_var = tk.StringVar(value=self.cfg_defaults.get("cucaracha_text_font", "Arial"))
+        self.cucaracha_font_size_var = tk.StringVar(value=str(self.cfg_defaults.get("cucaracha_text_font_size", "8")))
+        self.cucaracha_text_widget = None
+        self.cucaracha_frame = None
 
         # --- Variables de sortie et de statut ---
         self.generate_svg_var = tk.BooleanVar(value=True)
@@ -167,15 +170,30 @@ class Application(tk.Tk):
             messagebox.showerror("Erreur", "Veuillez sélectionner un fichier d’entrée.")
             return
 
+        # On initialise les arguments validés avec les valeurs par défaut
+        validated_args = {
+            'cuca_value_val': "",
+            'cuca_font_size_val': 8, # Valeur par défaut sûre
+        }
+
+        # On récupère la valeur de la Cucaracha depuis le bon widget
+        cucaracha_type = self.cucaracha_type_var.get()
+        if cucaracha_type == "text":
+            validated_args['cuca_value_val'] = self.cucaracha_text_widget.get("1.0", tk.END).strip()
+        elif cucaracha_type == "image":
+            validated_args['cuca_value_val'] = self.cucaracha_value_var.get().strip()
+        # Si c'est "none", la valeur reste une chaîne vide, ce qui est correct.
+
         try:
-            # On valide toutes les entrées numériques en une seule fois
-            validated_args = {
+            validated_args.update({
                 'margin_val': float(self.margin_var.get().strip().replace(',', '.')),
                 'safety_factor_val': float(self.safety_factor_var.get().strip().replace(',', '.')),
                 'date_spacing_val': float(self.date_spacing_var.get().strip().replace(',', '.')),
                 'logos_padding_val': float(self.logos_padding_var.get().strip().replace(',', '.')),
-                'font_size_forced_val': float(self.font_size_forced_var.get().strip().replace(',', '.'))
-            }
+                'font_size_forced_val': float(self.font_size_forced_var.get().strip().replace(',', '.')),
+                'stories_font_size_val': int(self.stories_font_size_var.get().strip()),
+                'cuca_font_size_val': int(self.cucaracha_font_size_var.get().strip())
+            })
         except ValueError:
             messagebox.showerror("Erreur", "Les champs numériques (marges, espacement, etc.) doivent être valides.")
             return
@@ -185,7 +203,6 @@ class Application(tk.Tk):
             messagebox.showerror("Erreur", "Le titre du poster est obligatoire.")
             return
 
-        validated_args['cuca_value_val'] = self.cucaracha_value_var.get().strip()
         validated_args['stories_font_size_val'] = int(self.stories_font_size_var.get().strip())
 
         self.status_var.set("Traitement en cours…")
@@ -238,6 +255,7 @@ class Application(tk.Tk):
             cucaracha_type=self.cucaracha_type_var.get(),
             cucaracha_value=validated_args['cuca_value_val'],
             cucaracha_text_font=self.cucaracha_font_var.get(),
+            cucaracha_font_size=validated_args['cuca_font_size_val'],
             date_box_back_color=self.date_box_back_color_var.get(),
             stories_font_name=self.stories_font_name_var.get(),
             stories_font_size=validated_args['stories_font_size_val'],

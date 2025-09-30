@@ -502,6 +502,7 @@ def _draw_cucaracha_box(c: canvas.Canvas, box_coords: tuple, cfg: Config):
     c_cfg = cfg.cucaracha_box
     content_type = c_cfg.get("content_type", "none")
     content_value = c_cfg.get("content_value", ".")
+
     if content_type == "none": return
 
     c.saveState()
@@ -520,19 +521,37 @@ def _draw_cucaracha_box(c: canvas.Canvas, box_coords: tuple, cfg: Config):
 
     if content_type == "text":
         font_name = c_cfg.get("text_font_name", "Arial")
+
+        font_size_value_from_cfg = c_cfg.get("text_font_size", 10)
+
+        # 1. Récupérer la taille de police et la convertir en nombre
+        try:
+            font_size = float(c_cfg.get("text_font_size", 10))
+        except (ValueError, TypeError):
+            font_size = 10.0 # Fallback
+
+        # 2. On gère le style italique avec des balises, ce qui est plus robuste.
+        text_content = content_value.replace('\n', '<br/>')
         if c_cfg.get("text_style", "normal") == "italic":
-            try:
-                pdfmetrics.getFont(font_name + "-Italic")
-                font_name += "-Italic"
-            except:
-                pass
+            text_content = f"<i>{text_content}</i>"
+
         align_map = {"left": TA_LEFT, "center": TA_CENTER, "right": TA_RIGHT}
         alignment = align_map.get(c_cfg.get("text_align", "center"), TA_CENTER)
-        text_style = ParagraphStyle('CucarachaText', fontName=font_name, fontSize=c_cfg.get("text_font_size", 10),
-                                    leading=c_cfg.get("text_font_size", 10) * 1.3, alignment=alignment)
-        story = [Paragraph(content_value.replace('\n', '<br/>'), text_style)]
+
+        # 3. On crée le style avec la variable `font_size` qui est garantie d'être un nombre.
+        text_style = ParagraphStyle(
+            'CucarachaText',
+            fontName=font_name,
+            fontSize=font_size,
+            leading=font_size * 1.3,  # Ce calcul est maintenant sûr.
+            alignment=alignment
+        )
+        story = [Paragraph(text_content, text_style)]
+
+        # 4. On dessine le cadre avec une bordure pour le débogage si le texte est vide.
         frame = Frame(content_x, content_y, content_w, content_h, showBoundary=0)
         frame.addFromList(story, c)
+
     elif content_type == "image":
         if os.path.exists(content_value):
             try:

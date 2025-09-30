@@ -20,11 +20,11 @@
 - [ ] Ajouter stories dans cli misenpageur
 - [ ] Sélectionner dossier output pour svg (nom des fichiers par défaut) comme la story instagram
 - [x] Ajouter au FE fine tuning pour posts instagram (backend color ou image (+ transparency), font, font color)
-- [ ] Cucaracha: ajout de saut de ligne dans texte. perte italique si non arial
+- [x] Cucaracha: ajout de saut de ligne dans texte. perte italique si non arial
 - [ ] Ajouter export fichier config.json silencieux et fichier log
 - [ ] Ajouter fichier de config.json avec valeurs par défaut (+ config débug) dans build. Fichier ensuite utilisé à runTime mais qui peut-être édité 
 - [ ] Améliorer niveaux de débug
-- [ ] Ajouter infos sur fichier stories et taille police cucaracha box dans boite summary
+- [ ] Ajouter infos sur fichier stories (qté) dans boite summary
 
 ## Priorité Moyenne
 - [x] Refactor dans dossier bidul.biduleur/bidul.

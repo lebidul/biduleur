@@ -123,22 +123,40 @@ def _create_logos_section(parent, app, ui_row):
 def _create_cucaracha_section(parent, app, ui_row):
     """Crée la section pour la boîte Cucaracha."""
     r = ui_row['r']
-    cucaracha_frame = ttk.LabelFrame(parent, text="Boîte 'Cucaracha'", padding="10")
-    cucaracha_frame.grid(row=r, column=0, columnspan=3, sticky="ew", pady=10)
-    cucaracha_frame.columnconfigure(1, weight=1)
+    app.cucaracha_frame = ttk.LabelFrame(parent, text="Boîte 'Cucaracha'", padding="10")
+    app.cucaracha_frame.grid(row=r, column=0, columnspan=3, sticky="ew", pady=10)
+    app.cucaracha_frame.columnconfigure(1, weight=1)
 
-    # Création et stockage de TOUS les widgets conditionnels
-    app.cucaracha_text_entry = tk.Entry(cucaracha_frame, textvariable=app.cucaracha_value_var)
-    app.cucaracha_font_label = tk.Label(cucaracha_frame, text="Police :")
-    app.cucaracha_font_combo = ttk.Combobox(cucaracha_frame, textvariable=app.cucaracha_font_var,
-                                            values=["Arial", "Helvetica", "Times", "Courier"], state="readonly")
-    app.cucaracha_image_entry = tk.Entry(cucaracha_frame, textvariable=app.cucaracha_value_var)
-    app.cucaracha_image_button = tk.Button(cucaracha_frame, text="Parcourir…")
-    # On crée le widget d'aperçu mais on ne le place pas
-    app.cucaracha_preview = tk.Label(cucaracha_frame, text="Aucun aperçu", relief="sunken", padx=5, pady=5)
+    # --- Widgets pour le type "Texte" ---
+    app.cucaracha_text_widget = tk.Text(app.cucaracha_frame, height=4, wrap=tk.WORD)
+    app.cucaracha_text_widget.insert("1.0", app.cucaracha_value_var.get())
 
-    # Création des boutons radio
-    radio_frame = ttk.Frame(cucaracha_frame)
+    # 1. On crée le cadre qui contiendra les options de police.
+    app.cucaracha_font_frame = ttk.Frame(app.cucaracha_frame)
+
+    # 2. On crée les widgets de police en leur donnant `app.cucaracha_font_frame` comme parent.
+    app.cucaracha_font_label = tk.Label(app.cucaracha_font_frame, text="Police :")
+    font_options = ["Arial", "Helvetica", "Times New Roman", "Courier", "DejaVu Sans"]
+    app.cucaracha_font_combo = ttk.Combobox(app.cucaracha_font_frame, textvariable=app.cucaracha_font_var,
+                                            values=font_options, state="readonly")
+    app.cucaracha_font_size_label = tk.Label(app.cucaracha_font_frame, text="Taille (pt):")
+    app.cucaracha_font_size_entry = tk.Entry(app.cucaracha_font_frame, textvariable=app.cucaracha_font_size_var,
+                                             width=5)
+
+    # 3. On utilise .pack() pour organiser les widgets À L'INTÉRIEUR du `font_frame`.
+    #    Ceci est autorisé car `font_frame` n'a pas encore de widgets gérés par .grid().
+    app.cucaracha_font_label.pack(side=tk.LEFT)
+    app.cucaracha_font_combo.pack(side=tk.LEFT, padx=(0, 10))
+    app.cucaracha_font_size_label.pack(side=tk.LEFT)
+    app.cucaracha_font_size_entry.pack(side=tk.LEFT)
+
+    # --- Widgets pour le type "Image" ---
+    app.cucaracha_image_entry = tk.Entry(app.cucaracha_frame, textvariable=app.cucaracha_value_var)
+    app.cucaracha_image_button = tk.Button(app.cucaracha_frame, text="Parcourir…")
+    app.cucaracha_preview = tk.Label(app.cucaracha_frame, text="Aucun aperçu", relief="sunken", padx=5, pady=5)
+
+    # --- Widgets communs ---
+    radio_frame = ttk.Frame(app.cucaracha_frame)
     radio_frame.grid(row=0, column=0, columnspan=3, sticky="w")
     tk.Radiobutton(radio_frame, text="Rien", variable=app.cucaracha_type_var, value="none").pack(side=tk.LEFT)
     tk.Radiobutton(radio_frame, text="Texte", variable=app.cucaracha_type_var, value="text").pack(side=tk.LEFT)
