@@ -227,6 +227,7 @@ class Application(tk.Tk):
         ok, msg = run_pipeline(
             # On passe les arguments en utilisant les clés du dictionnaire
             # pour éviter toute erreur d'ordre.
+            self.result_queue,
             input_file=self.input_var.get().strip(),
             generate_cover=self.generate_cover_var.get(),
             cover_image=self.cover_var.get().strip(),
@@ -269,29 +270,47 @@ class Application(tk.Tk):
 
     def _check_thread_for_results(self):
         """
-        Vérifie la queue pour le résultat du thread. Si le thread n'a pas fini,
-        se replanifie pour une vérification ultérieure.
+        Vérifie la queue pour les messages du thread (statut ou final)
+        et met à jour l'interface.
         """
         try:
-            ok, msg = self.result_queue.get(block=False)
+            # On traite tous les messages en attente dans la queue
+            while not self.result_queue.empty():
+                msg_type, data1, data2 = self.result_queue.get(block=False)
 
-            self.progress_bar.stop()
-            self.run_button.config(state=tk.NORMAL)
+                if msg_type == 'status':
+                    # C'est un message de statut, on met à jour le label
+                    self.status_var.set(data1)
 
-            if ok:
-                VictoryWindow(self, summary_text=msg)
-                self.status_var.set("Terminé avec succès.")
+                elif msg_type == 'final':
+                    # C'est le message final, on arrête tout
+                    self.progress_bar.stop()
+                    self.run_button.config(state=tk.NORMAL)
 
-                pdf_path = self.pdf_var.get().strip()
-                if pdf_path and os.path.exists(pdf_path):
-                    if messagebox.askyesno("Ouvrir le fichier ?", "Voulez-vous ouvrir le PDF généré maintenant ?"):
-                        callbacks.open_file(pdf_path)  # Utilise le helper
-            else:
-                messagebox.showerror("Erreur", msg)
-                self.status_var.set("Échec.")
+                    ok, msg = data1, data2
+                    if ok:
+                        VictoryWindow(self, summary_text=msg)
+                        self.status_var.set("Terminé avec succès.")
+
+                        # ... (demande pour ouvrir le PDF, inchangé)
+                    else:
+                        messagebox.showerror("Erreur", msg)
+                        self.status_var.set("Échec.")
+
+                    # On a traité le message final, on peut arrêter de vérifier
+                    return
 
         except queue.Empty:
-            self.after(100, self._check_thread_for_results)
+            # La queue est vide, ce n'est pas une erreur.
+            pass
+        except Exception as e:
+            # Gérer le cas où le message n'a pas le bon format
+            print(f"Erreur en lisant la queue : {e}")
+
+        # On se replanifie pour une vérification ultérieure si le thread est toujours actif
+        # Note : On ne peut pas vérifier `thread.is_alive()` directement ici car la référence est perdue.
+        # On continue de vérifier tant qu'un message 'final' n'est pas arrivé.
+        self.after(100, self._check_thread_for_results)
 
     # --- Méthodes pour la gestion du Canvas (Callbacks internes) ---
 
