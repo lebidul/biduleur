@@ -6,6 +6,7 @@ from tkinter import messagebox, filedialog
 import subprocess
 import importlib.resources as res
 import tempfile
+import queue
 
 from biduleur.csv_utils import parse_bidul
 from biduleur.format_utils import output_html_file
@@ -169,6 +170,7 @@ def save_embedded_template(filename, title):
 
 # Cette fonction est utilisée par le thread
 def run_pipeline(
+        status_queue: queue.Queue,
         input_file: str, generate_cover: bool, cover_image: str, ours_background_png: str, logos_dir: str,
         logos_layout: str, logos_padding_mm: float, date_box_back_color: str,
         out_html: str, out_agenda_html: str, out_pdf: str, auteur_couv: str, auteur_couv_url: str,
@@ -190,16 +192,34 @@ def run_pipeline(
         from misenpageur.misenpageur.layout_builder import build_layout_with_margins
     except Exception as e:
         import traceback
-        # On retourne une erreur claire si l'import échoue
-        return False, f"Erreur critique: Impossible de charger le module 'misenpageur'.\n\nDétails:\n{type(e).__name__}: {e}\n\n{traceback.format_exc()}"
+        status_queue.put(('final', False, f"Erreur critique: ...\n{e}\n\n{traceback.format_exc()}"))
+        return
 
     final_layout_path = None
     report = {}
     try:
+        status_queue.put(('status', "Préparation...", 0, None))
+
+        # 1. Calculer le nombre total d'étapes à l'avance
+        total_steps = 3  # 3 étapes de base : analyse, HTML, PDF/fin
+        if generate_svg and out_svg:
+            total_steps += 1
+        if generate_stories:
+            total_steps += 1
+
+        # 2. Envoyer un message d'initialisation avec le total
+        status_queue.put(('start', total_steps, None))
+        current_step = 0
+
         for p in (out_html, out_agenda_html, out_pdf, out_svg):
             if p: _ensure_parent_dir(p)
 
+        current_step += 1
+        status_queue.put(('status', f"Étape {current_step}/{total_steps} : Analyse du fichier...", current_step, None))
         html_body_bidul, html_body_agenda, number_of_lines = parse_bidul(input_file)
+
+        current_step += 1
+        status_queue.put(('status', f"Étape {current_step}/{total_steps} : Génération des HTML...", current_step, None))
         output_html_file(html_body_bidul, original_file_name=input_file, output_filename=out_html)
         output_html_file(html_body_agenda, original_file_name=input_file, output_filename=out_agenda_html)
 
@@ -254,13 +274,22 @@ def run_pipeline(
         lay = Layout.from_yaml(final_layout_path)
 
         if out_pdf:
+            current_step += 1
+            status_queue.put(('status', f"Étape {current_step}/{total_steps} : Création du PDF...", current_step, None))
             report = build_pdf(project_root, cfg, lay, out_pdf, cfg_path, paras)
         if generate_svg and out_svg:
             if not report:
                 report = build_pdf(project_root, cfg, lay, os.devnull, cfg_path, paras)
+            current_step += 1
+            status_queue.put(('status', f"Étape {current_step}/{total_steps} : Conversion en SVG...", current_step, None))
             build_svg(project_root, cfg, lay, out_svg, cfg_path, paras)
         if generate_stories:
-            generate_story_images(project_root, cfg, paras)
+            current_step += 1
+            # Message "en cours"
+            status_queue.put(('status', f"Étape {current_step}/{total_steps} : Création des Stories...", current_step, None))
+            num_stories_created = generate_story_images(project_root, cfg, paras)
+
+        status_queue.put(('status', "Finalisation...", None))
 
         summary_lines = [
             f"Fichier d'entrée : {os.path.basename(input_file)}", "-" * 40, "Fichiers de sortie créés :"
@@ -280,8 +309,10 @@ def run_pipeline(
             fs_poster_opt = report.get("font_size_poster_optimal", 0)
             summary_lines.append(
                 f"Taille de police (poster)    : {fs_poster:.2f} pt (optimale: {fs_poster_opt:.2f} pt)")
+        if generate_stories and stories_output_dir:
+            summary_lines.append(f"Nombre de fichiers images créés pour la Story: {num_stories_created}")
 
-        return True, "\n".join(summary_lines)
+        status_queue.put(('final', True, "\n".join(summary_lines)))
 
     except PermissionError as e:
         # On intercepte SPÉCIFIQUEMENT l'erreur de permission
@@ -292,11 +323,11 @@ def run_pipeline(
             f"{os.path.basename(locked_file)}\n\n"
             f"Veuillez vous assurer que le fichier n'est pas ouvert dans un autre programme (comme Adobe Reader) et réessayez."
         )
-        return False, user_message
+        status_queue.put(('final', False, user_message))
 
     except Exception as e:
         import traceback
-        return False, f"{type(e).__name__}: {e}\n\n{traceback.format_exc()}"
+        status_queue.put(('final', False, f"{type(e).__name__}: {e}\n\n{traceback.format_exc()}"))
 
     finally:
         if final_layout_path and os.path.exists(final_layout_path) and Path(final_layout_path).name.endswith(".yml"):

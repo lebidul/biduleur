@@ -16,15 +16,15 @@
 - [x] Dossier logos dupliqué
 - [x] Possibilité dans front-end ou config de choisir si taille de police calculée (pour sections ,3,4,5,6) ou forcée. SI forcée est trop grosse alors overflow sections 4.
 - [x] Générer photos post instagram pour le bidul du mois
-- [ ] Améliorer progress display dans GUI
-- [ ] Ajouter stories dans cli misenpageur
-- [ ] Sélectionner dossier output pour svg (nom des fichiers par défaut) comme la story instagram
+- [x] Améliorer progress display dans GUI
+- [x] Ajouter infos sur fichier stories (qté) dans boite summary
 - [x] Ajouter au FE fine tuning pour posts instagram (backend color ou image (+ transparency), font, font color)
 - [x] Cucaracha: ajout de saut de ligne dans texte. perte italique si non arial
+- [ ] Ajouter stories dans cli misenpageur
+- [ ] Sélectionner dossier output pour svg (nom des fichiers par défaut) comme la story instagram
 - [ ] Ajouter export fichier config.json silencieux et fichier log
 - [ ] Ajouter fichier de config.json avec valeurs par défaut (+ config débug) dans build. Fichier ensuite utilisé à runTime mais qui peut-être édité 
 - [ ] Améliorer niveaux de débug
-- [ ] Ajouter infos sur fichier stories (qté) dans boite summary
 
 ## Priorité Moyenne
 - [x] Refactor dans dossier bidul.biduleur/bidul.
@@ -36,6 +36,7 @@
 - [x] Progress bar.
 - [x] Problème affichage release notes dans release github
 - [ ] Ajouter logique de texte gris si poster moyennement foncé
+- [ ] Afficher WARN si le texte de la cucaracha box ne rentre pas
 - [ ] Nouveau paramètre (on peut en ajouter au temps qu'on veut pour définir mise en style (police, gras, etc..) pour certaines chaines de caractères
 - [ ] Image de fond dans GUI
 - [ ] Dans ours l'auteur et les hyperlinks ne suivent pas le .png dans le cas d'une margin (marche bien actuellement avec une marge < 4mm))

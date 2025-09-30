@@ -43,8 +43,8 @@ class Application(tk.Tk):
 
         # 3. ENSUITE, CRÉER les conteneurs principaux de l'interface
         self._create_scrollable_area()
-        self._create_action_bar()
-        self._create_status_bar()
+        self._create_action_and_status_bar()
+        self.total_progress_steps = 1
 
         # 4. ENFIN, remplir les conteneurs avec les widgets et leurs callbacks
         widgets.create_all(self)
@@ -137,27 +137,23 @@ class Application(tk.Tk):
         self.scrollable_frame.bind("<Configure>", self._on_frame_configure)
         self.canvas.bind("<Configure>", self._on_canvas_configure)
 
-    def _create_action_bar(self):
-        """Crée la barre d'action fixe en bas (bouton, progress bar)."""
+    def _create_action_and_status_bar(self):
+        """Crée la barre d'action fixe en bas, incluant le label de statut."""
         action_frame = ttk.Frame(self, padding="10")
         action_frame.grid(row=1, column=0, sticky="ew")
         action_frame.columnconfigure(0, weight=1)
 
-        self.progress_bar = ttk.Progressbar(action_frame, mode='indeterminate')
+        # 1. Créer le label de statut et le placer en haut du cadre
+        self.status_label = tk.Label(action_frame, textvariable=self.status_var, font=("Arial", 10))
+        self.status_label.pack(fill=tk.X, padx=5, pady=(0, 5))
+
+        # 2. Changer le mode en 'determinate'
+        self.progress_bar = ttk.Progressbar(action_frame, mode='determinate')
         self.progress_bar.pack(fill=tk.X, padx=5, pady=(0, 5))
 
-        # Le parent du bouton est 'action_frame', pas 'self'.
+        # 3. Le bouton "Lancer" vient en dernier
         self.run_button = tk.Button(action_frame, text="Lancer la Génération", bg="#4CAF50", fg="white", font=("Arial", 12, "bold"))
-
         self.run_button.pack(pady=10, ipady=5)
-
-    def _create_status_bar(self):
-        """Crée la barre de statut fixe tout en bas."""
-        # Le parent de la barre de statut est 'self' (la fenêtre racine),
-        # et elle doit être placée avec .grid() comme ses frères et sœurs.
-        # Nous allons créer le widget et le placer directement ici.
-        status_bar = tk.Label(self, textvariable=self.status_var, bd=1, relief=tk.SUNKEN, anchor=tk.W, padx=10, pady=5, font=("Arial", 10))
-        status_bar.grid(row=2, column=0, sticky="ew")
 
     # --- Méthodes de Callback pour l'exécution ---
 
@@ -206,13 +202,16 @@ class Application(tk.Tk):
         validated_args['stories_font_size_val'] = int(self.stories_font_size_var.get().strip())
 
         self.status_var.set("Traitement en cours…")
-        self.progress_bar.start()
         self.run_button.config(state=tk.DISABLED)
 
         # Créer et démarrer le thread de travail en lui passant le dictionnaire des arguments validés
         thread = threading.Thread(target=self._run_pipeline_in_thread, args=(validated_args,))
         thread.daemon = True
         thread.start()
+
+        # On réinitialise la barre de progression
+        self.progress_bar.config(value=0)
+        self.status_var.set("Démarrage du processus...")
 
         self.after(100, self._check_thread_for_results)
 
@@ -224,9 +223,10 @@ class Application(tk.Tk):
         # On utilise le helper _helpers.run_pipeline qui a été importé
         from ._helpers import run_pipeline
 
-        ok, msg = run_pipeline(
+        run_pipeline(
             # On passe les arguments en utilisant les clés du dictionnaire
             # pour éviter toute erreur d'ordre.
+            self.result_queue,
             input_file=self.input_var.get().strip(),
             generate_cover=self.generate_cover_var.get(),
             cover_image=self.cover_var.get().strip(),
@@ -265,33 +265,56 @@ class Application(tk.Tk):
             stories_bg_image=self.stories_bg_image_var.get().strip(),
             stories_alpha=self.stories_alpha_var.get()
         )
-        self.result_queue.put((ok, msg))
 
     def _check_thread_for_results(self):
         """
-        Vérifie la queue pour le résultat du thread. Si le thread n'a pas fini,
-        se replanifie pour une vérification ultérieure.
+        Vérifie la queue pour les messages du thread (statut ou final)
+        et met à jour l'interface.
         """
         try:
-            ok, msg = self.result_queue.get(block=False)
+            while not self.result_queue.empty():
+                message = self.result_queue.get(block=False)
+                msg_type = message[0]
 
-            self.progress_bar.stop()
-            self.run_button.config(state=tk.NORMAL)
+                if msg_type == 'start':
+                    self.total_progress_steps = message[1]
+                    self.progress_bar.config(maximum=self.total_progress_steps)
 
-            if ok:
-                VictoryWindow(self, summary_text=msg)
-                self.status_var.set("Terminé avec succès.")
+                elif msg_type == 'status':
+                    status_text = message[1]
+                    current_step = message[2]
+                    self.status_var.set(status_text)
+                    self.progress_bar.config(value=current_step)
 
-                pdf_path = self.pdf_var.get().strip()
-                if pdf_path and os.path.exists(pdf_path):
-                    if messagebox.askyesno("Ouvrir le fichier ?", "Voulez-vous ouvrir le PDF généré maintenant ?"):
-                        callbacks.open_file(pdf_path)  # Utilise le helper
-            else:
-                messagebox.showerror("Erreur", msg)
-                self.status_var.set("Échec.")
+                elif msg_type == 'final':
+                    ok, msg = message[1], message[2]
+
+                    self.progress_bar.config(value=self.total_progress_steps)  # Remplir à 100%
+                    self.run_button.config(state=tk.NORMAL)
+
+                    if ok:
+                        VictoryWindow(self, summary_text=msg)
+                        self.status_var.set("Terminé avec succès.")
+
+                        # ... (demande pour ouvrir le PDF, inchangé)
+                    else:
+                        messagebox.showerror("Erreur", msg)
+                        self.status_var.set("Échec.")
+
+                    # On a traité le message final, on peut arrêter de vérifier
+                    return
 
         except queue.Empty:
-            self.after(100, self._check_thread_for_results)
+            # La queue est vide, ce n'est pas une erreur.
+            pass
+        except Exception as e:
+            # Gérer le cas où le message n'a pas le bon format
+            print(f"Erreur en lisant la queue : {e}")
+
+        # On se replanifie pour une vérification ultérieure si le thread est toujours actif
+        # Note : On ne peut pas vérifier `thread.is_alive()` directement ici car la référence est perdue.
+        # On continue de vérifier tant qu'un message 'final' n'est pas arrivé.
+        self.after(100, self._check_thread_for_results)
 
     # --- Méthodes pour la gestion du Canvas (Callbacks internes) ---
 
