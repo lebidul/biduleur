@@ -17,6 +17,7 @@ from lxml import etree
 from .config import Config
 from .layout import Layout
 from .pdfbuild import build_pdf
+from leTruc._helpers import get_resource_path
 
 
 def _post_process_svg(svg_path: Path, expected_event_count: int):
@@ -121,12 +122,14 @@ def build_svg(project_root: str, cfg: Config, layout: Layout, out_dir: str, conf
         output_prefix = "page"
 
         executable_name = "pdf2svg.exe"  # Le nom de base ne change pas
-        path_to_executable = os.path.join(project_root, "bin", "win64", executable_name)
+        # path_to_executable = os.path.join(project_root, "bin", "win64", executable_name)
+        path_to_executable = get_resource_path("bin/win64/pdf2svg.exe")
+
 
         # On utilise le chemin complet 'path_to_executable' et non plus 'executable_name'
         command = [path_to_executable, temp_pdf_path, str(output_dir / f"{output_prefix}_%d.svg"), "all"]
 
-        log.info(f"Lancement de la conversion SVG...")
+        log.info(f"Lancement de la conversion SVG. Commande : {' '.join(command)}")
         subprocess.run(command, capture_output=True, text=True, check=True)
 
         num_pages = len(event_counts)
