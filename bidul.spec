@@ -15,7 +15,7 @@ datas = [
     ('misenpageur/assets', 'misenpageur/assets'),
     ('misenpageur/config.yml', 'misenpageur'),
     ('misenpageur/layout.yml', 'misenpageur'),
-    ('venv/Lib/site-packages/tkinterdnd2', 'tkinterdnd2')
+    ('venv/Lib/site-packages/tkinterdnd2', 'tkinterdnd2'),
     ('biduleur/templates', 'biduleur/templates'),
     ('bin/win64', 'bin/win64'),
     ('biduleur', 'biduleur'), # Copier le dossier biduleur
