@@ -19,6 +19,9 @@ import math
 import rectpack
 from rectpack import float2dec, PackerGlobal, PackerBFF, PackerBNF
 
+import logging # Ajouter cet import
+log = logging.getLogger(__name__) # Obtenir le logger pour ce module
+
 from .fonts import register_arial
 from .layout import Layout, Section
 from .config import Config
@@ -284,10 +287,10 @@ def _draw_logos_two_columns(c: canvas.Canvas, col_coords: tuple, logos: List[str
                 # Créer le rectangle pour le lien invisible
                 link_rect = (logo_x, logo_y, logo_x + w_fit, logo_y + h_fit)
                 c.linkURL(url, link_rect, relative=0, thickness=0)
-                # print(f"[INFO] Lien créé pour '{logo_basename}' vers '{url}'") # Optionnel
+                log.info(f"Lien créé pour '{logo_basename}' vers '{url}'") # Optionnel
 
         except Exception as e:
-            print(f"[WARN] Erreur avec le logo {os.path.basename(logo_path)}: {e}")
+            log.warning(f"Erreur avec le logo {os.path.basename(logo_path)}: {e}")
 
 
 def _draw_logos_optimized(c: canvas.Canvas, col_coords: tuple, logo_paths: List[str], cfg: Config):
@@ -377,7 +380,7 @@ def _draw_logos_optimized(c: canvas.Canvas, col_coords: tuple, logo_paths: List[
             max_area = test_area
 
     if not best_placements:
-        print("[WARN] Aucune solution de packing n'a pu être trouvée.")
+        log.warning(f"Aucune solution de packing n'a pu être trouvée.")
         _draw_logos_two_columns(c, col_coords, logo_paths, Config())
         return
 
@@ -407,7 +410,7 @@ def _draw_logos_optimized(c: canvas.Canvas, col_coords: tuple, logo_paths: List[
             kwargs = {'mask': 'auto'} if not isinstance(c, SVGCanvas) else {}
             c.drawImage(logo_path, logo_x, logo_y, width=final_w, height=final_h, **kwargs)
         except Exception as e:
-            print(f"[WARN] Erreur avec le logo {os.path.basename(logo_path)} lors du dessin: {e}")
+            log.warning(f"Erreur avec le logo {os.path.basename(logo_path)} lors du dessin: {e}")
 
         # 3. Vérifier si un lien existe pour ce logo et le dessiner
         logo_basename = os.path.basename(logo_path)
@@ -417,7 +420,7 @@ def _draw_logos_optimized(c: canvas.Canvas, col_coords: tuple, logo_paths: List[
             # Créer le rectangle pour le lien invisible
             link_rect = (logo_x, logo_y, logo_x + final_w, logo_y + final_h)
             c.linkURL(url, link_rect, relative=0, thickness=0)
-            print(f"[INFO] Lien créé pour '{logo_basename}' vers '{url}'")
+            log.info(f"Lien créé pour '{logo_basename}' vers '{url}'")
 
 
 def draw_s1(c: canvas.Canvas, S1_coords, logos: List[str], cfg: Config, lay: Layout):
@@ -494,7 +497,7 @@ def draw_poster_logos(c: canvas.Canvas, s_coords: Section, logos: List[str]):
             kwargs = {'mask': 'auto'} if not isinstance(c, SVGCanvas) else {}
             c.drawImage(image_to_draw, logo_x, logo_y, width=w_fit, height=h_fit, **kwargs)
         except Exception as e:
-            print(f"[WARN] Impossible de dessiner le logo du poster {os.path.basename(logo_path)}: {e}")
+            log.warning(f"Impossible de dessiner le logo du poster {os.path.basename(logo_path)}: {e}")
 
 
 def _draw_cucaracha_box(c: canvas.Canvas, box_coords: tuple, cfg: Config):
@@ -576,4 +579,4 @@ def _draw_cucaracha_box(c: canvas.Canvas, box_coords: tuple, cfg: Config):
                 kwargs = {'mask': 'auto'} if not isinstance(c, SVGCanvas) else {}
                 c.drawImage(image_to_draw, logo_x, logo_y, width=w_fit, height=h_fit, **kwargs)
             except Exception as e:
-                print(f"[WARN] Erreur avec l'image de la Cucaracha Box : {e}")
+                log.warning(f"Erreur avec l'image de la Cucaracha Box : {e}")

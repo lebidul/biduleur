@@ -5,14 +5,19 @@ from pathlib import Path
 from tkinter import messagebox, filedialog
 import subprocess
 import importlib.resources as res
-import tempfile
 import queue
+from datetime import datetime
+import json
+from dataclasses import asdict
+import logging
 
 from biduleur.csv_utils import parse_bidul
 from biduleur.format_utils import output_html_file
 from misenpageur.misenpageur.html_utils import extract_paragraphs_from_html
 from misenpageur.misenpageur.image_builder import generate_story_images
 from misenpageur.misenpageur.draw_logic import read_text
+from misenpageur import logger
+
 
 # Pour garder app.py propre, nous avons déplacé les fonctions "utilitaires" qui ne sont pas des méthodes de la classe dans un fichier séparé.
 
@@ -171,6 +176,7 @@ def save_embedded_template(filename, title):
 # Cette fonction est utilisée par le thread
 def run_pipeline(
         status_queue: queue.Queue,
+        debug_mode: bool,
         input_file: str, generate_cover: bool, cover_image: str, ours_background_png: str, logos_dir: str,
         logos_layout: str, logos_padding_mm: float, date_box_back_color: str,
         out_html: str, out_agenda_html: str, out_pdf: str, auteur_couv: str, auteur_couv_url: str,
@@ -184,6 +190,16 @@ def run_pipeline(
         stories_bg_type: str, stories_bg_color: str, stories_bg_image: str,
         stories_alpha: float
 ) -> tuple[bool, str]:
+    debug_dir = None
+    if debug_mode:
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        pdf_path = Path(out_pdf)
+        debug_dir = pdf_path.parent / f"debug_run_{timestamp}"
+        logger.setup_logger(str(debug_dir))
+
+    # On importe le logger configuré
+    log = logging.getLogger(__name__)
+
     try:
         from misenpageur.misenpageur.config import Config
         from misenpageur.misenpageur.layout import Layout
@@ -191,6 +207,7 @@ def run_pipeline(
         from misenpageur.misenpageur.svgbuild import build_svg
         from misenpageur.misenpageur.layout_builder import build_layout_with_margins
     except Exception as e:
+        log.error(f"Erreur critique d'import: {e}", exc_info=True)
         import traceback
         status_queue.put(('final', False, f"Erreur critique: ...\n{e}\n\n{traceback.format_exc()}"))
         return
@@ -312,11 +329,43 @@ def run_pipeline(
         if generate_stories and stories_output_dir:
             summary_lines.append(f"Nombre de fichiers images créés pour la Story: {num_stories_created}")
 
+        if debug_mode and debug_dir:
+            # 1. Sauvegarder la configuration utilisée
+            log.info("Sauvegarde de la configuration utilisée dans config.json...")
+
+            # Helper pour convertir les objets non sérialisables comme Path
+            def json_converter(o):
+                if isinstance(o, Path):
+                    return str(o)
+                # Lève une erreur pour les autres types non gérés
+                raise TypeError(f"Object of type {o.__class__.__name__} is not JSON serializable")
+
+            # On utilise un bloc try/except au cas où la sérialisation échouerait
+            try:
+                config_path = debug_dir / "config.json"
+                config_data = asdict(cfg)  # Convertit le dataclass en dictionnaire
+                with open(config_path, 'w', encoding='utf-8') as f:
+                    json.dump(config_data, f, indent=2, default=json_converter, ensure_ascii=False)
+            except Exception as e:
+                log.error(f"Impossible de sauvegarder le fichier config.json : {e}")
+
+            # 2. Sauvegarder le résumé de l'exécution
+            log.info("Sauvegarde du résumé dans summary.info...")
+            try:
+                summary_path = debug_dir / "summary.info"
+                with open(summary_path, 'w', encoding='utf-8') as f:
+                    f.write("\n".join(summary_lines))
+            except Exception as e:
+                log.error(f"Impossible de sauvegarder le fichier summary.info : {e}")
+
         status_queue.put(('final', True, "\n".join(summary_lines)))
+
+
 
     except PermissionError as e:
         # On intercepte SPÉCIFIQUEMENT l'erreur de permission
         # On extrait le nom du fichier qui cause le problème
+        log.error(f"Erreur de permission: {e.filename}", exc_info=True)
         locked_file = e.filename or "un fichier de sortie"
         user_message = (
             f"Impossible d'écrire le fichier suivant :\n\n"
@@ -326,10 +375,13 @@ def run_pipeline(
         status_queue.put(('final', False, user_message))
 
     except Exception as e:
+        log.error("Une erreur inattendue est survenue.", exc_info=True)
         import traceback
         status_queue.put(('final', False, f"{type(e).__name__}: {e}\n\n{traceback.format_exc()}"))
 
     finally:
+        if debug_mode:
+            logger.shutdown_logger()
         if final_layout_path and os.path.exists(final_layout_path) and Path(final_layout_path).name.endswith(".yml"):
             try:
                 os.remove(final_layout_path)

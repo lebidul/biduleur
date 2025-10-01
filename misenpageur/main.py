@@ -5,6 +5,11 @@ import argparse
 from pathlib import Path
 import sys
 import os
+from dataclasses import asdict
+from datetime import datetime
+
+import logging
+from .logger import setup_logger, save_dict_to_json, save_text_to_file
 
 
 # API internes
@@ -67,11 +72,39 @@ def make_parser() -> argparse.ArgumentParser:
         help="Forcer la génération des images pour les Stories (--no-stories pour désactiver)."
     )
 
+    p.add_argument(
+        "-v", "--verbose",
+        action="store_true",
+        help="Activer l'affichage des logs détaillés dans la console."
+    )
+
+    p.add_argument(
+        "--debug",
+        action="store_true",
+        help="Activer le mode débogage (crée un dossier de log horodaté)."
+    )
+
     return p
 
 
 def main(argv: list[str] | None = None) -> int:
     args = make_parser().parse_args(argv)
+
+    debug_dir = None
+    if args.debug:
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        # On base le dossier de debug sur le dossier de sortie du PDF pour la cohérence
+        # Si --out n'est pas fourni, cela utilisera la valeur par défaut.
+        debug_dir = Path(args.out).parent / f"debug_run_{timestamp}"
+
+    # On configure le logger. Si debug_dir est None, seul le mode console (si -v) sera actif.
+    setup_logger(log_dir=str(debug_dir) if debug_dir else None)
+    log = logging.getLogger(__name__)
+    # Si l'utilisateur n'a pas mis -v mais a mis --debug, on veut quand même voir les logs
+    if args.debug and not args.verbose:
+        logging.getLogger().setLevel(logging.INFO)
+    elif not args.verbose:
+        logging.getLogger().setLevel(logging.WARNING) # Mode silencieux par défaut
 
     # On utilise l'argument --root de la CLI comme base
     project_root = Path(args.root).resolve()
@@ -79,8 +112,11 @@ def main(argv: list[str] | None = None) -> int:
     cfg_path = project_root / args.config
     base_layout_path = project_root / args.layout
 
-    if not cfg_path.exists(): print(f"[ERR] config.yml introuvable: {cfg_path}"); return 2
-    if not base_layout_path.exists(): print(f"[ERR] layout.yml introuvable: {base_layout_path}"); return 2
+    setup_logger(log_dir=debug_dir)
+    log = logging.getLogger(__name__)
+
+    if not cfg_path.exists(): log.error(f"config.yml introuvable: {cfg_path}"); return 2
+    if not base_layout_path.exists(): log.error(f"layout.yml introuvable: {base_layout_path}"); return 2
 
     from misenpageur.misenpageur.config import Config
     from misenpageur.misenpageur.pdfbuild import build_pdf
@@ -95,7 +131,7 @@ def main(argv: list[str] | None = None) -> int:
         final_layout_path = build_layout_with_margins(str(base_layout_path), cfg)
         lay = Layout.from_yaml(final_layout_path)
     except Exception as e:
-        print(f"[ERR] Lecture config/layout : {e}")
+        log.error(f"Lecture config/layout : {e}")
         traceback.print_exc()
         return 2
 
@@ -106,7 +142,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.cover:
             cover_path = Path(args.cover).resolve()
             if not cover_path.exists():
-                print("[WARN] --cover fourni mais introuvable :", cover_path)
+                log.warning(f"--cover fourni mais introuvable :", cover_path)
             else:
                 cfg.cover_image = str(cover_path)
 
@@ -119,7 +155,7 @@ def main(argv: list[str] | None = None) -> int:
             cfg.stories['enabled'] = args.stories
 
         if not args.out and not args.svg:
-            print("[ERR] Au moins une sortie (--out pour le PDF ou --svg) est requise.")
+            log.error(f"Au moins une sortie (--out pour le PDF ou --svg) est requise.")
             return 2
 
         # Générer le PDF
@@ -142,7 +178,7 @@ def main(argv: list[str] | None = None) -> int:
             out_pdf.parent.mkdir(parents=True, exist_ok=True)
             cfg.output_pdf = str(out_pdf)
             # On passe le project_root
-            build_pdf(str(project_root), cfg, lay, str(out_pdf), cfg_path, paras)
+            report = build_pdf(str(project_root), cfg, lay, str(out_pdf), cfg_path, paras)
 
             # --- Générer le SVG (si demandé) ---
             if args.svg:
@@ -156,8 +192,26 @@ def main(argv: list[str] | None = None) -> int:
             if cfg.stories.get("enabled", False):
                 generate_story_images(str(project_root), cfg, paras)
 
+            if debug_dir:
+                # 1. Sauvegarder la configuration
+                # On utilise une fonction pour gérer les types non sérialisables comme Path
+                def json_converter(o):
+                    if isinstance(o, Path): return str(o)
+                    raise TypeError(f"Object of type {o.__class__.__name__} is not JSON serializable")
+
+                config_data = asdict(cfg)
+                save_dict_to_json(config_data, "config.json", str(debug_dir))
+
+                summary_lines = [
+                    f"PDF généré : {cfg.output_pdf}",
+                    f"Police principale : {report.get('font_size_main', 0):.2f} pt",
+                    f"Police du poster : {report.get('font_size_poster_final', 0):.2f} pt",
+                    f"Paragraphes non placés : {report.get('unused_paragraphs', 0)}",
+                ]
+                save_text_to_file("\n".join(summary_lines), "summary.info", str(debug_dir))
+
         except Exception as e:
-            print("[ERR] Échec build PDF :", e)
+            log.error(f"Échec build PDF :", e)
             traceback.print_exc()
             return 2
 

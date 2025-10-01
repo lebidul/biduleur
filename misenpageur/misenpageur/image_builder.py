@@ -9,6 +9,10 @@ import html
 from pathlib import Path
 from typing import List
 
+import logging # Ajouter cet import
+log = logging.getLogger(__name__) # Obtenir le logger pour ce module
+
+
 from PIL import Image, ImageDraw, ImageFont
 
 from .config import Config, StoryConfig
@@ -25,7 +29,7 @@ def _get_font(font_name: str, font_size: int) -> ImageFont.FreeTypeFont:
         try:
             return ImageFont.truetype("arial.ttf", font_size)
         except IOError:
-            print(f"[WARN] Polices '{font_name}' et 'arial.ttf' introuvables, fallback sur la police par défaut.")
+            log.warning(f"Polices '{font_name}' et 'arial.ttf' introuvables, fallback sur la police par défaut.")
             return ImageFont.load_default()
 
 
@@ -68,7 +72,7 @@ def _create_story_cover(cfg: StoryConfig, main_cfg: Config, project_root: str):
     # ... (fonction inchangée)
     cover_path = Path(project_root) / main_cfg.cover_image
     if not cover_path.exists():
-        print("[WARN] Image de couverture introuvable, la story de couv ne sera pas générée.")
+        log.warning(f"Image de couverture introuvable, la story de couv ne sera pas générée.")
         return 0 # Retourne 0 car aucun fichier n'a été créé
     background = Image.new("RGB", (cfg.width, cfg.height), color="#000000")
     with Image.open(cover_path) as img:
@@ -79,7 +83,7 @@ def _create_story_cover(cfg: StoryConfig, main_cfg: Config, project_root: str):
     output_path = Path(cfg.output_dir) / "story_cover.png"
     output_path.parent.mkdir(parents=True, exist_ok=True)
     background.save(output_path, "PNG")
-    print(f"[INFO] Story de couverture générée : {output_path}")
+    log.info(f"Story de couverture générée : {output_path}")
     return 1 # Retourne 1 car le fichier a été créé avec succès
 
 
@@ -123,8 +127,7 @@ def _create_story_agenda(cfg: StoryConfig, paragraphs: List[str]):
                 veil = Image.new("RGBA", img.size, (255, 255, 255, int(alpha * 255)))
                 img = Image.alpha_composite(img, veil).convert("RGB")
             except Exception as e:
-                print(
-                    f"[WARN] Impossible de charger l'image de fond '{bg_image_path}': {e}. Utilisation du fond de couleur.")
+                log.warning(f"Impossible de charger l'image de fond '{bg_image_path}': {e}. Utilisation du fond de couleur.")
                 img = None
 
         # Si le type est 'color' ou si l'image a échoué, on crée le fond uni
@@ -170,7 +173,7 @@ def _create_story_agenda(cfg: StoryConfig, paragraphs: List[str]):
         output_path = Path(cfg.output_dir) / output_filename
         output_path.parent.mkdir(parents=True, exist_ok=True)
         img.save(output_path, "PNG")
-        print(f"[INFO] Story de l'agenda générée : {output_path}")
+        log.info(f"Story de l'agenda générée : {output_path}")
 
     return page_num # Retourne le nombre total de pages créées
 

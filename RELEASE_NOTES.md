@@ -1,5 +1,27 @@
 
 ---
+# Bidul v1.3.2 - Mode Débogage Avancé et Unifié
+
+Cette version introduit une fonctionnalité majeure destinée aux développeurs et aux utilisateurs avancés : un mode de débogage complet et unifié sur l'ensemble des outils du projet (interface graphique, `misenpageur` CLI, `biduleur` CLI).
+
+## ✨ Nouveautés
+
+*   **Mode Débogage Intégré** : L'activation du mode débogage, que ce soit via la nouvelle case à cocher dans l'interface graphique ou via l'option `--debug` en ligne de commande, génère désormais un dossier de diagnostic complet et unique pour chaque exécution.
+*   **Historique des Exécutions** : Chaque dossier de débogage est horodaté (ex: `debug_run_2025-10-26_15-30-00`), permettant de conserver un historique détaillé et de comparer facilement les résultats de différentes exécutions.
+*   **Rapports de Diagnostic Complets** : Chaque dossier de débogage contient trois fichiers essentiels pour l'analyse et la reproductibilité :
+    1.  **`execution.log`** : Un journal détaillé de toutes les étapes du pipeline (parsing, génération PDF, conversion SVG, etc.), incluant les messages d'information, les avertissements (`WARN`) et les erreurs (`ERROR`) avec leur traceback complet.
+    2.  **`config.json`** : Un export complet de la configuration exacte utilisée pour cette exécution spécifique, incluant tous les paramètres par défaut et ceux modifiés par l'utilisateur.
+    3.  **`summary.info`** : Un résumé lisible du résultat de l'exécution, identique à celui affiché dans la fenêtre de victoire.
+
+## ⚙️ Pour les Développeuses et Développeurs
+
+*   **Système de Logging Centralisé** : Un nouveau module `misenpageur/logger.py` a été créé pour gérer la configuration du logging de manière centralisée. Il est désormais partagé par l'interface graphique et les deux outils en ligne de commande.
+*   **Utilisation du module `logging`** : Tous les `print()` informatifs à travers le projet ont été remplacés par des appels au logger standard de Python (`log.info`, `log.warning`, `log.error`), ce qui permet une gestion fine de la verbosité et une capture structurée des messages.
+*   **Amélioration des CLIs** :
+    *   Les outils `misenpageur` et `biduleur` disposent maintenant d'une option `--debug` pour activer la génération des dossiers de diagnostic.
+    *   L'option `-v` / `--verbose` contrôle désormais uniquement l'affichage des logs dans la console, la séparant de la logique de sauvegarde des fichiers.
+
+---
 # Bidul v1.3.1 - Amélioration de la Ligne de Commande et Cohérence des Sorties
 
 Cette version se concentre sur l'amélioration de l'outil en ligne de commande (`misenpageur`) et l'harmonisation du comportement des sorties multi-fichiers, rendant l'utilisation en mode script plus flexible et plus intuitive.

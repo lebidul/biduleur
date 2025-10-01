@@ -1,6 +1,10 @@
-from typing import Dict
-from biduleur.constants import GENRE_EVT_SV, GENRE_EVT_CONCERT, OUTPUT_FOLDER_NAME
 import os.path
+from typing import Dict
+
+import logging # Ajouter cet import
+log = logging.getLogger(__name__) # Obtenir le logger pour ce module
+
+from biduleur.constants import GENRE_EVT_SV, GENRE_EVT_CONCERT, OUTPUT_FOLDER_NAME
 
 def format_artists_styles(*triplets) -> str:
     artistes_styles = ""
@@ -125,4 +129,4 @@ def output_html_file(html_body: str, original_file_name: str = None, output_file
 </html>
 """
     open(output_filename, 'w+', encoding='utf-8').write(html_string)
-    print(f"Événements mises en forme et exportés das le fichier: {output_filename}")
+    log.info(f"Événements mises en forme et exportés das le fichier: {output_filename}")

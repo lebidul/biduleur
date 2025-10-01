@@ -22,7 +22,7 @@ def output_html_file(html_body: str, original_file_name: str = None, output_file
 </html>
 """
     open(output_filename, 'w+', encoding='utf-8').write(html_string)
-    print(f"Événements mises en forme et exportés das le fichier: {output_filename}")
+    log.info(f"Événements mises en forme et exportés das le fichier: {output_filename}")
 
 def capfirst(s):
     try:

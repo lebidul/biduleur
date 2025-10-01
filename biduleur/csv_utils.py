@@ -6,6 +6,9 @@ import pandas as pd
 from biduleur.constants import DATE, GENRE1, HORAIRE, COLONNE_INFO
 from biduleur.event_utils import parse_bidul_event
 
+import logging # Ajouter cet import
+log = logging.getLogger(__name__) # Obtenir le logger pour ce module
+
 
 # -----------------------------
 # Helpers format PRIX
@@ -155,7 +158,7 @@ def read_and_sort_file(filename: str) -> Optional[List[Dict]]:
 
         return df_sorted.to_dict('records')
     except Exception as e:
-        print(f"Error sorting the file: {e}. Ensure each line has a defined date.")
+        log.error(f"Error sorting the file: {e}. Ensure each line has a defined date.")
         return None
 
 
