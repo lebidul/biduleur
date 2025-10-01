@@ -3,6 +3,9 @@
 import tkinter as tk
 from tkinter import ttk
 
+from tkinterdnd2 import DND_FILES
+from .callbacks import on_drop_input_file, on_drop_cover_file
+
 # Ce fichier a une responsabilité unique : créer et placer tous les widgets de l'interface. Il ne contiendra aucune logique d'action (pas de command=... qui font des choses compliquées).
 # La stratégie est de créer une fonction principale create_all qui appelle des sous-fonctions pour chaque grande section de l'interface (une pour la section "Fichier d'entrée", une pour la section "Logos", etc.). C'est beaucoup plus propre et lisible.
 # # Notez que pour les widgets qui auront besoin d'une action (comme les boutons), nous les stockons dans l'instance de l'application (ex: app.input_button = ...). Le fichier callbacks.py les récupérera plus tard pour leur assigner une commande.
@@ -42,10 +45,40 @@ def create_all(app):
 def _create_input_section(parent, app, ui_row):
     """Crée la section pour le fichier d'entrée et les modèles."""
     r = ui_row['r']
-    tk.Label(parent, text="Fichier d’entrée (CSV / XLS) :").grid(row=r, column=0, sticky="e", padx=5, pady=5)
-    tk.Entry(parent, textvariable=app.input_var).grid(row=r, column=1, sticky="ew", padx=5, pady=5)
-    app.input_button = tk.Button(parent, text="Parcourir…")
-    app.input_button.grid(row=r, column=2, padx=5, pady=5)
+
+    # 1. On crée un cadre principal qui servira de zone de dépôt.
+    drop_zone = ttk.Frame(parent, relief="sunken", borderwidth=2, padding=20)
+    drop_zone.grid(row=r, column=0, columnspan=3, sticky="ew", padx=10, pady=10)
+
+    # On configure les colonnes et lignes internes pour centrer le contenu.
+    drop_zone.columnconfigure(0, weight=1)
+    drop_zone.rowconfigure(0, weight=1)
+    drop_zone.rowconfigure(2, weight=1)
+
+    # 2. On crée le label qui affichera le message ou le nom du fichier.
+    app.drop_zone_label = ttk.Label(
+        drop_zone,
+        text="Glissez-déposez votre fichier (XLS/CSV) ici",
+        font=("Arial", 12),
+        anchor="center"
+    )
+    app.drop_zone_label.grid(row=0, column=0, pady=(0, 10))
+
+    # 3. Un petit label "ou" pour séparer.
+    ttk.Label(drop_zone, text="— ou —").grid(row=1, column=0)
+
+    # 4. On place le bouton "Parcourir" à l'intérieur de la zone.
+    # Le bouton hérite déjà de sa commande depuis `callbacks.assign_all`.
+    app.input_button = tk.Button(drop_zone, text="Sélectionner un fichier...")
+    app.input_button.grid(row=2, column=0, pady=(10, 0))
+
+    # 5. On applique les bindings de glisser-déposer au cadre ET au label principal.
+    # C'est important pour que le dépôt fonctionne même si on vise le texte.
+    drop_zone.drop_target_register(DND_FILES)
+    app.drop_zone_label.drop_target_register(DND_FILES)
+
+    drop_zone.dnd_bind('<<Drop>>', lambda event: on_drop_input_file(app, event))
+    app.drop_zone_label.dnd_bind('<<Drop>>', lambda event: on_drop_input_file(app, event))
     r += 1
 
     models_frame = ttk.Frame(parent)
@@ -173,26 +206,56 @@ def _create_cover_section(parent, app, ui_row):
     cover_frame.grid(row=r, column=0, columnspan=3, sticky="ew", pady=10)
     cover_frame.columnconfigure(1, weight=1)
 
-    # Ligne 0
+    # Ligne 0 - Case à cocher
     tk.Checkbutton(cover_frame, text="Avec couv' (générer la page de couverture)",
                    variable=app.generate_cover_var).grid(row=0, column=0, columnspan=3, sticky="w", pady=2)
 
-    # Ligne 1
-    tk.Label(cover_frame, text="Image de Couverture :").grid(row=1, column=0, sticky="e", padx=5, pady=5)
-    tk.Entry(cover_frame, textvariable=app.cover_var).grid(row=1, column=1, sticky="ew", padx=5, pady=5)
-    app.cover_button = tk.Button(cover_frame, text="Parcourir…")
-    app.cover_button.grid(row=1, column=2, padx=5, pady=5)
+    # 1. On crée le cadre qui sert de zone de dépôt.
+    cover_drop_zone = ttk.Frame(cover_frame, relief="sunken", borderwidth=2, padding=10)
+    cover_drop_zone.grid(row=1, column=0, columnspan=3, sticky="ew", padx=5, pady=5)
+    cover_drop_zone.columnconfigure(0, weight=1) # Colonne pour le texte/bouton
+    cover_drop_zone.columnconfigure(1, weight=2) # Colonne pour l'aperçu, plus large
 
-    # Ligne 2 : Widget pour l'aperçu
-    app.cover_preview = tk.Label(cover_frame, text="Aucun aperçu", relief="sunken", padx=5, pady=5)
-    app.cover_preview.grid(row=2, column=1, sticky="w", pady=(5, 0), padx=5)
+    # 2. On crée le conteneur pour le texte et le bouton (partie gauche)
+    left_pane = ttk.Frame(cover_drop_zone)
+    left_pane.grid(row=0, column=0, sticky="nsew")
+    left_pane.rowconfigure(1, weight=1) # Pour centrer le bouton verticalement
+
+    # 3. Le label dynamique (texte ou nom de fichier)
+    app.cover_drop_zone_label = ttk.Label(
+        left_pane,
+        text="Glissez-déposez l'image de couverture ici",
+        font=("Arial", 10),
+        anchor="center",
+        justify="center"
+    )
+    app.cover_drop_zone_label.pack(pady=5, expand=True)
+
+    # 4. Le bouton "Parcourir"
+    app.cover_button = tk.Button(left_pane, text="Choisir une image...")
+    app.cover_button.pack(pady=5, expand=True)
+
+    # 5. Le widget d'aperçu (partie droite)
+    app.cover_preview = tk.Label(cover_drop_zone, text="Aucun aperçu", relief="groove")
+    app.cover_preview.grid(row=0, column=1, sticky="nsew", padx=(10, 0))
+
+    # 6. On applique les bindings de glisser-déposer à toute la zone.
+    # On lie l'événement à un NOUVEAU callback : `on_drop_cover_file`.
+    cover_drop_zone.drop_target_register(DND_FILES)
+    app.cover_drop_zone_label.drop_target_register(DND_FILES)
+    left_pane.drop_target_register(DND_FILES)
+    app.cover_preview.drop_target_register(DND_FILES)
+
+    cover_drop_zone.dnd_bind('<<Drop>>', lambda event: on_drop_cover_file(app, event))
+    app.cover_drop_zone_label.dnd_bind('<<Drop>>', lambda event: on_drop_cover_file(app, event))
+    left_pane.dnd_bind('<<Drop>>', lambda event: on_drop_cover_file(app, event))
+    app.cover_preview.dnd_bind('<<Drop>>', lambda event: on_drop_cover_file(app, event))
 
     # Lignes suivantes (décalées)
     tk.Label(cover_frame, text="Auteur Couverture :").grid(row=3, column=0, sticky="e", padx=5, pady=5)
     tk.Entry(cover_frame, textvariable=app.auteur_var).grid(row=3, column=1, columnspan=2, sticky="ew", padx=5, pady=5)
     tk.Label(cover_frame, text="URL auteur couverture :").grid(row=4, column=0, sticky="e", padx=5, pady=5)
-    tk.Entry(cover_frame, textvariable=app.auteur_url_var).grid(row=4, column=1, columnspan=2, sticky="ew", padx=5,
-                                                                pady=5)
+    tk.Entry(cover_frame, textvariable=app.auteur_url_var).grid(row=4, column=1, columnspan=2, sticky="ew", padx=5, pady=5)
 
     r += 1
     ui_row['r'] = r

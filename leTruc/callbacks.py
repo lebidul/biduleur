@@ -4,6 +4,7 @@ import os
 import tkinter as tk
 from tkinter import filedialog, messagebox, colorchooser, ttk
 from PIL import Image, ImageTk
+import re
 
 
 # On importe les helpers qui contiennent la logique "métier"
@@ -35,10 +36,7 @@ def assign_all(app):
                                                                                  "Choisir une image",
                                                                                  [("Images", "*.jpg *.jpeg *.png")]))
 
-    app.cover_button.config(command=lambda: on_pick_image_with_preview(app, app.cover_var, app.cover_preview,
-                                                                       "Image de couverture",
-                                                                       [("Images", "*.jpg;*.jpeg;*.png;*.tif;*.webp"),
-                                                                        ("Tous", "*.*")]))
+    app.cover_button.config(command=lambda: on_pick_cover_file(app))
 
     app.html_save_button.config(command=lambda: on_pick_save(app.html_var, "HTML", ".html", [("HTML", "*.html")]))
     app.agenda_save_button.config(
@@ -86,6 +84,8 @@ def assign_all(app):
     on_toggle_date_sep_options(app)
     on_toggle_alpha_slider(app)
     on_update_alpha_label(app)
+    _update_drop_zone_text(app, app.input_var.get())
+    _update_cover_drop_zone(app, app.cover_var.get())
 
     print("[INFO] Mise à jour des aperçus d'images au démarrage...")
     # On met à jour l'aperçu de l'ours si une valeur existe
@@ -102,8 +102,14 @@ def on_pick_input(app):
         filetypes=[("Excel", "*.xls;*.xlsx"), ("CSV", "*.csv"), ("Tous", "*.*")]
     )
     if not file_path: return
+
+    # Mettre à jour la variable
     app.input_var.set(file_path)
+    # Mettre à jour l'interface visuelle
+    _update_drop_zone_text(app, file_path)
+    # Mettre à jour les chemins de sortie
     d = _default_paths_from_input(file_path)
+
     app.html_var.set(d["html"])
     app.agenda_var.set(d["agenda_html"])
     app.pdf_var.set(d["pdf"])
@@ -139,13 +145,12 @@ def on_pick_color(color_var):
 
 def on_pick_image_with_preview(app, string_var, preview_widget, title, filetypes):
     """
-    Ouvre une boîte de dialogue pour choisir un fichier image, met à jour la
-    variable et affiche une miniature dans le widget d'aperçu.
+    Fonction générique pour les autres champs image (Ours, Cucaracha).
+    La logique pour la couverture est maintenant séparée.
     """
     path = filedialog.askopenfilename(title=title, filetypes=filetypes)
     if not path:
         return
-
     string_var.set(path)
     _update_preview(path, preview_widget)
 
@@ -267,6 +272,81 @@ def on_update_alpha_label(app):
     """Met à jour le label de pourcentage du slider."""
     app.alpha_value_label.config(text=f"{int(app.alpha_var.get() * 100)}%")
 
+
+def on_drop_input_file(app, event):
+    """
+    Callback exécuté lorsqu'un fichier est déposé sur le champ d'entrée.
+    """
+    # event.data contient le chemin du fichier, parfois entouré de {}.
+    # On nettoie la chaîne pour obtenir un chemin propre.
+    file_path = event.data.strip()
+    if file_path.startswith('{') and file_path.endswith('}'):
+        file_path = file_path[1:-1]
+
+    # On vérifie si le chemin est valide
+    if not os.path.exists(file_path):
+        messagebox.showerror("Erreur", f"Le fichier déposé n'a pas pu être trouvé :\n{file_path}")
+        return
+
+    # Mettre à jour la variable (important pour le backend)
+    app.input_var.set(file_path)
+    # Mettre à jour l'interface visuelle
+    _update_drop_zone_text(app, file_path)
+
+    # Mettre à jour les chemins de sortie par défaut
+    d = _default_paths_from_input(file_path)
+
+    app.html_var.set(d["html"])
+    app.agenda_var.set(d["agenda_html"])
+    app.pdf_var.set(d["pdf"])
+    app.svg_output_var.set(d["svg_output_dir"])
+    app.stories_output_var.set(d["stories_output"])
+
+def on_drop_cover_file(app, event):
+    """Callback pour une image de couverture déposée."""
+    file_path = event.data.strip()
+    if file_path.startswith('{') and file_path.endswith('}'):
+        file_path = file_path[1:-1]
+
+    if not os.path.exists(file_path):
+        return
+
+    # Mettre à jour la variable et l'interface
+    app.cover_var.set(file_path)
+    _update_cover_drop_zone(app, file_path)
+
+def on_pick_cover_file(app):
+    """Callback pour le bouton 'Choisir une image...' de la couverture."""
+    file_path = filedialog.askopenfilename(
+        title="Image de couverture",
+        filetypes=[("Images", "*.jpg *.jpeg *.png *.tif *.webp"), ("Tous", "*.*")]
+    )
+    if not file_path:
+        return
+
+    # Mettre à jour la variable et l'interface
+    app.cover_var.set(file_path)
+    _update_cover_drop_zone(app, file_path)
+
+def _update_drop_zone_text(app, file_path: str | None):
+    """Met à jour le texte de la zone de dépôt."""
+    if file_path and os.path.exists(file_path):
+        # Affiche seulement le nom du fichier pour la clarté
+        filename = os.path.basename(file_path)
+        app.drop_zone_label.config(text=f"Fichier sélectionné :\n{filename}", font=("Arial", 10, "bold"))
+    else:
+        # Texte par défaut
+        app.drop_zone_label.config(text="Glissez-déposez votre fichier (XLS/CSV) ici", font=("Arial", 12))
+
+def _update_cover_drop_zone(app, file_path: str | None):
+    """Met à jour le texte et l'aperçu de la zone de dépôt de la couverture."""
+    if file_path and os.path.exists(file_path):
+        filename = os.path.basename(file_path)
+        app.cover_drop_zone_label.config(text=f"Fichier :\n{filename}")
+        _update_preview(file_path, app.cover_preview)
+    else:
+        app.cover_drop_zone_label.config(text="Glissez-déposez l'image de couverture ici")
+        _update_preview(None, app.cover_preview)
 
 def _update_preview(path, preview_widget):
     """
