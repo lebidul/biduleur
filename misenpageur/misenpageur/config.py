@@ -1,6 +1,10 @@
 # misenpageur/misenpageur/config.py
 import yaml
 from dataclasses import dataclass, field
+
+import logging # Ajouter cet import
+log = logging.getLogger(__name__) # Obtenir le logger pour ce module
+
 from typing import Optional, Dict, Any, List
 
 
@@ -102,10 +106,10 @@ class Config:
                 data['packing_strategy'] = PackingStrategy(**data['packing_strategy'])
             return cls.from_dict(data)
         except FileNotFoundError:
-            print(f"[WARN] Fichier de configuration introuvable : {path}. Utilisation des valeurs par défaut.")
+            log.warning(f"Fichier de configuration introuvable : {path}. Utilisation des valeurs par défaut.")
             return cls()
         except Exception as e:
-            print(f"[ERR] Erreur de lecture du fichier de configuration YAML ({path}): {e}")
+            log.error(f"Erreur de lecture du fichier de configuration YAML ({path}): {e}")
             raise
 
     @classmethod

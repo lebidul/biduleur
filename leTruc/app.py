@@ -117,6 +117,8 @@ class Application(tk.Tk):
         self.generate_svg_var = tk.BooleanVar(value=True)
         self.status_var = tk.StringVar(value="Prêt.")
 
+        self.debug_mode_var = tk.BooleanVar(value=False)
+
     def _create_scrollable_area(self):
         """Crée la structure Canvas/Scrollbar pour rendre le contenu scrollable."""
         container = ttk.Frame(self)
@@ -150,6 +152,9 @@ class Application(tk.Tk):
         # 2. Changer le mode en 'determinate'
         self.progress_bar = ttk.Progressbar(action_frame, mode='determinate')
         self.progress_bar.pack(fill=tk.X, padx=5, pady=(0, 5))
+
+        debug_check = tk.Checkbutton(action_frame, text="Activer le mode débogage", variable=self.debug_mode_var)
+        debug_check.pack(pady=(5, 0))
 
         # 3. Le bouton "Lancer" vient en dernier
         self.run_button = tk.Button(action_frame, text="Lancer la Génération", bg="#4CAF50", fg="white", font=("Arial", 12, "bold"))
@@ -227,6 +232,7 @@ class Application(tk.Tk):
             # On passe les arguments en utilisant les clés du dictionnaire
             # pour éviter toute erreur d'ordre.
             self.result_queue,
+            debug_mode=self.debug_mode_var.get(),
             input_file=self.input_var.get().strip(),
             generate_cover=self.generate_cover_var.get(),
             cover_image=self.cover_var.get().strip(),

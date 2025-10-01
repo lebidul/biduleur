@@ -10,6 +10,10 @@ from pathlib import Path
 from typing import List, Tuple
 from collections.abc import Mapping
 
+import logging # Ajouter cet import
+log = logging.getLogger(__name__) # Obtenir le logger pour ce module
+
+
 from .config import Config, BulletConfig, PosterConfig, DateBoxConfig, DateLineConfig
 from .layout import Layout, Section
 from .html_utils import extract_paragraphs_from_html
@@ -70,7 +74,7 @@ def _analyze_image_brightness(
             # Formule de mélange : (opacité_voile * couleur_voile) + (opacité_image * couleur_image)
             final_brightness = (white_overlay_opacity * 255) + (image_opacity * avg_brightness_original)
 
-            print(f"[INFO] Luminosité originale: {avg_brightness_original:.1f}, "
+            log.info(f"Luminosité originale: {avg_brightness_original:.1f}, "
                   f"Après voile (transparence={transparency:.2f}): {final_brightness:.1f}, "
                   f"Seuil: {threshold}")
 
@@ -79,7 +83,7 @@ def _analyze_image_brightness(
             return 'dark' if final_brightness < threshold else 'light'
 
     except Exception as e:
-        print(f"[WARN] Impossible d'analyser la luminosité de l'image : {e}")
+        log.warning(f"Impossible d'analyser la luminosité de l'image : {e}")
         return 'light'
 
 
@@ -164,7 +168,7 @@ def _prepare_cover_for_print(src_path: str, target_w_pt: float, target_h_pt: flo
     # Calcule le DPI effectif au format placé
     eff_dpi = _effective_dpi(img.width, img.height, target_w_pt, target_h_pt)
     if eff_dpi and eff_dpi < min_dpi:
-        print(f"[WARN] Couverture: DPI effectif {eff_dpi:.0f} < {min_dpi} — qualité d’impression risquée.")
+        log.warning(f"Couverture: DPI effectif {eff_dpi:.0f} < {min_dpi} — qualité d’impression risquée.")
 
     if not convert:
         # Pas de conversion -> on laisse l'image telle quelle
@@ -184,7 +188,7 @@ def _prepare_cover_for_print(src_path: str, target_w_pt: float, target_h_pt: flo
         new_w = max(1, int(img2.width * scale))
         new_h = max(1, int(img2.height * scale))
         img2 = img2.resize((new_w, new_h), Image.LANCZOS)
-        print(f"[INFO] Couverture: downscale -> {new_w}x{new_h} px (~{max_dpi:.0f} DPI)")
+        log.info(f"Couverture: downscale -> {new_w}x{new_h} px (~{max_dpi:.0f} DPI)")
 
     # Sauvegarde JPEG CMYK de haute qualité dans un tmp
     tmp_dir = Path(os.path.dirname(cfg.output_pdf) or ".") / "_tmp_prepress"
@@ -266,7 +270,7 @@ def _ghostscript_pdfx(input_pdf: str, output_pdf: str, icc: str, gs: str = "gswi
             return False
         return True
     except Exception as e:
-        print(f"[ERR] Ghostscript non disponible: {e}")
+        log.error(f"Ghostscript non disponible: {e}")
         return False
 
 
@@ -528,7 +532,7 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
 
     if getattr(cfg, 'font_size_mode', 'auto') == 'force':
         best_fs = getattr(cfg, 'font_size_forced', 10.0)
-        print(f"[INFO] Utilisation de la taille de police forcée : {best_fs:.2f} pt")
+        log.info(f"Utilisation de la taille de police forcée : {best_fs:.2f} pt")
     else:
         # On exécute la recherche binaire uniquement en mode "auto"
         order_fs = ["S5", "S6", "S3", "S4"]
@@ -545,7 +549,7 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
             else:
                 hi = mid
             if abs(hi - lo) < 0.1: break
-        print(f"[INFO] Taille de police optimale calculée : {best_fs:.2f} pt")
+        log.info(f"Taille de police optimale calculée : {best_fs:.2f} pt")
 
     spacing_policy = SpacingPolicy(spacing_cfg, paragraph_style(cfg.font_name, best_fs, cfg.leading_ratio).leading)
     s5_full, s5_tail, s6_prelude, s6_full, rest_after_p2 = plan_pair_with_split(

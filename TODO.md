@@ -20,13 +20,13 @@
 - [x] Ajouter infos sur fichier stories (qté) dans boite summary
 - [x] Ajouter au FE fine tuning pour posts instagram (backend color ou image (+ transparency), font, font color)
 - [x] Cucaracha: ajout de saut de ligne dans texte. perte italique si non arial
-- [ ] Config front-end (widgets, helpers, callbacks, etc) dans un fichier config dédié avec wrapper et nouvelle class pour ne pas avoir sur trop de fichiers `chqaue fois`
-- [ ] Fix csv input
 - [x] Ajouter stories dans cli misenpageur
 - [x] Sélectionner dossier output pour svg (nom des fichiers par défaut) comme la story instagram
-- [ ] Ajouter export fichier config.json silencieux et fichier log
-- [ ] Ajouter fichier de config.json avec valeurs par défaut (+ config débug) dans build. Fichier ensuite utilisé à runTime mais qui peut-être édité 
-- [ ] Améliorer niveaux de débug
+- [x] Ajouter export fichier config.json silencieux et fichier log
+- [x] Ajouter fichier de config.json avec valeurs par défaut (+ config débug) dans build. Fichier ensuite utilisé à runTime mais qui peut-être édité 
+- [x] Améliorer niveaux de débug
+- [ ] Config front-end (widgets, helpers, callbacks, etc) dans un fichier config dédié avec wrapper et nouvelle class pour ne pas avoir sur trop de fichiers `chqaue fois`
+- [ ] Fix csv input
 
 ## Priorité Moyenne
 - [x] Refactor dans dossier bidul.biduleur/bidul.

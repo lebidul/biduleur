@@ -10,6 +10,9 @@ from pathlib import Path
 from collections import Counter
 from typing import List
 
+import logging # Ajouter cet import
+log = logging.getLogger(__name__) # Obtenir le logger pour ce module
+
 from lxml import etree
 from .config import Config
 from .layout import Layout
@@ -26,7 +29,8 @@ def _post_process_svg(svg_path: Path, expected_event_count: int):
     if not svg_path.exists() or expected_event_count == 0:
         return
 
-    print(f"[INFO] Post-traitement de {svg_path.name} (attend ~{expected_event_count} puces)...")
+    # log.info(f"Post-traitement de {svg_path.name} (attend ~{expected_event_count} puces)...")
+    log.info(f"Post-traitement de {svg_path.name} (attend ~{expected_event_count} puces)...")
 
     try:
         content = svg_path.read_text(encoding="utf-8")
@@ -38,8 +42,6 @@ def _post_process_svg(svg_path: Path, expected_event_count: int):
         root = etree.fromstring(content.encode('utf-8'), parser)
         ns = {'svg': 'http://www.w3.org/2000/svg'}
 
-        # ==================== NOUVELLE LOGIQUE DE DÉTECTION GÉOMÉTRIQUE ====================
-
         # 1. Trouver les candidats qui ont la bonne fréquence
         candidate_ids = []
         tolerance = 2
@@ -48,10 +50,10 @@ def _post_process_svg(svg_path: Path, expected_event_count: int):
                 candidate_ids.append(glyph_id)
 
         if not candidate_ids:
-            print("[WARN] Aucun glyphe candidat trouvé avec la bonne fréquence.")
+            log.warning(f"Aucun glyphe candidat trouvé avec la bonne fréquence.")
             return
 
-        print(f"[INFO] Glyphes candidats par fréquence : {candidate_ids}")
+        log.info(f"Glyphes candidats par fréquence : {candidate_ids}")
 
         glyph_id_to_replace = None
 
@@ -70,14 +72,12 @@ def _post_process_svg(svg_path: Path, expected_event_count: int):
             # Si le chemin ne contient AUCUNE des commandes de courbe, c'est notre homme !
             if not any(cmd in d_attr for cmd in curve_commands):
                 glyph_id_to_replace = glyph_id
-                print(f"[INFO] Glyphe de puce confirmé par sa géométrie (pas de courbes) : {glyph_id_to_replace}")
+                log.info(f"Glyphe de puce confirmé par sa géométrie (pas de courbes) : {glyph_id_to_replace}")
                 break  # On a trouvé, on sort de la boucle
 
         if not glyph_id_to_replace:
-            print("[WARN] Aucun des glyphes candidats n'avait la forme géométrique d'une puce.")
+            log.warning(f"Aucun des glyphes candidats n'avait la forme géométrique d'une puce.")
             return
-
-        # =================================================================================
 
         # 3. Remplacer la définition du glyphe identifié
         pattern = re.compile(fr'(<(?:symbol|g)[^>]*?id="{glyph_id_to_replace}"[^>]*?>)(.*?)(</(?:symbol|g)>)',
@@ -93,10 +93,10 @@ def _post_process_svg(svg_path: Path, expected_event_count: int):
 
             if num_replacements > 0:
                 svg_path.write_text(content, encoding="utf-8")
-                print(f"[INFO] Définition du glyphe '{glyph_id_to_replace}' corrigée avec succès.")
+                log.info(f"Définition du glyphe '{glyph_id_to_replace}' corrigée avec succès.")
 
     except Exception as e:
-        print(f"[WARN] Échec du post-traitement pour {svg_path.name}: {e}")
+        log.warning(f"Échec du post-traitement pour {svg_path.name}: {e}")
 
 
 def build_svg(project_root: str, cfg: Config, layout: Layout, out_dir: str, config_path: str, paras: List[str]) -> dict:
@@ -126,7 +126,7 @@ def build_svg(project_root: str, cfg: Config, layout: Layout, out_dir: str, conf
         # On utilise le chemin complet 'path_to_executable' et non plus 'executable_name'
         command = [path_to_executable, temp_pdf_path, str(output_dir / f"{output_prefix}_%d.svg"), "all"]
 
-        print(f"[INFO] Lancement de la conversion SVG...")
+        log.info(f"Lancement de la conversion SVG...")
         subprocess.run(command, capture_output=True, text=True, check=True)
 
         num_pages = len(event_counts)
@@ -135,11 +135,11 @@ def build_svg(project_root: str, cfg: Config, layout: Layout, out_dir: str, conf
             if svg_path.exists():
                 _post_process_svg(svg_path, event_counts.get(i, 0))
 
-        print(f"[INFO] Fichiers SVG sauvegardés et corrigés dans : {output_dir}")
+        log.info(f"Fichiers SVG sauvegardés et corrigés dans : {output_dir}")
 
     except (FileNotFoundError, subprocess.CalledProcessError) as e:
-        print(f"[ERR] Échec de la conversion SVG (assurez-vous que pdf2svg est installé et dans le PATH).")
-        if hasattr(e, 'stderr') and e.stderr: print(f"[ERR] stderr: {e.stderr}")
+        log.error(f"Échec de la conversion SVG (assurez-vous que pdf2svg est installé et dans le PATH).")
+        if hasattr(e, 'stderr') and e.stderr: log.error(f"stderr: {e.stderr}")
         return {"error": "La conversion SVG a échoué."}
     finally:
         if os.path.exists(temp_pdf_path):
