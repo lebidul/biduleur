@@ -25,7 +25,7 @@
 - [x] Ajouter export fichier config.json silencieux et fichier log
 - [x] Ajouter fichier de config.json avec valeurs par défaut (+ config débug) dans build. Fichier ensuite utilisé à runTime mais qui peut-être édité 
 - [x] Améliorer niveaux de débug
-- [ ] Config front-end (widgets, helpers, callbacks, etc) dans un fichier config dédié avec wrapper et nouvelle class pour ne pas avoir sur trop de fichiers `chqaue fois`
+- [x] Config front-end (widgets, helpers, callbacks, etc) dans un fichier config dédié avec wrapper et nouvelle class pour ne pas avoir sur trop de fichiers `chqaue fois` -> pas une bonne idée car trop complexe
 - [ ] Fix csv input
 
 ## Priorité Moyenne
@@ -46,6 +46,7 @@
 - [ ] Ajout helpers.
 - [ ] GUI qui génère une preview dynamiquement et ensuite propose de sauver le pdf (voir notes_ia/googleAIStudio.solutionGUIdynamique.md).
 - [ ] Revoir résolution GUI
+- [ ] Drag and drop
 - [ ] Exe linux + Mac
 - [ ] Changer framework GUI
 
