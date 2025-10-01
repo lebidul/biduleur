@@ -61,6 +61,12 @@ def make_parser() -> argparse.ArgumentParser:
         help="Type de répartition pour les logos : 'colonnes' (2 colonnes fixes) ou 'optimise' (packing)."
     )
 
+    p.add_argument(
+        "--stories",
+        action=argparse.BooleanOptionalAction,
+        help="Forcer la génération des images pour les Stories (--no-stories pour désactiver)."
+    )
+
     return p
 
 
@@ -109,6 +115,9 @@ def main(argv: list[str] | None = None) -> int:
 
         cfg.logos_layout = args.logos_layout
 
+        if args.stories is not None:
+            cfg.stories['enabled'] = args.stories
+
         if not args.out and not args.svg:
             print("[ERR] Au moins une sortie (--out pour le PDF ou --svg) est requise.")
             return 2
@@ -146,6 +155,7 @@ def main(argv: list[str] | None = None) -> int:
             # On récupère la config des stories depuis l'objet cfg
             if cfg.stories.get("enabled", False):
                 generate_story_images(str(project_root), cfg, paras)
+
         except Exception as e:
             print("[ERR] Échec build PDF :", e)
             traceback.print_exc()

@@ -412,12 +412,12 @@ def _create_output_section(parent, app, ui_row):
     app.pdf_save_button.grid(row=2, column=2, padx=5, pady=5)
 
     # SVG
-    tk.Checkbutton(output_frame, text="Générer un SVG éditable (pour Inkscape)", variable=app.generate_svg_var).grid(
+    tk.Checkbutton(output_frame, text="Générer des SVG éditables (pour Inkscape)", variable=app.generate_svg_var).grid(
         row=3, column=0, columnspan=3, sticky="w", padx=5, pady=5)
-    tk.Label(output_frame, text="Nom de base SVG :").grid(row=4, column=0, sticky="e", padx=5, pady=5)
-    tk.Entry(output_frame, textvariable=app.svg_var).grid(row=4, column=1, sticky="ew", padx=5, pady=5)
-    app.svg_save_button = tk.Button(output_frame, text="…", width=3)
-    app.svg_save_button.grid(row=4, column=2, padx=5, pady=5)
+    tk.Label(output_frame, text="Dossier SVG :").grid(row=4, column=0, sticky="e", padx=5, pady=5)
+    tk.Entry(output_frame, textvariable=app.svg_output_var).grid(row=4, column=1, sticky="ew", padx=5, pady=5)
+    app.svg_output_button = tk.Button(output_frame, text="…", width=3)
+    app.svg_output_button.grid(row=4, column=2, padx=5, pady=5)
 
     # Stories
     tk.Checkbutton(output_frame, text="Générer les images pour les Stories Instagram", variable=app.generate_stories_var).grid(
