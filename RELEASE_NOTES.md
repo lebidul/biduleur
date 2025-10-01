@@ -1,4 +1,26 @@
 
+---
+# Bidul v1.3.1 - Amélioration de la Ligne de Commande et Cohérence des Sorties
+
+Cette version se concentre sur l'amélioration de l'outil en ligne de commande (`misenpageur`) et l'harmonisation du comportement des sorties multi-fichiers, rendant l'utilisation en mode script plus flexible et plus intuitive.
+
+## ✨ Nouveautés et Améliorations
+
+*   **Contrôle des Stories depuis la Ligne de Commande** : L'outil `misenpageur` dispose désormais d'options pour piloter la génération des images pour les Stories Instagram. Il est maintenant possible de surcharger la configuration du fichier `config.yml` :
+    *   `--stories` : Force la création des images.
+    *   `--no-stories` : Empêche la création des images.
+
+*   **Gestion Simplifiée de la Sortie SVG** : Le comportement de la sortie des fichiers SVG a été rendu cohérent avec celui des Stories pour une meilleure expérience utilisateur :
+    *   **Sélection par dossier** : Dans l'interface graphique, vous choisissez désormais un dossier de destination pour les SVG, au lieu d'un nom de base de fichier.
+    *   **Nommage automatique** : Les fichiers sont automatiquement nommés `page_1.svg`, `page_2.svg`, etc., à l'intérieur du dossier choisi.
+    *   **Chemins par défaut intelligents** : L'interface propose maintenant par défaut un dossier `svgs/` situé à côté du fichier d'entrée, simplifiant la configuration initiale.
+
+## ⚙️ Pour les Développeuses et Développeurs
+
+*   **Amélioration du CLI** : L'argument `--stories` a été implémenté en utilisant `action=argparse.BooleanOptionalAction`, une bonne pratique qui crée automatiquement le drapeau `--no-stories` correspondant.
+*   **Harmonisation de la Logique de Sortie** : La logique de `svgbuild.py` a été refactorisée pour accepter un dossier de sortie (`out_dir`) au lieu d'un chemin de fichier complet, s'alignant sur le fonctionnement de `image_builder.py`.
+
+---
 
 # Bidul v1.3.0 - Export pour les Réseaux Sociaux et Personnalisation Avancée
 

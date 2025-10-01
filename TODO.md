@@ -8,7 +8,7 @@
 - [x] Icône.
 - [x] Taille fenêtre dynamique
 - [x] Export dans 1 seul svg -> pas possible
-- [x] Créér fichier couv.png comme partie de l'export -> c'est complétement con, on fournit déjà la couv.. 
+- [x] Créer fichier couv.png comme partie de l'export -> c'est complétement con, on fournit déjà la couv.. 
 - [x] Capturer erreur si pdf déjà ouvert et impossible à sauvegarder
 - [x] Hyperlinks sponsors
 - [x] Enlever border date box
@@ -20,8 +20,10 @@
 - [x] Ajouter infos sur fichier stories (qté) dans boite summary
 - [x] Ajouter au FE fine tuning pour posts instagram (backend color ou image (+ transparency), font, font color)
 - [x] Cucaracha: ajout de saut de ligne dans texte. perte italique si non arial
-- [ ] Ajouter stories dans cli misenpageur
-- [ ] Sélectionner dossier output pour svg (nom des fichiers par défaut) comme la story instagram
+- [ ] Config front-end (widgets, helpers, callbacks, etc) dans un fichier config dédié avec wrapper et nouvelle class pour ne pas avoir sur trop de fichiers `chqaue fois`
+- [ ] Fix csv input
+- [x] Ajouter stories dans cli misenpageur
+- [x] Sélectionner dossier output pour svg (nom des fichiers par défaut) comme la story instagram
 - [ ] Ajouter export fichier config.json silencieux et fichier log
 - [ ] Ajouter fichier de config.json avec valeurs par défaut (+ config débug) dans build. Fichier ensuite utilisé à runTime mais qui peut-être édité 
 - [ ] Améliorer niveaux de débug
@@ -43,7 +45,8 @@
 - [ ] Revoir optimisation de l'espace (remplacement de string si ca fait gagner une ligne, S4 pas remplie jusqu'au bout)
 - [ ] Ajout helpers.
 - [ ] GUI qui génère une preview dynamiquement et ensuite propose de sauver le pdf (voir notes_ia/googleAIStudio.solutionGUIdynamique.md).
-
+- [ ] Revoir résolution GUI
+- [ ] Exe linux + Mac
 - [ ] Changer framework GUI
 
 ## Documentation

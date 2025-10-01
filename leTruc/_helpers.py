@@ -174,7 +174,7 @@ def run_pipeline(
         input_file: str, generate_cover: bool, cover_image: str, ours_background_png: str, logos_dir: str,
         logos_layout: str, logos_padding_mm: float, date_box_back_color: str,
         out_html: str, out_agenda_html: str, out_pdf: str, auteur_couv: str, auteur_couv_url: str,
-        page_margin_mm: float, generate_svg: bool, out_svg: str, date_separator_type: str,
+        page_margin_mm: float, generate_svg: bool, out_svg_dir: str, date_separator_type: str,
         date_spacing: float, poster_design: int, font_size_safety_factor: float,
         background_alpha: float, poster_title: str, cucaracha_type: str,
         cucaracha_value: str, cucaracha_text_font: str, cucaracha_font_size: int,
@@ -202,7 +202,7 @@ def run_pipeline(
 
         # 1. Calculer le nombre total d'étapes à l'avance
         total_steps = 3  # 3 étapes de base : analyse, HTML, PDF/fin
-        if generate_svg and out_svg:
+        if generate_svg and out_svg_dir:
             total_steps += 1
         if generate_stories:
             total_steps += 1
@@ -211,7 +211,7 @@ def run_pipeline(
         status_queue.put(('start', total_steps, None))
         current_step = 0
 
-        for p in (out_html, out_agenda_html, out_pdf, out_svg):
+        for p in (out_html, out_agenda_html, out_pdf, out_svg_dir):
             if p: _ensure_parent_dir(p)
 
         current_step += 1
@@ -277,12 +277,12 @@ def run_pipeline(
             current_step += 1
             status_queue.put(('status', f"Étape {current_step}/{total_steps} : Création du PDF...", current_step, None))
             report = build_pdf(project_root, cfg, lay, out_pdf, cfg_path, paras)
-        if generate_svg and out_svg:
+        if generate_svg and out_svg_dir:
             if not report:
                 report = build_pdf(project_root, cfg, lay, os.devnull, cfg_path, paras)
             current_step += 1
             status_queue.put(('status', f"Étape {current_step}/{total_steps} : Conversion en SVG...", current_step, None))
-            build_svg(project_root, cfg, lay, out_svg, cfg_path, paras)
+            build_svg(project_root, cfg, lay, out_svg_dir, cfg_path, paras)
         if generate_stories:
             current_step += 1
             # Message "en cours"
@@ -297,7 +297,7 @@ def run_pipeline(
         if out_html: summary_lines.append(f"  - HTML: {out_html}")
         if out_agenda_html: summary_lines.append(f"  - HTML (Agenda): {out_agenda_html}")
         if out_pdf: summary_lines.append(f"  - PDF: {out_pdf}")
-        if generate_svg and out_svg: summary_lines.append(f"  - SVG: {out_svg}")
+        if generate_svg and out_svg_dir: summary_lines.append(f"  - SVG: {out_svg_dir}")
         if generate_stories and stories_output_dir: summary_lines.append(f"  - Stories: {stories_output_dir}")
 
         summary_lines.append("\n" + "-" * 40)
@@ -360,6 +360,6 @@ def _default_paths_from_input(input_file: str) -> dict:
         "html": str(folder / f"{base}.html"),
         "agenda_html": str(folder / f"{base}.agenda.html"),
         "pdf": str(folder / f"{base}.pdf"),
-        "svg": str(folder / f"{base}.svg"),
+        "svg_output_dir": str(folder / "svgs"),
         "stories_output": str(folder / "stories")
     }

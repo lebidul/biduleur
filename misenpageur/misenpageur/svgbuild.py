@@ -99,7 +99,7 @@ def _post_process_svg(svg_path: Path, expected_event_count: int):
         print(f"[WARN] Échec du post-traitement pour {svg_path.name}: {e}")
 
 
-def build_svg(project_root: str, cfg: Config, layout: Layout, out_path: str, config_path: str, paras: List[str]) -> dict:
+def build_svg(project_root: str, cfg: Config, layout: Layout, out_dir: str, config_path: str, paras: List[str]) -> dict:
     """
     Génère un SVG par page en convertissant un PDF temporaire, puis
     applique un post-traitement pour corriger les glyphes de puce.
@@ -113,8 +113,12 @@ def build_svg(project_root: str, cfg: Config, layout: Layout, out_path: str, con
         report = build_pdf(project_root, cfg, layout, temp_pdf_path, config_path, paras)
         event_counts = report.get("event_counts_per_page", {})
 
-        output_dir = Path(out_path).parent
-        output_prefix = Path(out_path).stem
+        # On s'assure que le dossier de sortie existe
+        output_dir = Path(out_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        # Le nom de base sera "page" (ex: page_1.svg, page_2.svg, ...)
+        output_prefix = "page"
 
         executable_name = "pdf2svg.exe"  # Le nom de base ne change pas
         path_to_executable = os.path.join(project_root, "bin", "win64", executable_name)
