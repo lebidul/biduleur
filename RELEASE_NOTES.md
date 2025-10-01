@@ -1,5 +1,30 @@
 
 ---
+# Bidul v1.3.3 - Modernisation de l'Interface et Aide Contextuelle
+
+Cette version se concentre sur une refonte majeure de l'ergonomie de l'interface graphique, en introduisant des fonctionnalités modernes pour une expérience utilisateur plus intuitive, plus rapide et mieux guidée.
+
+## ✨ Nouveautés
+
+*   **Glisser-Déposer (Drag and Drop) pour les Fichiers** : L'interface a été modernisée pour permettre la sélection de fichiers par glisser-déposer. Les champs "Fichier d'entrée" et "Image de couverture" ont été transformés en grandes zones de dépôt explicites. Vous pouvez désormais :
+    *   **Glisser et déposer** votre fichier `.xls`/`.csv` ou votre image de couverture directement dans la zone dédiée.
+    *   Ou continuer à utiliser le bouton **"Sélectionner un fichier..."** comme avant.
+    Cette amélioration rend la sélection des fichiers plus rapide et aligne l'application sur les standards des logiciels modernes.
+
+*   **Aide Contextuelle Intégrée (Tooltips)** : Pour rendre l'application plus facile à prendre en main, des infobulles d'aide (`tooltips`) ont été ajoutées sur de nombreux paramètres de l'interface. En laissant simplement le curseur de la souris quelques instants sur un champ ou une option, une petite fenêtre apparaît pour expliquer :
+    *   Le rôle du paramètre (ex: "Marge globale").
+    *   L'impact de chaque option (ex: la différence entre les modes "Automatique" et "Forcée" pour la taille de police).
+    *   Les valeurs attendues.
+    Cette fonctionnalité transforme l'interface en une documentation interactive, guidant l'utilisateur pas à pas.
+
+## ⚙️ Pour les Développeuses et Développeurs
+
+*   **Intégration de `tkinterdnd2`** : La fonctionnalité de glisser-déposer a été implémentée grâce à la bibliothèque `tkinterdnd2`, qui est maintenant une nouvelle dépendance du projet.
+*   **Création d'une Classe `Tooltip` Modulaire** : Toute la logique des infobulles a été encapsulée dans une classe réutilisable (`leTruc/tooltips.py`). Attacher une aide contextuelle à n'importe quel widget se fait désormais en une seule ligne de code, rendant l'extension de cette fonctionnalité très simple.
+*   **Fiabilisation du Build** : Le fichier de configuration de PyInstaller (`bidul.spec`) a été mis à jour pour embarquer correctement la nouvelle dépendance `tkinterdnd2`, garantissant le bon fonctionnement de l'exécutable Windows.
+
+---
+
 # Bidul v1.3.2 - Mode Débogage Avancé et Unifié
 
 Cette version introduit une fonctionnalité majeure destinée aux développeurs et aux utilisateurs avancés : un mode de débogage complet et unifié sur l'ensemble des outils du projet (interface graphique, `misenpageur` CLI, `biduleur` CLI).

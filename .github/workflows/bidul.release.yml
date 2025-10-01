@@ -27,6 +27,7 @@ jobs:
           pip install pyinstaller==6.6.0
           pip install -r biduleur/requirements.txt
           pip install -r misenpageur/requirements.txt
+          pip install -r leTruc/requirements.txt
 
       - name: Determine Version
         id: versioning

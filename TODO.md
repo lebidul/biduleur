@@ -25,7 +25,7 @@
 - [x] Ajouter export fichier config.json silencieux et fichier log
 - [x] Ajouter fichier de config.json avec valeurs par défaut (+ config débug) dans build. Fichier ensuite utilisé à runTime mais qui peut-être édité 
 - [x] Améliorer niveaux de débug
-- [ ] Config front-end (widgets, helpers, callbacks, etc) dans un fichier config dédié avec wrapper et nouvelle class pour ne pas avoir sur trop de fichiers `chqaue fois`
+- [x] Config front-end (widgets, helpers, callbacks, etc) dans un fichier config dédié avec wrapper et nouvelle class pour ne pas avoir sur trop de fichiers `chqaue fois` -> pas une bonne idée car trop complexe
 - [ ] Fix csv input
 
 ## Priorité Moyenne
@@ -37,13 +37,14 @@
 - [x] Problème sécurité Windows
 - [x] Progress bar.
 - [x] Problème affichage release notes dans release github
+- [x] Image de fond dans GUI
+- [x] Ajout helpers.
+- [x] Drag and drop
 - [ ] Ajouter logique de texte gris si poster moyennement foncé
 - [ ] Afficher WARN si le texte de la cucaracha box ne rentre pas
 - [ ] Nouveau paramètre (on peut en ajouter au temps qu'on veut pour définir mise en style (police, gras, etc..) pour certaines chaines de caractères
-- [ ] Image de fond dans GUI
 - [ ] Dans ours l'auteur et les hyperlinks ne suivent pas le .png dans le cas d'une margin (marche bien actuellement avec une marge < 4mm))
 - [ ] Revoir optimisation de l'espace (remplacement de string si ca fait gagner une ligne, S4 pas remplie jusqu'au bout)
-- [ ] Ajout helpers.
 - [ ] GUI qui génère une preview dynamiquement et ensuite propose de sauver le pdf (voir notes_ia/googleAIStudio.solutionGUIdynamique.md).
 - [ ] Revoir résolution GUI
 - [ ] Exe linux + Mac

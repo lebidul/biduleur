@@ -3,6 +3,7 @@ from tkinter import ttk, messagebox
 import threading
 import queue
 import os
+from tkinterdnd2 import TkinterDnD, DND_FILES
 
 # Importe les modules frères
 from . import widgets
@@ -13,7 +14,7 @@ from ._helpers import _load_cfg_defaults, get_resource_path
 from .victory import VictoryWindow
 
 
-class Application(tk.Tk):
+class Application(TkinterDnD.Tk):
     """
     Classe principale de l'interface graphique.
 
@@ -65,7 +66,7 @@ class Application(tk.Tk):
         self.input_var = tk.StringVar()
         self.ours_png_var = tk.StringVar(value=self.cfg_defaults.get("ours_background_png", ""))
         self.logos_var = tk.StringVar(value=self.cfg_defaults.get("logos_dir", ""))
-        self.cover_var = tk.StringVar(value=self.cfg_defaults.get("cover", ""))
+        self.cover_var = tk.StringVar()
         self.html_var = tk.StringVar()
         self.agenda_var = tk.StringVar()
         self.pdf_var = tk.StringVar()
@@ -112,6 +113,8 @@ class Application(tk.Tk):
         self.cucaracha_font_size_var = tk.StringVar(value=str(self.cfg_defaults.get("cucaracha_text_font_size", "8")))
         self.cucaracha_text_widget = None
         self.cucaracha_frame = None
+        self.drop_zone_label = None
+        self.cover_drop_zone_label = None
 
         # --- Variables de sortie et de statut ---
         self.generate_svg_var = tk.BooleanVar(value=True)

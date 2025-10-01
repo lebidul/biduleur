@@ -3,6 +3,10 @@
 import tkinter as tk
 from tkinter import ttk
 
+from tkinterdnd2 import DND_FILES
+from .callbacks import on_drop_input_file, on_drop_cover_file
+from .tooltips import Tooltip
+
 # Ce fichier a une responsabilité unique : créer et placer tous les widgets de l'interface. Il ne contiendra aucune logique d'action (pas de command=... qui font des choses compliquées).
 # La stratégie est de créer une fonction principale create_all qui appelle des sous-fonctions pour chaque grande section de l'interface (une pour la section "Fichier d'entrée", une pour la section "Logos", etc.). C'est beaucoup plus propre et lisible.
 # # Notez que pour les widgets qui auront besoin d'une action (comme les boutons), nous les stockons dans l'instance de l'application (ex: app.input_button = ...). Le fichier callbacks.py les récupérera plus tard pour leur assigner une commande.
@@ -42,10 +46,40 @@ def create_all(app):
 def _create_input_section(parent, app, ui_row):
     """Crée la section pour le fichier d'entrée et les modèles."""
     r = ui_row['r']
-    tk.Label(parent, text="Fichier d’entrée (CSV / XLS) :").grid(row=r, column=0, sticky="e", padx=5, pady=5)
-    tk.Entry(parent, textvariable=app.input_var).grid(row=r, column=1, sticky="ew", padx=5, pady=5)
-    app.input_button = tk.Button(parent, text="Parcourir…")
-    app.input_button.grid(row=r, column=2, padx=5, pady=5)
+
+    # 1. On crée un cadre principal qui servira de zone de dépôt.
+    drop_zone = ttk.Frame(parent, relief="sunken", borderwidth=2, padding=20)
+    drop_zone.grid(row=r, column=0, columnspan=3, sticky="ew", padx=10, pady=10)
+
+    # On configure les colonnes et lignes internes pour centrer le contenu.
+    drop_zone.columnconfigure(0, weight=1)
+    drop_zone.rowconfigure(0, weight=1)
+    drop_zone.rowconfigure(2, weight=1)
+
+    # 2. On crée le label qui affichera le message ou le nom du fichier.
+    app.drop_zone_label = ttk.Label(
+        drop_zone,
+        text="Glissez-déposez votre fichier (XLS/CSV) ici",
+        font=("Arial", 12),
+        anchor="center"
+    )
+    app.drop_zone_label.grid(row=0, column=0, pady=(0, 10))
+
+    # 3. Un petit label "ou" pour séparer.
+    ttk.Label(drop_zone, text="— ou —").grid(row=1, column=0)
+
+    # 4. On place le bouton "Parcourir" à l'intérieur de la zone.
+    # Le bouton hérite déjà de sa commande depuis `callbacks.assign_all`.
+    app.input_button = tk.Button(drop_zone, text="Sélectionner un fichier...")
+    app.input_button.grid(row=2, column=0, pady=(10, 0))
+
+    # 5. On applique les bindings de glisser-déposer au cadre ET au label principal.
+    # C'est important pour que le dépôt fonctionne même si on vise le texte.
+    drop_zone.drop_target_register(DND_FILES)
+    app.drop_zone_label.drop_target_register(DND_FILES)
+
+    drop_zone.dnd_bind('<<Drop>>', lambda event: on_drop_input_file(app, event))
+    app.drop_zone_label.dnd_bind('<<Drop>>', lambda event: on_drop_input_file(app, event))
     r += 1
 
     models_frame = ttk.Frame(parent)
@@ -127,14 +161,34 @@ def _create_cucaracha_section(parent, app, ui_row):
     app.cucaracha_frame.grid(row=r, column=0, columnspan=3, sticky="ew", pady=10)
     app.cucaracha_frame.columnconfigure(1, weight=1)
 
+    # --- Widgets communs (Boutons Radio) ---
+    radio_frame = ttk.Frame(app.cucaracha_frame)
+    radio_frame.grid(row=0, column=0, columnspan=3, sticky="w")
+
+    radio_none = tk.Radiobutton(radio_frame, text="Rien", variable=app.cucaracha_type_var, value="none")
+    radio_none.pack(side=tk.LEFT)
+
+    radio_text = tk.Radiobutton(radio_frame, text="Texte", variable=app.cucaracha_type_var, value="text")
+    radio_text.pack(side=tk.LEFT)
+
+    radio_image = tk.Radiobutton(radio_frame, text="Image", variable=app.cucaracha_type_var, value="image")
+    radio_image.pack(side=tk.LEFT)
+
+    Tooltip(radio_none, text="Aucun contenu ne sera affiché dans la boîte Cucaracha.")
+    Tooltip(radio_text,
+            text="Affiche un bloc de texte personnalisé dans la boîte.\n\nIdéal pour des annonces ou des informations supplémentaires.")
+    Tooltip(radio_image,
+            text="Affiche une image personnalisée dans la boîte.\n\nL'image sera redimensionnée pour s'adapter à la hauteur de la boîte.")
+
     # --- Widgets pour le type "Texte" ---
     app.cucaracha_text_widget = tk.Text(app.cucaracha_frame, height=4, wrap=tk.WORD)
     app.cucaracha_text_widget.insert("1.0", app.cucaracha_value_var.get())
+    Tooltip(app.cucaracha_text_widget, text="Entrez ici le texte à afficher. Les sauts de ligne sont pris en compte.")
 
-    # 1. On crée le cadre qui contiendra les options de police.
+    # Cadre pour les options de police
     app.cucaracha_font_frame = ttk.Frame(app.cucaracha_frame)
 
-    # 2. On crée les widgets de police en leur donnant `app.cucaracha_font_frame` comme parent.
+    # Widgets de police
     app.cucaracha_font_label = tk.Label(app.cucaracha_font_frame, text="Police :")
     font_options = ["Arial", "Helvetica", "Times New Roman", "Courier", "DejaVu Sans"]
     app.cucaracha_font_combo = ttk.Combobox(app.cucaracha_font_frame, textvariable=app.cucaracha_font_var,
@@ -143,8 +197,10 @@ def _create_cucaracha_section(parent, app, ui_row):
     app.cucaracha_font_size_entry = tk.Entry(app.cucaracha_font_frame, textvariable=app.cucaracha_font_size_var,
                                              width=5)
 
-    # 3. On utilise .pack() pour organiser les widgets À L'INTÉRIEUR du `font_frame`.
-    #    Ceci est autorisé car `font_frame` n'a pas encore de widgets gérés par .grid().
+    Tooltip(app.cucaracha_font_combo, text="Choisissez la famille de police pour le texte de la boîte.")
+    Tooltip(app.cucaracha_font_size_entry, text="Définissez la taille de la police en points (pt).")
+
+    # Organisation des widgets de police
     app.cucaracha_font_label.pack(side=tk.LEFT)
     app.cucaracha_font_combo.pack(side=tk.LEFT, padx=(0, 10))
     app.cucaracha_font_size_label.pack(side=tk.LEFT)
@@ -155,16 +211,10 @@ def _create_cucaracha_section(parent, app, ui_row):
     app.cucaracha_image_button = tk.Button(app.cucaracha_frame, text="Parcourir…")
     app.cucaracha_preview = tk.Label(app.cucaracha_frame, text="Aucun aperçu", relief="sunken", padx=5, pady=5)
 
-    # --- Widgets communs ---
-    radio_frame = ttk.Frame(app.cucaracha_frame)
-    radio_frame.grid(row=0, column=0, columnspan=3, sticky="w")
-    tk.Radiobutton(radio_frame, text="Rien", variable=app.cucaracha_type_var, value="none").pack(side=tk.LEFT)
-    tk.Radiobutton(radio_frame, text="Texte", variable=app.cucaracha_type_var, value="text").pack(side=tk.LEFT)
-    tk.Radiobutton(radio_frame, text="Image", variable=app.cucaracha_type_var, value="image").pack(side=tk.LEFT)
+    Tooltip(app.cucaracha_image_entry, text="Chemin vers le fichier image à afficher dans la boîte.")
 
     r += 1
     ui_row['r'] = r
-
 
 def _create_cover_section(parent, app, ui_row):
     """Crée la section pour les informations de couverture."""
@@ -173,26 +223,56 @@ def _create_cover_section(parent, app, ui_row):
     cover_frame.grid(row=r, column=0, columnspan=3, sticky="ew", pady=10)
     cover_frame.columnconfigure(1, weight=1)
 
-    # Ligne 0
+    # Ligne 0 - Case à cocher
     tk.Checkbutton(cover_frame, text="Avec couv' (générer la page de couverture)",
                    variable=app.generate_cover_var).grid(row=0, column=0, columnspan=3, sticky="w", pady=2)
 
-    # Ligne 1
-    tk.Label(cover_frame, text="Image de Couverture :").grid(row=1, column=0, sticky="e", padx=5, pady=5)
-    tk.Entry(cover_frame, textvariable=app.cover_var).grid(row=1, column=1, sticky="ew", padx=5, pady=5)
-    app.cover_button = tk.Button(cover_frame, text="Parcourir…")
-    app.cover_button.grid(row=1, column=2, padx=5, pady=5)
+    # 1. On crée le cadre qui sert de zone de dépôt.
+    cover_drop_zone = ttk.Frame(cover_frame, relief="sunken", borderwidth=2, padding=10)
+    cover_drop_zone.grid(row=1, column=0, columnspan=3, sticky="ew", padx=5, pady=5)
+    cover_drop_zone.columnconfigure(0, weight=1) # Colonne pour le texte/bouton
+    cover_drop_zone.columnconfigure(1, weight=2) # Colonne pour l'aperçu, plus large
 
-    # Ligne 2 : Widget pour l'aperçu
-    app.cover_preview = tk.Label(cover_frame, text="Aucun aperçu", relief="sunken", padx=5, pady=5)
-    app.cover_preview.grid(row=2, column=1, sticky="w", pady=(5, 0), padx=5)
+    # 2. On crée le conteneur pour le texte et le bouton (partie gauche)
+    left_pane = ttk.Frame(cover_drop_zone)
+    left_pane.grid(row=0, column=0, sticky="nsew")
+    left_pane.rowconfigure(1, weight=1) # Pour centrer le bouton verticalement
+
+    # 3. Le label dynamique (texte ou nom de fichier)
+    app.cover_drop_zone_label = ttk.Label(
+        left_pane,
+        text="Glissez-déposez l'image de couverture ici",
+        font=("Arial", 10),
+        anchor="center",
+        justify="center"
+    )
+    app.cover_drop_zone_label.pack(pady=5, expand=True)
+
+    # 4. Le bouton "Parcourir"
+    app.cover_button = tk.Button(left_pane, text="Choisir une image...")
+    app.cover_button.pack(pady=5, expand=True)
+
+    # 5. Le widget d'aperçu (partie droite)
+    app.cover_preview = tk.Label(cover_drop_zone, text="Aucun aperçu", relief="groove")
+    app.cover_preview.grid(row=0, column=1, sticky="nsew", padx=(10, 0))
+
+    # 6. On applique les bindings de glisser-déposer à toute la zone.
+    # On lie l'événement à un NOUVEAU callback : `on_drop_cover_file`.
+    cover_drop_zone.drop_target_register(DND_FILES)
+    app.cover_drop_zone_label.drop_target_register(DND_FILES)
+    left_pane.drop_target_register(DND_FILES)
+    app.cover_preview.drop_target_register(DND_FILES)
+
+    cover_drop_zone.dnd_bind('<<Drop>>', lambda event: on_drop_cover_file(app, event))
+    app.cover_drop_zone_label.dnd_bind('<<Drop>>', lambda event: on_drop_cover_file(app, event))
+    left_pane.dnd_bind('<<Drop>>', lambda event: on_drop_cover_file(app, event))
+    app.cover_preview.dnd_bind('<<Drop>>', lambda event: on_drop_cover_file(app, event))
 
     # Lignes suivantes (décalées)
     tk.Label(cover_frame, text="Auteur Couverture :").grid(row=3, column=0, sticky="e", padx=5, pady=5)
     tk.Entry(cover_frame, textvariable=app.auteur_var).grid(row=3, column=1, columnspan=2, sticky="ew", padx=5, pady=5)
     tk.Label(cover_frame, text="URL auteur couverture :").grid(row=4, column=0, sticky="e", padx=5, pady=5)
-    tk.Entry(cover_frame, textvariable=app.auteur_url_var).grid(row=4, column=1, columnspan=2, sticky="ew", padx=5,
-                                                                pady=5)
+    tk.Entry(cover_frame, textvariable=app.auteur_url_var).grid(row=4, column=1, columnspan=2, sticky="ew", padx=5, pady=5)
 
     r += 1
     ui_row['r'] = r
@@ -205,30 +285,53 @@ def _create_page_layout_section(parent, app, ui_row):
     page_layout_frame.grid(row=r, column=0, columnspan=3, sticky="ew", pady=10)
     page_layout_frame.columnconfigure(1, weight=1)
 
-    # On utilise un compteur de ligne local pour ce frame
     lr = 0
 
-    tk.Label(page_layout_frame, text="Marge globale (mm) :").grid(row=lr, column=0, sticky="w", padx=5, pady=5)
-    tk.Entry(page_layout_frame, textvariable=app.margin_var, width=10).grid(row=lr, column=1, sticky="w", padx=5,
-                                                                            pady=5)
+    # --- Marge globale ---
+    margin_label = tk.Label(page_layout_frame, text="Marge globale (mm) :")
+    margin_label.grid(row=lr, column=0, sticky="w", padx=5, pady=5)
+
+    margin_entry = tk.Entry(page_layout_frame, textvariable=app.margin_var, width=10)
+    margin_entry.grid(row=lr, column=1, sticky="w", padx=5, pady=5)
+
+    Tooltip(margin_label,
+            text="Définit la marge en millimètres entre le bord de la page A4 et le contenu.\n\nCette valeur est appliquée à toutes les pages.\nUne valeur typique est entre 1 et 5.")
+    Tooltip(margin_entry,
+            text="Définit la marge en millimètres entre le bord de la page A4 et le contenu.\n\nCette valeur est appliquée à toutes les pages.\nUne valeur typique est entre 1 et 5.")
+
     lr += 1
 
     # --- Taille de police ---
-    tk.Label(page_layout_frame, text="Taille de police :").grid(row=lr, column=0, sticky="w", padx=5, pady=5)
+    font_size_label = tk.Label(page_layout_frame, text="Taille de police :")
+    font_size_label.grid(row=lr, column=0, sticky="w", padx=5, pady=5)
+
     font_mode_frame = ttk.Frame(page_layout_frame)
     font_mode_frame.grid(row=lr, column=1, columnspan=2, sticky="w")
 
-    tk.Radiobutton(font_mode_frame, text="Automatique", variable=app.font_size_mode_var, value="auto").pack(
-        side=tk.LEFT, padx=5)
-    tk.Radiobutton(font_mode_frame, text="Forcée", variable=app.font_size_mode_var, value="force").pack(side=tk.LEFT,
-                                                                                                        padx=5)
+    radio_auto = tk.Radiobutton(font_mode_frame, text="Automatique", variable=app.font_size_mode_var, value="auto")
+    radio_auto.pack(side=tk.LEFT, padx=5)
+
+    radio_force = tk.Radiobutton(font_mode_frame, text="Forcée", variable=app.font_size_mode_var, value="force")
+    radio_force.pack(side=tk.LEFT, padx=5)
+
+    Tooltip(font_size_label,
+            text="Choisit le mode de calcul de la taille de police pour le corps de l'agenda (pages 1 & 2).")
+    Tooltip(radio_auto,
+            text="Mode 'Automatique' :\nL'application calcule la plus grande taille de police possible pour que tout le texte rentre dans les sections dédiées.")
+    Tooltip(radio_force,
+            text="Mode 'Forcée' :\nUtilise une taille de police fixe que vous définissez.\nSi le texte est trop long, il sera tronqué à la fin.")
+
     lr += 1
 
-    # Création des widgets conditionnels (mais on ne les place pas encore)
+    # --- Widgets conditionnels ---
     app.font_size_forced_label = tk.Label(page_layout_frame, text="Taille forcée (pt) :")
     app.font_size_forced_entry = tk.Entry(page_layout_frame, textvariable=app.font_size_forced_var, width=10)
 
-    # On stocke la ligne où ils devront apparaître pour le callback
+    Tooltip(app.font_size_forced_label,
+            text="Définissez ici la taille de police en points (pt) à utiliser.\nCe champ n'apparaît qu'en mode 'Forcée'.")
+    Tooltip(app.font_size_forced_entry,
+            text="Définissez ici la taille de police en points (pt) à utiliser.\nCe champ n'apparaît qu'en mode 'Forcée'.")
+
     app.font_size_forced_row = lr
 
     r += 1
