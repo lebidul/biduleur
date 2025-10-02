@@ -1,5 +1,24 @@
 
 ---
+# Bidul v1.3.4 - Fiabilisation de l'Export SVG et du Build Windows
+
+Cette version de maintenance cruciale se concentre sur la résolution de bugs qui pouvaient survenir lors de l'utilisation de l'export SVG, en particulier dans la version "standalone" de l'application (`bidul.exe`). L'application est désormais plus robuste et plus portable, garantissant un fonctionnement identique sur n'importe quelle machine Windows.
+
+## 🔧 Améliorations et Corrections
+
+*   **Correction d'un Crash Critique de l'Export SVG (Conflit de DLL)** : Un bug majeur qui provoquait un plantage de l'application (`pdf2svg.exe - Entry Point Not Found`) lors de la génération de fichiers SVG a été résolu. Ce problème survenait sur les systèmes où un autre logiciel (comme Tesseract-OCR) avait installé une version incompatible d'une bibliothèque partagée (`libfontconfig-1.dll`).
+
+*   **Fiabilisation du Chemin vers `pdf2svg` dans l'Application Portable** : La version "standalone" (`bidul.exe`) trouve désormais de manière fiable l'outil de conversion `pdf2svg.exe` qu'elle embarque. Cela corrige l'erreur `Échec de la conversion SVG` qui survenait après le packaging de l'application.
+
+*   **Nettoyage de la Configuration du Build** : Des dépendances obsolètes (`svglib`) ont été retirées de la configuration de PyInstaller. Cela résout une erreur `ModuleNotFoundError` qui pouvait survenir lors du build sur GitHub Actions et rend le processus de compilation plus propre.
+
+## ⚙️ Pour les Développeuses et Développeurs
+
+*   **Dépendances "Bundlées"** : La dépendance externe `pdf2svg.exe` est désormais livrée avec toutes ses DLLs requises. Le build PyInstaller embarque ce dossier en entier (`bin/win64`), garantissant que l'exécutable est totalement autonome et ne subit plus de conflits avec les bibliothèques installées sur le système de l'utilisateur.
+*   **Utilisation de `get_resource_path`** : La fonction utilitaire `get_resource_path` est maintenant utilisée pour trouver le chemin de `pdf2svg.exe` de manière fiable, que l'application soit lancée depuis les sources ou en tant qu'exécutable packagé (via `sys._MEIPASS`).
+
+---
+
 # Bidul v1.3.3 - Modernisation de l'Interface et Aide Contextuelle
 
 Cette version se concentre sur une refonte majeure de l'ergonomie de l'interface graphique, en introduisant des fonctionnalités modernes pour une expérience utilisateur plus intuitive, plus rapide et mieux guidée.
