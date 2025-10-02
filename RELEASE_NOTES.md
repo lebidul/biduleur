@@ -1,5 +1,23 @@
 
 ---
+# Bidul v1.3.5 - Affichage de la Version et Améliorations Internes
+
+Cette version de maintenance se concentre sur l'amélioration de l'expérience utilisateur et la robustesse du processus de build, en apportant plus de clarté sur la version de l'application utilisée.
+
+## ✨ Améliorations
+
+*   **Affichage du Numéro de Version dans le Titre** : Le numéro de version de l'application (ex: `v1.3.5`) est désormais **automatiquement affiché** dans la barre de titre de la fenêtre principale.
+    *   Cela permet aux utilisateurs d'identifier facilement la version qu'ils utilisent, ce qui est crucial pour le support technique et le suivi des bugs.
+    *   En mode développement, le titre affichera `v-dev` pour une distinction claire.
+
+## ⚙️ Pour les Développeuses et Développeurs
+
+*   **Injection de Version au Moment du Build** : Le numéro de version n'est plus codé en dur. Il est maintenant injecté dynamiquement lors du processus de build par le workflow GitHub Actions.
+    *   Le workflow extrait la version du tag Git (ex: `bidul-v1.3.5`), la "grave" dans un fichier `leTruc/_version.py`, qui est ensuite embarqué dans l'exécutable par PyInstaller.
+    *   Cette approche garantit que la version affichée est toujours synchronisée avec la release officielle, éliminant tout risque d'oubli ou d'erreur manuelle.
+
+---
+
 # Bidul v1.3.4 - Fiabilisation de l'Export SVG et du Build Windows
 
 Cette version de maintenance cruciale se concentre sur la résolution de bugs qui pouvaient survenir lors de l'utilisation de l'export SVG, en particulier dans la version "standalone" de l'application (`bidul.exe`). L'application est désormais plus robuste et plus portable, garantissant un fonctionnement identique sur n'importe quelle machine Windows.

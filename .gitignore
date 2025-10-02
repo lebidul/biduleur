@@ -49,3 +49,6 @@ instagram_session.json
 
 # Dossiers générés
 output_images/
+
+# Fichier de version généré par le build
+leTruc/_version.py
