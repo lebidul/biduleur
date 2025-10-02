@@ -190,7 +190,8 @@ def _create_cucaracha_section(parent, app, ui_row):
 
     # Widgets de police
     app.cucaracha_font_label = tk.Label(app.cucaracha_font_frame, text="Police :")
-    font_options = ["Arial", "Helvetica", "Times New Roman", "Courier", "DejaVu Sans"]
+    # font_options = ["Arial", "Helvetica", "Times New Roman", "Courier", "DejaVu Sans"]
+    font_options = ["Arial", "Helvetica", "Times New Roman", "Courier"]
     app.cucaracha_font_combo = ttk.Combobox(app.cucaracha_font_frame, textvariable=app.cucaracha_font_var,
                                             values=font_options, state="readonly")
     app.cucaracha_font_size_label = tk.Label(app.cucaracha_font_frame, text="Taille (pt):")
