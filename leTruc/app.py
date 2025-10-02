@@ -13,6 +13,12 @@ from . import callbacks
 from ._helpers import _load_cfg_defaults, get_resource_path
 from .victory import VictoryWindow
 
+try:
+    from ._version import __version__
+except ImportError:
+    # Si le fichier n'existe pas (cas du développement local), on utilise une valeur par défaut.
+    __version__ = "dev"
+
 
 class Application(TkinterDnD.Tk):
     """
@@ -26,7 +32,7 @@ class Application(TkinterDnD.Tk):
         super().__init__()
 
         # --- 1. Configuration de la fenêtre principale ---
-        self.title("Le Truc – Pipeline XLS/CSV → PDF")
+        self.title(f"Le Truc v{__version__} – Crée ton Bidul à la maison - .xls/.csv → .pdf")
         self.geometry("900x900")
         self.columnconfigure(0, weight=1)
         self.rowconfigure(0, weight=1)
