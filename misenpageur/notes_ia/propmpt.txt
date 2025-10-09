@@ -1,0 +1,37 @@
+Je mets en page chaque mois avec MS publisher un document A4 de 1 page recto.verso découpé en 8 sections (chacune faisant une taille A5). 
+
+
+
+
+* nom des sections
+	page 1:
+		moitié haute: 
+			partie gauche: S1
+			partie droite: S2
+		moitié basse: 
+			partie gauche: S3
+			partie droite: S4
+
+	page 2:
+		moitié haute: 
+			partie gauche: S5
+			partie droite: S6
+		moitié basse: 
+			partie gauche: S7
+			partie droite: S8
+
+* Contenu des sections
+	S1: images des logos (10) (partie gauche) + texte constant (appelé ours) (partie droite)
+	S2: image de couverture
+	Sections 3,4,5,6,7,8: contient les lignes d'un fichier html d'entrée réparties sur ces 6 sections, dans l'ordre suivant 5,7,6,8,3,4, c'est à dire que:
+		- la section 5 contient les lignes [1 ; a] du fichier html
+		- la section 7 contient les lignes [a+1; b] du fichier html
+		- la section 6 contient les lignes [b+1; c] du fichier html
+	La taille de police doit donc être adaptée pour pouvoir faire rentrer toutes les lignes du fichier html en alignement justifié au sein de chaque section en font "Arial Narrow"
+
+
+
+* Je joins un fichier input html (biduleur.html), un fichier template_bidul.pdf qui affiche la répartition des différentes sections dans le fichier final ainsi qu'un exemple de ce que doit être un fichier output (2025-09 Bidul 305.v3.pdf)
+
+
+Je cherche à changer ce process pour y intégrer plus d'automatisation et de programmation et une plus grande simplicité d'exécution. Que suggères-tu comme process et outils pour y parvenir ? 

@@ -12,7 +12,13 @@ biduleur/outputs
 publisher/output
 biduleur/outputs
 biduleur/outputs
-
+build
+dist
+*.exe
+*.pyd
+*.dll
+biduleur/build
+biduleur/dist
 
 # Folder view configuration files
 .DS_Store
@@ -42,3 +48,14 @@ indexeur_Geoffrey/temporaire/
 indexeur_Geoffrey/pdfs_a_traiter/
 indexeur_Geoffrey/PDF temporaire/
 indexeur_Geoffrey/fichiers_temporaires/
+
+# Fichiers sensibles à ne jamais envoyer sur GitHub
+.env
+gcp_creds.json
+instagram_session.json
+
+# Dossiers générés
+output_images/
+
+# Fichier de version généré par le build
+leTruc/_version.py

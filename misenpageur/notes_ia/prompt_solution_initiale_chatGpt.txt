@@ -1,0 +1,110 @@
+Génial, merci pour les fichiers — je vois bien la maquette S1→S8 et un exemple final, ainsi que l’HTML d’entrée avec les paragraphes en *Arial Narrow* et interlignage serré.  &#x20;
+
+Voici un process simple, entièrement automatisable, en restant 100% scriptable et reproductible.
+
+# Objectif
+
+* Partir d’un `biduleur.html` → générer un PDF A4 recto/verso, découpé en 8 sections (S1…S8), avec:
+
+  * S1 = 10 logos + « l’ours » (texte constant)
+  * S2 = visuel de couverture
+  * S5,S7,S6,S8,S3,S4 = flux du fichier HTML d’entrée, *justifié*, *Arial Narrow*, *taille auto-ajustée* pour faire tenir chaque bloc sans débordement, dans l’ordre 5→7→6→8→3→4. &#x20;
+
+# Stack recommandée (tout-Python, portable)
+
+**Option A — ReportLab + PyMuPDF (recommandé)**
+
+* **ReportLab (platypus Frames)** : cadres S1…S8 précis, justification, gestion fine des marges et du *leading*.
+* **PyMuPDF** : pour poser la \**trame* / *template* (votre PDF S1…S8) en arrière-plan et/ou fusion finale, si souhaité.&#x20;
+* **BeautifulSoup / lxml** : parser `biduleur.html` et produire une liste de *paragraph flowables*.&#x20;
+* **Pillow** : gestion et mosaïque des 10 logos (S1).
+* **Jinja2 + YAML** : configuration mensuelle (logos, visuel S2, ours, couleurs, marges) sans toucher au code.
+
+**Alternatives (selon préférences)**
+
+* **Scribus** (script Python intégré) : frames + styles + PDF, tout en WYSIWYG avec un script *batch*.
+* **Adobe InDesign** (ExtendScript/JS) : si vous êtes déjà équipé, très robuste, mais dépendance Adobe.
+* **WeasyPrint/HTML-CSS** : possible, mais la gestion « region/frames » *strictes* et l’auto-fitting granularisé est plus délicate qu’avec ReportLab.
+
+# Pipeline proposé (one-click)
+
+1. **Config du mois (`config.yml`)**
+
+   * chemins: `logos/`, `cover.jpg`, `ours.md`
+   * styles: marges, grille S1…S8 (coordonnées mm/pt), interlignes, tailles min/max, *fallback font* (ex. *Liberation Sans Narrow*, *Noto Sans Condensed* si *Arial Narrow* indisponible).
+2. **Parsing HTML**
+
+   * On lit `biduleur.html`, on extrait la liste ordonnée de `<p>` (texte riche: *<strong>*, *<em>*, etc.).&#x20;
+3. **Distribution dans les sections**
+
+   * Ordre de remplissage: S5 → S7 → S6 → S8 → S3 → S4.
+   * Algorithme « remplissage progressif » : on alimente S5 avec des paragraphes tant que ça tient → dès que la prochaine insertion déborde, on « recul-une-marche », on **réduit la taille de police** via une **recherche binaire** (ex. 9.5 pt…6.5 pt) et on reteste jusqu’à ce que tout tienne **justifié**.
+   * Puis on passe à S7, etc., jusqu’à épuisement du HTML.
+4. **Rendu PDF**
+
+   * On dessine la page 1 (S1 à S4) + page 2 (S5 à S8) avec **ReportLab Frames**.
+   * **S1** : grille d’images (10 logos) + insertion de l’ours (texte constant). La mosaïque adapte les tailles pour éviter toute déformation.
+   * **S2** : image de couverture (plein cadre, *cover*).
+   * **S5…S8/S3…S4** : paragraphes justifiés, *Arial Narrow* (ou fallback), interlignage fin (matching l’existant).
+   * Option : poser `bidul_template.pdf` en calque de fond avec PyMuPDF pour garder les repères exacts (si vous le souhaitez dans la sortie).&#x20;
+5. **Contrôles auto**
+
+   * Vérifier qu’aucun paragraphe n’a débordé (overflow).
+   * Générer un *preflight report* (JSON) : tailles utilisées par section, nb lignes, marges effectives.
+6. **Sorties**
+
+   * `YYYY-MM Bidul NNN.pdf` (final)
+   * `preview_lowres.pdf` (épreuve écran)
+   * `report.json` (diagnostics)
+   * Log des warnings (ex. police manquante, image introuvable).
+
+# Détails clés (pour que ce soit nickel)
+
+* **Justification & césure** : ReportLab gère l’alignement justifié. Pour la césure FR, on peut intégrer un dictionnaire (*pyphen*) pour éviter les « rivières ».
+* **Auto-fit fiable** : la **recherche binaire** de taille de police par section est robuste et rapide ; on garde un *leading* proportionnel (ex. 1.05–1.15× la taille).
+* **Compat police** : *Arial Narrow* est propriétaire. Si non disponible sur la machine, prévoir un *fallback* *Liberation Sans Narrow* / *Noto Sans Condensed* pour une largeur proche.
+* **Logos S1** : placer en grille (2×5 ou 5×2 selon l’espace), avec *max-height* identique et centrage vertical pour une ligne d’horizon propre.
+* **Couverture S2** : *cover/contain* selon vos habitudes; on peut autoriser un recadrage intelligent (Pillow + *smart crop* centré visage/zone).
+* **Constantes (« ours ») S1** : stockées en Markdown → conversion en Paragraph (ou HTML très simple) pour conserver l’italique/gras.
+* **Reproductibilité** : tout paramétré par `config.yml` (marges, coordonnées Sx, tailles min/max), pour ne plus toucher au code lors d’un changement de maquette.
+
+# Arborescence type
+
+```
+bidul_maker/
+  main.py
+  layout.yml              # coords S1..S8, marges, tailles par défaut
+  config.yml              # variables du mois (logos, visuel, ours)
+  assets/
+    fonts/arial-narrow/   # ou fallback
+    logos/*.png
+    cover.jpg
+  templates/
+    bidul_template.pdf    # option calque fond  (:contentReference[oaicite:9]{index=9})
+  input/
+    biduleur.html         # (:contentReference[oaicite:10]{index=10})
+  output/
+    2025-09 Bidul 305.v3.pdf   # attendu (:contentReference[oaicite:11]{index=11})
+    preview_lowres.pdf
+    report.json
+```
+
+# Variantes / évolutions
+
+* **Scribus** : si vous voulez garder une *maquette WYSIWYG*, on fabrique un `.sla` maître avec 8 cadres (S1…S8) + un script Python Scribus qui injecte le contenu, force justification, ajuste la taille, puis exporte en PDF/X.
+* **InDesign** : même logique via ExtendScript (JS) ou UXP, avec *textFrames* ciblés, *fitTextToFrame()* (script custom) et export PDF.
+* **Web-to-print** : un petit front (Streamlit/FastAPI) pour glisser-déposer `biduleur.html`, logos, et générer le PDF + aperçu.
+* **Contrôle qualité** : génération automatique d’un *contact-sheet* des logos et d’une **liste des paragraphes tronqués** (si le texte a dû être trop compressé).
+
+# Ce que je peux livrer rapidement
+
+* Un **prototype Python (ReportLab)** qui:
+
+  1. lit `biduleur.html`,
+  2. remplit S5→S7→S6→S8→S3→S4 avec justification,
+  3. auto-ajuste la taille de police par section pour que tout tienne,
+  4. pose S1 (mosaïque 10 logos + ours) et S2 (couverture),
+  5. exporte un PDF final compatible avec votre exemple.
+     (Le gabarit S1…S8 est repris de `bidul_template.pdf` pour garder les positions.)&#x20;
+
+Souhaitez-vous que je vous génère dès maintenant une première version du script (avec vos trois fichiers fournis comme jeux d’essai) et une *layout* par défaut calculée à partir du template S1→S8 ?
