@@ -124,7 +124,7 @@ if __name__ == "__main__":
     DOSSIER_DES_PDFS = "pdfs_a_traiter"         # Dossier contenant les PDF à analyser
     DOSSIER_TEMPORAIRE_RACINE = "fichiers_temporaires" # Dossier où sera créé le sous-dossier "tempo"
     
-    prompt_filepath = "prompt_mistral_13.txt"
+    prompt_filepath = "prompt_mistral.txt"
     
     # Choix de l'OCR
     #i_orc = choix_de_ORC()
