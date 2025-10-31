@@ -1,3 +1,42 @@
+# Bidul v1.3.6 - Amélioration de la Qualité SVG et Fiabilité de la Conversion
+
+Cette version apporte une refonte majeure du système de conversion PDF vers SVG, avec une amélioration significative de la qualité des images et une meilleure fiabilité sur tous les environnements.
+
+## ✨ Nouveautés
+
+*   **Qualité d'Image Améliorée dans les SVG** : Les fichiers SVG générés bénéficient désormais d'une résolution d'image doublée (zoom 2×), offrant des visuels 4× plus nets. Cette amélioration est particulièrement visible sur :
+    *   Les photos de couverture.
+    *   Les logos des partenaires.
+    *   Tous les éléments graphiques du programme.
+    Les fichiers restent légers tout en conservant une qualité professionnelle pour l'impression et l'affichage numérique.
+
+*   **Conservation Parfaite du Format A4** : Le système de conversion préserve maintenant exactement les dimensions du PDF original (210×297mm pour A4). Fini les SVG mal dimensionnés qui nécessitaient des ajustements manuels dans Inkscape ou Illustrator.
+
+*   **Conversion Plus Fiable et Sans Dépendances Externes** : Le moteur de conversion n'utilise plus `pdf2svg.exe` (qui nécessitait de nombreuses DLLs externes et posait des problèmes de compatibilité). À la place :
+    *   **PyMuPDF** est maintenant utilisé par défaut : conversion plus rapide, plus fiable, et fonctionnelle sur tous les systèmes Windows sans configuration supplémentaire.
+    *   **Fallback automatique** : Si PyMuPDF n'est pas disponible, le système bascule intelligemment vers pdf2svg.exe avec des messages d'erreur clairs pour guider l'utilisateur.
+
+*   **Meilleure Gestion des Erreurs** : Les messages d'erreur sont maintenant plus explicites et proposent des solutions concrètes en cas de problème (code d'erreur détecté, diagnostic des DLLs manquantes, suggestions d'installation).
+
+## ⚙️ Pour les Développeuses et Développeurs
+
+*   **Nouvelle Dépendance : PyMuPDF** : La bibliothèque `pymupdf` (aussi connue sous le nom de `fitz`) remplace `pdf2svg.exe` comme moteur de conversion principal. Elle offre :
+    *   Une API Python native (pas d'appel subprocess).
+    *   Un contrôle fin de la qualité via matrices de transformation.
+    *   Une compatibilité multiplateforme (Windows, Linux, macOS).
+
+*   **Architecture Modulaire de Conversion** : Le fichier `svgbuild.py` a été restructuré avec :
+    *   `_convert_pdf_to_svg_pymupdf()` : Conversion via PyMuPDF avec contrôle de la résolution.
+    *   `_convert_pdf_to_svg_pdf2svg()` : Conversion via pdf2svg.exe (fallback) avec diagnostic amélioré.
+    *   `_fix_svg_dimensions()` : Fonction dédiée pour corriger les dimensions du SVG et ajouter les attributs `width`, `height` et `viewBox`.
+    *   Sélection automatique de la meilleure méthode disponible.
+
+*   **Paramètre de Qualité Configurable** : Le facteur de zoom (actuellement `2.0`) est facilement modifiable dans le code pour ajuster le compromis qualité/taille de fichier selon les besoins.
+
+*   **Mise à Jour du Workflow CI/CD** : Le fichier GitHub Actions (`bidul_release.yml`) intègre maintenant l'installation de PyMuPDF pour garantir le bon fonctionnement de la conversion dans les builds automatisés.
+
+*   **Diagnostic Avancé** : En cas d'échec avec pdf2svg.exe, le système détecte maintenant le code d'erreur spécifique `3228369022` (DLLs manquantes) et affiche des instructions précises pour résoudre le problème.
+
 
 ---
 # Bidul v1.3.5 - Affichage de la Version et Améliorations Internes
