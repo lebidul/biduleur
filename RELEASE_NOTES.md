@@ -4,7 +4,9 @@ Cette version apporte une refonte majeure du système de conversion PDF vers SVG
 
 ## ✨ Nouveautés
 
-*   **Qualité d'Image Améliorée dans les SVG** : Les fichiers SVG générés bénéficient désormais d'une résolution d'image doublée (zoom 2×), offrant des visuels 4× plus nets. Cette amélioration est particulièrement visible sur :
+* **Dates "En Bref"** : La valeur de la date pour les événements infos est maintenant "Coups de coeur et en bref"   
+
+* **Qualité d'Image Améliorée dans les SVG** : Les fichiers SVG générés bénéficient désormais d'une résolution d'image doublée (zoom 2×), offrant des visuels 4× plus nets. Cette amélioration est particulièrement visible sur :
     *   Les photos de couverture.
     *   Les logos des partenaires.
     *   Tous les éléments graphiques du programme.
