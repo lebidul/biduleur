@@ -42,13 +42,17 @@
 - [x] Drag and drop
 - [ ] Ajouter logique de texte gris si poster moyennement foncé
 - [ ] Afficher WARN si le texte de la cucaracha box ne rentre pas
-- [ ] Nouveau paramètre (on peut en ajouter au temps qu'on veut pour définir mise en style (police, gras, etc..) pour certaines chaines de caractères
+- [ ] Nouveau paramètre (on peut en ajouter autant qu'on veut pour définir mise en style (police, gras, etc..) pour certaines chaines de caractères
 - [ ] Dans ours l'auteur et les hyperlinks ne suivent pas le .png dans le cas d'une margin (marche bien actuellement avec une marge < 4mm))
 - [ ] Revoir optimisation de l'espace (remplacement de string si ca fait gagner une ligne, S4 pas remplie jusqu'au bout)
 - [ ] GUI qui génère une preview dynamiquement et ensuite propose de sauver le pdf (voir notes_ia/googleAIStudio.solutionGUIdynamique.md).
 - [ ] Revoir résolution GUI
 - [ ] Exe linux + Mac
 - [ ] Changer framework GUI
+- [ ] Mieux gérer l'erreur dans le cas où les colonnes de l'input csv/xls sont mal configurées
+- [ ] Pouvoir entrer plusieurs dates (csv like) pour une même date pour ne pas avoir à répéter
+- [ ] "En Bref" -> "Coups de coeur et en Bref"
+- [ ] Pouvoir importer une config dans le GUI
 
 ## Documentation
 - [ ] Rédiger un guide utilisateur pour expliquer comment utiliser le module.

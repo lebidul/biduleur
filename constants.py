@@ -1,6 +1,6 @@
 # biduleur constants
 
-COLONNE_INFO = "En bref"
+COLONNE_INFO = "Coups de coeur et en bref"
 OUTPUT_FOLDER_NAME = './outputs/'
 LINE_HEIGHT = "0.25"
 P_MD_OPEN = f"""<p style="font-family: Arial Narrow;line-height:{LINE_HEIGHT}">"""

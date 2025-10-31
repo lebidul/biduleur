@@ -92,7 +92,7 @@ def format_evenement(evenement: str, style_evenement: str) -> str:
 def format_info(info: str, description_info: str, url_info: str) -> str:
     if not info or str(info).lower().strip() in ("", "nan"):
         return ""
-    return f"<strong>{info}</strong>{format_style(description_info)}{fmt_link(url_info)}"
+    return f"<strong>{info} - </strong><em>{description_info}</em>{fmt_link(url_info)}"
 
 def format_lieu(lieu: str) -> str:
     if not lieu or lieu == "Le Mans" or str(lieu).lower().strip() in ("", "nan") or isinstance(lieu, int):
