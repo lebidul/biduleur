@@ -17,7 +17,7 @@ log = logging.getLogger(__name__) # Obtenir le logger pour ce module
 from .config import Config, BulletConfig, PosterConfig, DateBoxConfig, DateLineConfig
 from .layout import Layout, Section
 from .html_utils import extract_paragraphs_from_html
-from .drawing import draw_s1, draw_s2_cover, list_images, paragraph_style, draw_poster_logos
+from .drawing import draw_s1, draw_s2_cover, list_images, paragraph_style, draw_poster_logos, _load_high_quality_image
 from .fonts import (register_arial_narrow, register_dejavu_sans, register_dsnet_stamped,
                     register_arial, register_helvetica, register_times, register_courier)
 from .spacing import SpacingConfig, SpacingPolicy
@@ -613,10 +613,20 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
                 poster_text_color = poster_cfg_dict.get("text_color_dark_bg", "#FFFFFF")
                 print("[INFO] Fond sombre détecté, la police du poster passe en blanc.")
             if cover_path:
-                # 1. Dessiner l'image de fond
-                kwargs = {'mask': 'auto'} if not isinstance(c, SVGCanvas) else {}
-                c.drawImage(cover_path, 0, 0, width=layout.page.width, height=layout.page.height,
-                            preserveAspectRatio=True, anchor='c', **kwargs)
+                # 1. Dessiner l'image de fond en haute qualité
+                try:
+                    if not isinstance(c, SVGCanvas):
+                        img_reader = _load_high_quality_image(cover_path, layout.page.width, layout.page.height, min_dpi=300)
+                        c.drawImage(img_reader, 0, 0, width=layout.page.width, height=layout.page.height,
+                                    preserveAspectRatio=True, anchor='c', mask='auto')
+                    else:
+                        c.drawImage(cover_path, 0, 0, width=layout.page.width, height=layout.page.height,
+                                    preserveAspectRatio=True, anchor='c')
+                except Exception as e:
+                    log.warning(f"Erreur chargement cover poster: {e}")
+                    kwargs = {'mask': 'auto'} if not isinstance(c, SVGCanvas) else {}
+                    c.drawImage(cover_path, 0, 0, width=layout.page.width, height=layout.page.height,
+                                preserveAspectRatio=True, anchor='c', **kwargs)
 
                 # ==================== DESSIN DU VOILE DE TRANSPARENCE ====================
                 # 2. Dessiner un rectangle blanc semi-transparent par-dessus
@@ -631,9 +641,19 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
             poster_frames = [S7["S7_Col1"], S7["S7_Col2_Full"], S7["S7_Col3"]]
         else:
             if cover_path:
-                kwargs = {'mask': 'auto'} if not isinstance(c, SVGCanvas) else {}
-                c.drawImage(cover_path, S7["S7_CoverImage"].x, S7["S7_CoverImage"].y, S7["S7_CoverImage"].w,
-                            S7["S7_CoverImage"].h, preserveAspectRatio=True, anchor='c', **kwargs)
+                try:
+                    if not isinstance(c, SVGCanvas):
+                        img_reader = _load_high_quality_image(cover_path, S7["S7_CoverImage"].w, S7["S7_CoverImage"].h, min_dpi=300)
+                        c.drawImage(img_reader, S7["S7_CoverImage"].x, S7["S7_CoverImage"].y, S7["S7_CoverImage"].w,
+                                    S7["S7_CoverImage"].h, preserveAspectRatio=True, anchor='c', mask='auto')
+                    else:
+                        c.drawImage(cover_path, S7["S7_CoverImage"].x, S7["S7_CoverImage"].y, S7["S7_CoverImage"].w,
+                                    S7["S7_CoverImage"].h, preserveAspectRatio=True, anchor='c')
+                except Exception as e:
+                    log.warning(f"Erreur chargement cover poster: {e}")
+                    kwargs = {'mask': 'auto'} if not isinstance(c, SVGCanvas) else {}
+                    c.drawImage(cover_path, S7["S7_CoverImage"].x, S7["S7_CoverImage"].y, S7["S7_CoverImage"].w,
+                                S7["S7_CoverImage"].h, preserveAspectRatio=True, anchor='c', **kwargs)
             poster_frames = [S7[name] for name in ["S7_Col1", "S7_Col2_Top", "S7_Col2_Bottom", "S7_Col3"]]
 
         # --- Éléments communs ---

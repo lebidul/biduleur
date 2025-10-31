@@ -19,13 +19,63 @@ import math
 import rectpack
 from rectpack import float2dec, PackerGlobal, PackerBFF, PackerBNF
 
-import logging # Ajouter cet import
-log = logging.getLogger(__name__) # Obtenir le logger pour ce module
+import logging  # Ajouter cet import
+
+log = logging.getLogger(__name__)  # Obtenir le logger pour ce module
 
 from .fonts import register_arial
 from .layout import Layout, Section
 from .config import Config
 from .utils import mm_to_pt
+
+
+def _load_high_quality_image(image_path: str, target_width_pt: float, target_height_pt: float, min_dpi: int = 300):
+    """
+    Charge une image avec optimisation pour la qualité d'impression.
+
+    Args:
+        image_path: Chemin vers l'image
+        target_width_pt: Largeur cible en points
+        target_height_pt: Hauteur cible en points
+        min_dpi: Résolution minimale souhaitée (défaut: 300 DPI)
+
+    Returns:
+        ImageReader: Image optimisée prête pour ReportLab
+    """
+    img = Image.open(image_path)
+
+    # Convertir en RGB si nécessaire
+    if img.mode not in ('RGB', 'L'):
+        if img.mode == 'RGBA':
+            background = Image.new('RGB', img.size, (255, 255, 255))
+            background.paste(img, mask=img.split()[-1])
+            img = background
+        else:
+            img = img.convert('RGB')
+
+    # Calculer dimensions cibles en pixels pour le DPI souhaité
+    target_width_px = int((target_width_pt / 72.0) * min_dpi)
+    target_height_px = int((target_height_pt / 72.0) * min_dpi)
+
+    img_width, img_height = img.size
+
+    # Redimensionner si nécessaire avec LANCZOS pour la meilleure qualité
+    if img_width < target_width_px or img_height < target_height_px:
+        # Upscale si trop petit
+        ratio = max(target_width_px / img_width, target_height_px / img_height)
+        new_width = int(img_width * ratio)
+        new_height = int(img_height * ratio)
+        img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+        log.debug(f"Upscaling: {img_width}x{img_height} → {new_width}x{new_height}px ({min_dpi} DPI)")
+    elif img_width > target_width_px * 2 or img_height > target_height_px * 2:
+        # Downscale si beaucoup trop grand (économie de taille de fichier)
+        ratio = min(target_width_px / img_width, target_height_px / img_height)
+        new_width = int(img_width * ratio)
+        new_height = int(img_height * ratio)
+        img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+        log.debug(f"Downscaling: {img_width}x{img_height} → {new_width}x{new_height}px")
+
+    return ImageReader(img)
 
 
 def list_images(path: str, max_images: int = 100) -> List[str]:
@@ -48,6 +98,7 @@ def paragraph_style(font_name: str, font_size: float, leading_ratio: float) -> P
         leading=font_size * leading_ratio,
     )
 
+
 def draw_paragraph(c: canvas.Canvas, p: Paragraph, x: float, y: float):
     """
     Dessine un objet Paragraph sur le canvas, en s'adaptant s'il s'agit
@@ -64,7 +115,7 @@ def draw_paragraph(c: canvas.Canvas, p: Paragraph, x: float, y: float):
     c.setFont(p.style.fontName, p.style.fontSize)
     c.setFillColor(p.style.textColor)
 
-    y_pos = y + p.height # On commence par le haut du paragraphe
+    y_pos = y + p.height  # On commence par le haut du paragraphe
     for line in p.blPara.lines:
         y_pos -= p.style.leading
         # Gérer l'alignement
@@ -72,7 +123,7 @@ def draw_paragraph(c: canvas.Canvas, p: Paragraph, x: float, y: float):
             c.drawCentredString(x + p.width / 2, y_pos, line.text)
         elif p.style.alignment == TA_RIGHT:
             c.drawRightString(x + p.width, y_pos, line.text)
-        else: # TA_LEFT
+        else:  # TA_LEFT
             c.drawString(x, y_pos, line.text)
     c.restoreState()
 
@@ -94,10 +145,21 @@ def _draw_ours_column(c: canvas.Canvas, col_coords: tuple, cfg: Config):
     scale_x = w_col / REF_COL_WIDTH if REF_COL_WIDTH > 0 else 1.0
     scale_y = h_col / REF_COL_HEIGHT if REF_COL_HEIGHT > 0 else 1.0
 
-    # 3. Dessin de l'image de fond (inchangé)
+    # 3. Dessin de l'image de fond avec haute qualité
     bg_path = os.path.join(project_root, s1_cfg.get('ours_background_png', ''))
     if os.path.exists(bg_path):
-        c.drawImage(bg_path, x_col, y_col, width=w_col, height=h_col, preserveAspectRatio=True, anchor='c', mask='auto')
+        try:
+            if not isinstance(c, SVGCanvas):
+                img_reader = _load_high_quality_image(bg_path, w_col, h_col, min_dpi=300)
+                c.drawImage(img_reader, x_col, y_col, width=w_col, height=h_col, preserveAspectRatio=True, anchor='c',
+                            mask='auto')
+            else:
+                c.drawImage(bg_path, x_col, y_col, width=w_col, height=h_col, preserveAspectRatio=True, anchor='c',
+                            mask='auto')
+        except Exception as e:
+            log.warning(f"Erreur chargement background ours: {e}")
+            c.drawImage(bg_path, x_col, y_col, width=w_col, height=h_col, preserveAspectRatio=True, anchor='c',
+                        mask='auto')
 
     # 4. Dessin du nom de l'auteur et de son lien (avec mise à l'échelle)
     auteur_text = getattr(cfg, 'auteur_couv', '')
@@ -185,7 +247,8 @@ def _draw_ours_column(c: canvas.Canvas, col_coords: tuple, cfg: Config):
         # La police est mise à l'échelle par le ratio vertical
         title_font_size = s1_cfg.get('qr_code_title_font_size', 9) * scale_y
         title_font_name = s1_cfg.get('qr_code_title_font_name', 'Helvetica-Bold')
-        title_style = ParagraphStyle('OursTitle', fontName=title_font_name, fontSize=title_font_size, alignment=TA_CENTER)
+        title_style = ParagraphStyle('OursTitle', fontName=title_font_name, fontSize=title_font_size,
+                                     alignment=TA_CENTER)
         p = Paragraph(title_text, title_style)
 
         p_w, p_h = p.wrapOn(c, w_col, h_col)
@@ -195,6 +258,7 @@ def _draw_ours_column(c: canvas.Canvas, col_coords: tuple, cfg: Config):
         title_y_pos = qr_y_pos + qr_code_size_pt + (mm_to_pt(1) * scale_y)
 
         p.drawOn(c, title_x_pos, title_y_pos)
+
 
 # --- FONCTION PRINCIPALE (ROUTEUR) ---
 def _draw_logos_column(c: canvas.Canvas, col_coords: tuple, logos: List[str], cfg: Config):
@@ -287,7 +351,7 @@ def _draw_logos_two_columns(c: canvas.Canvas, col_coords: tuple, logos: List[str
                 # Créer le rectangle pour le lien invisible
                 link_rect = (logo_x, logo_y, logo_x + w_fit, logo_y + h_fit)
                 c.linkURL(url, link_rect, relative=0, thickness=0)
-                log.info(f"Lien créé pour '{logo_basename}' vers '{url}'") # Optionnel
+                log.info(f"Lien créé pour '{logo_basename}' vers '{url}'")  # Optionnel
 
         except Exception as e:
             log.warning(f"Erreur avec le logo {os.path.basename(logo_path)}: {e}")
@@ -444,8 +508,13 @@ def draw_s1(c: canvas.Canvas, S1_coords, logos: List[str], cfg: Config, lay: Lay
     _draw_logos_column(c, logos_col_coords, logos, cfg)
     _draw_ours_column(c, ours_col_coords, cfg)
 
+
 def draw_s2_cover(c: canvas.Canvas, S2_coords, image_path: str, inner_pad: float):
+    """
+    Dessine l'image de couverture avec haute qualité (300 DPI minimum).
+    """
     x, y, w, h = S2_coords.x, S2_coords.y, S2_coords.w, S2_coords.h
+
     if not image_path or not os.path.exists(image_path):
         c.saveState()
         c.setStrokeColor(grey)
@@ -455,15 +524,27 @@ def draw_s2_cover(c: canvas.Canvas, S2_coords, image_path: str, inner_pad: float
         c.restoreState()
         return
 
+    # Pour SVG, comportement original
     if isinstance(c, SVGCanvas):
         image_to_draw = Image.open(image_path)
-    else:
-        image_to_draw = image_path
-    kwargs = {'mask': 'auto'} if not isinstance(c, SVGCanvas) else {}
-    c.drawImage(image_to_draw, x, y, w, h, preserveAspectRatio=True, anchor='c', **kwargs)
+        c.drawImage(image_to_draw, x, y, w, h, preserveAspectRatio=True, anchor='c')
+        return
+
+    # Pour PDF : optimisation haute qualité avec fonction helper
+    try:
+        img_reader = _load_high_quality_image(image_path, w, h, min_dpi=300)
+        c.drawImage(img_reader, x, y, w, h, preserveAspectRatio=True, anchor='c', mask='auto')
+        log.debug(f"Image de couverture insérée: {w:.1f}x{h:.1f}pt (300 DPI)")
+    except Exception as e:
+        log.error(f"Erreur lors du chargement de l'image de couverture: {e}")
+        # Fallback: méthode originale
+        c.drawImage(image_path, x, y, w, h, preserveAspectRatio=True, anchor='c', mask='auto')
 
 
 def draw_poster_logos(c: canvas.Canvas, s_coords: Section, logos: List[str]):
+    """
+    Dessine les logos des partenaires avec haute qualité (300 DPI minimum).
+    """
     x, y, w, h = s_coords.x, s_coords.y, s_coords.w, s_coords.h
     if not logos or not w > 0 or not h > 0: return
 
@@ -474,11 +555,7 @@ def draw_poster_logos(c: canvas.Canvas, s_coords: Section, logos: List[str]):
     for i, logo_path in enumerate(logos):
         cell_x = x + i * cell_w
         try:
-            if isinstance(c, SVGCanvas):
-                image_to_draw = Image.open(logo_path)
-            else:
-                image_to_draw = logo_path
-
+            # Calculer dimensions du logo
             img_reader = ImageReader(logo_path)
             img_w, img_h = img_reader.getSize()
             aspect = img_h / img_w if img_w > 0 else 1
@@ -494,8 +571,15 @@ def draw_poster_logos(c: canvas.Canvas, s_coords: Section, logos: List[str]):
             logo_x = cell_x + (cell_w - w_fit) / 2
             logo_y = y + (h - h_fit) / 2
 
-            kwargs = {'mask': 'auto'} if not isinstance(c, SVGCanvas) else {}
-            c.drawImage(image_to_draw, logo_x, logo_y, width=w_fit, height=h_fit, **kwargs)
+            # Pour SVG, comportement original
+            if isinstance(c, SVGCanvas):
+                image_to_draw = Image.open(logo_path)
+                c.drawImage(image_to_draw, logo_x, logo_y, width=w_fit, height=h_fit)
+            else:
+                # Pour PDF : haute qualité
+                img_reader_hq = _load_high_quality_image(logo_path, w_fit, h_fit, min_dpi=300)
+                c.drawImage(img_reader_hq, logo_x, logo_y, width=w_fit, height=h_fit, mask='auto')
+
         except Exception as e:
             log.warning(f"Impossible de dessiner le logo du poster {os.path.basename(logo_path)}: {e}")
 
@@ -531,7 +615,7 @@ def _draw_cucaracha_box(c: canvas.Canvas, box_coords: tuple, cfg: Config):
         try:
             font_size = float(c_cfg.get("text_font_size", 10))
         except (ValueError, TypeError):
-            font_size = 10.0 # Fallback
+            font_size = 10.0  # Fallback
 
         # 2. On gère le style italique avec des balises, ce qui est plus robuste.
         text_content = content_value.replace('\n', '<br/>')
