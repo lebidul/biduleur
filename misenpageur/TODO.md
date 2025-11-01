@@ -16,7 +16,7 @@
 - [x] Poster (page 3).
 - [x] Qualité pdf. - convert_image affecte qualité ?
 - [ ] Unit tests.
-- [ ] Intégrer nouveaux logos de Gaelle.
+- [x] Intégrer nouveaux logos de Gaelle.
 - [x] Enlever watermark pdf2svg dans svg outputs.
 - [ ] Améliorer visuel QR code.
 - [x] Empêcher qu'une date (ligne date) commence à la fin d'une section
