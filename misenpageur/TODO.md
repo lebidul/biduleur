@@ -14,12 +14,12 @@
 - [x] Config cucaracha v2: pouvoir ajouter image pour additional box
 - [x] Config qr code
 - [x] Poster (page 3).
-- [ ] Qualité pdf. - convert_image affecte qualité ?
+- [x] Qualité pdf. - convert_image affecte qualité ?
 - [ ] Unit tests.
 - [ ] Intégrer nouveaux logos de Gaelle.
 - [x] Enlever watermark pdf2svg dans svg outputs.
 - [ ] Améliorer visuel QR code.
-- [ ] Empêcher qu'une date (ligne date) commence à la fin d'une section
+- [x] Empêcher qu'une date (ligne date) commence à la fin d'une section
 - [ ] Déplacer insecabilité dans biduleur (sur lieu et ville) ? (autorise moins de flexibiité though)
 
 ## Priorité Moyenne

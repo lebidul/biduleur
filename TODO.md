@@ -51,7 +51,7 @@
 - [ ] Changer framework GUI
 - [ ] Mieux gérer l'erreur dans le cas où les colonnes de l'input csv/xls sont mal configurées
 - [ ] Pouvoir entrer plusieurs dates (csv like) pour une même date pour ne pas avoir à répéter
-- [ ] "En Bref" -> "Coups de coeur et en Bref"
+- [x] "En Bref" -> "Coups de coeur et en Bref"
 - [ ] Pouvoir importer une config dans le GUI
 
 ## Documentation
