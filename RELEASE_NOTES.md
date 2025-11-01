@@ -1,5 +1,62 @@
 ---
 
+# Bidul v1.3.7 - Correction de la Mise en Page des Dates
+
+Cette version corrige un défaut de mise en page qui pouvait affecter la lisibilité du programme en permettant à des lignes de dates de se retrouver orphelines en bas de section.
+
+## ✨ Nouveautés
+
+*   **Fin des Dates Orphelines** : Le système de mise en page empêche désormais qu'une ligne de date (ex: "SAMEDI 14") se retrouve seule en bas d'une section (S3, S4, S5, S6, S7, S8) sans aucun événement qui la suit. Cette amélioration garantit une mise en page plus cohérente et professionnelle en s'assurant que :
+    *   Chaque date est toujours accompagnée d'au moins un événement dans la même section.
+    *   Si une date et son premier événement ne peuvent pas tenir ensemble dans l'espace restant, la date passe automatiquement à la section suivante avec ses événements.
+    *   La lisibilité du programme est préservée : les dates restent toujours contextualisées par leurs événements associés.
+
+*   **Correction Complète** : Le fix fonctionne maintenant dans **tous les modes de génération** :
+    *   **Mode automatique** : Quand la taille de police est calculée automatiquement pour optimiser l'espace.
+    *   **Mode forcé** : Quand la taille de police est définie manuellement dans la configuration.
+    
+    Le problème qui persistait en mode forcé dans les premières versions du fix a été complètement résolu.
+
+## ⚙️ Pour les Développeuses et Développeurs
+
+*   **Contrainte de Lookahead Généralisée** : Le système utilise maintenant une contrainte "anti-orpheline" à 5 endroits stratégiques dans le code de mise en page (`textflow.py`) :
+    1. **`measure_fit_at_fs()`** : Mesure combien de paragraphes peuvent être placés dans une section.
+    2. **`draw_section_fixed_fs_with_prelude()`** : Dessine les sections S4 et S6 (avec éléments de prélude).
+    3. **`draw_section_fixed_fs_with_tail()`** : Dessine les sections S3 et S5 (avec éléments de tail).
+    4. **`plan_pair_with_split()` - A_full** : Distribue le contenu pour la première section d'une paire (S3 ou S5).
+    5. **`plan_pair_with_split()` - B_full** : Distribue le contenu pour la seconde section d'une paire (S4 ou S6).
+
+*   **Logique de la Contrainte** : Avant de placer une DATE dans une section, le système vérifie maintenant :
+```python
+    # Si c'est une DATE et qu'il reste des paragraphes après
+    if kind == "DATE" and i < len(paras_text) - 1:
+        next_kind = "EVENT" if _is_event(paras_text[i + 1]) else "DATE"
+        
+        # Si le prochain est un EVENT, vérifier l'espace disponible
+        if next_kind == "EVENT":
+            # Calculer l'espace nécessaire pour DATE + EVENT
+            if not assez_d_espace_pour_les_deux:
+                break  # Ne pas placer la DATE
+```
+    Cette logique s'applique de manière cohérente dans toutes les fonctions de mesure et de dessin.
+
+*   **Cas Particuliers Gérés** :
+    *   Les dates consécutives (ex: SAMEDI 14 suivi de DIMANCHE 15) ne sont pas contraintes et peuvent se suivre librement.
+    *   Une date en dernière position du contenu (fin naturelle du document) peut être placée sans contrainte.
+    *   La variable `first_non_event_seen_in_S5` est correctement gérée pour calculer les espacements dans la section S5.
+
+*   **Architecture de la Solution** : La correction initiale ne couvrait que les fonctions de dessin direct, ce qui expliquait pourquoi le problème persistait en mode forcé. L'ajout de la contrainte dans `plan_pair_with_split()` - qui est responsable de la **distribution** du contenu entre sections paires (S3/S4, S5/S6) - résout le problème à la source, avant même que le dessin ne commence.
+
+*   **Tests Recommandés** :
+    *   Vérifier qu'aucune date n'est orpheline dans les sections S3 à S8.
+    *   Tester avec des configurations en mode automatique et mode forcé.
+    *   Vérifier le comportement avec des séquences de dates consécutives.
+    *   S'assurer que les documents avec peu d'événements se génèrent correctement.
+
+*   **Fichier Modifié** : `misenpageur/misenpageur/textflow.py` - 5 modifications réparties sur environ 100 lignes de code.
+
+---
+
 # Bidul v1.3.6 - Amélioration de la Qualité SVG et des Images PDF
 
 Cette version apporte une refonte majeure du système de conversion PDF vers SVG et de la gestion des images dans les PDF, avec une amélioration significative de la qualité visuelle pour l'impression professionnelle.
