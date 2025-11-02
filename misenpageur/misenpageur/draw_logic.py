@@ -10,9 +10,9 @@ from pathlib import Path
 from typing import List, Tuple
 from collections.abc import Mapping
 
-import logging # Ajouter cet import
-log = logging.getLogger(__name__) # Obtenir le logger pour ce module
+import logging  # Ajouter cet import
 
+log = logging.getLogger(__name__)  # Obtenir le logger pour ce module
 
 from .config import Config, BulletConfig, PosterConfig, DateBoxConfig, DateLineConfig
 from .layout import Layout, Section
@@ -41,6 +41,7 @@ import xml.etree.ElementTree as ET
 
 PT_PER_INCH = 72.0
 MM_PER_INCH = 25.4
+
 
 def _pp_get(cfg, key, default=None):
     pp = getattr(cfg, "prepress", {}) or {}
@@ -75,8 +76,8 @@ def _analyze_image_brightness(
             final_brightness = (white_overlay_opacity * 255) + (image_opacity * avg_brightness_original)
 
             log.info(f"Luminosité originale: {avg_brightness_original:.1f}, "
-                  f"Après voile (transparence={transparency:.2f}): {final_brightness:.1f}, "
-                  f"Seuil: {threshold}")
+                     f"Après voile (transparence={transparency:.2f}): {final_brightness:.1f}, "
+                     f"Seuil: {threshold}")
 
             # On utilise la condition qui a du sens physiquement :
             # si la luminosité finale est basse, le fond est sombre.
@@ -280,6 +281,7 @@ def read_text(path: str) -> str:
     with open(path, "r", encoding="utf-8") as f:
         return f.read()
 
+
 def _xml_escape(s: str) -> str:
     return (s.replace("&", "&amp;")
             .replace("<", "&lt;")
@@ -398,6 +400,7 @@ def _read_date_box_config(cfg: Config) -> DateBoxConfig:
         back_color=getattr(cfg, "date_box_back_color", None),
     )
 
+
 def _read_bullet_config(cfg: Config) -> BulletConfig:
     """Crée un objet BulletConfig à partir de la config principale."""
     return BulletConfig(
@@ -406,6 +409,7 @@ def _read_bullet_config(cfg: Config) -> BulletConfig:
         event_hanging_indent=cfg.event_hanging_indent,
         bullet_text_indent=cfg.bullet_text_indent
     )
+
 
 def _read_poster_config(cfg: Config) -> PosterConfig:
     block = cfg.poster
@@ -420,7 +424,7 @@ def _read_poster_config(cfg: Config) -> PosterConfig:
         font_size_min=float(block.get("font_size_min", 6.0)),
         font_size_max=float(block.get("font_size_max", 10.0)),
         font_size_safety_factor=float(block.get("font_size_safety_factor", 0.98)),
-        background_image_alpha = float(block.get("background_image_alpha", 0.85)),
+        background_image_alpha=float(block.get("background_image_alpha", 0.85)),
         date_spaceBefore=float(block.get("date_spaceBefore", 2.0)),
         date_spaceAfter=float(block.get("date_spaceAfter", 2.0))
     )
@@ -452,8 +456,8 @@ def _read_date_line_config(cfg: Config) -> DateLineConfig:
 
 
 def _create_poster_story(
-    paras_text: List[str], font_name: str, font_size: float,
-    leading_ratio: float, bullet_cfg: BulletConfig
+        paras_text: List[str], font_name: str, font_size: float,
+        leading_ratio: float, bullet_cfg: BulletConfig
 ) -> List[Paragraph]:
     """Crée la liste d'objets Paragraph pour le poster."""
     base_style = paragraph_style(font_name, font_size, leading_ratio)
@@ -563,7 +567,6 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
     report["unused_paragraphs"] = len(rest_after_p1)
     report["font_size_main"] = best_fs
 
-
     def count_events(para_list: List[str]) -> int:
         return sum(1 for p in para_list if _is_event(p))
 
@@ -579,7 +582,7 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
     # --- RENDU PAGE 1 & 2 ---
     draw_s1(c, S["S1"], logos, cfg, layout)
     if not cfg.skip_cover:
-        prepped_cover = _prepare_cover_for_print(cover_path, S["S2"].w, S["S2"].h, cfg) # cover_path est déjà absolu
+        prepped_cover = _prepare_cover_for_print(cover_path, S["S2"].w, S["S2"].h, cfg)  # cover_path est déjà absolu
         draw_s2_cover(c, S["S2"], prepped_cover, cfg.inner_padding)
     draw_section_fixed_fs_with_tail(c, S["S3"], s3_full, s3_tail, cfg.font_name, best_fs, cfg.leading_ratio,
                                     cfg.inner_padding, "S3", spacing_policy, bullet_cfg, date_box, date_line)
@@ -593,7 +596,7 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
 
     # --- RENDU PAGE 3 (POSTER) ---
     poster_cfg = _read_poster_config(cfg)
-    poster_cfg_dict = cfg.poster # On récupère le dictionnaire
+    poster_cfg_dict = cfg.poster  # On récupère le dictionnaire
     best_fs_poster = poster_cfg.font_size_min
 
     if poster_cfg.enabled:
@@ -616,7 +619,8 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
                 # 1. Dessiner l'image de fond en haute qualité
                 try:
                     if not isinstance(c, SVGCanvas):
-                        img_reader = _load_high_quality_image(cover_path, layout.page.width, layout.page.height, min_dpi=300)
+                        img_reader = _load_high_quality_image(cover_path, layout.page.width, layout.page.height,
+                                                              min_dpi=300)
                         c.drawImage(img_reader, 0, 0, width=layout.page.width, height=layout.page.height,
                                     preserveAspectRatio=True, anchor='c', mask='auto')
                     else:
@@ -643,7 +647,8 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
             if cover_path:
                 try:
                     if not isinstance(c, SVGCanvas):
-                        img_reader = _load_high_quality_image(cover_path, S7["S7_CoverImage"].w, S7["S7_CoverImage"].h, min_dpi=300)
+                        img_reader = _load_high_quality_image(cover_path, S7["S7_CoverImage"].w, S7["S7_CoverImage"].h,
+                                                              min_dpi=300)
                         c.drawImage(img_reader, S7["S7_CoverImage"].x, S7["S7_CoverImage"].y, S7["S7_CoverImage"].w,
                                     S7["S7_CoverImage"].h, preserveAspectRatio=True, anchor='c', mask='auto')
                     else:
@@ -705,11 +710,76 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
         c.restoreState()
 
         s_qr = S7["S7_QRCode"]
-        qr_gen = qrcode.QRCode(version=1, border=1)
-        qr_gen.add_data(cfg.section_1.get('qr_code_value', ''))
+
+        # Récupérer les paramètres de style du QR code depuis la config
+        qr_value = cfg.section_1.get('qr_code_value', '')
+        qr_style = cfg.section_1.get('qr_code_style', 'standard')
+        qr_color = cfg.section_1.get('qr_code_color', '#000000')
+
+        # Convertir couleur hex en RGB
+        def hex_to_rgb(hex_color):
+            hex_color = hex_color.lstrip('#')
+            return tuple(int(hex_color[i:i + 2], 16) for i in (0, 2, 4))
+
+        try:
+            front_color_rgb = hex_to_rgb(qr_color)
+        except:
+            front_color_rgb = (0, 0, 0)
+
+        qr_gen = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_H,
+            box_size=10,
+            border=1
+        )
+        qr_gen.add_data(qr_value)
         qr_gen.make(fit=True)
         buffer = io.BytesIO()
-        qr_gen.make_image().save(buffer, format='PNG')
+
+        # Essayer d'utiliser les styles avancés si disponibles
+        try:
+            from qrcode.image.styledpil import StyledPilImage
+            from qrcode.image.styles.moduledrawers import (
+                RoundedModuleDrawer,
+                CircleModuleDrawer,
+                GappedSquareModuleDrawer
+            )
+            from qrcode.image.styles.colormasks import SolidFillColorMask
+
+            # Sélectionner le style de module
+            module_drawer = None
+            if qr_style == 'rounded':
+                module_drawer = RoundedModuleDrawer()
+            elif qr_style == 'circles':
+                module_drawer = CircleModuleDrawer()
+            elif qr_style == 'gapped':
+                module_drawer = GappedSquareModuleDrawer()
+
+            if module_drawer:
+                qr_img = qr_gen.make_image(
+                    image_factory=StyledPilImage,
+                    module_drawer=module_drawer,
+                    color_mask=SolidFillColorMask(
+                        back_color=(255, 255, 255),
+                        front_color=front_color_rgb
+                    )
+                )
+                log.debug(f"QR code poster (S7) généré avec style '{qr_style}'")
+            else:
+                # Style standard avec couleur personnalisée
+                qr_img = qr_gen.make_image(
+                    fill_color=f"#{front_color_rgb[0]:02x}{front_color_rgb[1]:02x}{front_color_rgb[2]:02x}",
+                    back_color="white"
+                )
+                log.debug("QR code poster (S7) généré avec style standard")
+
+            qr_img.save(buffer, format='PNG')
+
+        except (ImportError, AttributeError) as e:
+            # Fallback vers la méthode standard
+            log.debug(f"Styles avancés QR code non disponibles pour S7: {e}")
+            qr_gen.make_image(fill_color="black", back_color="white").save(buffer, format='PNG')
+
         buffer.seek(0)
 
         kwargs = {'mask': 'auto'} if not isinstance(c, SVGCanvas) else {}
@@ -725,10 +795,10 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
             if mid <= lo or mid >= hi: break
 
             if measure_poster_fit_at_fs(
-                c, poster_frames, poster_paras,
-                cfg.font_name, mid, cfg.leading_ratio, bullet_cfg,
-                poster_cfg,
-                poster_text_color  # On passe la configuration du poster
+                    c, poster_frames, poster_paras,
+                    cfg.font_name, mid, cfg.leading_ratio, bullet_cfg,
+                    poster_cfg,
+                    poster_text_color  # On passe la configuration du poster
             ):
                 best_fs_poster, lo = mid, mid
             else:
@@ -752,7 +822,8 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
     print("-" * 20)
     print(f"Taille de police (pages 1-2): {best_fs:.2f} pt")
     if poster_cfg.enabled:
-        print(f"Taille de police (poster)    : {best_fs_poster * poster_cfg.font_size_safety_factor:.2f} pt (optimale: {best_fs_poster:.2f})")
+        print(
+            f"Taille de police (poster)    : {best_fs_poster * poster_cfg.font_size_safety_factor:.2f} pt (optimale: {best_fs_poster:.2f})")
     print(f"Paragraphes non placés      : {len(rest_after_p1)}")
     print("-" * 20)
 

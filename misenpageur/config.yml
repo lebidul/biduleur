@@ -143,6 +143,7 @@ section_1:
   qr_code_title_font_name: "Arial-Bold"
   qr_code_title_font_size: 9
 
+
   auteur_pos_x_mm: 25
   auteur_pos_y_mm: 47
   auteur_font_name: "Arial-Bold"
@@ -151,6 +152,9 @@ section_1:
 
   qr_code_value: "https://www.lebidul.com"
   qr_code_height_mm: 32
+
+  qr_code_style: "gapped"    # standard|rounded|circles|gapped
+  qr_code_color: "#797a7a"    # Couleur en hex
 
   additional_box_height_mm: 35
   logo_box_bottom_margin_mm: 0

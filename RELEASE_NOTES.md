@@ -1,5 +1,98 @@
 ---
 
+# Bidul v1.3.8 - QR Codes Stylisés et Modernes
+
+Cette version modernise l'apparence des QR codes présents dans le document (page 1 et page 4) avec des styles visuels personnalisables, permettant un aspect plus professionnel et cohérent avec l'identité graphique de Radio Alpa.
+
+## ✨ Nouveautés
+
+*   **QR Codes Stylisés et Personnalisables** : Ajout de différents fichiers de logos dans le build pour différentes configurations:
+    *   **`logos` & `logos.v0`** : Ceux qui ont servi à faire le Biudl #306 (next gen v1.0)
+    *   **`logos.vectorized`** : v0 +  vectorisation https://vectorizer.ai/
+    *   **`logos.impression`** : v0 +  upsert logos impression Gaelle
+*   **QR Codes Stylisés et Personnalisables** : Les QR codes du document bénéficient maintenant de styles visuels modernes configurables. Fini les QR codes noirs et blancs basiques ! Vous pouvez désormais choisir parmi plusieurs styles :
+    *   **`rounded`** (recommandé) : Coins arrondis pour un aspect moderne et élégant.
+    *   **`circles`** : Points circulaires pour un rendu artistique et original.
+    *   **`gapped`** : Carrés espacés pour un look aéré et contemporain.
+    *   **`standard`** : QR code classique (comportement par défaut).
+    
+    Ces styles s'appliquent automatiquement aux **deux QR codes** du document :
+    - Le QR code de la section "ours" (page 1, en bas à gauche).
+    - Le QR code du poster (page 4, section S7).
+
+*   **Couleurs Personnalisables** : Les QR codes peuvent maintenant être générés dans la couleur de votre choix (au format hexadécimal). Par défaut en noir (`#000000`), vous pouvez les personnaliser aux couleurs de votre charte graphique (par exemple bleu `#3498DB`, rouge `#E74C3C`, etc.). La couleur s'applique de manière cohérente sur les deux pages.
+
+*   **Configuration Centralisée** : Un seul endroit dans `config.yml` pour configurer l'apparence des deux QR codes, garantissant une cohérence visuelle sur l'ensemble du document :
+```yaml
+    section_1:
+      qr_code_style: "rounded"    # Style du QR code
+      qr_code_color: "#000000"    # Couleur en hexadécimal
+```
+
+*   **Qualité d'Impression Optimisée** : Les QR codes stylisés utilisent une correction d'erreur élevée (`ERROR_CORRECT_H`), permettant une meilleure résistance aux imperfections d'impression tout en conservant une excellente scannabilité.
+
+*   **Fallback Automatique et Fiable** : Si la bibliothèque de styles avancés n'est pas disponible, le système génère automatiquement un QR code standard sans erreur bloquante. Des messages de log clairs indiquent quel style est utilisé, facilitant le diagnostic.
+
+## ⚙️ Pour les Développeuses et Développeurs
+
+*   **Nouvelle Dépendance : `qrcode[pil]`** : La bibliothèque `qrcode` avec support PIL (Pillow) est maintenant requise pour profiter des styles avancés. Cette version inclut :
+    *   Les modules de dessin stylisés (`StyledPilImage`, `RoundedModuleDrawer`, `CircleModuleDrawer`, `GappedSquareModuleDrawer`).
+    *   Les masques de couleur pour la personnalisation (`SolidFillColorMask`).
+    *   Installation : `pip install qrcode[pil]>=7.0.0`
+
+*   **Architecture de Génération Unifiée** : La logique de génération des QR codes stylisés a été implémentée de manière cohérente dans deux fichiers :
+    *   **`drawing.py`** (lignes ~234-280) : QR code de la section "ours" (page 1).
+    *   **`draw_logic.py`** (lignes ~707-770) : QR code du poster (page 4, section S7).
+    
+    Les deux utilisent la même fonction helper `hex_to_rgb()` pour convertir les couleurs et la même logique de fallback.
+
+*   **Paramètres de Configuration** : Deux nouveaux paramètres optionnels dans `config.yml` sous `section_1` :
+```yaml
+    qr_code_style: "rounded"  # Options: standard, rounded, circles, gapped
+    qr_code_color: "#000000"  # Code couleur hexadécimal (avec ou sans #)
+```
+    
+    Ces paramètres sont optionnels. Par défaut, le style `standard` et la couleur noire sont utilisés si non spécifiés.
+
+*   **Gestion Intelligente des Erreurs** : Le code implémente un try/except à trois niveaux :
+    1. **Tentative de génération stylisée** : Avec StyledPilImage et drawers personnalisés.
+    2. **Fallback vers style standard avec couleur** : Si les modules stylisés ne sont pas disponibles.
+    3. **Fallback ultime vers noir/blanc** : En cas d'erreur de conversion de couleur.
+    
+    Chaque niveau est accompagné de logs appropriés (`log.info`, `log.debug`, `log.warning`).
+
+*   **Correction d'Erreur Élevée** : Les QR codes sont maintenant générés avec `error_correction=qrcode.constants.ERROR_CORRECT_H` (correction maximale ~30%) au lieu de la correction par défaut. Cela permet :
+    - Une meilleure résistance aux dégradations d'impression.
+    - La possibilité future d'ajouter un logo au centre du QR code.
+    - Une scannabilité améliorée sur supports usés ou mal imprimés.
+
+*   **Mise à Jour du Requirements** : Le fichier `misenpageur/requirements.txt` doit inclure :
+```
+    qrcode[pil]>=7.0.0
+```
+    Cette dépendance sera automatiquement installée lors du build via GitHub Actions.
+
+*   **Logs de Diagnostic** : Des logs informatifs permettent de suivre la génération des QR codes :
+```
+    QR code généré avec style 'rounded'
+    QR code poster (S7) généré avec style 'rounded'
+```
+    Ou en cas de fallback :
+```
+    Styles avancés QR code non disponibles: [erreur]
+    Utilisation du style QR code standard. Pour les styles avancés, installez: pip install qrcode[pil]
+```
+
+*   **Compatibilité Ascendante** : Les configurations existantes sans les nouveaux paramètres `qr_code_style` et `qr_code_color` continuent de fonctionner normalement, générant des QR codes standard noirs et blancs comme avant. Aucune migration nécessaire.
+
+*   **Documentation Complète** : Plusieurs fichiers de documentation ont été créés :
+    - `README_QR_STYLES.md` : Guide d'implémentation complet.
+    - `config_qr_code_example.yml` : Exemples de configurations avec commentaires détaillés.
+    - `QR_CODE_IMPROVEMENTS.md` : Documentation technique des différentes options.
+    - `QR_CODE_POSTER_S7.md` : Explications spécifiques pour le QR code du poster.
+
+---
+
 # Bidul v1.3.7 - Correction de la Mise en Page des Dates
 
 Cette version corrige un défaut de mise en page qui pouvait affecter la lisibilité du programme en permettant à des lignes de dates de se retrouver orphelines en bas de section.
