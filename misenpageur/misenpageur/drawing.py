@@ -233,11 +233,74 @@ def _draw_ours_column(c: canvas.Canvas, col_coords: tuple, cfg: Config):
 
     # On utilise cfg.section_1 pour être cohérent
     qr_value = s1_cfg.get('qr_code_value', '')
-    qr_gen = qrcode.QRCode(version=1, border=0)
+    qr_style = s1_cfg.get('qr_code_style', 'standard')  # Options: standard, rounded, circles, gapped
+    qr_color = s1_cfg.get('qr_code_color', '#000000')  # Couleur en hex
+
+    # Convertir couleur hex en RGB
+    def hex_to_rgb(hex_color):
+        hex_color = hex_color.lstrip('#')
+        return tuple(int(hex_color[i:i + 2], 16) for i in (0, 2, 4))
+
+    try:
+        front_color_rgb = hex_to_rgb(qr_color)
+    except:
+        front_color_rgb = (0, 0, 0)  # Noir par défaut
+
+    qr_gen = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_H,  # Haute correction pour meilleure qualité
+        box_size=10,
+        border=0
+    )
     qr_gen.add_data(qr_value)
     qr_gen.make(fit=True)
     buffer = io.BytesIO()
-    qr_gen.make_image(fill_color="black", back_color="white").save(buffer, format='PNG')
+
+    # Essayer d'utiliser les styles avancés si disponibles
+    try:
+        from qrcode.image.styledpil import StyledPilImage
+        from qrcode.image.styles.moduledrawers import (
+            RoundedModuleDrawer,
+            CircleModuleDrawer,
+            GappedSquareModuleDrawer
+        )
+        from qrcode.image.styles.colormasks import SolidFillColorMask
+
+        # Sélectionner le style de module
+        module_drawer = None
+        if qr_style == 'rounded':
+            module_drawer = RoundedModuleDrawer()
+        elif qr_style == 'circles':
+            module_drawer = CircleModuleDrawer()
+        elif qr_style == 'gapped':
+            module_drawer = GappedSquareModuleDrawer()
+
+        if module_drawer:
+            qr_img = qr_gen.make_image(
+                image_factory=StyledPilImage,
+                module_drawer=module_drawer,
+                color_mask=SolidFillColorMask(
+                    back_color=(255, 255, 255),
+                    front_color=front_color_rgb
+                )
+            )
+            log.info(f"QR code généré avec style '{qr_style}'")
+        else:
+            # Style standard avec couleur personnalisée
+            qr_img = qr_gen.make_image(
+                fill_color=f"#{front_color_rgb[0]:02x}{front_color_rgb[1]:02x}{front_color_rgb[2]:02x}",
+                back_color="white"
+            )
+            log.info("QR code généré avec style standard")
+
+        qr_img.save(buffer, format='PNG')
+
+    except (ImportError, AttributeError) as e:
+        # Fallback vers la méthode standard si les modules stylisés ne sont pas disponibles
+        log.warning(f"Styles avancés QR code non disponibles: {e}")
+        log.info("Utilisation du style QR code standard. Pour les styles avancés, installez: pip install qrcode[pil]")
+        qr_gen.make_image(fill_color="black", back_color="white").save(buffer, format='PNG')
+
     buffer.seek(0)
 
     c.drawImage(ImageReader(buffer), qr_x_pos, qr_y_pos, width=qr_code_size_pt, height=qr_code_size_pt, mask='auto')

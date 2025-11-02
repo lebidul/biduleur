@@ -16,11 +16,15 @@
 - [x] Poster (page 3).
 - [x] Qualité pdf. - convert_image affecte qualité ?
 - [ ] Unit tests.
-- [ ] Intégrer nouveaux logos de Gaelle.
+- [ ] Logos SVG
+- [ ] URL logos dans export SVG
+- [x] Intégrer nouveaux logos de Gaelle.
 - [x] Enlever watermark pdf2svg dans svg outputs.
 - [ ] Améliorer visuel QR code.
 - [x] Empêcher qu'une date (ligne date) commence à la fin d'une section
 - [ ] Déplacer insecabilité dans biduleur (sur lieu et ville) ? (autorise moins de flexibiité though)
+- [ ] Fichiers svg outputs prennent le nom du fichier pdf
+- [ ] Améliorer affichage optimisée des logos (plusieurs propals ?)
 
 ## Priorité Moyenne
 - [x] Amélioration lisibilité finale (ex. caractère de bullet point comme paramètre, cadre pour date)
