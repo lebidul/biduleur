@@ -54,6 +54,8 @@
 - [x] "En Bref" -> "Coups de coeur et en Bref"
 - [ ] Pouvoir importer une config dans le GUI
 - [ ] SVG output qui ont le même nom que le pdf
+- [ ] Nombre d'exemplaires dans ours
+- [ ] Mettre nouveau logo les arts services (Gëelle) dans ours
 
 ## Documentation
 - [ ] Rédiger un guide utilisateur pour expliquer comment utiliser le module.
