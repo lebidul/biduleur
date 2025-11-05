@@ -54,6 +54,7 @@ def _project_defaults() -> dict:
 
     return {"root": repo_root, "config": cfg, "layout": lay}
 
+
 # Cette fonction est utilisée par le constructeur de l'Application
 def _load_cfg_defaults() -> dict:
     """
@@ -233,7 +234,13 @@ def run_pipeline(
 
         current_step += 1
         status_queue.put(('status', f"Étape {current_step}/{total_steps} : Analyse du fichier...", current_step, None))
-        html_body_bidul, html_body_agenda, number_of_lines = parse_bidul(input_file)
+
+        try:
+            html_body_bidul, html_body_agenda, number_of_lines = parse_bidul(input_file)
+        except ValueError as e:
+            # Erreur de validation (colonnes manquantes ou fichier corrompu)
+            status_queue.put(('final', False, str(e)))
+            return
 
         current_step += 1
         status_queue.put(('status', f"Étape {current_step}/{total_steps} : Génération des HTML...", current_step, None))
@@ -298,12 +305,14 @@ def run_pipeline(
             if not report:
                 report = build_pdf(project_root, cfg, lay, os.devnull, cfg_path, paras)
             current_step += 1
-            status_queue.put(('status', f"Étape {current_step}/{total_steps} : Conversion en SVG...", current_step, None))
+            status_queue.put(
+                ('status', f"Étape {current_step}/{total_steps} : Conversion en SVG...", current_step, None))
             build_svg(project_root, cfg, lay, out_svg_dir, cfg_path, paras)
         if generate_stories:
             current_step += 1
             # Message "en cours"
-            status_queue.put(('status', f"Étape {current_step}/{total_steps} : Création des Stories...", current_step, None))
+            status_queue.put(
+                ('status', f"Étape {current_step}/{total_steps} : Création des Stories...", current_step, None))
             num_stories_created = generate_story_images(project_root, cfg, paras)
 
         status_queue.put(('status', "Finalisation...", None))
@@ -388,6 +397,7 @@ def run_pipeline(
             except OSError:
                 pass
 
+
 # Cette fonction est utilisée à la fin du run
 def open_file(filepath):
     """Ouvre un fichier avec l'application par défaut du système."""
@@ -397,12 +407,13 @@ def open_file(filepath):
     try:
         if sys.platform == "win32":
             os.startfile(filepath)
-        elif sys.platform == "darwin": # macOS
+        elif sys.platform == "darwin":  # macOS
             subprocess.run(["open", filepath])
-        else: # Linux
+        else:  # Linux
             subprocess.run(["xdg-open", filepath])
     except Exception as e:
         messagebox.showwarning("Ouverture impossible", f"Impossible d'ouvrir le fichier automatiquement:\n{e}")
+
 
 def _default_paths_from_input(input_file: str) -> dict:
     input_path = Path(input_file)
@@ -415,3 +426,131 @@ def _default_paths_from_input(input_file: str) -> dict:
         "svg_output_dir": str(folder / "svgs"),
         "stories_output": str(folder / "stories")
     }
+
+def load_and_apply_config(app_instance, config_path: str):
+    """
+    Charge un config.yml et met à jour les variables du GUI.
+    Les valeurs absentes dans le config sont préservées (garde valeur actuelle du GUI).
+    """
+
+    from misenpageur.misenpageur.config import Config
+
+    cfg = Config.from_yaml(config_path)
+
+    # Helper pour chemins absolus
+    resource_root = get_resource_path('.')
+
+    def make_abs(p):
+        if not p:
+            return ""
+        return os.path.join(resource_root, p) if not os.path.isabs(p) else p
+
+    # Mise à jour des variables (garde valeur actuelle si absente dans config)
+    if cfg.cover_image:
+        app_instance.cover_var.set(make_abs(cfg.cover_image))
+    if cfg.logos_dir:
+        app_instance.logos_var.set(make_abs(cfg.logos_dir))
+    if hasattr(cfg, 'auteur_couv') and cfg.auteur_couv:
+        app_instance.auteur_var.set(cfg.auteur_couv)
+    if hasattr(cfg, 'auteur_couv_url') and cfg.auteur_couv_url:
+        app_instance.auteur_url_var.set(cfg.auteur_couv_url)
+
+    # Section 1 (ours)
+    if isinstance(cfg.section_1, dict) and cfg.section_1.get("ours_background_png"):
+        app_instance.ours_png_var.set(make_abs(cfg.section_1["ours_background_png"]))
+
+    # Layout
+    if isinstance(cfg.pdf_layout, dict):
+        margin = cfg.pdf_layout.get("page_margin_mm")
+        if margin is not None:
+            app_instance.margin_var.set(str(margin))
+
+    # Font
+    if hasattr(cfg, 'font_size_mode'):
+        app_instance.font_size_mode_var.set(cfg.font_size_mode)
+    if hasattr(cfg, 'font_size_forced'):
+        app_instance.font_size_forced_var.set(str(cfg.font_size_forced))
+
+    # Date separator
+    if hasattr(cfg, 'date_line') and isinstance(cfg.date_line, dict):
+        if cfg.date_line.get("enabled", False):
+            app_instance.date_separator_var.set("ligne")
+    if hasattr(cfg, 'date_box') and isinstance(cfg.date_box, dict):
+        if cfg.date_box.get("enabled", False):
+            app_instance.date_separator_var.set("box")
+            if cfg.date_box.get("back_color"):
+                app_instance.date_box_back_color_var.set(cfg.date_box["back_color"])
+
+    # Date spacing
+    if hasattr(cfg, 'date_spaceBefore'):
+        app_instance.date_spacing_var.set(str(cfg.date_spaceBefore))
+
+    # Poster
+    if isinstance(cfg.poster, dict):
+        title = cfg.poster.get("title")
+        if title is not None:
+            app_instance.poster_title_var.set(title)
+
+        design = cfg.poster.get("design")
+        if design is not None:
+            app_instance.poster_design_var.set(design)
+
+        safety = cfg.poster.get("font_size_safety_factor")
+        if safety is not None:
+            app_instance.safety_factor_var.set(str(safety))
+
+        alpha = cfg.poster.get("background_image_alpha")
+        if alpha is not None:
+            app_instance.alpha_var.set(alpha)
+
+    # Cucaracha
+    if isinstance(cfg.cucaracha_box, dict):
+        ctype = cfg.cucaracha_box.get("content_type")
+        if ctype:
+            app_instance.cucaracha_type_var.set(ctype)
+
+        cvalue = cfg.cucaracha_box.get("content_value")
+        if cvalue:
+            app_instance.cucaracha_value_var.set(cvalue)
+
+        cfont = cfg.cucaracha_box.get("text_font_name")
+        if cfont:
+            app_instance.cucaracha_font_var.set(cfont)
+
+        cfsize = cfg.cucaracha_box.get("text_font_size")
+        if cfsize is not None:
+            app_instance.cucaracha_font_size_var.set(str(cfsize))
+
+    # Stories
+    if isinstance(cfg.stories, dict):
+        enabled = cfg.stories.get("enabled")
+        if enabled is not None:
+            app_instance.generate_stories_var.set(enabled)
+
+        font_name = cfg.stories.get("agenda_font_name")
+        if font_name:
+            app_instance.stories_font_name_var.set(font_name)
+
+        font_size = cfg.stories.get("agenda_font_size")
+        if font_size is not None:
+            app_instance.stories_font_size_var.set(str(font_size))
+
+        text_color = cfg.stories.get("text_color")
+        if text_color:
+            app_instance.stories_font_color_var.set(text_color)
+
+        bg_color = cfg.stories.get("background_color")
+        if bg_color:
+            app_instance.stories_bg_color_var.set(bg_color)
+
+        bg_alpha = cfg.stories.get("background_image_alpha")
+        if bg_alpha is not None:
+            app_instance.stories_alpha_var.set(bg_alpha)
+
+        bg_type = cfg.stories.get("background_type")
+        if bg_type:
+            app_instance.stories_bg_type_var.set(bg_type)
+
+        bg_image = cfg.stories.get("background_image")
+        if bg_image:
+            app_instance.stories_bg_image_var.set(make_abs(bg_image))

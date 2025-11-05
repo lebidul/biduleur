@@ -3,7 +3,7 @@ from typing import List, Dict, Optional, Any
 
 import pandas as pd
 
-from biduleur.constants import DATE, GENRE1, HORAIRE, COLONNE_INFO
+from biduleur.constants import DATE, HORAIRE, FESTIVAL, STYLE_FESTIVAL, VILLE, LIEU, PRIX, GENRE1, SPECTACLE1, ARTISTE1, STYLE1, GENRE2, SPECTACLE2, ARTISTE2, STYLE2, GENRE3, SPECTACLE3, ARTISTE3, STYLE3, GENRE4, SPECTACLE4, ARTISTE4, STYLE4, COLONNE_INFO
 from biduleur.event_utils import parse_bidul_event
 
 import logging # Ajouter cet import
@@ -22,6 +22,14 @@ _CURRENCY_MAP = {
 }
 
 _CURRENCY_COL_CANDIDATES = ("DEVISE", "CURRENCY", "MONNAIE")
+
+REQUIRED_COLUMNS = [
+    DATE, HORAIRE, FESTIVAL, STYLE_FESTIVAL, VILLE, LIEU, PRIX,
+    GENRE1, SPECTACLE1, ARTISTE1, STYLE1,
+    GENRE2, SPECTACLE2, ARTISTE2, STYLE2,
+    GENRE3, SPECTACLE3, ARTISTE3, STYLE3,
+    GENRE4, SPECTACLE4, ARTISTE4, STYLE4
+]
 
 
 def _canonical_currency_symbol(raw: Any) -> str:
@@ -132,15 +140,44 @@ def read_and_sort_file(filename: str) -> Optional[List[Dict]]:
         Optional[List[Dict]]: Liste des enregistrements triés ou None en cas d'erreur.
     """
     try:
-        # Détermine le type de fichier en fonction de l'extension
         file_extension = os.path.splitext(filename)[1].lower()
 
-        if file_extension in ['.csv']:
-            df = pd.read_csv(filename, encoding='utf8', keep_default_na=False, na_values=[''])
-        elif file_extension in ['.xls', '.xlsx']:
-            df = pd.read_excel(filename, keep_default_na=False, na_values=[''])
-        else:
-            raise ValueError(f"Format de fichier non supporté : {file_extension}")
+        # Lecture du fichier avec gestion d'erreur spécifique
+        try:
+            if file_extension in ['.csv']:
+                df = pd.read_csv(filename, encoding='utf8', keep_default_na=False, na_values=[''])
+            elif file_extension in ['.xls', '.xlsx']:
+                df = pd.read_excel(filename, keep_default_na=False, na_values=[''])
+            else:
+                raise ValueError(f"Format de fichier non supporté : {file_extension}\n\nFormats acceptés : .csv, .xls, .xlsx")
+        except Exception as read_error:
+            # Transformer les erreurs de lecture en messages clairs
+            error_msg = str(read_error).lower()
+            if "format cannot be determined" in error_msg or "corrupt" in error_msg:
+                raise ValueError(
+                    f"Le fichier Excel est corrompu ou illisible.\n\n"
+                    f"Solutions :\n"
+                    f"• Ouvrir le fichier dans Excel et l'enregistrer à nouveau\n"
+                    f"• Exporter en CSV depuis Excel\n"
+                    f"• Vérifier que le fichier n'est pas vide"
+                )
+            elif "permission" in error_msg or "access" in error_msg:
+                raise ValueError(
+                    f"Impossible d'accéder au fichier.\n\n"
+                    f"Assurez-vous que :\n"
+                    f"• Le fichier n'est pas ouvert dans Excel\n"
+                    f"• Vous avez les droits de lecture"
+                )
+            else:
+                raise ValueError(f"Erreur lors de la lecture du fichier :\n\n{read_error}")
+
+        # Validation des colonnes obligatoires
+        missing_cols = [col for col in REQUIRED_COLUMNS if col not in df.columns]
+        if missing_cols:
+            raise ValueError(
+                f"Colonnes manquantes dans le fichier :\n\n" +
+                "\n".join(f"• {col}" for col in missing_cols)
+            )
 
         # --- Conversion PRIX -> texte avec devise ---
         df = _convert_price_column_to_text(df)
@@ -157,6 +194,9 @@ def read_and_sort_file(filename: str) -> Optional[List[Dict]]:
         df_sorted = df_sorted.drop(columns=['sort_key'])
 
         return df_sorted.to_dict('records')
+    except ValueError:
+        # Re-lever les erreurs de validation pour qu'elles remontent
+        raise
     except Exception as e:
         log.error(f"Error sorting the file: {e}. Ensure each line has a defined date.")
         return None

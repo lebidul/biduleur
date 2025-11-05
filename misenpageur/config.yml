@@ -154,7 +154,7 @@ section_1:
   qr_code_height_mm: 32
 
   qr_code_style: "gapped"    # standard|rounded|circles|gapped
-  qr_code_color: "#797a7a"    # Couleur en hex
+  qr_code_color: "#000000"    # Couleur en hex
 
   additional_box_height_mm: 35
   logo_box_bottom_margin_mm: 0

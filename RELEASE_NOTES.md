@@ -1,5 +1,149 @@
 ---
 
+
+# Bidul v1.3.8 - Amélioration de l'Expérience Utilisateur
+
+Cette version apporte trois améliorations significatives pour simplifier l'utilisation du Bidul : nommage cohérent des fichiers SVG, validation robuste des fichiers d'entrée, et gestion avancée de la configuration via l'interface graphique.
+
+## ✨ Nouveautés
+
+*   **Nommage Cohérent des Fichiers SVG** : Les fichiers SVG exportés utilisent désormais automatiquement le même nom de base que le fichier PDF source, facilitant leur identification et leur organisation :
+    *   **Avant** : `page_1.svg`, `page_2.svg`, `page_3.svg`, `page_4.svg`
+    *   **Après** : `bidul_novembre_1.svg`, `bidul_novembre_2.svg`, `bidul_novembre_3.svg`, `bidul_novembre_4.svg`
+    
+    Cette amélioration simplifie la gestion des fichiers, particulièrement lors de la génération de plusieurs éditions du Bidul. Les fichiers SVG sont immédiatement identifiables et peuvent être organisés par mois sans confusion.
+
+*   **Validation Améliorée des Fichiers d'Entrée** : Le système détecte désormais les problèmes de fichiers d'entrée **avant** la génération et affiche des messages d'erreur clairs et exploitables :
+    *   **Colonnes Manquantes** : Liste précise des colonnes obligatoires absentes du fichier Excel/CSV
+        ```
+        Colonnes manquantes dans le fichier :
+        
+        • GENRE
+        • VILLE
+        • LIEU
+        • PRIX
+        • GENRE 1
+        • NOM SPECTACLE 1 ( SV )
+        ...
+        ```
+    *   **Fichier Excel Corrompu** : Message explicite avec solutions proposées
+        ```
+        Le fichier Excel est corrompu ou illisible.
+        
+        Solutions :
+        • Ouvrir le fichier dans Excel et l'enregistrer à nouveau
+        • Exporter en CSV depuis Excel
+        • Vérifier que le fichier n'est pas vide
+        ```
+    *   **Problèmes de Permissions** : Indication claire si le fichier est ouvert ailleurs ou inaccessible
+    
+    **Terminé les PDF vides sans explication** : L'utilisateur sait immédiatement ce qui ne va pas et comment le corriger.
+
+*   **Import et Reset de Configuration (Mode Debug)** : Deux nouveaux boutons apparaissent en bas de l'interface quand le mode débogage est activé :
+    *   **📁 Importer config.yml** : Permet de charger un fichier de configuration personnalisé et met automatiquement à jour tous les champs de l'interface graphique (chemins des images, polices, marges, couleurs, etc.). Idéal pour :
+        *   Tester différentes configurations sans éditer manuellement chaque paramètre
+        *   Partager des configurations entre machines
+        *   Revenir à une configuration sauvegardée précédemment
+    *   **🔄 Reset config** : Restaure instantanément tous les paramètres aux valeurs par défaut du projet
+    
+    **Comportement intelligent** :
+    *   Les paramètres non présents dans le fichier importé conservent leur valeur actuelle (pas d'écrasement complet)
+    *   Les chemins relatifs sont automatiquement convertis en chemins absolus
+    *   Les boutons n'apparaissent qu'en mode debug pour éviter les manipulations accidentelles
+
+## ⚙️ Pour les Développeuses et Développeurs
+
+*   **Nommage SVG - Modification de `svgbuild.py`** :
+    ```python
+    # Ligne 273 - Utilisation du nom de base du PDF comme préfixe
+    output_prefix = Path(cfg.output_pdf).stem if cfg.output_pdf else "page"
+    
+    # Résultat : au lieu de page_1.svg, on obtient bidul_novembre_1.svg
+    svg_path = output_dir / f"{output_prefix}_{page_num + 1}.svg"
+    ```
+    Le changement est minimal (une ligne) mais l'impact sur l'expérience utilisateur est significatif.
+
+*   **Validation des Fichiers - Architecture** :
+    *   **`biduleur/csv_utils.py`** : Liste exhaustive des colonnes obligatoires définie en constante
+        ```python
+        REQUIRED_COLUMNS = [
+            DATE, GENRE_EVT, HORAIRE, FESTIVAL, STYLE_FESTIVAL, VILLE, LIEU, PRIX,
+            GENRE1, SPECTACLE1, ARTISTE1, STYLE1,
+            GENRE2, SPECTACLE2, ARTISTE2, STYLE2,
+            GENRE3, SPECTACLE3, ARTISTE3, STYLE3,
+            GENRE4, SPECTACLE4, ARTISTE4, STYLE4
+        ]
+        ```
+    *   **Validation en deux temps** :
+        1. **Vérification de lecture** : Détection des fichiers corrompus ou inaccessibles avec messages contextuels
+        2. **Vérification de colonnes** : Liste des colonnes manquantes avec formatage utilisateur-friendly
+    *   **Propagation intelligente des erreurs** :
+        ```python
+        # csv_utils.py - Les ValueError sont propagées, pas les autres exceptions
+        except ValueError:
+            raise  # Erreurs de validation remontent au GUI
+        except Exception as e:
+            log.error(f"Error sorting the file: {e}")
+            return None
+        ```
+    *   **`leTruc/_helpers.py`** : Capture des `ValueError` dans `run_pipeline()` et affichage via la queue
+        ```python
+        try:
+            html_body_bidul, html_body_agenda, number_of_lines = parse_bidul(input_file)
+        except ValueError as e:
+            status_queue.put(('final', False, str(e)))
+            return
+        ```
+
+*   **Import/Reset Config - Implémentation Complète** :
+    *   **`leTruc/app.py`** : Ajout du frame `config_buttons_frame` avec les deux boutons
+        *   Frame initialement créé mais masqué (`.pack_forget()`)
+        *   Méthodes `_on_import_config()` et `_on_reset_config()` qui appellent `load_and_apply_config()`
+    *   **`leTruc/callbacks.py`** : Fonction `on_toggle_config_buttons()` liée à `debug_mode_var`
+        ```python
+        def on_toggle_config_buttons(app):
+            """Affiche/cache les boutons config selon mode debug"""
+            if app.debug_mode_var.get():
+                app.config_buttons_frame.pack(pady=(5, 0))
+            else:
+                app.config_buttons_frame.pack_forget()
+        ```
+    *   **`leTruc/_helpers.py`** : Nouvelle fonction `load_and_apply_config()` (~140 lignes)
+        *   Charge le config via `Config.from_yaml()`
+        *   Met à jour conditionnellement chaque variable du GUI (if present)
+        *   Gère la conversion des chemins relatifs → absolus
+        *   Couvre tous les paramètres : images, polices, marges, couleurs, poster, cucaracha, stories
+
+*   **Cas Particuliers Gérés** :
+    *   **Validation** : Les messages d'erreur utilisent le caractère `•` pour les listes plutôt que des puces complexes
+    *   **Import Config** : Les valeurs `None` ou vides dans le config ne modifient pas les variables du GUI (préservation intelligente)
+    *   **Chemins Absolus** : La fonction `make_abs()` dans `load_and_apply_config()` utilise `get_resource_path()` pour garantir la compatibilité PyInstaller
+
+*   **Tests Recommandés** :
+    1. **Validation** : Tester avec un fichier Excel manquant les colonnes VILLE, LIEU, PRIX → vérifier que le popup liste ces 3 colonnes
+    2. **SVG** : Générer un PDF `test_decembre.pdf` → vérifier que les SVG sont `test_decembre_1.svg`, etc.
+    3. **Import/Reset** : 
+        *   Activer le debug → boutons apparaissent
+        *   Importer un config avec `poster.title = "TEST"` → champ Titre du poster doit se mettre à jour
+        *   Reset → tous les champs reviennent aux valeurs par défaut
+
+---
+
+## 📦 Fichiers Modifiés
+
+*   `misenpageur/misenpageur/svgbuild.py` (ligne 273)
+*   `biduleur/csv_utils.py` (ajout REQUIRED_COLUMNS + gestion erreurs)
+*   `leTruc/app.py` (ajout config_buttons_frame + méthodes import/reset)
+*   `leTruc/callbacks.py` (ajout on_toggle_config_buttons)
+*   `leTruc/_helpers.py` (ajout load_and_apply_config + try/except parse_bidul)
+
+## 🔄 Compatibilité
+
+*   Compatible avec toutes les versions antérieures
+*   Aucune modification de config.yml requise
+*   Pas de nouvelle dépendance
+*   Fonctionne avec Python 3.10+ sur Windows/Linux/macOS
+=======
 # Bidul v1.3.8 - QR Codes Stylisés et Modernes
 
 Cette version modernise l'apparence des QR codes présents dans le document (page 1 et page 4) avec des styles visuels personnalisables, permettant un aspect plus professionnel et cohérent avec l'identité graphique de Radio Alpa.

@@ -270,7 +270,7 @@ def build_svg(project_root: str, cfg: Config, layout: Layout, out_dir: str, conf
         output_dir = Path(out_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        output_prefix = "page"
+        output_prefix = Path(cfg.output_pdf).stem if cfg.output_pdf else "page"
 
         # Stratégie : PyMuPDF en priorité, sinon pdf2svg
         success = False

@@ -1,3 +1,6 @@
+# leTruc/app.py
+# MODIFICATIONS : Ajout boutons import/reset config dans mode debug
+
 import tkinter as tk
 from tkinter import ttk, messagebox
 import threading
@@ -16,16 +19,12 @@ from .victory import VictoryWindow
 try:
     from ._version import __version__
 except ImportError:
-    # Si le fichier n'existe pas (cas du développement local), on utilise une valeur par défaut.
     __version__ = "dev"
 
 
 class Application(TkinterDnD.Tk):
     """
     Classe principale de l'interface graphique.
-
-    Elle initialise la fenêtre, gère l'état de l'interface (variables),
-    et orchestre la création des widgets et l'assignation des callbacks.
     """
 
     def __init__(self):
@@ -65,8 +64,6 @@ class Application(TkinterDnD.Tk):
     def _initialize_variables(self):
         """
         Initialise toutes les variables Tkinter (StringVar, BooleanVar, etc.)
-        comme attributs de l'instance. Ces variables lient l'état du backend
-        de l'application aux widgets de l'interface.
         """
         # --- Variables pour les chemins de fichiers et dossiers ---
         self.input_var = tk.StringVar()
@@ -154,45 +151,61 @@ class Application(TkinterDnD.Tk):
         action_frame.grid(row=1, column=0, sticky="ew")
         action_frame.columnconfigure(0, weight=1)
 
-        # 1. Créer le label de statut et le placer en haut du cadre
+        # 1. Label de statut
         self.status_label = tk.Label(action_frame, textvariable=self.status_var, font=("Arial", 10))
         self.status_label.pack(fill=tk.X, padx=5, pady=(0, 5))
 
-        # 2. Changer le mode en 'determinate'
+        # 2. Barre de progression
         self.progress_bar = ttk.Progressbar(action_frame, mode='determinate')
         self.progress_bar.pack(fill=tk.X, padx=5, pady=(0, 5))
 
+        # 3. Checkbox debug
         debug_check = tk.Checkbutton(action_frame, text="Activer le mode débogage", variable=self.debug_mode_var)
         debug_check.pack(pady=(5, 0))
 
-        # 3. Le bouton "Lancer" vient en dernier
-        self.run_button = tk.Button(action_frame, text="Lancer la Génération", bg="#4CAF50", fg="white", font=("Arial", 12, "bold"))
+        # 4. ✨ NOUVEAU : Frame pour les boutons de config (visible uniquement en mode debug)
+        self.config_buttons_frame = ttk.Frame(action_frame)
+
+        import_config_btn = tk.Button(
+            self.config_buttons_frame,
+            text="📁 Importer config.yml",
+            command=self._on_import_config
+        )
+        import_config_btn.pack(side=tk.LEFT, padx=5)
+
+        reset_config_btn = tk.Button(
+            self.config_buttons_frame,
+            text="🔄 Reset config",
+            command=self._on_reset_config
+        )
+        reset_config_btn.pack(side=tk.LEFT, padx=5)
+
+        # Initialement caché (sera affiché par le callback si debug activé)
+        # Le pack() sera géré par le callback dans callbacks.py
+
+        # 5. Bouton principal
+        self.run_button = tk.Button(action_frame, text="Lancer la Génération", bg="#4CAF50", fg="white",
+                                    font=("Arial", 12, "bold"))
         self.run_button.pack(pady=10, ipady=5)
 
     # --- Méthodes de Callback pour l'exécution ---
 
     def _on_run(self):
-        """
-        Callback pour le bouton "Lancer". Valide les entrées et démarre
-        le traitement dans un thread séparé pour ne pas geler l'interface.
-        """
+        """Callback pour le bouton "Lancer"."""
         if not self.input_var.get().strip():
-            messagebox.showerror("Erreur", "Veuillez sélectionner un fichier d’entrée.")
+            messagebox.showerror("Erreur", "Veuillez sélectionner un fichier d'entrée.")
             return
 
-        # On initialise les arguments validés avec les valeurs par défaut
         validated_args = {
             'cuca_value_val': "",
-            'cuca_font_size_val': 8, # Valeur par défaut sûre
+            'cuca_font_size_val': 8,
         }
 
-        # On récupère la valeur de la Cucaracha depuis le bon widget
         cucaracha_type = self.cucaracha_type_var.get()
         if cucaracha_type == "text":
             validated_args['cuca_value_val'] = self.cucaracha_text_widget.get("1.0", tk.END).strip()
         elif cucaracha_type == "image":
             validated_args['cuca_value_val'] = self.cucaracha_value_var.get().strip()
-        # Si c'est "none", la valeur reste une chaîne vide, ce qui est correct.
 
         try:
             validated_args.update({
@@ -218,28 +231,20 @@ class Application(TkinterDnD.Tk):
         self.status_var.set("Traitement en cours…")
         self.run_button.config(state=tk.DISABLED)
 
-        # Créer et démarrer le thread de travail en lui passant le dictionnaire des arguments validés
         thread = threading.Thread(target=self._run_pipeline_in_thread, args=(validated_args,))
         thread.daemon = True
         thread.start()
 
-        # On réinitialise la barre de progression
         self.progress_bar.config(value=0)
         self.status_var.set("Démarrage du processus...")
 
         self.after(100, self._check_thread_for_results)
 
     def _run_pipeline_in_thread(self, validated_args):
-        """
-        Wrapper qui exécute la fonction de traitement lourde 'run_pipeline'.
-        Cette méthode s'exécute dans un thread séparé.
-        """
-        # On utilise le helper _helpers.run_pipeline qui a été importé
+        """Wrapper qui exécute la fonction de traitement lourde."""
         from ._helpers import run_pipeline
 
         run_pipeline(
-            # On passe les arguments en utilisant les clés du dictionnaire
-            # pour éviter toute erreur d'ordre.
             self.result_queue,
             debug_mode=self.debug_mode_var.get(),
             input_file=self.input_var.get().strip(),
@@ -282,10 +287,7 @@ class Application(TkinterDnD.Tk):
         )
 
     def _check_thread_for_results(self):
-        """
-        Vérifie la queue pour les messages du thread (statut ou final)
-        et met à jour l'interface.
-        """
+        """Vérifie la queue pour les messages du thread."""
         try:
             while not self.result_queue.empty():
                 message = self.result_queue.get(block=False)
@@ -304,32 +306,55 @@ class Application(TkinterDnD.Tk):
                 elif msg_type == 'final':
                     ok, msg = message[1], message[2]
 
-                    self.progress_bar.config(value=self.total_progress_steps)  # Remplir à 100%
+                    self.progress_bar.config(value=self.total_progress_steps)
                     self.run_button.config(state=tk.NORMAL)
 
                     if ok:
                         VictoryWindow(self, summary_text=msg)
                         self.status_var.set("Terminé avec succès.")
-
-                        # ... (demande pour ouvrir le PDF, inchangé)
                     else:
                         messagebox.showerror("Erreur", msg)
                         self.status_var.set("Échec.")
 
-                    # On a traité le message final, on peut arrêter de vérifier
                     return
 
         except queue.Empty:
-            # La queue est vide, ce n'est pas une erreur.
             pass
         except Exception as e:
-            # Gérer le cas où le message n'a pas le bon format
             print(f"Erreur en lisant la queue : {e}")
 
-        # On se replanifie pour une vérification ultérieure si le thread est toujours actif
-        # Note : On ne peut pas vérifier `thread.is_alive()` directement ici car la référence est perdue.
-        # On continue de vérifier tant qu'un message 'final' n'est pas arrivé.
         self.after(100, self._check_thread_for_results)
+
+    # --- ✨ NOUVELLES MÉTHODES pour import/reset config ---
+
+    def _on_import_config(self):
+        """Import et applique un config.yml personnalisé"""
+        from tkinter import filedialog
+        from ._helpers import load_and_apply_config
+
+        config_path = filedialog.askopenfilename(
+            title="Sélectionner un fichier config.yml",
+            filetypes=[("YAML", "*.yml *.yaml"), ("Tous", "*.*")]
+        )
+        if not config_path:
+            return
+
+        try:
+            load_and_apply_config(self, config_path)
+            messagebox.showinfo("Succès", f"Configuration chargée depuis :\n{os.path.basename(config_path)}")
+        except Exception as e:
+            messagebox.showerror("Erreur", f"Impossible de charger la config :\n{e}")
+
+    def _on_reset_config(self):
+        """Reset vers config par défaut"""
+        from ._helpers import load_and_apply_config, _project_defaults
+
+        defaults = _project_defaults()
+        try:
+            load_and_apply_config(self, defaults["config"])
+            messagebox.showinfo("Succès", "Configuration réinitialisée")
+        except Exception as e:
+            messagebox.showerror("Erreur", f"Impossible de reset :\n{e}")
 
     # --- Méthodes pour la gestion du Canvas (Callbacks internes) ---
 
