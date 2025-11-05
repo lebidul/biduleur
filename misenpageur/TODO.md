@@ -17,7 +17,7 @@
 - [x] Qualité pdf. - convert_image affecte qualité ?
 - [ ] Unit tests.
 - [x] Logos SVG
-- [ ] URL logos dans export SVG
+- [x] URL logos dans export SVG -> trop complex. on accepte de perdre les hyperliens avec le pdf créé depuis le svg 
 - [x] Intégrer nouveaux logos de Gaelle.
 - [x] Enlever watermark pdf2svg dans svg outputs.
 - [x] Améliorer visuel QR code.
@@ -36,8 +36,6 @@
 - [ ] Intégration du workflow dans page admin de wordpress.
 - [x] Options d’hyphénation pour rendre des strings insécables.
 - [x] Enlever toutes les références `SVGCanvas` dans `draw_logic` et `drawing`.
-
-
 
 ## Documentation
 - [ ] Rédiger un guide utilisateur pour expliquer comment utiliser le module.
