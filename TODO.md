@@ -49,11 +49,11 @@
 - [ ] Revoir résolution GUI
 - [ ] Exe linux + Mac
 - [ ] Changer framework GUI
-- [ ] Mieux gérer l'erreur dans le cas où les colonnes de l'input csv/xls sont mal configurées
+- [x] Mieux gérer l'erreur dans le cas où les colonnes de l'input csv/xls sont mal configurées
 - [ ] Pouvoir entrer plusieurs dates (csv like) pour une même date pour ne pas avoir à répéter
 - [x] "En Bref" -> "Coups de coeur et en Bref"
-- [ ] Pouvoir importer une config dans le GUI
-- [ ] SVG output qui ont le même nom que le pdf
+- [x] Pouvoir importer une config dans le GUI
+- [x] SVG output qui ont le même nom que le pdf
 - [ ] Nombre d'exemplaires dans ours
 - [ ] Mettre nouveau logo les arts services (Gëelle) dans ours
 
