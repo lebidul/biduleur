@@ -53,6 +53,7 @@
 - [ ] Pouvoir entrer plusieurs dates (csv like) pour une même date pour ne pas avoir à répéter
 - [x] "En Bref" -> "Coups de coeur et en Bref"
 - [ ] Pouvoir importer une config dans le GUI
+- [ ] SVG output qui ont le même nom que le pdf
 
 ## Documentation
 - [ ] Rédiger un guide utilisateur pour expliquer comment utiliser le module.
