@@ -1,5 +1,7 @@
 # leTruc/callbacks.py
 # -*- coding: utf-8 -*-
+# MODIFICATIONS : Ajout toggle pour boutons config en mode debug
+
 import os
 import tkinter as tk
 from tkinter import filedialog, messagebox, colorchooser, ttk
@@ -69,11 +71,13 @@ def assign_all(app):
     app.stories_font_color_var.trace_add("write", lambda *args: app.stories_font_color_preview.config(bg=app.stories_font_color_var.get()))
     app.stories_bg_color_var.trace_add("write", lambda *args: app.stories_bg_color_preview.config(bg=app.stories_bg_color_var.get()))
 
-    # On ne trace plus la variable de la couleur de bordure.
     app.date_box_back_color_var.trace_add(
         "write",
         lambda *args: app.back_color_preview.config(bg=app.date_box_back_color_var.get())
     )
+
+    # ✨ NOUVEAU : Toggle des boutons config quand debug mode change
+    app.debug_mode_var.trace_add("write", lambda *args: on_toggle_config_buttons(app))
 
     # --- Appels initiaux pour définir l'état de l'interface au démarrage ---
     on_toggle_padding_widget(app)
@@ -84,6 +88,7 @@ def assign_all(app):
     on_toggle_date_sep_options(app)
     on_toggle_alpha_slider(app)
     on_update_alpha_label(app)
+    on_toggle_config_buttons(app)  # ✨ NOUVEAU : Initialiser l'état des boutons config
     _update_drop_zone_text(app, app.input_var.get())
     _update_cover_drop_zone(app, app.cover_var.get())
 
@@ -98,7 +103,7 @@ def assign_all(app):
 def on_pick_input(app):
     """Callback pour le bouton de sélection du fichier d'entrée."""
     file_path = filedialog.askopenfilename(
-        title="Sélectionner l’entrée (CSV / XLS / XLSX)",
+        title="Sélectionner l'entrée (CSV / XLS / XLSX)",
         filetypes=[("Excel", "*.xls;*.xlsx"), ("CSV", "*.csv"), ("Tous", "*.*")]
     )
     if not file_path: return
@@ -146,7 +151,6 @@ def on_pick_color(color_var):
 def on_pick_image_with_preview(app, string_var, preview_widget, title, filetypes):
     """
     Fonction générique pour les autres champs image (Ours, Cucaracha).
-    La logique pour la couverture est maintenant séparée.
     """
     path = filedialog.askopenfilename(title=title, filetypes=filetypes)
     if not path:
@@ -157,18 +161,13 @@ def on_pick_image_with_preview(app, string_var, preview_widget, title, filetypes
     try:
         # Créer la miniature avec Pillow
         with Image.open(path) as img:
-            # On définit la taille maximale de la miniature
             img.thumbnail((150, 150))
-            # Convertir l'image Pillow en image Tkinter
             tk_image = ImageTk.PhotoImage(img)
 
-            # Mettre à jour le widget d'aperçu
-            preview_widget.config(image=tk_image, text="")  # On retire le texte "Aucune image"
-            # Garder une référence à l'image pour éviter qu'elle soit effacée !
+            preview_widget.config(image=tk_image, text="")
             preview_widget.image = tk_image
 
     except Exception as e:
-        # Si le fichier n'est pas une image valide, on affiche une erreur
         preview_widget.config(image=None, text=f"Erreur: {e}")
         preview_widget.image = None
 
@@ -213,7 +212,6 @@ def on_toggle_stories_bg_widgets(app):
         app.stories_bg_color_frame.grid(row=row, column=1, sticky="w", padx=5, pady=5)
     else:  # "image"
         app.stories_bg_image_frame.grid(row=row, column=1, sticky="ew", padx=5, pady=5)
-        # Le slider de transparence n'a de sens que pour l'image
         app.stories_alpha_frame.grid(row=row + 1, column=1, sticky="ew", padx=5, pady=5)
 
 
@@ -224,10 +222,9 @@ def on_update_stories_alpha_label(app):
 
 def on_toggle_cucaracha_widgets(app):
     """Affiche ou cache les options de la boîte Cucaracha."""
-    # On cache maintenant les conteneurs et non plus les widgets individuels
     widgets_to_hide = [
         app.cucaracha_text_widget,
-        app.cucaracha_font_frame,  # On cache le cadre entier
+        app.cucaracha_font_frame,
         app.cucaracha_image_entry,
         app.cucaracha_image_button,
         app.cucaracha_preview
@@ -237,9 +234,7 @@ def on_toggle_cucaracha_widgets(app):
 
     ctype = app.cucaracha_type_var.get()
     if ctype == "text":
-        # On affiche la zone de texte
         app.cucaracha_text_widget.grid(row=1, column=0, columnspan=3, sticky="ew", pady=(5, 0))
-        # Et on affiche le cadre des options de police juste en dessous
         app.cucaracha_font_frame.grid(row=2, column=0, columnspan=3, sticky="w", padx=5, pady=5)
 
     elif ctype == "image":
@@ -273,27 +268,28 @@ def on_update_alpha_label(app):
     app.alpha_value_label.config(text=f"{int(app.alpha_var.get() * 100)}%")
 
 
+# ✨ NOUVELLE FONCTION : Toggle des boutons config
+def on_toggle_config_buttons(app):
+    """Affiche/cache les boutons config selon mode debug"""
+    if app.debug_mode_var.get():
+        app.config_buttons_frame.pack(pady=(5, 0))
+    else:
+        app.config_buttons_frame.pack_forget()
+
+
 def on_drop_input_file(app, event):
-    """
-    Callback exécuté lorsqu'un fichier est déposé sur le champ d'entrée.
-    """
-    # event.data contient le chemin du fichier, parfois entouré de {}.
-    # On nettoie la chaîne pour obtenir un chemin propre.
+    """Callback exécuté lorsqu'un fichier est déposé sur le champ d'entrée."""
     file_path = event.data.strip()
     if file_path.startswith('{') and file_path.endswith('}'):
         file_path = file_path[1:-1]
 
-    # On vérifie si le chemin est valide
     if not os.path.exists(file_path):
         messagebox.showerror("Erreur", f"Le fichier déposé n'a pas pu être trouvé :\n{file_path}")
         return
 
-    # Mettre à jour la variable (important pour le backend)
     app.input_var.set(file_path)
-    # Mettre à jour l'interface visuelle
     _update_drop_zone_text(app, file_path)
 
-    # Mettre à jour les chemins de sortie par défaut
     d = _default_paths_from_input(file_path)
 
     app.html_var.set(d["html"])
@@ -311,7 +307,6 @@ def on_drop_cover_file(app, event):
     if not os.path.exists(file_path):
         return
 
-    # Mettre à jour la variable et l'interface
     app.cover_var.set(file_path)
     _update_cover_drop_zone(app, file_path)
 
@@ -324,18 +319,15 @@ def on_pick_cover_file(app):
     if not file_path:
         return
 
-    # Mettre à jour la variable et l'interface
     app.cover_var.set(file_path)
     _update_cover_drop_zone(app, file_path)
 
 def _update_drop_zone_text(app, file_path: str | None):
     """Met à jour le texte de la zone de dépôt."""
     if file_path and os.path.exists(file_path):
-        # Affiche seulement le nom du fichier pour la clarté
         filename = os.path.basename(file_path)
         app.drop_zone_label.config(text=f"Fichier sélectionné :\n{filename}", font=("Arial", 10, "bold"))
     else:
-        # Texte par défaut
         app.drop_zone_label.config(text="Glissez-déposez votre fichier (XLS/CSV) ici", font=("Arial", 12))
 
 def _update_cover_drop_zone(app, file_path: str | None):
@@ -349,29 +341,20 @@ def _update_cover_drop_zone(app, file_path: str | None):
         _update_preview(None, app.cover_preview)
 
 def _update_preview(path, preview_widget):
-    """
-    Met à jour un widget d'aperçu avec une miniature de l'image spécifiée.
-
-    Args:
-        path (str): Le chemin vers le fichier image.
-        preview_widget (tk.Label): Le widget Label à mettre à jour.
-    """
+    """Met à jour un widget d'aperçu avec une miniature de l'image spécifiée."""
     if not path or not os.path.exists(path):
         preview_widget.config(image=None, text="Aucune image")
         preview_widget.image = None
         return
 
     try:
-        # Créer la miniature avec Pillow
         with Image.open(path) as img:
             img.thumbnail((150, 150))
             tk_image = ImageTk.PhotoImage(img)
 
-            # Mettre à jour le widget d'aperçu
             preview_widget.config(image=tk_image, text="")
             preview_widget.image = tk_image
     except Exception as e:
-        # Si le fichier n'est pas une image valide
         preview_widget.config(image=None, text="Fichier invalide")
         preview_widget.image = None
         print(f"[WARN] Impossible de créer la miniature pour {path}: {e}")
