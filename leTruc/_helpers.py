@@ -233,7 +233,13 @@ def run_pipeline(
 
         current_step += 1
         status_queue.put(('status', f"Étape {current_step}/{total_steps} : Analyse du fichier...", current_step, None))
-        html_body_bidul, html_body_agenda, number_of_lines = parse_bidul(input_file)
+
+        try:
+            html_body_bidul, html_body_agenda, number_of_lines = parse_bidul(input_file)
+        except ValueError as e:
+            # Erreur de validation (colonnes manquantes)
+            status_queue.put(('final', False, str(e)))
+            return
 
         current_step += 1
         status_queue.put(('status', f"Étape {current_step}/{total_steps} : Génération des HTML...", current_step, None))

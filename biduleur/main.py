@@ -26,10 +26,10 @@ except (ModuleNotFoundError, ImportError):
 
 # --- Logique métier ---
 
-def run_biduleur(input_file: str, bidul_output_file: str, agenda_output_file: str) -> tuple[bool, int]:
+def run_biduleur(input_file: str, bidul_output_file: str, agenda_output_file: str) -> tuple[bool, int, str]:
     """
     Fonction principale qui traite le fichier d'entrée et génère les sorties HTML.
-    Retourne True en cas de succès, False sinon.
+    Retourne (success, num_lines, error_message)
     """
     log = logging.getLogger(__name__)
     try:
@@ -51,11 +51,16 @@ def run_biduleur(input_file: str, bidul_output_file: str, agenda_output_file: st
         log.info("Traitement terminé avec succès !")
         log.info(f"Nombre d'événements traités : {number_of_lines}")
         log.info("-" * 40)
-        return True, number_of_lines
+        return True, number_of_lines, ""
+
+    except ValueError as e:
+        # Erreurs de validation
+        log.error(f"Validation échouée : {e}")
+        return False, 0, str(e)
 
     except Exception as e:
-        log.error(f"Une erreur critique est survenue lors du traitement de {input_file}.", exc_info=True)
-        return False, 0
+        log.error(f"Erreur critique : {e}", exc_info=True)
+        return False, 0, f"Erreur inattendue : {e}"
 
 
 # --- Gestionnaire de la ligne de commande (CLI) ---
