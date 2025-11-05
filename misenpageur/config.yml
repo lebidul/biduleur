@@ -15,7 +15,7 @@ input_html: "misenpageur/fichier_biduleur/biduleur_bullets.html"
 template_pdf: "misenpageur/templates/bidul_template.pdf"
 output_pdf: "misenpageur/bidul/bidul_print.pdf"  # ✅ Nom différent pour ne pas écraser
 
-logos_dir: "misenpageur/assets/logos"
+logos_dir: "misenpageur/assets/logos.svg"
 cover_image: "misenpageur/assets/couv/couverture.png"
 nobr_file: "misenpageur/assets/textes/nobr.txt"
 ours_md: "misenpageur/assets/ours/ours.md"

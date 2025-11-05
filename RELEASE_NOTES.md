@@ -1,5 +1,103 @@
 ---
 
+# Bidul v1.3.9 - Support des Logos Vectoriels (SVG)
+
+Cette version apporte le support complet des logos au format SVG (vectoriel), permettant un rendu parfait à toutes les résolutions, particulièrement important pour l'impression professionnelle et l'affichage web haute définition.
+
+## ✨ Nouveautés
+
+*   **Logos Vectoriels SVG** : Le Bidul accepte maintenant les logos au format `.svg` en plus des formats bitmap (`.png`, `.jpg`, `.jpeg`). Les logos vectoriels offrent :
+    *   **Qualité parfaite** à toutes les tailles et résolutions
+    *   **Fichiers PDF plus légers** comparé aux bitmaps haute résolution
+    *   **Netteté optimale** pour l'impression professionnelle
+    *   **Rendu parfait** dans les exports SVG du document
+
+*   **Mix PNG + SVG dans le Même Dossier** : Vous pouvez désormais mélanger logos bitmap et vectoriels dans le dossier `logos/` :
+    ```
+    logos/
+    ├── RadioAlpa.svg          ← Vectoriel
+    ├── BlueZinc.svg           ← Vectoriel
+    ├── LeMansLaVille.png      ← Bitmap
+    └── BrasserieSeptante.svg  ← Vectoriel
+    ```
+    Le système détecte automatiquement le format et applique le rendu approprié.
+
+*   **Support Complet sur Toutes les Pages** : Les logos SVG sont correctement affichés sur :
+    *   **Page 1** : Section ours (colonne de gauche) - layouts "colonnes" et "optimisé"
+    *   **Page 4** : Poster avec logos partenaires en bas
+    *   Les **hyperlinks** des logos SVG fonctionnent comme pour les PNG
+
+*   **Fallback Automatique** : Si la bibliothèque `svglib` n'est pas installée, les logos SVG sont automatiquement ignorés avec un message de log explicite, sans bloquer la génération du document.
+
+## ⚙️ Pour les Développeuses et Développeurs
+
+*   **Nouvelle Dépendance : `svglib>=1.0.0`** : Bibliothèque pour la conversion SVG → ReportLab Drawing. Installation : `pip install svglib`
+
+*   **Architecture de Support SVG** : Quatre fonctions modifiées dans `drawing.py` pour gérer les logos SVG :
+
+    1. **`list_images()` (ligne 96)** : Détection des fichiers `.svg`
+        ```python
+        if f.lower().endswith((".png", ".jpg", ".jpeg", ".svg")):
+        ```
+
+    2. **`_load_and_measure_logo()` (nouvelles lignes 275-320)** : Fonction helper universelle
+        ```python
+        def _load_and_measure_logo(logo_path: str):
+            """Charge un logo (PNG, JPG ou SVG) et retourne ses dimensions."""
+            # Retourne: (image_object, width, height, is_svg)
+        ```
+        - Pour SVG : Utilise `svg2rlg()` pour convertir en ReportLab Drawing
+        - Pour bitmap : Utilise `ImageReader()` (comportement existant)
+        - Gère les erreurs avec logs appropriés
+
+    3. **`_draw_logo_at_position()` (nouvelles lignes 322-352)** : Rendu universel
+        ```python
+        def _draw_logo_at_position(c, logo_obj, x, y, w, h, is_svg):
+            """Dessine un logo (SVG ou bitmap) à la position spécifiée."""
+        ```
+        - SVG : Applique transformation (scale + translate) puis `renderPDF.draw()`
+        - Bitmap : `c.drawImage()` avec masque alpha (comportement existant)
+
+    4. **Intégration dans les fonctions de layout** :
+        - `_draw_logos_two_columns()` : Support SVG complet
+        - `_draw_logos_optimized()` : Support SVG avec packing intelligent
+        - `draw_poster_logos()` : Support SVG pour page 4
+
+*   **Gestion Cohérente des Dimensions** : Les SVG conservent leur aspect ratio natif de la même manière que les bitmaps. Le calcul du fit (largeur/hauteur disponible) est identique pour les deux formats.
+
+*   **Logs de Diagnostic** : Messages explicites pour suivre le chargement des logos :
+    ```
+    [DEBUG] Logo SVG chargé: BlueZinc.svg (556.0x280.0pt)
+    [DEBUG] Logo SVG chargé: BrasserieSeptante-Deux.svg (1572.0x340.0pt)
+    ```
+    Ou en cas d'absence de svglib :
+    ```
+    [WARNING] SVG ignoré (svglib non disponible): RadioAlpa.svg
+    ```
+
+*   **Compatibilité Ascendante Totale** : Les configurations existantes avec uniquement des PNG/JPG continuent de fonctionner exactement comme avant. Aucune migration nécessaire.
+
+*   **Correctifs Inclus** : Résolution des warnings "cannot identify image file" qui apparaissaient lors de l'utilisation d'`ImageReader()` avec des fichiers SVG. La fonction `draw_poster_logos()` a été corrigée pour utiliser `_load_and_measure_logo()` au lieu d'`ImageReader()` directement.
+
+*   **Tests de Validation** : Testé avec succès sur 13 logos SVG réels issus de partenaires Radio Alpa (BlueZinc, BrasserieSeptante-Deux, LeMansLaVille, etc.). Génération PDF + exports SVG validés sans warnings.
+
+---
+
+## 📦 Fichiers Modifiés
+
+*   `misenpageur/misenpageur/drawing.py` (+150 lignes)
+    - Ajout `_load_and_measure_logo()` et `_draw_logo_at_position()`
+    - Modification `list_images()`, `_draw_logos_two_columns()`, `_draw_logos_optimized()`, `draw_poster_logos()`
+*   `misenpageur/requirements.txt` (ajout `svglib>=1.0.0`)
+
+## 🔄 Compatibilité
+
+*   Compatible avec toutes les versions antérieures
+*   Aucune modification de `config.yml` requise
+*   Fonctionne avec Python 3.10+ sur Windows/Linux/macOS
+*   Dépendance optionnelle : sans `svglib`, les logos SVG sont simplement ignorés
+
+---
 
 # Bidul v1.3.8 - Amélioration de l'Expérience Utilisateur
 

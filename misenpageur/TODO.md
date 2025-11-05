@@ -16,14 +16,14 @@
 - [x] Poster (page 3).
 - [x] Qualité pdf. - convert_image affecte qualité ?
 - [ ] Unit tests.
-- [ ] Logos SVG
-- [ ] URL logos dans export SVG
+- [x] Logos SVG
+- [x] URL logos dans export SVG -> trop complex. on accepte de perdre les hyperliens avec le pdf créé depuis le svg 
 - [x] Intégrer nouveaux logos de Gaelle.
 - [x] Enlever watermark pdf2svg dans svg outputs.
 - [x] Améliorer visuel QR code.
 - [x] Empêcher qu'une date (ligne date) commence à la fin d'une section
 - [ ] Déplacer insecabilité dans biduleur (sur lieu et ville) ? (autorise moins de flexibiité though)
-- [ ] Fichiers svg outputs prennent le nom du fichier pdf
+- [x] Fichiers svg outputs prennent le nom du fichier pdf
 - [ ] Améliorer affichage optimisée des logos (plusieurs propals ?)
 
 ## Priorité Moyenne
@@ -36,8 +36,6 @@
 - [ ] Intégration du workflow dans page admin de wordpress.
 - [x] Options d’hyphénation pour rendre des strings insécables.
 - [x] Enlever toutes les références `SVGCanvas` dans `draw_logic` et `drawing`.
-
-
 
 ## Documentation
 - [ ] Rédiger un guide utilisateur pour expliquer comment utiliser le module.
