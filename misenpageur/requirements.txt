@@ -30,3 +30,5 @@ rectpack==0.2.2
 pymupdf>=1.23.0
 
 qrcode[pil]>=7.0.0
+
+svglib>=1.0.0

@@ -23,6 +23,16 @@ import logging  # Ajouter cet import
 
 log = logging.getLogger(__name__)  # Obtenir le logger pour ce module
 
+# Support SVG pour les logos
+try:
+    from svglib.svglib import svg2rlg
+    from reportlab.graphics import renderPDF
+
+    SVGLIB_AVAILABLE = True
+except ImportError:
+    SVGLIB_AVAILABLE = False
+    log.debug("svglib non disponible - les logos SVG seront ignorés")
+
 from .fonts import register_arial
 from .layout import Layout, Section
 from .config import Config
@@ -83,7 +93,7 @@ def list_images(path: str, max_images: int = 100) -> List[str]:
         return []
     res = []
     for f in sorted(os.listdir(path)):
-        if f.lower().endswith((".png", ".jpg", ".jpeg")):
+        if f.lower().endswith((".png", ".jpg", ".jpeg", ".svg")):
             res.append(os.path.join(path, f))
             if len(res) >= max_images:
                 break
@@ -324,6 +334,99 @@ def _draw_ours_column(c: canvas.Canvas, col_coords: tuple, cfg: Config):
 
 
 # --- FONCTION PRINCIPALE (ROUTEUR) ---
+
+
+# =====================================================================
+# FONCTIONS HELPER POUR SUPPORT SVG
+# =====================================================================
+
+def _load_and_measure_logo(logo_path: str):
+    """
+    Charge un logo (PNG, JPG ou SVG) et retourne ses dimensions.
+
+    Args:
+        logo_path: Chemin vers le fichier logo
+
+    Returns:
+        tuple: (image_object, width, height, is_svg)
+            - image_object: ImageReader ou Drawing selon le type
+            - width, height: Dimensions en points
+            - is_svg: True si c'est un SVG
+    """
+    ext = os.path.splitext(logo_path)[1].lower()
+
+    if ext == '.svg':
+        if not SVGLIB_AVAILABLE:
+            log.warning(f"SVG ignoré (svglib non disponible): {os.path.basename(logo_path)}")
+            return (None, 0, 0, False)
+
+        try:
+            drawing = svg2rlg(logo_path)
+            if drawing is None:
+                log.warning(f"Impossible de charger le SVG: {os.path.basename(logo_path)}")
+                return (None, 0, 0, False)
+
+            # Obtenir dimensions natives
+            width = drawing.width
+            height = drawing.height
+
+            log.debug(f"Logo SVG chargé: {os.path.basename(logo_path)} ({width:.1f}x{height:.1f}pt)")
+            return (drawing, width, height, True)
+
+        except Exception as e:
+            log.warning(f"Erreur chargement SVG {os.path.basename(logo_path)}: {e}")
+            return (None, 0, 0, False)
+    else:
+        # PNG/JPG - code existant
+        try:
+            img_reader = ImageReader(logo_path)
+            img_w, img_h = img_reader.getSize()
+            return (img_reader, img_w, img_h, False)
+        except Exception as e:
+            log.warning(f"Erreur chargement image {os.path.basename(logo_path)}: {e}")
+            return (None, 0, 0, False)
+
+
+def _draw_logo_at_position(c: canvas.Canvas, logo_obj, logo_x, logo_y, w_fit, h_fit, is_svg):
+    """
+    Dessine un logo (SVG ou bitmap) à la position spécifiée.
+
+    Args:
+        c: Canvas ReportLab
+        logo_obj: ImageReader (bitmap) ou Drawing (SVG)
+        logo_x, logo_y: Position en points
+        w_fit, h_fit: Dimensions cibles en points
+        is_svg: True si c'est un SVG
+    """
+    if is_svg and logo_obj:
+        # Dessin SVG
+        native_w = logo_obj.width
+        native_h = logo_obj.height
+
+        if native_w == 0 or native_h == 0:
+            log.warning("SVG avec dimensions nulles, ignoré")
+            return
+
+        scale_x = w_fit / native_w
+        scale_y = h_fit / native_h
+
+        # Sauvegarder l'état et appliquer transformation
+        c.saveState()
+        c.translate(logo_x, logo_y)
+        c.scale(scale_x, scale_y)
+
+        try:
+            renderPDF.draw(logo_obj, c, 0, 0)
+        except Exception as e:
+            log.warning(f"Erreur rendu SVG: {e}")
+
+        c.restoreState()
+    else:
+        # Dessin bitmap (code existant)
+        kwargs = {'mask': 'auto'} if not isinstance(c, SVGCanvas) else {}
+        c.drawImage(logo_obj, logo_x, logo_y, width=w_fit, height=h_fit, **kwargs)
+
+
 def _draw_logos_column(c: canvas.Canvas, col_coords: tuple, logos: List[str], cfg: Config):
     """
     Gère la colonne des logos : dessine d'abord la cucaracha_box si elle existe,
@@ -383,15 +486,14 @@ def _draw_logos_two_columns(c: canvas.Canvas, col_coords: tuple, logos: List[str
         row = rows - 1 - (i // cols)
         col = i % cols
         cell_x, cell_y = zone_x + col * cell_w, zone_y + row * cell_h
-        try:
-            if isinstance(c, SVGCanvas):
-                image_to_draw = Image.open(logo_path)
-            else:
-                image_to_draw = logo_path  # Le canvas PDF gère les chemins
 
-            # On utilise ImageReader juste pour obtenir les dimensions
-            img_reader = ImageReader(logo_path)
-            img_w, img_h = img_reader.getSize()
+        try:
+            # Charger logo (SVG ou bitmap)
+            logo_obj, img_w, img_h, is_svg = _load_and_measure_logo(logo_path)
+            if not logo_obj:
+                continue
+
+            # Calculer fit (identique pour SVG et bitmap)
             aspect = img_h / img_w if img_w > 0 else 1
 
             w_fit = cell_w - (2 * padding)
@@ -403,18 +505,17 @@ def _draw_logos_two_columns(c: canvas.Canvas, col_coords: tuple, logos: List[str
             logo_x = cell_x + (cell_w - w_fit) / 2
             logo_y = cell_y + (cell_h - h_fit) / 2
 
-            kwargs = {'mask': 'auto'} if not isinstance(c, SVGCanvas) else {}
-            c.drawImage(image_to_draw, logo_x, logo_y, width=w_fit, height=h_fit, **kwargs)
+            # Dessiner (SVG ou bitmap)
+            _draw_logo_at_position(c, logo_obj, logo_x, logo_y, w_fit, h_fit, is_svg)
 
-            # 2. Vérifier si un lien existe pour ce logo et le dessiner
+            # Ajouter hyperlink si présent (identique pour SVG et bitmap)
             logo_basename = os.path.basename(logo_path)
             url = links_map.get(logo_basename)
 
             if url:
-                # Créer le rectangle pour le lien invisible
                 link_rect = (logo_x, logo_y, logo_x + w_fit, logo_y + h_fit)
                 c.linkURL(url, link_rect, relative=0, thickness=0)
-                log.info(f"Lien créé pour '{logo_basename}' vers '{url}'")  # Optionnel
+                log.info(f"Lien créé pour '{logo_basename}' vers '{url}'")
 
         except Exception as e:
             log.warning(f"Erreur avec le logo {os.path.basename(logo_path)}: {e}")
@@ -435,14 +536,20 @@ def _draw_logos_optimized(c: canvas.Canvas, col_coords: tuple, logo_paths: List[
     logos_data = []
     for path in logo_paths:
         try:
-            with Image.open(path) as img:
-                img_rgba = img.convert("RGBA")
-                bbox = img_rgba.getbbox()
-                if bbox:
-                    true_w, true_h = bbox[2] - bbox[0], bbox[3] - bbox[1]
-                    if true_w > 0 and true_h > 0:
-                        logos_data.append({'path': path, 'w': true_w, 'h': true_h, 'ratio': true_h / true_w})
-        except Exception:
+            # Charger logo (SVG ou bitmap) pour obtenir ses dimensions
+            logo_obj, img_w, img_h, is_svg = _load_and_measure_logo(path)
+            if logo_obj and img_w > 0 and img_h > 0:
+                # Pour le packing, on utilise les dimensions natives
+                logos_data.append({
+                    'path': path,
+                    'w': img_w,
+                    'h': img_h,
+                    'ratio': img_h / img_w,
+                    'is_svg': is_svg,
+                    'obj': logo_obj  # Garder l'objet pour le dessin
+                })
+        except Exception as e:
+            log.debug(f"Logo ignoré dans packing: {os.path.basename(path)} - {e}")
             pass
     if not logos_data: return
 
@@ -534,8 +641,15 @@ def _draw_logos_optimized(c: canvas.Canvas, col_coords: tuple, logo_paths: List[
         logo_y = y_offset + float(rect.y) + padding_pt
 
         try:
-            kwargs = {'mask': 'auto'} if not isinstance(c, SVGCanvas) else {}
-            c.drawImage(logo_path, logo_x, logo_y, width=final_w, height=final_h, **kwargs)
+            # Récupérer l'objet logo et son type depuis logo_data
+            is_svg = logo_data.get('is_svg', False)
+            logo_obj = logo_data.get('obj')
+
+            if logo_obj:
+                _draw_logo_at_position(c, logo_obj, logo_x, logo_y, final_w, final_h, is_svg)
+            else:
+                # Fallback si l'objet n'est pas disponible
+                log.warning(f"Objet logo non disponible pour {os.path.basename(logo_path)}")
         except Exception as e:
             log.warning(f"Erreur avec le logo {os.path.basename(logo_path)} lors du dessin: {e}")
 
@@ -606,7 +720,7 @@ def draw_s2_cover(c: canvas.Canvas, S2_coords, image_path: str, inner_pad: float
 
 def draw_poster_logos(c: canvas.Canvas, s_coords: Section, logos: List[str]):
     """
-    Dessine les logos des partenaires avec haute qualité (300 DPI minimum).
+    Dessine les logos des partenaires avec support SVG et haute qualité (300 DPI minimum).
     """
     x, y, w, h = s_coords.x, s_coords.y, s_coords.w, s_coords.h
     if not logos or not w > 0 or not h > 0: return
@@ -618,9 +732,12 @@ def draw_poster_logos(c: canvas.Canvas, s_coords: Section, logos: List[str]):
     for i, logo_path in enumerate(logos):
         cell_x = x + i * cell_w
         try:
-            # Calculer dimensions du logo
-            img_reader = ImageReader(logo_path)
-            img_w, img_h = img_reader.getSize()
+            # Charger logo (SVG ou bitmap)
+            logo_obj, img_w, img_h, is_svg = _load_and_measure_logo(logo_path)
+            if not logo_obj:
+                continue
+
+            # Calculer dimensions avec aspect ratio
             aspect = img_h / img_w if img_w > 0 else 1
 
             box_w = cell_w - (2 * padding)
@@ -634,14 +751,16 @@ def draw_poster_logos(c: canvas.Canvas, s_coords: Section, logos: List[str]):
             logo_x = cell_x + (cell_w - w_fit) / 2
             logo_y = y + (h - h_fit) / 2
 
-            # Pour SVG, comportement original
-            if isinstance(c, SVGCanvas):
-                image_to_draw = Image.open(logo_path)
-                c.drawImage(image_to_draw, logo_x, logo_y, width=w_fit, height=h_fit)
+            # Dessiner (SVG ou bitmap avec haute qualité)
+            if is_svg:
+                _draw_logo_at_position(c, logo_obj, logo_x, logo_y, w_fit, h_fit, True)
             else:
-                # Pour PDF : haute qualité
-                img_reader_hq = _load_high_quality_image(logo_path, w_fit, h_fit, min_dpi=300)
-                c.drawImage(img_reader_hq, logo_x, logo_y, width=w_fit, height=h_fit, mask='auto')
+                # Pour bitmap : utiliser haute qualité si pas SVGCanvas
+                if isinstance(c, SVGCanvas):
+                    c.drawImage(logo_obj, logo_x, logo_y, width=w_fit, height=h_fit)
+                else:
+                    img_reader_hq = _load_high_quality_image(logo_path, w_fit, h_fit, min_dpi=300)
+                    c.drawImage(img_reader_hq, logo_x, logo_y, width=w_fit, height=h_fit, mask='auto')
 
         except Exception as e:
             log.warning(f"Impossible de dessiner le logo du poster {os.path.basename(logo_path)}: {e}")
