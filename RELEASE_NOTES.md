@@ -1,5 +1,86 @@
 ---
 
+# Bidul v1.3.10 - Robustesse Excel et Cucaracha Box Améliorée
+
+Cette version corrige un bug critique lors de l'import de fichiers Excel et améliore la flexibilité de la Cucaracha Box avec le support d'images en arrière-plan.
+
+## ✨ Nouveautés
+
+*   **Compatibilité Excel Renforcée** : Le Bidul gère désormais correctement les fichiers Excel dont les colonnes contiennent des types natifs (dates, heures, nombres) au lieu de texte brut. Plus besoin de reformater manuellement vos fichiers Excel avant import :
+    *   **Colonne HORAIRE** : Les heures au format Excel (`datetime.time`) sont automatiquement converties en texte (`14h30`)
+    *   **Colonnes DATE** : Les dates Excel (`datetime.datetime`) sont correctement interprétées
+    *   **Colonnes numériques** : Les entiers et décimaux sont convertis en texte de manière transparente
+    
+    **Avant** : `AttributeError: 'datetime.time' object has no attribute 'lower'`
+    **Maintenant** : Import fluide, aucune erreur
+
+*   **Cucaracha Box : Image en Arrière-Plan** : Lorsque le type de contenu est `image`, celle-ci est maintenant affichée en arrière-plan de toute la box, permettant au titre de rester visible par-dessus :
+    *   L'image est redimensionnée pour couvrir l'intégralité de la box
+    *   Le ratio d'aspect est préservé avec centrage automatique
+    *   Le titre (souligné) s'affiche par-dessus l'image
+    *   Idéal pour des visuels promotionnels avec légende
+
+## ⚙️ Pour les Développeuses et Développeurs
+
+*   **Nouvelle Fonction Helper `_to_str()`** : Ajout dans `format_utils.py` d'une fonction de conversion robuste qui centralise la gestion des types Excel :
+    ```python
+    def _to_str(value: Any) -> str:
+        """Convertit une valeur en string de manière robuste."""
+        if value is None:
+            return ""
+        if isinstance(value, datetime.time):
+            return value.strftime("%Hh%M")
+        if isinstance(value, datetime.datetime):
+            return value.strftime("%d/%m/%Y %Hh%M")
+        if isinstance(value, (int, float)):
+            return str(value)
+        return str(value)
+    ```
+    Cette fonction est appelée en entrée de toutes les fonctions de formatage (`fmt_heure()`, `format_string()`, `format_style()`, etc.).
+
+*   **Fonctions Modifiées dans `format_utils.py`** :
+    *   `fmt_heure()` : Gestion native de `datetime.time`
+    *   `format_string()` : Conversion automatique en entrée, suppression du crash sur types non-string
+    *   `format_artists_styles()`, `format_sv()`, `format_concert()` : Appels à `_to_str()` sur les paramètres
+    *   `format_style()`, `format_lieu()`, `format_evenement()` : Robustesse accrue
+    *   Suppression des type hints restrictifs (`: str` → accepte `Any`)
+
+*   **Refactoring de `_draw_cucaracha_box()`** : Réorganisation de l'ordre de dessin dans `drawing.py` :
+    ```python
+    # Nouvel ordre :
+    # 1. Image en background (si content_type == "image")
+    # 2. Titre par-dessus (toujours visible)
+    # 3. Texte (si content_type == "text")
+    ```
+    L'image utilise maintenant `preserveAspectRatio=True, anchor='c'` pour un rendu centré couvrant toute la box.
+
+*   **Stratégie de Robustesse** : Plutôt que de normaliser les types dans `csv_utils.py` (à la lecture), la conversion est effectuée dans `format_utils.py` (au formatage). Avantages :
+    *   Moins de risque de régression sur le parsing existant
+    *   Protection contre tout type inattendu, quelle que soit la source
+    *   Code de conversion centralisé et testable
+
+*   **Logs Inchangés** : Aucun nouveau log ajouté. Les erreurs de formatage qui auraient crashé sont maintenant silencieusement converties en chaînes vides ou valeurs par défaut.
+
+---
+
+## 📦 Fichiers Modifiés
+
+*   `biduleur/format_utils.py` (~30 lignes modifiées)
+    - Ajout de `_to_str()` et import `datetime`
+    - Modification de toutes les fonctions de formatage pour utiliser `_to_str()`
+*   `misenpageur/misenpageur/drawing.py` (~25 lignes modifiées)
+    - Refactoring de `_draw_cucaracha_box()` : image en background, titre par-dessus
+
+## 🔄 Compatibilité
+
+*   Compatible avec toutes les versions antérieures
+*   Aucune modification de `config.yml` requise
+*   Les fichiers CSV continuent de fonctionner comme avant
+*   Les fichiers Excel avec colonnes texte continuent de fonctionner comme avant
+*   Fonctionne avec Python 3.10+ sur Windows/Linux/macOS
+
+---
+
 # Bidul v1.3.9 - Support des Logos Vectoriels (SVG)
 
 Cette version apporte le support complet des logos au format SVG (vectoriel), permettant un rendu parfait à toutes les résolutions, particulièrement important pour l'impression professionnelle et l'affichage web haute définition.
