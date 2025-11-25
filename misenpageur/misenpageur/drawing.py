@@ -774,54 +774,8 @@ def _draw_cucaracha_box(c: canvas.Canvas, box_coords: tuple, cfg: Config):
 
     if content_type == "none": return
 
-    c.saveState()
-    title = c_cfg.get("title", "Cucaracha")
-    title_style = ParagraphStyle('CucarachaTitle', fontName=c_cfg.get("title_font_name", "Arial-Italic"),
-                                 fontSize=c_cfg.get("title_font_size", 8),
-                                 leading=c_cfg.get("title_font_size", 8) * 1.2, underline=1)
-    title_p = Paragraph(title, title_style)
-    title_w, title_h = title_p.wrapOn(c, w - 4, h)
-    title_p.drawOn(c, x + 2, y + h - title_h - 2)
-    c.restoreState()
-
-    padding = 2 * mm
-    content_x, content_y = x + padding, y + padding
-    content_w, content_h = w - (2 * padding), h - title_h - (2 * padding)
-
-    if content_type == "text":
-        font_name = c_cfg.get("text_font_name", "Arial")
-
-        font_size_value_from_cfg = c_cfg.get("text_font_size", 10)
-
-        # 1. Récupérer la taille de police et la convertir en nombre
-        try:
-            font_size = float(c_cfg.get("text_font_size", 10))
-        except (ValueError, TypeError):
-            font_size = 10.0  # Fallback
-
-        # 2. On gère le style italique avec des balises, ce qui est plus robuste.
-        text_content = content_value.replace('\n', '<br/>')
-        if c_cfg.get("text_style", "normal") == "italic":
-            text_content = f"<i>{text_content}</i>"
-
-        align_map = {"left": TA_LEFT, "center": TA_CENTER, "right": TA_RIGHT}
-        alignment = align_map.get(c_cfg.get("text_align", "center"), TA_CENTER)
-
-        # 3. On crée le style avec la variable `font_size` qui est garantie d'être un nombre.
-        text_style = ParagraphStyle(
-            'CucarachaText',
-            fontName=font_name,
-            fontSize=font_size,
-            leading=font_size * 1.3,  # Ce calcul est maintenant sûr.
-            alignment=alignment
-        )
-        story = [Paragraph(text_content, text_style)]
-
-        # 4. On dessine le cadre avec une bordure pour le débogage si le texte est vide.
-        frame = Frame(content_x, content_y, content_w, content_h, showBoundary=0)
-        frame.addFromList(story, c)
-
-    elif content_type == "image":
+    # --- IMAGE EN BACKGROUND (dessinée AVANT le titre) ---
+    if content_type == "image":
         if os.path.exists(content_value):
             try:
                 if isinstance(c, SVGCanvas):
@@ -829,20 +783,54 @@ def _draw_cucaracha_box(c: canvas.Canvas, box_coords: tuple, cfg: Config):
                 else:
                     image_to_draw = ImageReader(content_value)
 
-                img_reader = ImageReader(content_value)
-                img_w, img_h = img_reader.getSize()
-                aspect = img_h / img_w if img_w > 0 else 1
-
-                w_fit = content_w
-                h_fit = w_fit * aspect
-                if h_fit > content_h:
-                    h_fit = content_h
-                    w_fit = h_fit / aspect
-
-                logo_x = content_x + (content_w - w_fit) / 2
-                logo_y = content_y + (content_h - h_fit) / 2
-
+                # Image couvre toute la box (pas de padding)
                 kwargs = {'mask': 'auto'} if not isinstance(c, SVGCanvas) else {}
-                c.drawImage(image_to_draw, logo_x, logo_y, width=w_fit, height=h_fit, **kwargs)
+                c.drawImage(image_to_draw, x, y, width=w, height=h,
+                           preserveAspectRatio=True, anchor='c', **kwargs)
             except Exception as e:
                 log.warning(f"Erreur avec l'image de la Cucaracha Box : {e}")
+
+    # --- TITRE (toujours par-dessus) ---
+    title = c_cfg.get("title", "Cucaracha")
+    if title:
+        c.saveState()
+        title_style = ParagraphStyle('CucarachaTitle',
+                                     fontName=c_cfg.get("title_font_name", "Arial-Italic"),
+                                     fontSize=c_cfg.get("title_font_size", 8),
+                                     leading=c_cfg.get("title_font_size", 8) * 1.2,
+                                     underline=1)
+        title_p = Paragraph(title, title_style)
+        title_w, title_h = title_p.wrapOn(c, w - 4, h)
+        title_p.drawOn(c, x + 2, y + h - title_h - 2)
+        c.restoreState()
+
+    # --- TEXTE (si content_type == "text") ---
+    if content_type == "text":
+        padding = 2 * mm
+        title_h = c_cfg.get("title_font_size", 8) * 1.2 + 4  # Approximation hauteur titre
+        content_x, content_y = x + padding, y + padding
+        content_w, content_h = w - (2 * padding), h - title_h - (2 * padding)
+
+        font_name = c_cfg.get("text_font_name", "Arial")
+        try:
+            font_size = float(c_cfg.get("text_font_size", 10))
+        except (ValueError, TypeError):
+            font_size = 10.0
+
+        text_content = content_value.replace('\n', '<br/>')
+        if c_cfg.get("text_style", "normal") == "italic":
+            text_content = f"<i>{text_content}</i>"
+
+        align_map = {"left": TA_LEFT, "center": TA_CENTER, "right": TA_RIGHT}
+        alignment = align_map.get(c_cfg.get("text_align", "center"), TA_CENTER)
+
+        text_style = ParagraphStyle(
+            'CucarachaText',
+            fontName=font_name,
+            fontSize=font_size,
+            leading=font_size * 1.3,
+            alignment=alignment
+        )
+        story = [Paragraph(text_content, text_style)]
+        frame = Frame(content_x, content_y, content_w, content_h, showBoundary=0)
+        frame.addFromList(story, c)
