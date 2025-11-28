@@ -27,6 +27,10 @@
 - [x] Améliorer niveaux de débug
 - [x] Config front-end (widgets, helpers, callbacks, etc) dans un fichier config dédié avec wrapper et nouvelle class pour ne pas avoir sur trop de fichiers `chqaue fois` -> pas une bonne idée car trop complexe
 - [ ] Fix csv input
+- [ ] Output separate pdf pages
+- [ ] Inactive row
+- [ ] Checkbox "au chapeau"
+- [ ] Lire logos depuis svg (qui contiendrait tous les logos) pareil pour l'ours
 
 ## Priorité Moyenne
 - [x] Refactor dans dossier bidul.biduleur/bidul.
@@ -56,6 +60,10 @@
 - [x] SVG output qui ont le même nom que le pdf
 - [ ] Nombre d'exemplaires dans ours
 - [ ] Mettre nouveau logo les arts services (Gëelle) dans ours
+- [ ] config dans GUI:
+  - .json et non pas .yml dans UI
+  - paramètres non peuplés: organisation logos, fichiers input
+- [ ] amélioration de la performance
 
 ## Documentation
 - [ ] Rédiger un guide utilisateur pour expliquer comment utiliser le module.

@@ -68,6 +68,10 @@ class Application(TkinterDnD.Tk):
         # --- Variables pour les chemins de fichiers et dossiers ---
         self.input_var = tk.StringVar()
         self.ours_png_var = tk.StringVar(value=self.cfg_defaults.get("ours_background_png", ""))
+        self.ours_layout_var = tk.StringVar(value="svg")
+        self.ours_svg_var = tk.StringVar(value="misenpageur/assets/ours/ours.svg")
+        self.ours_type_var = tk.StringVar(value="svg")
+        self.ours_svg_var = tk.StringVar(value="misenpageur/assets/ours/ours.svg")
         self.logos_var = tk.StringVar(value=self.cfg_defaults.get("logos_dir", ""))
         self.cover_var = tk.StringVar()
         self.html_var = tk.StringVar()
@@ -93,7 +97,8 @@ class Application(TkinterDnD.Tk):
 
         # --- Variables pour la mise en page ---
         self.margin_var = tk.StringVar(value=str(self.cfg_defaults.get("page_margin_mm", "1.0")))
-        self.logos_layout_var = tk.StringVar(value="colonnes")
+        self.logos_layout_var = tk.StringVar(value="svg")
+        self.logos_svg_var = tk.StringVar(value="misenpageur/assets/logos.svg")
         self.logos_padding_var = tk.StringVar(value="1.0")
         self.font_size_mode_var = tk.StringVar(value=self.cfg_defaults.get("font_size_mode", "auto"))
         self.font_size_forced_var = tk.StringVar(value=str(self.cfg_defaults.get("font_size_forced", "10.0")))
@@ -251,9 +256,12 @@ class Application(TkinterDnD.Tk):
             generate_cover=self.generate_cover_var.get(),
             cover_image=self.cover_var.get().strip(),
             ours_background_png=self.ours_png_var.get().strip(),
+            ours_layout=self.ours_layout_var.get(),
+            ours_svg_file=self.ours_svg_var.get().strip(),
             logos_dir=self.logos_var.get().strip(),
             logos_layout=self.logos_layout_var.get(),
             logos_padding_mm=validated_args['logos_padding_val'],
+            logos_svg_file=self.logos_svg_var.get().strip(),
             out_html=self.html_var.get().strip(),
             out_agenda_html=self.agenda_var.get().strip(),
             out_pdf=self.pdf_var.get().strip(),

@@ -8,7 +8,6 @@ from tkinter import filedialog, messagebox, colorchooser, ttk
 from PIL import Image, ImageTk
 import re
 
-
 # On importe les helpers qui contiennent la logique "métier"
 from ._helpers import _default_paths_from_input, save_embedded_template, open_file
 
@@ -26,12 +25,16 @@ def assign_all(app):
     app.xlsx_template_button.config(
         command=lambda: save_embedded_template('tapage_template.xlsx', "Enregistrer le modèle XLSX"))
 
-    app.ours_button.config(command=lambda: on_pick_image_with_preview(app, app.ours_png_var,
-                                                                      app.ours_preview,
-                                                                      "Image de fond pour l'Ours (PNG)",
-                                                                      [("Images", "*.png;*.jpg;*.jpeg"),
-                                                                       ("Tous", "*.*")]))
+    app.ours_png_button.config(command=lambda: on_pick_image_with_preview(app, app.ours_png_var,
+                                                                          app.ours_preview,
+                                                                          "Image de fond pour l'Ours (PNG)",
+                                                                          [("Images", "*.png;*.jpg;*.jpeg"),
+                                                                           ("Tous", "*.*")]))
+    app.ours_svg_button.config(command=lambda: on_pick_file(app.ours_svg_var, "Fichier SVG de l'Ours",
+                                                            [("SVG", "*.svg"), ("Tous", "*.*")]))
     app.logos_button.config(command=lambda: on_pick_directory(app.logos_var, "Dossier des logos"))
+    app.logos_svg_button.config(command=lambda: on_pick_file(app.logos_svg_var, "Fichier SVG des logos",
+                                                             [("SVG", "*.svg"), ("Tous", "*.*")]))
 
     app.cucaracha_image_button.config(command=lambda: on_pick_image_with_preview(app, app.cucaracha_value_var,
                                                                                  app.cucaracha_preview,
@@ -57,10 +60,12 @@ def assign_all(app):
     app.stories_font_color_button.config(command=lambda: on_pick_color(app.stories_font_color_var))
     app.stories_bg_color_button.config(command=lambda: on_pick_color(app.stories_bg_color_var))
     app.stories_bg_image_button.config(
-        command=lambda: on_pick_file(app.stories_bg_image_var, "Choisir une image de fond", [("Images", "*.jpg *.jpeg *.png")]))
+        command=lambda: on_pick_file(app.stories_bg_image_var, "Choisir une image de fond",
+                                     [("Images", "*.jpg *.jpeg *.png")]))
 
     # --- Liaison des variables aux fonctions de "toggle" ---
     app.logos_layout_var.trace_add("write", lambda *args: on_toggle_padding_widget(app))
+    app.ours_layout_var.trace_add("write", lambda *args: on_toggle_ours_widgets(app))
     app.font_size_mode_var.trace_add("write", lambda *args: on_toggle_font_size_widgets(app))
     app.cucaracha_type_var.trace_add("write", lambda *args: on_toggle_cucaracha_widgets(app))
     app.date_separator_var.trace_add("write", lambda *args: on_toggle_date_sep_options(app))
@@ -68,8 +73,10 @@ def assign_all(app):
     app.alpha_var.trace_add("write", lambda *args: on_update_alpha_label(app))
     app.stories_bg_type_var.trace_add("write", lambda *args: on_toggle_stories_bg_widgets(app))
     app.stories_alpha_var.trace_add("write", lambda *args: on_update_stories_alpha_label(app))
-    app.stories_font_color_var.trace_add("write", lambda *args: app.stories_font_color_preview.config(bg=app.stories_font_color_var.get()))
-    app.stories_bg_color_var.trace_add("write", lambda *args: app.stories_bg_color_preview.config(bg=app.stories_bg_color_var.get()))
+    app.stories_font_color_var.trace_add("write", lambda *args: app.stories_font_color_preview.config(
+        bg=app.stories_font_color_var.get()))
+    app.stories_bg_color_var.trace_add("write", lambda *args: app.stories_bg_color_preview.config(
+        bg=app.stories_bg_color_var.get()))
 
     app.date_box_back_color_var.trace_add(
         "write",
@@ -81,6 +88,7 @@ def assign_all(app):
 
     # --- Appels initiaux pour définir l'état de l'interface au démarrage ---
     on_toggle_padding_widget(app)
+    on_toggle_ours_widgets(app)
     on_toggle_font_size_widgets(app)
     on_toggle_stories_bg_widgets(app)
     on_update_stories_alpha_label(app)
@@ -97,6 +105,7 @@ def assign_all(app):
     _update_preview(app.ours_png_var.get(), app.ours_preview)
     # On met à jour l'aperçu de la couverture si une valeur existe
     _update_preview(app.cover_var.get(), app.cover_preview)
+
 
 # --- Fonctions de sélection de fichiers/dossiers ---
 
@@ -175,14 +184,65 @@ def on_pick_image_with_preview(app, string_var, preview_widget, title, filetypes
 # --- Fonctions de visibilité conditionnelle ("toggle") ---
 
 def on_toggle_padding_widget(app):
-    """Affiche ou cache le champ de marge des logos."""
+    """Affiche ou cache les widgets selon le mode de répartition des logos."""
+    layout = app.logos_layout_var.get()
     lr = app.logos_padding_row
-    if app.logos_layout_var.get() == "optimise":
-        app.logos_padding_label.grid(row=lr, column=0, sticky="e", padx=5, pady=5)
-        app.logos_padding_entry.grid(row=lr, column=1, sticky="w")
-    else:
+
+    if layout == "svg":
+        # Mode SVG : cacher dossier logos et marge, afficher fichier SVG
+        app.logos_dir_label.grid_remove()
+        app.logos_dir_entry.grid_remove()
+        app.logos_button.grid_remove()
         app.logos_padding_label.grid_remove()
         app.logos_padding_entry.grid_remove()
+        app.logos_svg_label.grid(row=lr, column=0, sticky="e", padx=5, pady=5)
+        app.logos_svg_entry.grid(row=lr, column=1, sticky="ew", padx=5, pady=5)
+        app.logos_svg_button.grid(row=lr, column=2, padx=5, pady=5)
+    elif layout == "optimise":
+        # Mode optimisé : afficher dossier logos et marge, cacher fichier SVG
+        app.logos_dir_label.grid(row=0, column=0, sticky="e", padx=5, pady=5)
+        app.logos_dir_entry.grid(row=0, column=1, sticky="ew", padx=5, pady=5)
+        app.logos_button.grid(row=0, column=2, padx=5, pady=5)
+        app.logos_padding_label.grid(row=lr, column=0, sticky="e", padx=5, pady=5)
+        app.logos_padding_entry.grid(row=lr, column=1, sticky="w")
+        app.logos_svg_label.grid_remove()
+        app.logos_svg_entry.grid_remove()
+        app.logos_svg_button.grid_remove()
+    else:
+        # Mode colonnes : afficher dossier logos, cacher marge et fichier SVG
+        app.logos_dir_label.grid(row=0, column=0, sticky="e", padx=5, pady=5)
+        app.logos_dir_entry.grid(row=0, column=1, sticky="ew", padx=5, pady=5)
+        app.logos_button.grid(row=0, column=2, padx=5, pady=5)
+        app.logos_padding_label.grid_remove()
+        app.logos_padding_entry.grid_remove()
+        app.logos_svg_label.grid_remove()
+        app.logos_svg_entry.grid_remove()
+        app.logos_svg_button.grid_remove()
+
+
+def on_toggle_ours_widgets(app):
+    """Affiche ou cache les widgets selon le mode de source de l'ours."""
+    layout = app.ours_layout_var.get()
+    lr = app.ours_widgets_row
+
+    if layout == "svg":
+        # Mode SVG : afficher fichier SVG, cacher PNG et aperçu
+        app.ours_svg_label.grid(row=lr, column=0, sticky="e", padx=5, pady=5)
+        app.ours_svg_entry.grid(row=lr, column=1, sticky="ew", padx=5, pady=5)
+        app.ours_svg_button.grid(row=lr, column=2, padx=5, pady=5)
+        app.ours_png_label.grid_remove()
+        app.ours_png_entry.grid_remove()
+        app.ours_png_button.grid_remove()
+        app.ours_preview.grid_remove()
+    else:
+        # Mode PNG : afficher PNG et aperçu, cacher fichier SVG
+        app.ours_png_label.grid(row=lr, column=0, sticky="e", padx=5, pady=5)
+        app.ours_png_entry.grid(row=lr, column=1, sticky="ew", padx=5, pady=5)
+        app.ours_png_button.grid(row=lr, column=2, padx=5, pady=5)
+        app.ours_preview.grid(row=lr + 1, column=1, sticky="w", pady=(5, 0), padx=5)
+        app.ours_svg_label.grid_remove()
+        app.ours_svg_entry.grid_remove()
+        app.ours_svg_button.grid_remove()
 
 
 def on_toggle_font_size_widgets(app):
@@ -298,6 +358,7 @@ def on_drop_input_file(app, event):
     app.svg_output_var.set(d["svg_output_dir"])
     app.stories_output_var.set(d["stories_output"])
 
+
 def on_drop_cover_file(app, event):
     """Callback pour une image de couverture déposée."""
     file_path = event.data.strip()
@@ -309,6 +370,7 @@ def on_drop_cover_file(app, event):
 
     app.cover_var.set(file_path)
     _update_cover_drop_zone(app, file_path)
+
 
 def on_pick_cover_file(app):
     """Callback pour le bouton 'Choisir une image...' de la couverture."""
@@ -322,6 +384,7 @@ def on_pick_cover_file(app):
     app.cover_var.set(file_path)
     _update_cover_drop_zone(app, file_path)
 
+
 def _update_drop_zone_text(app, file_path: str | None):
     """Met à jour le texte de la zone de dépôt."""
     if file_path and os.path.exists(file_path):
@@ -329,6 +392,7 @@ def _update_drop_zone_text(app, file_path: str | None):
         app.drop_zone_label.config(text=f"Fichier sélectionné :\n{filename}", font=("Arial", 10, "bold"))
     else:
         app.drop_zone_label.config(text="Glissez-déposez votre fichier (XLS/CSV) ici", font=("Arial", 12))
+
 
 def _update_cover_drop_zone(app, file_path: str | None):
     """Met à jour le texte et l'aperçu de la zone de dépôt de la couverture."""
@@ -339,6 +403,7 @@ def _update_cover_drop_zone(app, file_path: str | None):
     else:
         app.cover_drop_zone_label.config(text="Glissez-déposez l'image de couverture ici")
         _update_preview(None, app.cover_preview)
+
 
 def _update_preview(path, preview_widget):
     """Met à jour un widget d'aperçu avec une miniature de l'image spécifiée."""

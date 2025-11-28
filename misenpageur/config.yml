@@ -202,7 +202,7 @@ poster:
 
 packing_strategy:
   algorithm: 'Global'
-  sort_algo: 'AREA'
+  sort_algo: 'WIDTH'
 
 logo_hyperlinks:
 - image: "BlueZinc.png"

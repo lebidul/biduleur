@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 import os
 import io
+import re
+import xml.etree.ElementTree as ET
 import qrcode
 from typing import List
 
@@ -138,6 +140,85 @@ def draw_paragraph(c: canvas.Canvas, p: Paragraph, x: float, y: float):
     c.restoreState()
 
 
+def _draw_ours_from_svg(c: canvas.Canvas, col_coords: tuple, cfg: Config):
+    """
+    Dessine l'ours depuis un fichier SVG pré-composé.
+    Extrait et applique les hyperliens définis dans le SVG.
+    """
+    x, y, w, h = col_coords
+    svg_path = getattr(cfg, 'ours_svg_file', '')
+    project_root = getattr(cfg, 'project_root', '.')
+
+    if svg_path and not os.path.isabs(svg_path):
+        svg_path = os.path.join(project_root, svg_path)
+
+    if not svg_path or not os.path.exists(svg_path):
+        log.warning(f"SVG ours non trouvé: {svg_path}")
+        return False
+
+    if not SVGLIB_AVAILABLE:
+        log.warning("svglib non disponible - impossible de charger le SVG ours")
+        return False
+
+    try:
+        # 1. Extraire les liens AVANT le rendu
+        links = _extract_svg_links(svg_path)
+
+        # 2. Charger et dessiner le SVG
+        drawing = svg2rlg(svg_path)
+        if not drawing:
+            log.warning(f"Impossible de charger le SVG: {svg_path}")
+            return False
+
+        # Calculer le scale pour remplir la box (remplir la hauteur)
+        scale_x = w / drawing.width if drawing.width > 0 else 1
+        scale_y = h / drawing.height if drawing.height > 0 else 1
+        scale = scale_y  # Remplir la hauteur
+
+        # Centrer dans la box
+        scaled_w = drawing.width * scale
+        scaled_h = drawing.height * scale
+        offset_x = x + (w - scaled_w) / 2
+        offset_y = y + (h - scaled_h) / 2
+
+        # Dessiner le SVG avec clip
+        c.saveState()
+        clip_path = c.beginPath()
+        clip_path.rect(x, y, w, h)
+        c.clipPath(clip_path, stroke=0, fill=0)
+        c.translate(offset_x, offset_y)
+        c.scale(scale, scale)
+        renderPDF.draw(drawing, c, 0, 0)
+        c.restoreState()
+
+        # 3. Ajouter les liens PDF avec les positions transformées
+        for url, lx, ly, lw, lh in links:
+            pdf_x = offset_x + lx * scale
+            pdf_y = offset_y + ly * scale
+            pdf_w = lw * scale
+            pdf_h = lh * scale
+
+            # Clipper le lien à la zone visible
+            clip_x1, clip_y1 = x, y
+            clip_x2, clip_y2 = x + w, y + h
+            link_x1 = max(pdf_x, clip_x1)
+            link_y1 = max(pdf_y, clip_y1)
+            link_x2 = min(pdf_x + pdf_w, clip_x2)
+            link_y2 = min(pdf_y + pdf_h, clip_y2)
+
+            if link_x1 < link_x2 and link_y1 < link_y2:
+                link_rect = (link_x1, link_y1, link_x2, link_y2)
+                c.linkURL(url, link_rect, relative=0, thickness=0)
+                log.debug(f"Lien PDF ours ajouté: {url[:40]}...")
+
+        log.info(f"Ours SVG chargé depuis {os.path.basename(svg_path)} (scale={scale:.3f}, {len(links)} liens)")
+        return True
+
+    except Exception as e:
+        log.warning(f"Erreur chargement SVG ours: {e}")
+        return False
+
+
 def _draw_ours_column(c: canvas.Canvas, col_coords: tuple, cfg: Config):
     """
     Dessine la colonne "ours" et adapte la position ET la taille de tous ses
@@ -155,21 +236,30 @@ def _draw_ours_column(c: canvas.Canvas, col_coords: tuple, cfg: Config):
     scale_x = w_col / REF_COL_WIDTH if REF_COL_WIDTH > 0 else 1.0
     scale_y = h_col / REF_COL_HEIGHT if REF_COL_HEIGHT > 0 else 1.0
 
-    # 3. Dessin de l'image de fond avec haute qualité
-    bg_path = os.path.join(project_root, s1_cfg.get('ours_background_png', ''))
-    if os.path.exists(bg_path):
-        try:
-            if not isinstance(c, SVGCanvas):
-                img_reader = _load_high_quality_image(bg_path, w_col, h_col, min_dpi=300)
-                c.drawImage(img_reader, x_col, y_col, width=w_col, height=h_col, preserveAspectRatio=True, anchor='c',
-                            mask='auto')
-            else:
+    # 3. Dessin du fond (SVG ou PNG)
+    ours_layout = getattr(cfg, 'ours_layout', 'png')
+    svg_drawn = False
+
+    if ours_layout == 'svg':
+        svg_drawn = _draw_ours_from_svg(c, col_coords, cfg)
+
+    if not svg_drawn:
+        # Fallback sur PNG ou mode PNG explicite
+        bg_path = os.path.join(project_root, s1_cfg.get('ours_background_png', ''))
+        if os.path.exists(bg_path):
+            try:
+                if not isinstance(c, SVGCanvas):
+                    img_reader = _load_high_quality_image(bg_path, w_col, h_col, min_dpi=300)
+                    c.drawImage(img_reader, x_col, y_col, width=w_col, height=h_col, preserveAspectRatio=True,
+                                anchor='c',
+                                mask='auto')
+                else:
+                    c.drawImage(bg_path, x_col, y_col, width=w_col, height=h_col, preserveAspectRatio=True, anchor='c',
+                                mask='auto')
+            except Exception as e:
+                log.warning(f"Erreur chargement background ours: {e}")
                 c.drawImage(bg_path, x_col, y_col, width=w_col, height=h_col, preserveAspectRatio=True, anchor='c',
                             mask='auto')
-        except Exception as e:
-            log.warning(f"Erreur chargement background ours: {e}")
-            c.drawImage(bg_path, x_col, y_col, width=w_col, height=h_col, preserveAspectRatio=True, anchor='c',
-                        mask='auto')
 
     # 4. Dessin du nom de l'auteur et de son lien (avec mise à l'échelle)
     auteur_text = getattr(cfg, 'auteur_couv', '')
@@ -337,6 +427,280 @@ def _draw_ours_column(c: canvas.Canvas, col_coords: tuple, cfg: Config):
 
 
 # =====================================================================
+# FONCTIONS POUR EXTRACTION LIENS SVG
+# =====================================================================
+
+def _parse_svg_transform(transform_str: str):
+    """
+    Parse une chaîne de transformation SVG et retourne une matrice 2D.
+    Supporte: translate, matrix, scale, rotate.
+
+    Returns:
+        tuple: (a, b, c, d, e, f) représentant la matrice:
+               | a c e |
+               | b d f |
+               | 0 0 1 |
+    """
+    if not transform_str:
+        return (1, 0, 0, 1, 0, 0)  # Identité
+
+    # Matrice identité
+    result = [1, 0, 0, 1, 0, 0]
+
+    # Pattern pour extraire les transformations
+    pattern = r'(translate|matrix|scale|rotate)\s*\(([^)]+)\)'
+
+    for match in re.finditer(pattern, transform_str):
+        func = match.group(1)
+        values = [float(v.strip()) for v in re.split(r'[,\s]+', match.group(2).strip()) if v.strip()]
+
+        if func == 'translate':
+            tx = values[0] if len(values) > 0 else 0
+            ty = values[1] if len(values) > 1 else 0
+            # Multiplier: result = result * translate
+            result[4] += tx * result[0] + ty * result[2]
+            result[5] += tx * result[1] + ty * result[3]
+
+        elif func == 'matrix':
+            if len(values) >= 6:
+                a, b, c, d, e, f = values[:6]
+                # Multiplier les matrices
+                new = [
+                    result[0] * a + result[2] * b,
+                    result[1] * a + result[3] * b,
+                    result[0] * c + result[2] * d,
+                    result[1] * c + result[3] * d,
+                    result[0] * e + result[2] * f + result[4],
+                    result[1] * e + result[3] * f + result[5]
+                ]
+                result = new
+
+        elif func == 'scale':
+            sx = values[0] if len(values) > 0 else 1
+            sy = values[1] if len(values) > 1 else sx
+            result[0] *= sx
+            result[1] *= sx
+            result[2] *= sy
+            result[3] *= sy
+
+    return tuple(result)
+
+
+def _apply_transform(x, y, matrix):
+    """Applique une matrice de transformation à un point."""
+    a, b, c, d, e, f = matrix
+    return (a * x + c * y + e, b * x + d * y + f)
+
+
+def _multiply_matrices(m1, m2):
+    """Multiplie deux matrices de transformation SVG."""
+    a1, b1, c1, d1, e1, f1 = m1
+    a2, b2, c2, d2, e2, f2 = m2
+    return (
+        a1 * a2 + c1 * b2,
+        b1 * a2 + d1 * b2,
+        a1 * c2 + c1 * d2,
+        b1 * c2 + d1 * d2,
+        a1 * e2 + c1 * f2 + e1,
+        b1 * e2 + d1 * f2 + f1
+    )
+
+
+def _extract_svg_links(svg_path: str):
+    """
+    Extrait les liens et leurs bounding boxes depuis un fichier SVG.
+
+    Returns:
+        list: [(url, x, y, width, height), ...] en points (coordonnées PDF)
+    """
+    MM_TO_PT = 2.834645
+    links = []
+
+    try:
+        tree = ET.parse(svg_path)
+        root = tree.getroot()
+
+        # Récupérer viewBox pour les dimensions (en mm pour Inkscape)
+        viewbox = root.get('viewBox', '').split()
+        svg_height_mm = float(viewbox[3]) if len(viewbox) >= 4 else float(root.get('height', '100').replace('mm', ''))
+        svg_height_pt = svg_height_mm * MM_TO_PT
+
+        def get_transform(elem):
+            """Récupère la transformation d'un élément."""
+            t = elem.get('transform', '')
+            return _parse_svg_transform(t)
+
+        def find_links(elem, parent_matrix=(1, 0, 0, 1, 0, 0)):
+            """Parcourt récursivement pour trouver les liens."""
+            # Calculer la matrice cumulée
+            local_matrix = get_transform(elem)
+            current_matrix = _multiply_matrices(parent_matrix, local_matrix)
+
+            # Tag sans namespace
+            tag = elem.tag.split('}')[-1] if '}' in elem.tag else elem.tag
+
+            if tag == 'a':
+                # Récupérer l'URL
+                url = elem.get('{http://www.w3.org/1999/xlink}href') or elem.get('href', '')
+
+                if url and not url.startswith('data:'):
+                    # Chercher l'image enfant
+                    for child in elem:
+                        child_tag = child.tag.split('}')[-1] if '}' in child.tag else child.tag
+                        if child_tag == 'image':
+                            # Récupérer les attributs de l'image
+                            child_matrix = _multiply_matrices(current_matrix, get_transform(child))
+
+                            img_x = float(child.get('x', 0))
+                            img_y = float(child.get('y', 0))
+                            img_w = float(child.get('width', 0))
+                            img_h = float(child.get('height', 0))
+
+                            # Appliquer la transformation aux coins (coordonnées en mm)
+                            x1, y1 = _apply_transform(img_x, img_y, child_matrix)
+                            x2, y2 = _apply_transform(img_x + img_w, img_y + img_h, child_matrix)
+
+                            # Normaliser (en cas de scale négatif)
+                            final_x_mm = min(x1, x2)
+                            final_y_mm = min(y1, y2)
+                            final_w_mm = abs(x2 - x1)
+                            final_h_mm = abs(y2 - y1)
+
+                            # Convertir mm → points
+                            final_x_pt = final_x_mm * MM_TO_PT
+                            final_w_pt = final_w_mm * MM_TO_PT
+                            final_h_pt = final_h_mm * MM_TO_PT
+
+                            # Inverser Y pour PDF (SVG: origine en haut, PDF: origine en bas)
+                            final_y_pt = svg_height_pt - (final_y_mm * MM_TO_PT) - final_h_pt
+
+                            links.append((url, final_x_pt, final_y_pt, final_w_pt, final_h_pt))
+                            log.debug(
+                                f"Lien extrait: {url[:50]}... @ ({final_x_pt:.1f}, {final_y_pt:.1f}, {final_w_pt:.1f}x{final_h_pt:.1f})")
+                            break
+
+            # Parcourir les enfants
+            for child in elem:
+                find_links(child, current_matrix)
+
+        find_links(root)
+        log.info(f"Extraction SVG: {len(links)} liens trouvés")
+
+    except Exception as e:
+        log.warning(f"Erreur extraction liens SVG: {e}")
+
+    return links
+
+
+def _draw_logos_from_svg(c: canvas.Canvas, col_coords: tuple, cfg: Config, fill_height: bool = False):
+    """
+    Dessine les logos depuis un fichier SVG pré-composé.
+    Extrait et applique les hyperliens définis dans le SVG.
+
+    Args:
+        c: Canvas ReportLab
+        col_coords: (x, y, w, h) de la zone
+        cfg: Configuration
+        fill_height: Si True, scale pour remplir la hauteur (sinon garde aspect ratio)
+    """
+    x, y, w, h = col_coords
+    svg_path = getattr(cfg, 'logos_svg_file', '')
+    project_root = getattr(cfg, 'project_root', '.')
+
+    if svg_path and not os.path.isabs(svg_path):
+        svg_path = os.path.join(project_root, svg_path)
+
+    if not svg_path or not os.path.exists(svg_path):
+        log.warning(f"SVG logos non trouvé: {svg_path}")
+        return
+
+    if not SVGLIB_AVAILABLE:
+        log.warning("svglib non disponible - impossible de charger le SVG logos")
+        return
+
+    try:
+        # 1. Extraire les liens AVANT le rendu
+        links = _extract_svg_links(svg_path)
+
+        # 2. Charger et dessiner le SVG
+        drawing = svg2rlg(svg_path)
+        if not drawing:
+            log.warning(f"Impossible de charger le SVG: {svg_path}")
+            return
+
+        # Calculer le scale pour remplir la box
+        scale_x = w / drawing.width if drawing.width > 0 else 1
+        scale_y = h / drawing.height if drawing.height > 0 else 1
+
+        # Option pour forcer le remplissage en hauteur
+        force_fill_height = getattr(cfg, 'logos_svg_fill_height', False)
+
+        if fill_height or force_fill_height:
+            # Remplir la hauteur (centré horizontalement, peut être croppé)
+            scale = scale_y
+        else:
+            # Garder l'aspect ratio (comportement par défaut)
+            scale = min(scale_x, scale_y)
+
+        # Centrer dans la box
+        scaled_w = drawing.width * scale
+        scaled_h = drawing.height * scale
+        offset_x = x + (w - scaled_w) / 2
+        offset_y = y + (h - scaled_h) / 2
+
+        # Dessiner le SVG
+        c.saveState()
+
+        # Si fill_height, ajouter un clip pour éviter le débordement
+        if fill_height or force_fill_height:
+            # Créer un rectangle de clip sur la zone autorisée
+            clip_path = c.beginPath()
+            clip_path.rect(x, y, w, h)
+            c.clipPath(clip_path, stroke=0, fill=0)
+
+        c.translate(offset_x, offset_y)
+        c.scale(scale, scale)
+        renderPDF.draw(drawing, c, 0, 0)
+        c.restoreState()
+
+        # 3. Ajouter les liens PDF avec les positions transformées
+        for url, lx, ly, lw, lh in links:
+            # Appliquer le scale et l'offset aux coordonnées du lien
+            pdf_x = offset_x + lx * scale
+            pdf_y = offset_y + ly * scale
+            pdf_w = lw * scale
+            pdf_h = lh * scale
+
+            # Clipper le lien à la zone visible si fill_height
+            if fill_height or force_fill_height:
+                # Bornes de la zone
+                clip_x1, clip_y1 = x, y
+                clip_x2, clip_y2 = x + w, y + h
+
+                # Ajuster le rectangle du lien
+                link_x1 = max(pdf_x, clip_x1)
+                link_y1 = max(pdf_y, clip_y1)
+                link_x2 = min(pdf_x + pdf_w, clip_x2)
+                link_y2 = min(pdf_y + pdf_h, clip_y2)
+
+                # Ignorer si le lien est complètement hors zone
+                if link_x1 >= link_x2 or link_y1 >= link_y2:
+                    continue
+
+                link_rect = (link_x1, link_y1, link_x2, link_y2)
+            else:
+                link_rect = (pdf_x, pdf_y, pdf_x + pdf_w, pdf_y + pdf_h)
+
+            c.linkURL(url, link_rect, relative=0, thickness=0)
+            log.debug(f"Lien PDF ajouté: {url[:40]}... @ rect{link_rect}")
+
+        log.info(f"Logos SVG chargés depuis {os.path.basename(svg_path)} (scale={scale:.3f}, {len(links)} liens)")
+
+    except Exception as e:
+        log.warning(f"Erreur chargement SVG logos: {e}")
+
+
+# =====================================================================
 # FONCTIONS HELPER POUR SUPPORT SVG
 # =====================================================================
 
@@ -458,7 +822,12 @@ def _draw_logos_column(c: canvas.Canvas, col_coords: tuple, logos: List[str], cf
 
     # 4. Appeler la bonne fonction de dessin pour la zone des logos
     layout_type = getattr(cfg, "logos_layout", "colonnes")
-    if layout_type == "optimise" and logos and logo_zone_h > 0:
+    if layout_type == "svg" and logo_zone_h > 0:
+        # Layout depuis fichier SVG pré-composé
+        # Si pas de cucaracha_box, remplir toute la hauteur
+        fill_height = (cucaracha_h == 0)
+        _draw_logos_from_svg(c, logo_zone_coords, cfg, fill_height=fill_height)
+    elif layout_type == "optimise" and logos and logo_zone_h > 0:
         # On passe cfg pour lire la stratégie de packing
         _draw_logos_optimized(c, logo_zone_coords, logos, cfg)
     elif logo_zone_h > 0:
@@ -786,7 +1155,7 @@ def _draw_cucaracha_box(c: canvas.Canvas, box_coords: tuple, cfg: Config):
                 # Image couvre toute la box (pas de padding)
                 kwargs = {'mask': 'auto'} if not isinstance(c, SVGCanvas) else {}
                 c.drawImage(image_to_draw, x, y, width=w, height=h,
-                           preserveAspectRatio=True, anchor='c', **kwargs)
+                            preserveAspectRatio=True, anchor='c', **kwargs)
             except Exception as e:
                 log.warning(f"Erreur avec l'image de la Cucaracha Box : {e}")
 

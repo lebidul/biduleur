@@ -178,8 +178,9 @@ def save_embedded_template(filename, title):
 def run_pipeline(
         status_queue: queue.Queue,
         debug_mode: bool,
-        input_file: str, generate_cover: bool, cover_image: str, ours_background_png: str, logos_dir: str,
-        logos_layout: str, logos_padding_mm: float, date_box_back_color: str,
+        input_file: str, generate_cover: bool, cover_image: str, ours_background_png: str,
+        ours_layout: str, ours_svg_file: str, logos_dir: str,
+        logos_layout: str, logos_padding_mm: float, logos_svg_file: str, date_box_back_color: str,
         out_html: str, out_agenda_html: str, out_pdf: str, auteur_couv: str, auteur_couv_url: str,
         page_margin_mm: float, generate_svg: bool, out_svg_dir: str, date_separator_type: str,
         date_spacing: float, poster_design: int, font_size_safety_factor: float,
@@ -269,6 +270,9 @@ def run_pipeline(
         cfg.font_size_forced = font_size_forced
         cfg.logos_layout = logos_layout
         cfg.logos_padding_mm = logos_padding_mm
+        cfg.logos_svg_file = logos_svg_file
+        cfg.ours_layout = ours_layout
+        cfg.ours_svg_file = ours_svg_file
         cfg.date_line['enabled'] = (date_separator_type == "ligne")
         cfg.date_box['enabled'] = (date_separator_type == "box")
         if cfg.date_box['enabled']:
