@@ -793,7 +793,7 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
         kwargs = {'mask': 'auto'} if not isinstance(c, SVGCanvas) else {}
         c.drawImage(ImageReader(buffer), s_qr.x, s_qr.y, s_qr.w, s_qr.h, **kwargs)
 
-        draw_poster_logos(c, S7["S7_Logos"], logos)
+        draw_poster_logos(c, S7["S7_Logos"], logos, cfg)
 
         # --- Calcul de la taille de police ---
         poster_paras = s5_full + s6_full + s3_full + s4_full

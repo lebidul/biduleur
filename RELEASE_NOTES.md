@@ -11,6 +11,7 @@ Cette version majeure introduit le support natif des fichiers SVG pour les secti
     *   Conservation des proportions et hyperlinks définis dans le SVG
     *   Mise à l'échelle automatique pour remplir la zone disponible
     *   Idéal pour un contrôle précis du placement des logos
+    *   **Poster** : Les images sont automatiquement extraites du SVG et redisposées horizontalement
 
 *   **Ours depuis fichier SVG** : La section "Ours" (mentions légales) supporte également le rendu SVG :
     *   Nouveau mode de layout : `svg` (en plus de `png`)
@@ -116,6 +117,12 @@ Cette version majeure introduit le support natif des fichiers SVG pour les secti
 *   `misenpageur/misenpageur/draw_logic.py` (~10 lignes modifiées)
     - Appel à `apply_icon_replacements()` avant le calcul de taille
     - Lecture des options `chapeau_icon_enabled` et `free_icon_enabled`
+    - Passage de `cfg` à `draw_poster_logos()` pour le support SVG
+
+*   `misenpageur/misenpageur/drawing.py` (~15 lignes modifiées)
+    - `draw_poster_logos()` : nouveau paramètre `cfg` optionnel
+    - Support du mode SVG pour les logos du poster (page 3)
+    - Nouvelle fonction `_extract_images_from_svg()` : extrait les images embarquées (base64 ou externes) avec leurs liens
 
 *   `misenpageur/misenpageur/config.py` (~30 lignes ajoutées)
     - Nouveaux champs : `input_file`, `output_svg_dir`, `generate_svg`, etc.

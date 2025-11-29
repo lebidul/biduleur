@@ -272,8 +272,12 @@ def _draw_ours_column(c: canvas.Canvas, col_coords: tuple, cfg: Config):
         ref_pos_x_pt = mm_to_pt(s1_cfg.get('auteur_pos_x_mm', 0))
         ref_pos_y_pt = mm_to_pt(s1_cfg.get('auteur_pos_y_mm', 0))
 
+        # Ajustement vertical pour compenser la différence SVG/PNG
+        auteur_offset_y_mm = s1_cfg.get('auteur_offset_y_mm', 0)
+        offset_y_pt = mm_to_pt(auteur_offset_y_mm)
+
         abs_pos_x = x_col + (ref_pos_x_pt * scale_x)
-        abs_pos_y = y_col + (ref_pos_y_pt * scale_y)
+        abs_pos_y = y_col + (ref_pos_y_pt * scale_y) + offset_y_pt
 
         c.setFont(font_name, font_size)
         c.setFillColorRGB(0, 0, 0)
@@ -504,6 +508,72 @@ def _multiply_matrices(m1, m2):
         a1 * e2 + c1 * f2 + e1,
         b1 * e2 + d1 * f2 + f1
     )
+
+
+def _extract_images_from_svg(svg_path: str):
+    """
+    Extrait les images (avec données) et leurs liens depuis un fichier SVG.
+
+    Returns:
+        list: [(image_data, url, original_width, original_height), ...]
+        image_data peut être un chemin de fichier ou des données base64
+    """
+    import base64
+    from io import BytesIO
+
+    images = []
+
+    try:
+        tree = ET.parse(svg_path)
+        root = tree.getroot()
+        svg_dir = os.path.dirname(svg_path)
+
+        def find_images(elem, current_url=None):
+            """Parcourt récursivement pour trouver les images."""
+            tag = elem.tag.split('}')[-1] if '}' in elem.tag else elem.tag
+
+            # Si c'est un lien, récupérer l'URL
+            if tag == 'a':
+                url = elem.get('{http://www.w3.org/1999/xlink}href') or elem.get('href', '')
+                if url and not url.startswith('data:'):
+                    current_url = url
+
+            # Si c'est une image
+            if tag == 'image':
+                href = elem.get('{http://www.w3.org/1999/xlink}href') or elem.get('href', '')
+                img_w = float(elem.get('width', '0').replace('mm', '').replace('px', ''))
+                img_h = float(elem.get('height', '0').replace('mm', '').replace('px', ''))
+
+                if href:
+                    if href.startswith('data:'):
+                        # Image embarquée en base64
+                        try:
+                            # Format: data:image/png;base64,XXXX
+                            header, data = href.split(',', 1)
+                            img_bytes = base64.b64decode(data)
+                            images.append((BytesIO(img_bytes), current_url, img_w, img_h))
+                        except Exception as e:
+                            log.warning(f"Erreur décodage image base64: {e}")
+                    else:
+                        # Image externe (chemin relatif ou absolu)
+                        if not os.path.isabs(href):
+                            href = os.path.join(svg_dir, href)
+                        if os.path.exists(href):
+                            images.append((href, current_url, img_w, img_h))
+                        else:
+                            log.warning(f"Image non trouvée: {href}")
+
+            # Parcourir les enfants
+            for child in elem:
+                find_images(child, current_url)
+
+        find_images(root)
+        log.info(f"Extraction SVG: {len(images)} images trouvées")
+
+    except Exception as e:
+        log.warning(f"Erreur extraction images SVG: {e}")
+
+    return images
 
 
 def _extract_svg_links(svg_path: str):
@@ -1087,12 +1157,96 @@ def draw_s2_cover(c: canvas.Canvas, S2_coords, image_path: str, inner_pad: float
         c.drawImage(image_path, x, y, w, h, preserveAspectRatio=True, anchor='c', mask='auto')
 
 
-def draw_poster_logos(c: canvas.Canvas, s_coords: Section, logos: List[str]):
+def draw_poster_logos(c: canvas.Canvas, s_coords: Section, logos: List[str], cfg: Config = None):
     """
-    Dessine les logos des partenaires avec support SVG et haute qualité (300 DPI minimum).
+    Dessine les logos des partenaires en ligne horizontale pour le poster.
+    Si logos_layout == 'svg', extrait les images du SVG et les redispose horizontalement.
     """
+    from io import BytesIO
+
     x, y, w, h = s_coords.x, s_coords.y, s_coords.w, s_coords.h
-    if not logos or not w > 0 or not h > 0: return
+    if not w > 0 or not h > 0: return
+
+    # Mode SVG : extraire les images et les redisposer horizontalement
+    layout_type = getattr(cfg, "logos_layout", "colonnes") if cfg else "colonnes"
+    if layout_type == "svg" and cfg:
+        svg_path = getattr(cfg, 'logos_svg_file', '')
+        project_root = getattr(cfg, 'project_root', '.')
+
+        if svg_path and not os.path.isabs(svg_path):
+            svg_path = os.path.join(project_root, svg_path)
+
+        if svg_path and os.path.exists(svg_path):
+            # Extraire les images du SVG
+            svg_images = _extract_images_from_svg(svg_path)
+
+            if svg_images:
+                num_logos = len(svg_images)
+                cell_w = w / num_logos
+                padding = 2
+
+                for i, (img_data, url, orig_w, orig_h) in enumerate(svg_images):
+                    cell_x = x + i * cell_w
+                    try:
+                        # Charger l'image
+                        if isinstance(img_data, BytesIO):
+                            # Image base64
+                            img_data.seek(0)
+                            pil_img = Image.open(img_data)
+                            img_w, img_h = pil_img.size
+                        elif isinstance(img_data, str) and os.path.exists(img_data):
+                            # Fichier externe
+                            pil_img = Image.open(img_data)
+                            img_w, img_h = pil_img.size
+                        else:
+                            continue
+
+                        # Calculer dimensions avec aspect ratio
+                        aspect = img_h / img_w if img_w > 0 else 1
+
+                        box_w = cell_w - (2 * padding)
+                        box_h = h - (2 * padding)
+                        w_fit = box_w
+                        h_fit = w_fit * aspect
+                        if h_fit > box_h:
+                            h_fit = box_h
+                            w_fit = h_fit / aspect
+
+                        logo_x = cell_x + (cell_w - w_fit) / 2
+                        logo_y = y + (h - h_fit) / 2
+
+                        # Dessiner l'image
+                        if isinstance(c, SVGCanvas):
+                            c.drawImage(pil_img, logo_x, logo_y, width=w_fit, height=h_fit)
+                        else:
+                            # Convertir en ImageReader pour PDF
+                            if isinstance(img_data, BytesIO):
+                                img_data.seek(0)
+                                img_reader = ImageReader(img_data)
+                            else:
+                                img_reader = ImageReader(img_data)
+                            c.drawImage(img_reader, logo_x, logo_y, width=w_fit, height=h_fit, mask='auto')
+
+                        # Ajouter hyperlink si présent
+                        if url:
+                            link_rect = (logo_x, logo_y, logo_x + w_fit, logo_y + h_fit)
+                            c.linkURL(url, link_rect, relative=0, thickness=0)
+                            log.debug(f"Lien poster créé: {url[:40]}...")
+
+                    except Exception as e:
+                        log.warning(f"Erreur logo poster depuis SVG: {e}")
+
+                log.info(f"Poster: {num_logos} logos extraits du SVG et disposés horizontalement")
+                return  # Fin du mode SVG
+
+    # Mode classique : dessiner les logos individuels
+    if not logos: return
+
+    # Récupérer les hyperlinks depuis cfg si disponible
+    links_map = {}
+    if cfg:
+        links_map = {os.path.basename(link.get('image', '')): link.get('href')
+                     for link in getattr(cfg, 'logo_hyperlinks', [])}
 
     num_logos = len(logos)
     cell_w = w / num_logos
@@ -1130,6 +1284,13 @@ def draw_poster_logos(c: canvas.Canvas, s_coords: Section, logos: List[str]):
                 else:
                     img_reader_hq = _load_high_quality_image(logo_path, w_fit, h_fit, min_dpi=300)
                     c.drawImage(img_reader_hq, logo_x, logo_y, width=w_fit, height=h_fit, mask='auto')
+
+            # Ajouter hyperlink si présent
+            logo_basename = os.path.basename(logo_path)
+            url = links_map.get(logo_basename)
+            if url:
+                link_rect = (logo_x, logo_y, logo_x + w_fit, logo_y + h_fit)
+                c.linkURL(url, link_rect, relative=0, thickness=0)
 
         except Exception as e:
             log.warning(f"Impossible de dessiner le logo du poster {os.path.basename(logo_path)}: {e}")
