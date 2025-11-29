@@ -1,5 +1,160 @@
 ---
 
+# Bidul v1.4.1 - SVG Natif, Icônes Dynamiques et Filtrage des Événements
+
+Cette version majeure introduit le support natif des fichiers SVG pour les sections Logos et Ours, des icônes automatiques pour les événements gratuits ou au chapeau, et un filtrage des événements inactifs directement depuis le fichier source.
+
+## ✨ Nouveautés
+
+*   **Logos depuis fichier SVG** : La section logos peut maintenant être générée directement depuis un fichier SVG pré-composé (ex: Inkscape) :
+    *   Nouveau mode de layout : `svg` (en plus de `colonnes` et `optimisé`)
+    *   Conservation des proportions et hyperlinks définis dans le SVG
+    *   Mise à l'échelle automatique pour remplir la zone disponible
+    *   Idéal pour un contrôle précis du placement des logos
+
+*   **Ours depuis fichier SVG** : La section "Ours" (mentions légales) supporte également le rendu SVG :
+    *   Nouveau mode de layout : `svg` (en plus de `png`)
+    *   Permet d'éditer facilement le contenu dans Inkscape
+    *   Conservation des liens hypertextes (Facebook, Instagram, site web)
+    *   Meilleure qualité d'impression (vectoriel)
+
+*   **Icône "Au Chapeau"** : Remplacement automatique de `, au chapeau` par une icône de chapeau 🎩 :
+    *   Checkbox dans l'interface : "Remplacer , au chapeau par une icône"
+    *   Taille de l'icône adaptée dynamiquement à la police
+    *   Gain d'espace dans l'agenda (le texte est plus court)
+    *   Gère les variantes : `, au chapeau`, `au chapeau`, `AU CHAPEAU`, espaces insécables
+
+*   **Icône "Gratuit"** : Remplacement automatique de `, 0€` par une icône FREE :
+    *   Checkbox dans l'interface : "Remplacer , 0€ par une icône"
+    *   Évite les faux positifs (`10€`, `20€` ne sont pas remplacés)
+    *   Gère les variantes : `, 0€`, `0€`, `0 €`, `0&euro;`
+
+*   **Filtrage des événements inactifs** : Nouvelle colonne optionnelle `INACTIF` dans le fichier source :
+    *   Si la valeur est `o` ou `O`, la ligne est ignorée
+    *   Permet de désactiver temporairement des événements sans les supprimer
+    *   Log informatif : `[INACTIF] 3 ligne(s) ignorée(s)`
+    *   Aucun impact si la colonne est absente
+
+*   **Import de configuration amélioré** :
+    *   Support des fichiers YAML et JSON
+    *   Bouton renommé : "📁 Importer config"
+    *   Filtre de fichiers : YAML, JSON, ou tous
+    *   Import depuis les artefacts de debug (config.json) facilité
+
+## ⚙️ Pour les Développeuses et Développeurs
+
+*   **Nouveau système d'icônes avec placeholder** : Architecture en deux phases pour les remplacements d'icônes :
+    ```python
+    # Phase 1 : AVANT le calcul de taille de police
+    paras = apply_icon_replacements(paras, chapeau_enabled, free_enabled)
+    # Remplace ", au chapeau" -> "{{CHAPEAU}}" et ", 0€" -> "{{FREE}}"
+    
+    # Phase 2 : LORS du rendu (dans _mk_text_for_kind)
+    txt = _replace_all_placeholders(txt, font_size)
+    # Remplace "{{CHAPEAU}}" -> <img .../> avec la bonne taille
+    ```
+    Cette approche permet de calculer la taille de police optimale en tenant compte du gain d'espace.
+
+*   **Fonctions ajoutées dans `textflow.py`** :
+    *   `apply_chapeau_to_paragraphs()` : Remplace `, au chapeau` par placeholder
+    *   `apply_free_to_paragraphs()` : Remplace `, 0€` par placeholder
+    *   `apply_icon_replacements()` : Applique les remplacements activés
+    *   `_get_icon_img_tag()` : Génère la balise `<img>` dimensionnée
+    *   `_replace_all_placeholders()` : Remplace tous les placeholders par les images
+
+*   **Pattern regex robuste pour `0€`** :
+    ```python
+    # Évite les faux positifs avec lookbehind négatif
+    pattern = r',?(?:\s|&nbsp;|\u00A0)*(?<![0-9])0(?:\s|&nbsp;|\u00A0)*(?:€|&euro;)'
+    ```
+    Ne matche que `0€` isolé, pas `10€`, `20€`, etc.
+
+*   **Nouveaux champs dans `Config`** :
+    ```python
+    input_file: Optional[str] = None          # Fichier d'entrée (Excel/CSV)
+    output_svg_dir: Optional[str] = None      # Dossier de sortie SVG
+    generate_svg: bool = True                 # Générer des SVG éditables
+    stories_output_dir: Optional[str] = None  # Dossier de sortie stories
+    chapeau_icon_enabled: bool = False        # Activer icône chapeau
+    free_icon_enabled: bool = False           # Activer icône gratuit
+    ```
+
+*   **Support JSON dans `Config`** :
+    ```python
+    @classmethod
+    def from_file(cls, path: str) -> "Config":
+        """Charge depuis YAML ou JSON (détection automatique)."""
+        ext = os.path.splitext(path)[1].lower()
+        if ext == '.json':
+            return cls.from_json(path)
+        else:
+            return cls.from_yaml(path)
+    ```
+
+*   **Filtrage des lignes inactives dans `csv_utils.py`** :
+    ```python
+    def _filter_inactive_rows(df: pd.DataFrame) -> pd.DataFrame:
+        """Filtre les lignes où INACTIF = 'o' (case insensitive)."""
+        # Cherche la colonne INACTIF (optionnelle)
+        # Filtre les lignes où la valeur est 'o' ou 'O'
+        # Log le nombre de lignes ignorées
+    ```
+
+*   **Rendu SVG avec préservation des hyperlinks** : Le module `svglib` est utilisé pour charger les SVG, et les liens sont extraits puis recréés comme annotations PDF.
+
+---
+
+## 📦 Fichiers Modifiés
+
+### Module `misenpageur`
+
+*   `misenpageur/misenpageur/textflow.py` (~100 lignes ajoutées)
+    - Système de placeholders et remplacement d'icônes
+    - Fonctions `apply_*_to_paragraphs()` et `_replace_*_placeholder()`
+    - Constantes `CHAPEAU_ICON_PATH`, `FREE_ICON_PATH`
+
+*   `misenpageur/misenpageur/draw_logic.py` (~10 lignes modifiées)
+    - Appel à `apply_icon_replacements()` avant le calcul de taille
+    - Lecture des options `chapeau_icon_enabled` et `free_icon_enabled`
+
+*   `misenpageur/misenpageur/config.py` (~30 lignes ajoutées)
+    - Nouveaux champs : `input_file`, `output_svg_dir`, `generate_svg`, etc.
+    - Méthodes `from_json()` et `from_file()`
+
+### Module `letruc` (GUI)
+
+*   `letruc/app.py` (~15 lignes modifiées)
+    - Variables `chapeau_icon_var` et `free_icon_var`
+    - Dialogue d'import config avec support JSON
+
+*   `letruc/widgets.py` (~10 lignes ajoutées)
+    - Checkboxes pour les options icônes chapeau et gratuit
+
+*   `letruc/_helpers.py` (~50 lignes modifiées)
+    - `load_and_apply_config()` : support JSON et nouveaux champs
+    - `run_pipeline()` : passage des paramètres icônes
+
+### Module `biduleur`
+
+*   `biduleur/csv_utils.py` (~30 lignes ajoutées)
+    - Fonction `_filter_inactive_rows()`
+    - Constante `INACTIF_COLUMN`
+
+### Nouveaux fichiers
+
+*   `misenpageur/assets/icons/chapeau.png` (icône chapeau, fond transparent)
+*   `misenpageur/assets/icons/free.png` (icône FREE, fond transparent)
+
+## 🔄 Compatibilité
+
+*   Compatible avec toutes les versions antérieures
+*   Aucune modification de `config.yml` requise (nouveaux champs optionnels)
+*   Les fichiers Excel/CSV sans colonne INACTIF continuent de fonctionner
+*   Les fichiers SVG sont optionnels (modes PNG/colonnes toujours disponibles)
+*   Fonctionne avec Python 3.10+ sur Windows/Linux/macOS
+
+---
+
 # Bidul v1.3.10 - Robustesse Excel et Cucaracha Box Améliorée
 
 Cette version corrige un bug critique lors de l'import de fichiers Excel et améliore la flexibilité de la Cucaracha Box avec le support d'images en arrière-plan.

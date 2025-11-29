@@ -175,7 +175,7 @@ class Application(TkinterDnD.Tk):
 
         import_config_btn = tk.Button(
             self.config_buttons_frame,
-            text="📁 Importer config.yml",
+            text="📁 Importer config",
             command=self._on_import_config
         )
         import_config_btn.pack(side=tk.LEFT, padx=5)
@@ -340,13 +340,18 @@ class Application(TkinterDnD.Tk):
     # --- ✨ NOUVELLES MÉTHODES pour import/reset config ---
 
     def _on_import_config(self):
-        """Import et applique un config.yml personnalisé"""
+        """Import et applique un fichier de config (YAML ou JSON)"""
         from tkinter import filedialog
         from ._helpers import load_and_apply_config
 
         config_path = filedialog.askopenfilename(
-            title="Sélectionner un fichier config.yml",
-            filetypes=[("YAML", "*.yml *.yaml"), ("Tous", "*.*")]
+            title="Sélectionner un fichier de configuration",
+            filetypes=[
+                ("Config (YAML/JSON)", "*.yml *.yaml *.json"),
+                ("YAML", "*.yml *.yaml"),
+                ("JSON", "*.json"),
+                ("Tous", "*.*")
+            ]
         )
         if not config_path:
             return

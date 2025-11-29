@@ -28,8 +28,8 @@
 - [x] Config front-end (widgets, helpers, callbacks, etc) dans un fichier config dédié avec wrapper et nouvelle class pour ne pas avoir sur trop de fichiers `chqaue fois` -> pas une bonne idée car trop complexe
 - [ ] Fix csv input
 - [ ] Output separate pdf pages
-- [ ] Inactive row
-- [ ] Checkbox "au chapeau"
+- [x] Inactive row
+- [x] Checkbox "au chapeau"
 - [x] Lire logos depuis svg (qui contiendrait tous les logos) pareil pour l'ours
 
 ## Priorité Moyenne
@@ -60,10 +60,7 @@
 - [x] SVG output qui ont le même nom que le pdf
 - [x] Nombre d'exemplaires dans ours
 - [ ] Mettre nouveau logo les arts services (Gëelle) dans ours
-- [ ] config dans GUI:
-  - .json et non pas .yml dans UI
-  - champs pas dans export/import: chapeau, path couv, paths input, output. Générer SVG
-  - paramètres non peuplés: organisation logos, fichiers input
+- [ ] config dans GUI: champs pas dans export/import: paths input
 - [ ] amélioration de la performance
 
 ## Documentation

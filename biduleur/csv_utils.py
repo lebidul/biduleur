@@ -3,12 +3,14 @@ from typing import List, Dict, Optional, Any
 
 import pandas as pd
 
-from biduleur.constants import DATE, HORAIRE, FESTIVAL, STYLE_FESTIVAL, VILLE, LIEU, PRIX, GENRE1, SPECTACLE1, ARTISTE1, STYLE1, GENRE2, SPECTACLE2, ARTISTE2, STYLE2, GENRE3, SPECTACLE3, ARTISTE3, STYLE3, GENRE4, SPECTACLE4, ARTISTE4, STYLE4, COLONNE_INFO
+from biduleur.constants import DATE, HORAIRE, FESTIVAL, STYLE_FESTIVAL, VILLE, LIEU, PRIX, GENRE1, SPECTACLE1, ARTISTE1, \
+    STYLE1, GENRE2, SPECTACLE2, ARTISTE2, STYLE2, GENRE3, SPECTACLE3, ARTISTE3, STYLE3, GENRE4, SPECTACLE4, ARTISTE4, \
+    STYLE4, COLONNE_INFO
 from biduleur.event_utils import parse_bidul_event
 
-import logging # Ajouter cet import
-log = logging.getLogger(__name__) # Obtenir le logger pour ce module
+import logging  # Ajouter cet import
 
+log = logging.getLogger(__name__)  # Obtenir le logger pour ce module
 
 # -----------------------------
 # Helpers format PRIX
@@ -22,6 +24,9 @@ _CURRENCY_MAP = {
 }
 
 _CURRENCY_COL_CANDIDATES = ("DEVISE", "CURRENCY", "MONNAIE")
+
+# Nom de la colonne optionnelle pour désactiver des lignes
+INACTIF_COLUMN = "INACTIF"
 
 REQUIRED_COLUMNS = [
     DATE, HORAIRE, FESTIVAL, STYLE_FESTIVAL, VILLE, LIEU, PRIX,
@@ -81,7 +86,8 @@ def _normalize_price_cell(value: Any, symbol_hint: str) -> str:
             return ""
         # Si déjà avec symbole (€ $ £ CHF) -> on préserve
         lowered = s.lower()
-        if ("€" in s) or ("$" in s) or ("£" in s) or ("chf" in lowered) or ("eur" in lowered) or ("usd" in lowered) or ("gbp" in lowered):
+        if ("€" in s) or ("$" in s) or ("£" in s) or ("chf" in lowered) or ("eur" in lowered) or ("usd" in lowered) or (
+                "gbp" in lowered):
             return s
         # Si c'est un nombre en texte -> on tente de convertir
         try:
@@ -127,6 +133,46 @@ def _convert_price_column_to_text(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def _filter_inactive_rows(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Filtre les lignes où la colonne INACTIF vaut "n" (case insensitive).
+    La colonne INACTIF est optionnelle - si elle n'existe pas, aucun filtrage n'est fait.
+
+    Args:
+        df: DataFrame à filtrer
+
+    Returns:
+        DataFrame filtré (sans les lignes inactives)
+    """
+    # Chercher la colonne INACTIF (case insensitive)
+    inactif_col = None
+    for col in df.columns:
+        if col.upper() == INACTIF_COLUMN:
+            inactif_col = col
+            break
+
+    if inactif_col is None:
+        # Colonne non présente, pas de filtrage
+        return df
+
+    # Compter les lignes avant filtrage
+    count_before = len(df)
+
+    # Filtrer : garder les lignes où INACTIF n'est PAS "o" (case insensitive)
+    # On convertit en string, strip, et compare en lowercase
+    mask = df[inactif_col].apply(
+        lambda x: str(x).strip().lower() != "o" if pd.notna(x) else True
+    )
+    df_filtered = df[mask]
+
+    # Compter les lignes filtrées
+    count_filtered = count_before - len(df_filtered)
+    if count_filtered > 0:
+        log.info(f"[INACTIF] {count_filtered} ligne(s) ignorée(s) (colonne '{inactif_col}' = 'o')")
+
+    return df_filtered
+
+
 # -----------------------------
 # Lecture + tri
 # -----------------------------
@@ -149,7 +195,8 @@ def read_and_sort_file(filename: str) -> Optional[List[Dict]]:
             elif file_extension in ['.xls', '.xlsx']:
                 df = pd.read_excel(filename, keep_default_na=False, na_values=[''])
             else:
-                raise ValueError(f"Format de fichier non supporté : {file_extension}\n\nFormats acceptés : .csv, .xls, .xlsx")
+                raise ValueError(
+                    f"Format de fichier non supporté : {file_extension}\n\nFormats acceptés : .csv, .xls, .xlsx")
         except Exception as read_error:
             # Transformer les erreurs de lecture en messages clairs
             error_msg = str(read_error).lower()
@@ -178,6 +225,9 @@ def read_and_sort_file(filename: str) -> Optional[List[Dict]]:
                 f"Colonnes manquantes dans le fichier :\n\n" +
                 "\n".join(f"• {col}" for col in missing_cols)
             )
+
+        # --- Filtrage des lignes inactives ---
+        df = _filter_inactive_rows(df)
 
         # --- Conversion PRIX -> texte avec devise ---
         df = _convert_price_column_to_text(df)
