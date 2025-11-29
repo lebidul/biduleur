@@ -58,6 +58,8 @@ class Config:
     logo_hyperlinks: List[Dict[str, str]] = field(default_factory=list)
     ours_layout: str = "svg"  # "png" ou "svg"
     ours_svg_file: Optional[str] = None  # Chemin vers le fichier SVG de l'ours
+    chapeau_icon_enabled: bool = False  # Remplacer ", au chapeau" par icône
+    free_icon_enabled: bool = False  # Remplacer ", 0€" par icône
     ours_md: str = "assets/ours/ours.md"
     ours_svg: str = "assets/ours/ours_template.svg"
     nobr_file: str = "assets/textes/nobr.txt"

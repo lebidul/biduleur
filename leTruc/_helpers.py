@@ -186,6 +186,8 @@ def run_pipeline(
         date_spacing: float, poster_design: int, font_size_safety_factor: float,
         background_alpha: float, poster_title: str, cucaracha_type: str,
         cucaracha_value: str, cucaracha_text_font: str, cucaracha_font_size: int,
+        chapeau_icon_enabled: bool,
+        free_icon_enabled: bool,
         generate_stories: bool, stories_output_dir: str,
         font_size_mode: str, font_size_forced: float,
         stories_font_name: str, stories_font_size: int, stories_font_color: str,
@@ -287,6 +289,8 @@ def run_pipeline(
         cfg.cucaracha_box['content_value'] = cucaracha_value
         cfg.cucaracha_box['text_font_name'] = cucaracha_text_font
         cfg.cucaracha_box['text_font_size'] = cucaracha_font_size
+        cfg.chapeau_icon_enabled = chapeau_icon_enabled
+        cfg.free_icon_enabled = free_icon_enabled
         cfg.stories['enabled'] = generate_stories
         if stories_output_dir:
             cfg.stories['output_dir'] = stories_output_dir

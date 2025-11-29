@@ -70,6 +70,8 @@ class Application(TkinterDnD.Tk):
         self.ours_png_var = tk.StringVar(value=self.cfg_defaults.get("ours_background_png", ""))
         self.ours_layout_var = tk.StringVar(value="svg")
         self.ours_svg_var = tk.StringVar(value="misenpageur/assets/ours/ours.svg")
+        self.chapeau_icon_var = tk.BooleanVar(value=False)  # Remplacer "au chapeau" par icône
+        self.free_icon_var = tk.BooleanVar(value=False)  # Remplacer "0€" par icône
         self.ours_type_var = tk.StringVar(value="svg")
         self.ours_svg_var = tk.StringVar(value="misenpageur/assets/ours/ours.svg")
         self.logos_var = tk.StringVar(value=self.cfg_defaults.get("logos_dir", ""))
@@ -284,6 +286,8 @@ class Application(TkinterDnD.Tk):
             cucaracha_value=validated_args['cuca_value_val'],
             cucaracha_text_font=self.cucaracha_font_var.get(),
             cucaracha_font_size=validated_args['cuca_font_size_val'],
+            chapeau_icon_enabled=self.chapeau_icon_var.get(),
+            free_icon_enabled=self.free_icon_var.get(),
             date_box_back_color=self.date_box_back_color_var.get(),
             stories_font_name=self.stories_font_name_var.get(),
             stories_font_size=validated_args['stories_font_size_val'],

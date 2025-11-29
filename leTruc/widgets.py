@@ -361,6 +361,22 @@ def _create_page_layout_section(parent, app, ui_row):
             text="Définissez ici la taille de police en points (pt) à utiliser.\nCe champ n'apparaît qu'en mode 'Forcée'.")
 
     app.font_size_forced_row = lr
+    lr += 1
+
+    # --- Option "au chapeau" → icône ---
+    chapeau_check = tk.Checkbutton(page_layout_frame, text='Remplacer ", au chapeau" par une icône',
+                                   variable=app.chapeau_icon_var)
+    chapeau_check.grid(row=lr, column=0, columnspan=2, sticky="w", padx=5, pady=5)
+    Tooltip(chapeau_check,
+            text='Remplace automatiquement ", au chapeau" par une icône de chapeau dans le texte des événements.')
+    lr += 1
+
+    # --- Option "0€" → icône ---
+    free_check = tk.Checkbutton(page_layout_frame, text='Remplacer ", 0€" par une icône',
+                                variable=app.free_icon_var)
+    free_check.grid(row=lr, column=0, columnspan=2, sticky="w", padx=5, pady=5)
+    Tooltip(free_check,
+            text='Remplace automatiquement ", 0€" par une icône "gratuit" dans le texte des événements.')
 
     r += 1
     ui_row['r'] = r

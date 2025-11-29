@@ -30,7 +30,7 @@
 - [ ] Output separate pdf pages
 - [ ] Inactive row
 - [ ] Checkbox "au chapeau"
-- [ ] Lire logos depuis svg (qui contiendrait tous les logos) pareil pour l'ours
+- [x] Lire logos depuis svg (qui contiendrait tous les logos) pareil pour l'ours
 
 ## Priorité Moyenne
 - [x] Refactor dans dossier bidul.biduleur/bidul.
@@ -58,10 +58,11 @@
 - [x] "En Bref" -> "Coups de coeur et en Bref"
 - [x] Pouvoir importer une config dans le GUI
 - [x] SVG output qui ont le même nom que le pdf
-- [ ] Nombre d'exemplaires dans ours
+- [x] Nombre d'exemplaires dans ours
 - [ ] Mettre nouveau logo les arts services (Gëelle) dans ours
 - [ ] config dans GUI:
   - .json et non pas .yml dans UI
+  - champs pas dans export/import: chapeau, path couv, paths input, output. Générer SVG
   - paramètres non peuplés: organisation logos, fichiers input
 - [ ] amélioration de la performance
 

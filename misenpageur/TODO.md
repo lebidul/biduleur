@@ -24,7 +24,7 @@
 - [x] Empêcher qu'une date (ligne date) commence à la fin d'une section
 - [ ] Déplacer insecabilité dans biduleur (sur lieu et ville) ? (autorise moins de flexibiité though)
 - [x] Fichiers svg outputs prennent le nom du fichier pdf
-- [ ] Améliorer affichage optimisée des logos (plusieurs propals ?)
+- [x] Améliorer affichage optimisée des logos (plusieurs propals ?)
 
 ## Priorité Moyenne
 - [x] Amélioration lisibilité finale (ex. caractère de bullet point comme paramètre, cadre pour date)
