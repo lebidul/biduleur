@@ -62,6 +62,7 @@
 - [ ] Mettre nouveau logo les arts services (Gëelle) dans ours
 - [ ] config dans GUI: champs pas dans export/import: paths input
 - [ ] amélioration de la performance
+- [ ] Enlever du GUI les paramètres qu ón ne change jamais (ou les mettre dans un onglet config)
 
 ## Documentation
 - [ ] Rédiger un guide utilisateur pour expliquer comment utiliser le module.
