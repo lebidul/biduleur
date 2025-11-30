@@ -514,6 +514,9 @@ def _extract_images_from_svg(svg_path: str):
     """
     Extrait les images (avec données) et leurs liens depuis un fichier SVG.
 
+    Note: Les images dans <defs> sont ignorées car ce sont des définitions
+    réutilisables, pas des images affichées directement.
+
     Returns:
         list: [(image_data, url, original_width, original_height), ...]
         image_data peut être un chemin de fichier ou des données base64
@@ -528,9 +531,13 @@ def _extract_images_from_svg(svg_path: str):
         root = tree.getroot()
         svg_dir = os.path.dirname(svg_path)
 
-        def find_images(elem, current_url=None):
+        def find_images(elem, current_url=None, in_defs=False):
             """Parcourt récursivement pour trouver les images."""
             tag = elem.tag.split('}')[-1] if '}' in elem.tag else elem.tag
+
+            # Ignorer les éléments dans <defs> (définitions, pas affichés)
+            if tag == 'defs':
+                in_defs = True
 
             # Si c'est un lien, récupérer l'URL
             if tag == 'a':
@@ -538,8 +545,8 @@ def _extract_images_from_svg(svg_path: str):
                 if url and not url.startswith('data:'):
                     current_url = url
 
-            # Si c'est une image
-            if tag == 'image':
+            # Si c'est une image (et pas dans <defs>)
+            if tag == 'image' and not in_defs:
                 href = elem.get('{http://www.w3.org/1999/xlink}href') or elem.get('href', '')
                 img_w = float(elem.get('width', '0').replace('mm', '').replace('px', ''))
                 img_h = float(elem.get('height', '0').replace('mm', '').replace('px', ''))
@@ -565,10 +572,10 @@ def _extract_images_from_svg(svg_path: str):
 
             # Parcourir les enfants
             for child in elem:
-                find_images(child, current_url)
+                find_images(child, current_url, in_defs)
 
         find_images(root)
-        log.info(f"Extraction SVG: {len(images)} images trouvées")
+        log.info(f"Extraction SVG: {len(images)} images trouvées (hors <defs>)")
 
     except Exception as e:
         log.warning(f"Erreur extraction images SVG: {e}")
