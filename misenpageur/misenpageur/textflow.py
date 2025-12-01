@@ -2,9 +2,11 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass
 from typing import List, Tuple, Optional
+from PIL import Image
 
 from reportlab.pdfgen import canvas
 from reportlab.platypus import Paragraph, Frame, Spacer
@@ -23,9 +25,180 @@ from .config import BulletConfig, DateBoxConfig, DateLineConfig, PosterConfig  #
 PT_PER_INCH = 72.0
 MM_PER_INCH = 25.4
 
+# Chemin vers les icônes (relatif au dossier parent du module)
+_MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
+_PACKAGE_DIR = os.path.dirname(_MODULE_DIR)  # Remonter d'un niveau (misenpageur/misenpageur -> misenpageur)
+CHAPEAU_ICON_PATH = os.path.join(_PACKAGE_DIR, "assets", "icons", "chapeau.png")
+FREE_ICON_PATH = os.path.join(_PACKAGE_DIR, "assets", "icons", "free.png")
+
+# Placeholders ASCII simples qui ne seront pas modifiés par sanitize_inline_markup
+CHAPEAU_PLACEHOLDER = "{{CHAPEAU}}"
+FREE_PLACEHOLDER = "{{FREE}}"
+
 
 def mm_to_pt(mm: float) -> float:
     return mm * PT_PER_INCH / MM_PER_INCH
+
+
+def _get_icon_img_tag(icon_path: str, font_size: float, scale: float = 0.8) -> str:
+    """
+    Génère la balise img pour une icône, dimensionnée selon la police.
+
+    Args:
+        icon_path: Chemin vers l'icône
+        font_size: Taille de la police en points
+        scale: Facteur d'échelle par rapport à la taille de police (défaut 0.8)
+
+    Returns:
+        str: Balise <img> ReportLab ou chaîne vide si l'icône n'existe pas
+    """
+    if not os.path.exists(icon_path):
+        return ""
+
+    try:
+        img = Image.open(icon_path)
+        aspect = img.width / img.height
+        img_h_pt = font_size * scale
+        img_w_pt = img_h_pt * aspect
+
+        return f'<img src="{icon_path}" width="{img_w_pt:.1f}" height="{img_h_pt:.1f}" valign="middle"/>'
+    except Exception as e:
+        print(f"[WARN] Erreur chargement icône {icon_path}: {e}")
+        return ""
+
+
+def _get_chapeau_img_tag(font_size: float) -> str:
+    """Génère la balise img pour l'icône chapeau."""
+    return _get_icon_img_tag(CHAPEAU_ICON_PATH, font_size, scale=0.8)
+
+
+def _get_free_img_tag(font_size: float) -> str:
+    """Génère la balise img pour l'icône free."""
+    return _get_icon_img_tag(FREE_ICON_PATH, font_size, scale=0.8)
+
+
+def _replace_chapeau_placeholder(txt: str, font_size: float) -> str:
+    """Remplace le placeholder chapeau par l'image avec la taille correcte."""
+    if CHAPEAU_PLACEHOLDER not in txt:
+        return txt
+
+    img_tag = _get_chapeau_img_tag(font_size)
+    if img_tag:
+        return txt.replace(CHAPEAU_PLACEHOLDER, img_tag)
+    return txt
+
+
+def _replace_free_placeholder(txt: str, font_size: float) -> str:
+    """Remplace le placeholder free par l'image avec la taille correcte."""
+    if FREE_PLACEHOLDER not in txt:
+        return txt
+
+    img_tag = _get_free_img_tag(font_size)
+    if img_tag:
+        return txt.replace(FREE_PLACEHOLDER, img_tag)
+    return txt
+
+
+def _replace_all_placeholders(txt: str, font_size: float) -> str:
+    """Remplace tous les placeholders d'icônes par les images."""
+    txt = _replace_chapeau_placeholder(txt, font_size)
+    txt = _replace_free_placeholder(txt, font_size)
+    return txt
+
+
+def apply_chapeau_to_paragraphs(paras: List[str]) -> List[str]:
+    """
+    Remplace "au chapeau" par un placeholder court dans les paragraphes.
+
+    Cette fonction doit être appelée AVANT le calcul de la taille de police
+    pour que le gain d'espace soit pris en compte. Le placeholder sera
+    remplacé par l'image réelle lors du rendu (dans _mk_text_for_kind).
+
+    Args:
+        paras: Liste des paragraphes HTML
+
+    Returns:
+        Liste des paragraphes avec le placeholder
+    """
+    # Vérifier que l'icône existe
+    if not os.path.exists(CHAPEAU_ICON_PATH):
+        print(f"[WARN] Icône chapeau non trouvée: {CHAPEAU_ICON_PATH}")
+        return paras
+
+    # Pattern qui gère les espaces normaux, &nbsp; et espaces insécables Unicode
+    pattern = r',?(?:\s|&nbsp;|\u00A0)*au(?:\s|&nbsp;|\u00A0)+chapeau'
+
+    result = []
+    count = 0
+    for p in paras:
+        # Remplacer par ", " + placeholder pour garder la virgule
+        new_p, n = re.subn(pattern, ', ' + CHAPEAU_PLACEHOLDER, p, flags=re.IGNORECASE)
+        count += n
+        result.append(new_p)
+
+    if count > 0:
+        print(f"[CHAPEAU] {count} occurrences remplacées")
+
+    return result
+
+
+def apply_free_to_paragraphs(paras: List[str]) -> List[str]:
+    """
+    Remplace ", 0€" par un placeholder court dans les paragraphes.
+
+    Args:
+        paras: Liste des paragraphes HTML
+
+    Returns:
+        Liste des paragraphes avec le placeholder
+    """
+    # Vérifier que l'icône existe
+    if not os.path.exists(FREE_ICON_PATH):
+        print(f"[WARN] Icône free non trouvée: {FREE_ICON_PATH}")
+        return paras
+
+    # Pattern qui gère ", 0€", ",0€", ", 0 €", "0&euro;", etc.
+    # (?<![0-9]) = lookbehind négatif pour éviter de matcher "10€", "20€", etc.
+    # Gère aussi &nbsp; et espaces insécables, et &euro; pour €
+    pattern = r',?(?:\s|&nbsp;|\u00A0)*(?<![0-9])0(?:\s|&nbsp;|\u00A0)*(?:€|&euro;)'
+
+    result = []
+    count = 0
+    for p in paras:
+        # Remplacer par ", " + placeholder pour garder la virgule
+        new_p, n = re.subn(pattern, ', ' + FREE_PLACEHOLDER, p, flags=re.IGNORECASE)
+        count += n
+        result.append(new_p)
+
+    if count > 0:
+        print(f"[FREE] {count} occurrences remplacées")
+
+    return result
+
+
+def apply_icon_replacements(paras: List[str], chapeau_enabled: bool = False, free_enabled: bool = False) -> List[str]:
+    """
+    Applique les remplacements d'icônes activés sur les paragraphes.
+
+    Cette fonction doit être appelée AVANT le calcul de la taille de police.
+
+    Args:
+        paras: Liste des paragraphes HTML
+        chapeau_enabled: Activer le remplacement "au chapeau"
+        free_enabled: Activer le remplacement "0€"
+
+    Returns:
+        Liste des paragraphes avec les placeholders
+    """
+    result = paras
+
+    if chapeau_enabled:
+        result = apply_chapeau_to_paragraphs(result)
+
+    if free_enabled:
+        result = apply_free_to_paragraphs(result)
+
+    return result
 
 
 _BULLET_RE = re.compile(r'^\s*(?:❑|□|■|&#9643;)\s*', re.I)
@@ -71,21 +244,19 @@ def _mk_style_for_kind(base: ParagraphStyle, kind: str,
 
 
 def _mk_text_for_kind(
-        raw: str, kind: str, bullet_cfg: BulletConfig
+        raw: str, kind: str, bullet_cfg: BulletConfig, font_size: float = 10.0
 ) -> Tuple[str, Optional[str]]:
     txt = _strip_head_tail_breaks(sanitize_inline_markup(raw))
     bullet_text = None
     if kind == "EVENT":
         if bullet_cfg.show_event_bullet:
-            # On ajoute des espaces (insécables) APRÈS la puce.
-            # C'est cela qui va créer la distance visuelle fixe.
             bullet_char = bullet_cfg.event_bullet_replacement or "❑"
-            # bullet_char = bullet_cfg.event_bullet_replacement or "■"
-            bullet_text = f"{bullet_char}"  # Puce (possibilité d'ajouter des) espaces insécables)
-            # bullet_text = f"{bullet_char}"
-
-        # On nettoie TOUJOURS la puce du texte principal
+            bullet_text = f"{bullet_char}"
         txt = _strip_leading_bullet(txt)
+
+    # Remplacer tous les placeholders d'icônes par les images
+    txt = _replace_all_placeholders(txt, font_size)
+
     return apply_glyph_fallbacks(txt), bullet_text
 
 
@@ -105,7 +276,7 @@ def measure_fit_at_fs(
     for i, raw in enumerate(paras_text):
         kind = "EVENT" if _is_event(raw) else "DATE"
         st = _mk_style_for_kind(base, kind, bullet_cfg, date_box)
-        txt, bullet = _mk_text_for_kind(raw, kind, bullet_cfg)
+        txt, bullet = _mk_text_for_kind(raw, kind, bullet_cfg, font_size)
         p = Paragraph(txt, st, bulletText=bullet)
         _w, ph = p.wrap(w, 1e6)
         sb = spacing_policy.space_before(kind, section_name, first_non_event_seen_in_S5)
@@ -131,7 +302,7 @@ def measure_fit_at_fs(
                 first_non_event_after_current = first_non_event_seen_in_S5
 
                 next_st = _mk_style_for_kind(base, next_kind, bullet_cfg, date_box)
-                next_txt, next_bullet = _mk_text_for_kind(next_raw, next_kind, bullet_cfg)
+                next_txt, next_bullet = _mk_text_for_kind(next_raw, next_kind, bullet_cfg, font_size)
                 next_p = Paragraph(next_txt, next_st, bulletText=next_bullet)
                 _next_w, next_ph = next_p.wrap(w, 1e6)
                 next_sb = spacing_policy.space_before(next_kind, section_name, first_non_event_after_current)
@@ -176,7 +347,7 @@ def draw_section_fixed_fs_with_prelude(
     for i, raw in enumerate(paras_text or []):
         kind = "EVENT" if _is_event(raw) else "DATE"
         st = _mk_style_for_kind(base, kind, bullet_cfg, date_box)
-        txt, bullet = _mk_text_for_kind(raw, kind, bullet_cfg)
+        txt, bullet = _mk_text_for_kind(raw, kind, bullet_cfg, font_size)
         p = Paragraph(txt, st, bulletText=bullet)
         _w, ph = p.wrap(w, h)
         sb = spacing_policy.space_before(kind, section_name, first_non_event_seen_in_S5)
@@ -199,7 +370,7 @@ def draw_section_fixed_fs_with_prelude(
                 first_non_event_after_current = first_non_event_seen_in_S5
 
                 next_st = _mk_style_for_kind(base, next_kind, bullet_cfg, date_box)
-                next_txt, next_bullet = _mk_text_for_kind(next_raw, next_kind, bullet_cfg)
+                next_txt, next_bullet = _mk_text_for_kind(next_raw, next_kind, bullet_cfg, font_size)
                 next_p = Paragraph(next_txt, next_st, bulletText=next_bullet)
                 _next_w, next_ph = next_p.wrap(w, h)
                 next_sb = spacing_policy.space_before(next_kind, section_name, first_non_event_after_current)
@@ -248,7 +419,7 @@ def draw_section_fixed_fs_with_tail(
     for i, raw in enumerate(paras_text or []):
         kind = "EVENT" if _is_event(raw) else "DATE"
         st = _mk_style_for_kind(base, kind, bullet_cfg, date_box)
-        txt, bullet = _mk_text_for_kind(raw, kind, bullet_cfg)
+        txt, bullet = _mk_text_for_kind(raw, kind, bullet_cfg, font_size)
         p = Paragraph(txt, st, bulletText=bullet)
         _w, ph = p.wrap(w, h)
         sb = spacing_policy.space_before(kind, section_name, first_non_event_seen_in_S5)
@@ -272,7 +443,7 @@ def draw_section_fixed_fs_with_tail(
                 first_non_event_after_current = first_non_event_seen_in_S5
 
                 next_st = _mk_style_for_kind(base, next_kind, bullet_cfg, date_box)
-                next_txt, next_bullet = _mk_text_for_kind(next_raw, next_kind, bullet_cfg)
+                next_txt, next_bullet = _mk_text_for_kind(next_raw, next_kind, bullet_cfg, font_size)
                 next_p = Paragraph(next_txt, next_st, bulletText=next_bullet)
                 _next_w, next_ph = next_p.wrap(w, h)
                 next_sb = spacing_policy.space_before(next_kind, section_name, first_non_event_after_current)
@@ -331,7 +502,7 @@ def plan_pair_with_split(
         raw = paras_text[i]
         kind = "EVENT" if _is_event(raw) else "DATE"
         stA = _mk_style_for_kind(base, kind, bullet_cfg, date_box)
-        txtA, bulletA = _mk_text_for_kind(raw, kind, bullet_cfg)
+        txtA, bulletA = _mk_text_for_kind(raw, kind, bullet_cfg, font_size)
         p = Paragraph(txtA, stA, bulletText=bulletA)
         _w, ph = p.wrap(wA, 1e6)
         sbA = spacing_policy.space_before(kind, nameA, first_non_event_seen_in_S5_A)
@@ -349,7 +520,7 @@ def plan_pair_with_split(
                     # Calculer si le prochain EVENT peut rentrer dans A
                     first_non_event_after_current = first_non_event_seen_in_S5_A
                     next_st = _mk_style_for_kind(base, next_kind, bullet_cfg, date_box)
-                    next_txt, next_bullet = _mk_text_for_kind(next_raw, next_kind, bullet_cfg)
+                    next_txt, next_bullet = _mk_text_for_kind(next_raw, next_kind, bullet_cfg, font_size)
                     next_p = Paragraph(next_txt, next_st, bulletText=next_bullet)
                     _next_w, next_ph = next_p.wrap(wA, 1e6)
                     next_sb = spacing_policy.space_before(next_kind, nameA, first_non_event_after_current)
@@ -387,7 +558,7 @@ def plan_pair_with_split(
         raw = paras_text[i]
         kind = "EVENT" if _is_event(raw) else "DATE"
         stB = _mk_style_for_kind(base, kind, bullet_cfg, date_box)
-        txtB, bulletB = _mk_text_for_kind(raw, kind, bullet_cfg)
+        txtB, bulletB = _mk_text_for_kind(raw, kind, bullet_cfg, font_size)
         q = Paragraph(txtB, stB, bulletText=bulletB)
         _w, hq = q.wrap(wB, 1e6)
         sbB = spacing_policy.space_before(kind, nameB, first_non_event_seen_in_S5_B)
@@ -405,7 +576,7 @@ def plan_pair_with_split(
                     # Calculer si le prochain EVENT peut rentrer dans B
                     first_non_event_after_current = first_non_event_seen_in_S5_B
                     next_st = _mk_style_for_kind(base, next_kind, bullet_cfg, date_box)
-                    next_txt, next_bullet = _mk_text_for_kind(next_raw, next_kind, bullet_cfg)
+                    next_txt, next_bullet = _mk_text_for_kind(next_raw, next_kind, bullet_cfg, font_size)
                     next_p = Paragraph(next_txt, next_st, bulletText=next_bullet)
                     _next_w, next_ph = next_p.wrap(wB, 1e6)
                     next_sb = spacing_policy.space_before(next_kind, nameB, first_non_event_after_current)
@@ -447,7 +618,7 @@ def measure_poster_fit_at_fs(
             raw = paras_text[para_idx]
             kind = "EVENT" if _is_event(raw) else "DATE"
             st = _mk_style_for_kind(base_style, kind, bullet_cfg, DateBoxConfig())
-            txt, bullet = _mk_text_for_kind(raw, kind, bullet_cfg)
+            txt, bullet = _mk_text_for_kind(raw, kind, bullet_cfg, font_size)
             p = Paragraph(txt, st, bulletText=bullet)
 
             _w, p_h = p.wrapOn(c, section.w, section.h)
@@ -483,7 +654,7 @@ def draw_poster_text_in_frames(
     for raw in paras_text:
         kind = "EVENT" if _is_event(raw) else "DATE"
         st = _mk_style_for_kind(base_style, kind, bullet_cfg, DateBoxConfig())
-        txt, bullet = _mk_text_for_kind(raw, kind, bullet_cfg)
+        txt, bullet = _mk_text_for_kind(raw, kind, bullet_cfg, font_size)
 
         # Si c'est une date, on ajoute des objets Spacer à la story
         if kind == "DATE":

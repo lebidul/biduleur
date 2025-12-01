@@ -72,7 +72,7 @@ def parse_bidul_event(event: Dict, current_date: str = None) -> Tuple[str, str, 
     # Construction des lignes de sortie
     string_event_bidul = f"{evenement_str}{artistes_styles_str}{lieu_str}{ville_str}{heure_prix_insecable}"
     # string_event_agenda = f"&ensp;&##9643 {evenement_str}{artistes_styles_str}{event_lieu_str}{ville_str}{heure}{prix}{liens}"
-    string_event_agenda = f"&ensp;&##9643 {evenement_str}{artistes_styles_str}{event_lieu_str}{ville_str}{heure}{prix}"
+    string_event_agenda = f"{evenement_str}{artistes_styles_str}{lieu_str}{ville_str}{heure_prix_insecable}"
     string_event_bidul_post = (
         f"&ensp;&#10087 <span style=\"color:#CF8E6D\">{evenement_str}{artistes_styles}</span><br>"
         f"&nbsp{event_lieu_str}{ville_str}<br>&nbsp{heure}{prix}"

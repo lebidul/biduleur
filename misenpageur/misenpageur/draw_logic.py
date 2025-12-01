@@ -515,6 +515,14 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
     if nobr_list:
         paras = [_apply_non_breaking_strings(p, nobr_list) for p in paras]
 
+    # --- Remplacement des icônes (AVANT calcul taille police) ---
+    chapeau_enabled = getattr(cfg, 'chapeau_icon_enabled', False)
+    free_enabled = getattr(cfg, 'free_icon_enabled', False)
+    if chapeau_enabled or free_enabled:
+        from .textflow import apply_icon_replacements
+        paras = apply_icon_replacements(paras, chapeau_enabled, free_enabled)
+        log.info(f"Remplacement icônes activé (chapeau={chapeau_enabled}, free={free_enabled})")
+
     logos = list_images(os.path.join(project_root, cfg.logos_dir))
     cover_path = os.path.join(project_root, cfg.cover_image)
 
@@ -785,7 +793,7 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
         kwargs = {'mask': 'auto'} if not isinstance(c, SVGCanvas) else {}
         c.drawImage(ImageReader(buffer), s_qr.x, s_qr.y, s_qr.w, s_qr.h, **kwargs)
 
-        draw_poster_logos(c, S7["S7_Logos"], logos)
+        draw_poster_logos(c, S7["S7_Logos"], logos, cfg)
 
         # --- Calcul de la taille de police ---
         poster_paras = s5_full + s6_full + s3_full + s4_full
@@ -798,7 +806,7 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
                     c, poster_frames, poster_paras,
                     cfg.font_name, mid, cfg.leading_ratio, bullet_cfg,
                     poster_cfg,
-                    poster_text_color  # On passe la configuration du poster
+                    poster_text_color
             ):
                 best_fs_poster, lo = mid, mid
             else:
@@ -815,7 +823,7 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
             c, poster_frames, poster_paras,
             cfg.font_name, final_fs_poster, cfg.leading_ratio, bullet_cfg,
             poster_cfg,
-            poster_text_color  # On passe la configuration du poster
+            poster_text_color
         )
 
     # --- Affichage final ---

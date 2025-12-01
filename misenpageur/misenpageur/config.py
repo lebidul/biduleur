@@ -1,4 +1,5 @@
 # misenpageur/misenpageur/config.py
+import os
 import yaml
 from dataclasses import dataclass, field
 
@@ -45,15 +46,25 @@ class PackingStrategy:
 @dataclass
 class Config:
     # --- Paths ---
+    input_file: Optional[str] = None  # Fichier d'entrée (Excel/CSV)
     input_html: str = "input.html"
     output_pdf: str = "output.pdf"
+    output_svg_dir: Optional[str] = None  # Dossier de sortie pour les SVG éditables
+    generate_svg: bool = True  # Générer des SVG éditables
+    stories_output_dir: Optional[str] = None  # Dossier de sortie pour les stories
     cover_image: Optional[str] = None
     auteur_couv: Optional[str] = None
     auteur_couv_url: Optional[str] = None
     logos_dir: str = "assets/logos"
     logos_layout: str = "colonnes"
     logos_padding_mm: float = 1.0 # Marge en mm pour le layout optimisé
+    logos_svg_file: Optional[str] = None  # Chemin vers le fichier SVG pré-composé
+    logos_svg_fill_height: bool = False  # Forcer le remplissage en hauteur (peut cropper les côtés)
     logo_hyperlinks: List[Dict[str, str]] = field(default_factory=list)
+    ours_layout: str = "svg"  # "png" ou "svg"
+    ours_svg_file: Optional[str] = None  # Chemin vers le fichier SVG de l'ours
+    chapeau_icon_enabled: bool = False  # Remplacer ", au chapeau" par icône
+    free_icon_enabled: bool = False  # Remplacer ", 0€" par icône
     ours_md: str = "assets/ours/ours.md"
     ours_svg: str = "assets/ours/ours_template.svg"
     nobr_file: str = "assets/textes/nobr.txt"
@@ -111,6 +122,32 @@ class Config:
         except Exception as e:
             log.error(f"Erreur de lecture du fichier de configuration YAML ({path}): {e}")
             raise
+
+    @classmethod
+    def from_json(cls, path: str) -> "Config":
+        """Charge la configuration depuis un fichier JSON."""
+        import json
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                data = json.load(f) or {}
+            if 'packing_strategy' in data and isinstance(data['packing_strategy'], dict):
+                data['packing_strategy'] = PackingStrategy(**data['packing_strategy'])
+            return cls.from_dict(data)
+        except FileNotFoundError:
+            log.warning(f"Fichier de configuration introuvable : {path}. Utilisation des valeurs par défaut.")
+            return cls()
+        except Exception as e:
+            log.error(f"Erreur de lecture du fichier de configuration JSON ({path}): {e}")
+            raise
+
+    @classmethod
+    def from_file(cls, path: str) -> "Config":
+        """Charge la configuration depuis un fichier YAML ou JSON (détection automatique)."""
+        ext = os.path.splitext(path)[1].lower()
+        if ext == '.json':
+            return cls.from_json(path)
+        else:
+            return cls.from_yaml(path)
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "Config":

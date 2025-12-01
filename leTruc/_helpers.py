@@ -178,13 +178,16 @@ def save_embedded_template(filename, title):
 def run_pipeline(
         status_queue: queue.Queue,
         debug_mode: bool,
-        input_file: str, generate_cover: bool, cover_image: str, ours_background_png: str, logos_dir: str,
-        logos_layout: str, logos_padding_mm: float, date_box_back_color: str,
+        input_file: str, generate_cover: bool, cover_image: str, ours_background_png: str,
+        ours_layout: str, ours_svg_file: str, logos_dir: str,
+        logos_layout: str, logos_padding_mm: float, logos_svg_file: str, date_box_back_color: str,
         out_html: str, out_agenda_html: str, out_pdf: str, auteur_couv: str, auteur_couv_url: str,
         page_margin_mm: float, generate_svg: bool, out_svg_dir: str, date_separator_type: str,
         date_spacing: float, poster_design: int, font_size_safety_factor: float,
         background_alpha: float, poster_title: str, cucaracha_type: str,
         cucaracha_value: str, cucaracha_text_font: str, cucaracha_font_size: int,
+        chapeau_icon_enabled: bool,
+        free_icon_enabled: bool,
         generate_stories: bool, stories_output_dir: str,
         font_size_mode: str, font_size_forced: float,
         stories_font_name: str, stories_font_size: int, stories_font_color: str,
@@ -255,10 +258,13 @@ def run_pipeline(
         cfg = Config.from_yaml(cfg_path)
 
         cfg.project_root = project_root
-
+        cfg.input_file = input_file  # Fichier d'entrée Excel/CSV
         cfg.input_html = out_html
         cfg.skip_cover = not generate_cover
         if out_pdf: cfg.output_pdf = out_pdf
+        cfg.generate_svg = generate_svg  # Générer des SVG éditables
+        cfg.output_svg_dir = out_svg_dir  # Dossier de sortie SVG
+        cfg.stories_output_dir = stories_output_dir  # Dossier de sortie stories
         if (cover_image or "").strip(): cfg.cover_image = cover_image.strip()
         if (ours_background_png or "").strip(): cfg.section_1['ours_background_png'] = ours_background_png.strip()
         if (logos_dir or "").strip(): cfg.logos_dir = logos_dir.strip()
@@ -269,6 +275,9 @@ def run_pipeline(
         cfg.font_size_forced = font_size_forced
         cfg.logos_layout = logos_layout
         cfg.logos_padding_mm = logos_padding_mm
+        cfg.logos_svg_file = logos_svg_file
+        cfg.ours_layout = ours_layout
+        cfg.ours_svg_file = ours_svg_file
         cfg.date_line['enabled'] = (date_separator_type == "ligne")
         cfg.date_box['enabled'] = (date_separator_type == "box")
         if cfg.date_box['enabled']:
@@ -283,6 +292,8 @@ def run_pipeline(
         cfg.cucaracha_box['content_value'] = cucaracha_value
         cfg.cucaracha_box['text_font_name'] = cucaracha_text_font
         cfg.cucaracha_box['text_font_size'] = cucaracha_font_size
+        cfg.chapeau_icon_enabled = chapeau_icon_enabled
+        cfg.free_icon_enabled = free_icon_enabled
         cfg.stories['enabled'] = generate_stories
         if stories_output_dir:
             cfg.stories['output_dir'] = stories_output_dir
@@ -429,35 +440,71 @@ def _default_paths_from_input(input_file: str) -> dict:
 
 def load_and_apply_config(app_instance, config_path: str):
     """
-    Charge un config.yml et met à jour les variables du GUI.
+    Charge un fichier de config (YAML ou JSON) et met à jour les variables du GUI.
     Les valeurs absentes dans le config sont préservées (garde valeur actuelle du GUI).
     """
 
     from misenpageur.misenpageur.config import Config
 
-    cfg = Config.from_yaml(config_path)
+    # Utiliser from_file pour détecter automatiquement le format
+    cfg = Config.from_file(config_path)
 
     # Helper pour chemins absolus
     resource_root = get_resource_path('.')
+    config_dir = os.path.dirname(os.path.abspath(config_path))
 
-    def make_abs(p):
+    def make_abs(p, base_dir=resource_root):
         if not p:
             return ""
-        return os.path.join(resource_root, p) if not os.path.isabs(p) else p
+        return os.path.join(base_dir, p) if not os.path.isabs(p) else p
 
-    # Mise à jour des variables (garde valeur actuelle si absente dans config)
+    # --- Fichiers d'entrée/sortie ---
+    if hasattr(cfg, 'input_file') and cfg.input_file:
+        app_instance.input_var.set(make_abs(cfg.input_file, config_dir))
+    if hasattr(cfg, 'output_pdf') and cfg.output_pdf:
+        app_instance.pdf_var.set(make_abs(cfg.output_pdf, config_dir))
+    if hasattr(cfg, 'output_svg_dir') and cfg.output_svg_dir:
+        app_instance.svg_output_var.set(make_abs(cfg.output_svg_dir, config_dir))
+    if hasattr(cfg, 'stories_output_dir') and cfg.stories_output_dir:
+        app_instance.stories_output_var.set(make_abs(cfg.stories_output_dir, config_dir))
+
+    # --- Options d'icônes ---
+    if hasattr(cfg, 'chapeau_icon_enabled'):
+        app_instance.chapeau_icon_var.set(cfg.chapeau_icon_enabled)
+    if hasattr(cfg, 'free_icon_enabled'):
+        app_instance.free_icon_var.set(cfg.free_icon_enabled)
+
+    # --- SVG éditable ---
+    if hasattr(cfg, 'generate_svg'):
+        app_instance.generate_svg_var.set(cfg.generate_svg)
+
+    # --- Images et ressources ---
     if cfg.cover_image:
-        app_instance.cover_var.set(make_abs(cfg.cover_image))
+        app_instance.cover_var.set(make_abs(cfg.cover_image, config_dir))
     if cfg.logos_dir:
-        app_instance.logos_var.set(make_abs(cfg.logos_dir))
+        app_instance.logos_var.set(make_abs(cfg.logos_dir, config_dir))
     if hasattr(cfg, 'auteur_couv') and cfg.auteur_couv:
         app_instance.auteur_var.set(cfg.auteur_couv)
     if hasattr(cfg, 'auteur_couv_url') and cfg.auteur_couv_url:
         app_instance.auteur_url_var.set(cfg.auteur_couv_url)
 
-    # Section 1 (ours)
+    # --- Paramètres des logos ---
+    if hasattr(cfg, 'logos_layout') and cfg.logos_layout:
+        app_instance.logos_layout_var.set(cfg.logos_layout)
+    if hasattr(cfg, 'logos_svg_file') and cfg.logos_svg_file:
+        app_instance.logos_svg_var.set(make_abs(cfg.logos_svg_file, config_dir))
+    if hasattr(cfg, 'logos_padding_mm') and cfg.logos_padding_mm is not None:
+        app_instance.logos_padding_var.set(str(cfg.logos_padding_mm))
+
+    # --- Paramètres de l'ours ---
+    if hasattr(cfg, 'ours_layout') and cfg.ours_layout:
+        app_instance.ours_layout_var.set(cfg.ours_layout)
+    if hasattr(cfg, 'ours_svg_file') and cfg.ours_svg_file:
+        app_instance.ours_svg_var.set(make_abs(cfg.ours_svg_file, config_dir))
+
+    # Section 1 (ours background PNG)
     if isinstance(cfg.section_1, dict) and cfg.section_1.get("ours_background_png"):
-        app_instance.ours_png_var.set(make_abs(cfg.section_1["ours_background_png"]))
+        app_instance.ours_png_var.set(make_abs(cfg.section_1["ours_background_png"], config_dir))
 
     # Layout
     if isinstance(cfg.pdf_layout, dict):
@@ -527,6 +574,11 @@ def load_and_apply_config(app_instance, config_path: str):
         if enabled is not None:
             app_instance.generate_stories_var.set(enabled)
 
+        # Support pour output_dir dans le dict stories (compatibilité)
+        output_dir = cfg.stories.get("output_dir")
+        if output_dir:
+            app_instance.stories_output_var.set(make_abs(output_dir, config_dir))
+
         font_name = cfg.stories.get("agenda_font_name")
         if font_name:
             app_instance.stories_font_name_var.set(font_name)
@@ -553,4 +605,4 @@ def load_and_apply_config(app_instance, config_path: str):
 
         bg_image = cfg.stories.get("background_image")
         if bg_image:
-            app_instance.stories_bg_image_var.set(make_abs(bg_image))
+            app_instance.stories_bg_image_var.set(make_abs(bg_image, config_dir))

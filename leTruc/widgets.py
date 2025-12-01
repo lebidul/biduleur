@@ -105,15 +105,30 @@ def _create_ours_section(parent, app, ui_row):
     ours_frame.grid(row=r, column=0, columnspan=3, sticky="ew", pady=10)
     ours_frame.columnconfigure(1, weight=1)
 
-    # Ligne 0 du LabelFrame
-    tk.Label(ours_frame, text="Image de fond (PNG) :").grid(row=0, column=0, sticky="e", padx=5, pady=5)
-    tk.Entry(ours_frame, textvariable=app.ours_png_var).grid(row=0, column=1, sticky="ew", padx=5, pady=5)
-    app.ours_button = tk.Button(ours_frame, text="Parcourir…")
-    app.ours_button.grid(row=0, column=2, padx=5, pady=5)
+    # Ligne 0 : Radio buttons pour le type de source
+    tk.Label(ours_frame, text="Source :").grid(row=0, column=0, sticky="e", padx=5, pady=5)
+    ours_layout_radios = ttk.Frame(ours_frame)
+    ours_layout_radios.grid(row=0, column=1, columnspan=2, sticky="w")
+    tk.Radiobutton(ours_layout_radios, text="Fichier SVG", variable=app.ours_layout_var, value="svg").pack(
+        side=tk.LEFT, padx=5)
+    tk.Radiobutton(ours_layout_radios, text="Image PNG", variable=app.ours_layout_var, value="png").pack(
+        side=tk.LEFT, padx=5)
 
-    # Ligne 1 du LabelFrame : Widget pour l'aperçu
+    # Ligne 1 : Widgets SVG (affichés par défaut)
+    app.ours_svg_label = tk.Label(ours_frame, text="Fichier SVG :")
+    app.ours_svg_entry = tk.Entry(ours_frame, textvariable=app.ours_svg_var)
+    app.ours_svg_button = tk.Button(ours_frame, text="Parcourir…")
+
+    # Ligne 1 : Widgets PNG (cachés par défaut)
+    app.ours_png_label = tk.Label(ours_frame, text="Image de fond (PNG) :")
+    app.ours_png_entry = tk.Entry(ours_frame, textvariable=app.ours_png_var)
+    app.ours_png_button = tk.Button(ours_frame, text="Parcourir…")
+
+    # Ligne 2 : Widget pour l'aperçu (PNG uniquement)
     app.ours_preview = tk.Label(ours_frame, text="Aucun aperçu", relief="sunken", padx=5, pady=5)
-    app.ours_preview.grid(row=1, column=1, sticky="w", pady=(5, 0), padx=5)
+
+    # Stocker la ligne pour le callback
+    app.ours_widgets_row = 1
 
     r += 1
     ui_row['r'] = r
@@ -128,8 +143,11 @@ def _create_logos_section(parent, app, ui_row):
     logos_frame.columnconfigure(1, weight=1)
 
     lr = 0
-    tk.Label(logos_frame, text="Dossier logos :").grid(row=lr, column=0, sticky="e", padx=5, pady=5)
-    tk.Entry(logos_frame, textvariable=app.logos_var).grid(row=lr, column=1, sticky="ew", padx=5, pady=5)
+    # Widgets du dossier logos (affichés seulement pour colonnes/optimise)
+    app.logos_dir_label = tk.Label(logos_frame, text="Dossier logos :")
+    app.logos_dir_label.grid(row=lr, column=0, sticky="e", padx=5, pady=5)
+    app.logos_dir_entry = tk.Entry(logos_frame, textvariable=app.logos_var)
+    app.logos_dir_entry.grid(row=lr, column=1, sticky="ew", padx=5, pady=5)
     app.logos_button = tk.Button(logos_frame, text="Parcourir…")
     app.logos_button.grid(row=lr, column=2, padx=5, pady=5)
     lr += 1
@@ -146,9 +164,18 @@ def _create_logos_section(parent, app, ui_row):
         side=tk.LEFT, padx=5)
     tk.Radiobutton(logos_layout_radios, text="Optimisée", variable=app.logos_layout_var, value="optimise").pack(
         side=tk.LEFT, padx=5)
+    tk.Radiobutton(logos_layout_radios, text="Fichier SVG", variable=app.logos_layout_var, value="svg").pack(
+        side=tk.LEFT, padx=5)
+    lr += 1
+
+    # Widgets du fichier SVG (affichés seulement pour svg)
+    app.logos_svg_label = tk.Label(logos_frame, text="Fichier SVG :")
+    app.logos_svg_entry = tk.Entry(logos_frame, textvariable=app.logos_svg_var)
+    app.logos_svg_button = tk.Button(logos_frame, text="Parcourir…")
 
     # On stocke la ligne pour le callback
-    app.logos_padding_row = lr + 1
+    app.logos_padding_row = lr
+    app.logos_svg_row = lr
 
     r += 1
     ui_row['r'] = r
@@ -334,6 +361,22 @@ def _create_page_layout_section(parent, app, ui_row):
             text="Définissez ici la taille de police en points (pt) à utiliser.\nCe champ n'apparaît qu'en mode 'Forcée'.")
 
     app.font_size_forced_row = lr
+    lr += 1
+
+    # --- Option "au chapeau" → icône ---
+    chapeau_check = tk.Checkbutton(page_layout_frame, text='Remplacer ", au chapeau" par une icône',
+                                   variable=app.chapeau_icon_var)
+    chapeau_check.grid(row=lr, column=0, columnspan=2, sticky="w", padx=5, pady=5)
+    Tooltip(chapeau_check,
+            text='Remplace automatiquement ", au chapeau" par une icône de chapeau dans le texte des événements.')
+    lr += 1
+
+    # --- Option "0€" → icône ---
+    free_check = tk.Checkbutton(page_layout_frame, text='Remplacer ", 0€" par une icône',
+                                variable=app.free_icon_var)
+    free_check.grid(row=lr, column=0, columnspan=2, sticky="w", padx=5, pady=5)
+    Tooltip(free_check,
+            text='Remplace automatiquement ", 0€" par une icône "gratuit" dans le texte des événements.')
 
     r += 1
     ui_row['r'] = r

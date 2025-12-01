@@ -68,6 +68,12 @@ class Application(TkinterDnD.Tk):
         # --- Variables pour les chemins de fichiers et dossiers ---
         self.input_var = tk.StringVar()
         self.ours_png_var = tk.StringVar(value=self.cfg_defaults.get("ours_background_png", ""))
+        self.ours_layout_var = tk.StringVar(value="svg")
+        self.ours_svg_var = tk.StringVar(value="misenpageur/assets/ours/ours.svg")
+        self.chapeau_icon_var = tk.BooleanVar(value=False)  # Remplacer "au chapeau" par icône
+        self.free_icon_var = tk.BooleanVar(value=False)  # Remplacer "0€" par icône
+        self.ours_type_var = tk.StringVar(value="svg")
+        self.ours_svg_var = tk.StringVar(value="misenpageur/assets/ours/ours.svg")
         self.logos_var = tk.StringVar(value=self.cfg_defaults.get("logos_dir", ""))
         self.cover_var = tk.StringVar()
         self.html_var = tk.StringVar()
@@ -93,7 +99,8 @@ class Application(TkinterDnD.Tk):
 
         # --- Variables pour la mise en page ---
         self.margin_var = tk.StringVar(value=str(self.cfg_defaults.get("page_margin_mm", "1.0")))
-        self.logos_layout_var = tk.StringVar(value="colonnes")
+        self.logos_layout_var = tk.StringVar(value="svg")
+        self.logos_svg_var = tk.StringVar(value="misenpageur/assets/logos.svg")
         self.logos_padding_var = tk.StringVar(value="1.0")
         self.font_size_mode_var = tk.StringVar(value=self.cfg_defaults.get("font_size_mode", "auto"))
         self.font_size_forced_var = tk.StringVar(value=str(self.cfg_defaults.get("font_size_forced", "10.0")))
@@ -168,7 +175,7 @@ class Application(TkinterDnD.Tk):
 
         import_config_btn = tk.Button(
             self.config_buttons_frame,
-            text="📁 Importer config.yml",
+            text="📁 Importer config",
             command=self._on_import_config
         )
         import_config_btn.pack(side=tk.LEFT, padx=5)
@@ -251,9 +258,12 @@ class Application(TkinterDnD.Tk):
             generate_cover=self.generate_cover_var.get(),
             cover_image=self.cover_var.get().strip(),
             ours_background_png=self.ours_png_var.get().strip(),
+            ours_layout=self.ours_layout_var.get(),
+            ours_svg_file=self.ours_svg_var.get().strip(),
             logos_dir=self.logos_var.get().strip(),
             logos_layout=self.logos_layout_var.get(),
             logos_padding_mm=validated_args['logos_padding_val'],
+            logos_svg_file=self.logos_svg_var.get().strip(),
             out_html=self.html_var.get().strip(),
             out_agenda_html=self.agenda_var.get().strip(),
             out_pdf=self.pdf_var.get().strip(),
@@ -276,6 +286,8 @@ class Application(TkinterDnD.Tk):
             cucaracha_value=validated_args['cuca_value_val'],
             cucaracha_text_font=self.cucaracha_font_var.get(),
             cucaracha_font_size=validated_args['cuca_font_size_val'],
+            chapeau_icon_enabled=self.chapeau_icon_var.get(),
+            free_icon_enabled=self.free_icon_var.get(),
             date_box_back_color=self.date_box_back_color_var.get(),
             stories_font_name=self.stories_font_name_var.get(),
             stories_font_size=validated_args['stories_font_size_val'],
@@ -328,13 +340,18 @@ class Application(TkinterDnD.Tk):
     # --- ✨ NOUVELLES MÉTHODES pour import/reset config ---
 
     def _on_import_config(self):
-        """Import et applique un config.yml personnalisé"""
+        """Import et applique un fichier de config (YAML ou JSON)"""
         from tkinter import filedialog
         from ._helpers import load_and_apply_config
 
         config_path = filedialog.askopenfilename(
-            title="Sélectionner un fichier config.yml",
-            filetypes=[("YAML", "*.yml *.yaml"), ("Tous", "*.*")]
+            title="Sélectionner un fichier de configuration",
+            filetypes=[
+                ("Config (YAML/JSON)", "*.yml *.yaml *.json"),
+                ("YAML", "*.yml *.yaml"),
+                ("JSON", "*.json"),
+                ("Tous", "*.*")
+            ]
         )
         if not config_path:
             return
