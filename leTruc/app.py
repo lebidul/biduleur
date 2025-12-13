@@ -131,7 +131,7 @@ class Application(TkinterDnD.Tk):
         self.generate_svg_var = tk.BooleanVar(value=True)
         self.status_var = tk.StringVar(value="Prêt.")
 
-        self.debug_mode_var = tk.BooleanVar(value=False)
+        self.debug_mode_var = tk.BooleanVar(value=self.cfg_defaults.get("debug_mode", False))
 
         # --- Abréviations ---
         self.abbreviations_data = self.cfg_defaults.get("abbreviations", {})

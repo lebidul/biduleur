@@ -80,7 +80,8 @@ def _load_cfg_defaults() -> dict:
         "cucaracha_type": "none",
         "cucaracha_value": "",
         "cucaracha_text_font": "Arial",
-        "abbreviations": {}  # v1.4.2 : Abréviations
+        "abbreviations": {},  # v1.4.2 : Abréviations
+        "debug_mode": False
     }
 
     # On essaie de lire les vraies valeurs par défaut depuis le config.yml
@@ -145,6 +146,7 @@ def _load_cfg_defaults() -> dict:
             })
         out["font_size_mode"] = getattr(cfg, "font_size_mode", "auto")
         out["font_size_forced"] = getattr(cfg, "font_size_forced", 10.0)
+        out["debug_mode"] = getattr(cfg, "debug_mode", False)
 
         if isinstance(cfg.stories, dict):
             out["stories_enabled"] = cfg.stories.get("enabled", True)
@@ -442,6 +444,9 @@ def run_pipeline(
             try:
                 config_path = debug_dir / "config.json"
                 config_data = asdict(cfg)  # Convertit le dataclass en dictionnaire
+                # Ajouter le fichier input et les abréviations pour permettre l'import complet
+                config_data["_input_file"] = input_file
+                config_data["_abbreviations_enabled"] = abbreviations_enabled or {}
                 with open(config_path, 'w', encoding='utf-8') as f:
                     json.dump(config_data, f, indent=2, default=json_converter, ensure_ascii=False)
             except Exception as e:
@@ -542,6 +547,18 @@ def load_and_apply_config(app_instance, config_path: str):
     # Utiliser from_file pour détecter automatiquement le format
     cfg = Config.from_file(config_path)
 
+    # Charger aussi les données brutes pour récupérer les champs supplémentaires (_input_file, _abbreviations_enabled)
+    raw_data = {}
+    try:
+        with open(config_path, 'r', encoding='utf-8') as f:
+            if config_path.lower().endswith('.json'):
+                raw_data = json.load(f)
+            else:
+                import yaml
+                raw_data = yaml.safe_load(f) or {}
+    except Exception as e:
+        print(f"[WARN] Erreur lors de la lecture des données brutes : {e}")
+
     # Helper pour chemins absolus
     resource_root = get_resource_path('.')
     config_dir = os.path.dirname(os.path.abspath(config_path))
@@ -552,8 +569,14 @@ def load_and_apply_config(app_instance, config_path: str):
         return os.path.join(base_dir, p) if not os.path.isabs(p) else p
 
     # --- Fichiers d'entrée/sortie ---
-    if hasattr(cfg, 'input_file') and cfg.input_file:
-        app_instance.input_var.set(make_abs(cfg.input_file, config_dir))
+    # Priorité au champ _input_file (sauvegardé par le mode debug), sinon input_file
+    input_file = raw_data.get('_input_file') or getattr(cfg, 'input_file', None)
+    if input_file:
+        abs_path = make_abs(input_file, config_dir)
+        app_instance.input_var.set(abs_path)
+        # Mettre à jour la zone de dépôt visuelle
+        from .callbacks import _update_drop_zone_text
+        _update_drop_zone_text(app_instance, abs_path)
     if hasattr(cfg, 'output_pdf') and cfg.output_pdf:
         app_instance.pdf_var.set(make_abs(cfg.output_pdf, config_dir))
     if hasattr(cfg, 'output_svg_dir') and cfg.output_svg_dir:
@@ -570,6 +593,10 @@ def load_and_apply_config(app_instance, config_path: str):
     # --- SVG éditable ---
     if hasattr(cfg, 'generate_svg'):
         app_instance.generate_svg_var.set(cfg.generate_svg)
+
+    # --- Debug mode ---
+    if hasattr(cfg, 'debug_mode'):
+        app_instance.debug_mode_var.set(cfg.debug_mode)
 
     # --- Images et ressources ---
     if cfg.cover_image:
@@ -700,6 +727,12 @@ def load_and_apply_config(app_instance, config_path: str):
         if bg_image:
             app_instance.stories_bg_image_var.set(make_abs(bg_image, config_dir))
 
-    # v1.4.2 : Les abréviations viennent UNIQUEMENT de abbreviations.yml
-    # On ne les importe JAMAIS depuis config.yml/json
-    # L'état des checkboxes est géré par le GUI qui charge abbreviations.yml
+    # v1.4.2+ : Importer les abréviations depuis _abbreviations_enabled (config.json debug)
+    abbreviations_enabled = raw_data.get('_abbreviations_enabled', {})
+    if abbreviations_enabled and hasattr(app_instance, 'abbreviation_vars'):
+        for key, enabled in abbreviations_enabled.items():
+            if key in app_instance.abbreviation_vars:
+                app_instance.abbreviation_vars[key].set(enabled)
+
+    # Forcer le rafraîchissement du GUI
+    app_instance.update_idletasks()
