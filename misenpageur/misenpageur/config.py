@@ -3,10 +3,13 @@ import os
 import yaml
 from dataclasses import dataclass, field
 
-import logging # Ajouter cet import
-log = logging.getLogger(__name__) # Obtenir le logger pour ce module
+import logging
+log = logging.getLogger(__name__)
 
 from typing import Optional, Dict, Any, List
+
+# Note v1.4.2 : Les abréviations sont maintenant dans abbreviations.yml
+# Ce fichier ne gère plus les abréviations
 
 
 # ==================== DÉFINITIONS CENTRALISÉES ====================
@@ -15,7 +18,7 @@ class BulletConfig:
     show_event_bullet: bool = True
     event_bullet_replacement: str | None = None
     event_hanging_indent: float = 10.0
-    bullet_text_indent: float = -3.0  # Décalage puce/texte
+    bullet_text_indent: float = -3.0
 
 
 @dataclass
@@ -33,46 +36,45 @@ class PosterConfig:
     background_image_alpha: float = 0.85
     date_spaceBefore: float = 2.0
     date_spaceAfter: float = 2.0
-    date_spaceBefore: float = 2.0
-    date_spaceAfter: float = 2.0
 
-# ==================== NOUVEAU DATACLASS POUR LA STRATÉGIE DE PACKING ====================
+
 @dataclass
 class PackingStrategy:
     """Définit la stratégie à utiliser pour l'arrangement des logos."""
-    algorithm: str = 'Global'  # 'Global', 'BFF', 'BNF'
-    sort_algo: str = 'AREA'    # 'AREA', 'MAXSIDE', 'HEIGHT', 'WIDTH'
+    algorithm: str = 'Global'
+    sort_algo: str = 'AREA'
+
 
 @dataclass
 class Config:
     # --- Paths ---
-    input_file: Optional[str] = None  # Fichier d'entrée (Excel/CSV)
+    input_file: Optional[str] = None
     input_html: str = "input.html"
     output_pdf: str = "output.pdf"
-    output_svg_dir: Optional[str] = None  # Dossier de sortie pour les SVG éditables
-    generate_svg: bool = True  # Générer des SVG éditables
-    stories_output_dir: Optional[str] = None  # Dossier de sortie pour les stories
+    output_svg_dir: Optional[str] = None
+    generate_svg: bool = True
+    stories_output_dir: Optional[str] = None
     cover_image: Optional[str] = None
     auteur_couv: Optional[str] = None
     auteur_couv_url: Optional[str] = None
     logos_dir: str = "assets/logos"
     logos_layout: str = "colonnes"
-    logos_padding_mm: float = 1.0 # Marge en mm pour le layout optimisé
-    logos_svg_file: Optional[str] = None  # Chemin vers le fichier SVG pré-composé
-    logos_svg_fill_height: bool = False  # Forcer le remplissage en hauteur (peut cropper les côtés)
+    logos_padding_mm: float = 1.0
+    logos_svg_file: Optional[str] = None
+    logos_svg_fill_height: bool = False
     logo_hyperlinks: List[Dict[str, str]] = field(default_factory=list)
-    ours_layout: str = "svg"  # "png" ou "svg"
-    ours_svg_file: Optional[str] = None  # Chemin vers le fichier SVG de l'ours
-    chapeau_icon_enabled: bool = False  # Remplacer ", au chapeau" par icône
-    free_icon_enabled: bool = False  # Remplacer ", 0€" par icône
+    ours_layout: str = "svg"
+    ours_svg_file: Optional[str] = None
+    chapeau_icon_enabled: bool = False
+    free_icon_enabled: bool = False
     ours_md: str = "assets/ours/ours.md"
     ours_svg: str = "assets/ours/ours_template.svg"
     nobr_file: str = "assets/textes/nobr.txt"
 
     # --- Font & Layout ---
     font_name: str = "ArialNarrow"
-    font_size_mode: str = "auto"  # "auto" ou "force"
-    font_size_forced: float = 10.0 # Valeur si mode="force"
+    font_size_mode: str = "auto"
+    font_size_forced: float = 10.0
     font_size_min: float = 8.0
     font_size_max: float = 12.0
     leading_ratio: float = 1.15
@@ -85,13 +87,12 @@ class Config:
     event_spaceBefore: float = 1.0
     event_spaceAfter: float = 1.0
 
-    # --- Bullets (maintenant des champs directs) ---
+    # --- Bullets ---
     show_event_bullet: bool = True
     event_bullet_replacement: Optional[str] = None
     event_hanging_indent: float = 10.0
     bullet_text_indent: float = -3.0
 
-    # On initialise avec les valeurs par défaut du dataclass PackingStrategy
     packing_strategy: PackingStrategy = field(default_factory=PackingStrategy)
 
     # --- Dictionnaires pour les configs complexes ---
@@ -104,8 +105,10 @@ class Config:
     stories: Dict[str, Any] = field(default_factory=dict)
 
     skip_cover: bool = False
-
     cucaracha_box: Dict[str, Any] = field(default_factory=dict)
+
+    # Note : Le champ 'abbreviations' a été supprimé en v1.4.2
+    # Les abréviations sont maintenant dans abbreviations.yml
 
     @classmethod
     def from_yaml(cls, path: str) -> "Config":
@@ -156,6 +159,7 @@ class Config:
         kwargs = {k: v for k, v in d.items() if k in known_fields}
         return cls(**kwargs)
 
+
 @dataclass
 class DateBoxConfig:
     enabled: bool = False
@@ -164,12 +168,14 @@ class DateBoxConfig:
     border_color: str | None = "#000000"
     back_color: str | None = None
 
+
 @dataclass
 class DateLineConfig:
     enabled: bool = False
     width: float = 0.5
     color: str = "#000000"
     gap_after_text_mm: float = 3.0
+
 
 @dataclass
 class StoryConfig:
@@ -187,5 +193,5 @@ class StoryConfig:
     background_type: str = "color"
     background_image: Optional[str] = None
     background_image_alpha: float = 0.5
-    margin: int = 60  # Marge horizontale en pixels
-    line_spacing_ratio: float = 1.2  # Ratio de l'interligne (1.2 = 120%)
+    margin: int = 60
+    line_spacing_ratio: float = 1.2

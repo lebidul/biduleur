@@ -1,5 +1,6 @@
 # leTruc/app.py
 # MODIFICATIONS : Ajout boutons import/reset config dans mode debug
+# v1.4.2 : Ajout système d'abréviations
 
 import tkinter as tk
 from tkinter import ttk, messagebox
@@ -132,6 +133,10 @@ class Application(TkinterDnD.Tk):
 
         self.debug_mode_var = tk.BooleanVar(value=False)
 
+        # --- Abréviations ---
+        self.abbreviations_data = self.cfg_defaults.get("abbreviations", {})
+        self.abbreviation_vars = {}  # Créées dans widgets.py
+
     def _create_scrollable_area(self):
         """Crée la structure Canvas/Scrollbar pour rendre le contenu scrollable."""
         container = ttk.Frame(self)
@@ -166,61 +171,57 @@ class Application(TkinterDnD.Tk):
         self.progress_bar = ttk.Progressbar(action_frame, mode='determinate')
         self.progress_bar.pack(fill=tk.X, padx=5, pady=(0, 5))
 
-        # 3. Checkbox debug
-        debug_check = tk.Checkbutton(action_frame, text="Activer le mode débogage", variable=self.debug_mode_var)
-        debug_check.pack(pady=(5, 0))
+        # 3. Cadre pour le bouton principal et le mode debug
+        button_frame = ttk.Frame(action_frame)
+        button_frame.pack(fill=tk.X, padx=5)
 
-        # 4. ✨ NOUVEAU : Frame pour les boutons de config (visible uniquement en mode debug)
+        # Bouton principal
+        self.run_button = tk.Button(button_frame, text="🚀 Créer le Bidul !", font=("Arial", 14, "bold"), bg="#4CAF50",
+                                    fg="white")
+        self.run_button.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(0, 10))
+
+        # Checkbox mode debug
+        self.debug_checkbox = tk.Checkbutton(button_frame, text="Mode Debug", variable=self.debug_mode_var)
+        self.debug_checkbox.pack(side=tk.LEFT)
+
+        # ✨ NOUVEAU : Cadre pour les boutons de configuration (caché par défaut)
         self.config_buttons_frame = ttk.Frame(action_frame)
 
-        import_config_btn = tk.Button(
-            self.config_buttons_frame,
-            text="📁 Importer config",
-            command=self._on_import_config
-        )
-        import_config_btn.pack(side=tk.LEFT, padx=5)
+        import_btn = tk.Button(self.config_buttons_frame, text="📂 Importer config",
+                               command=self._on_import_config)
+        import_btn.pack(side=tk.LEFT, padx=5)
 
-        reset_config_btn = tk.Button(
-            self.config_buttons_frame,
-            text="🔄 Reset config",
-            command=self._on_reset_config
-        )
-        reset_config_btn.pack(side=tk.LEFT, padx=5)
-
-        # Initialement caché (sera affiché par le callback si debug activé)
-        # Le pack() sera géré par le callback dans callbacks.py
-
-        # 5. Bouton principal
-        self.run_button = tk.Button(action_frame, text="Lancer la Génération", bg="#4CAF50", fg="white",
-                                    font=("Arial", 12, "bold"))
-        self.run_button.pack(pady=10, ipady=5)
-
-    # --- Méthodes de Callback pour l'exécution ---
+        reset_btn = tk.Button(self.config_buttons_frame, text="🔄 Reset config",
+                              command=self._on_reset_config)
+        reset_btn.pack(side=tk.LEFT, padx=5)
 
     def _on_run(self):
-        """Callback pour le bouton "Lancer"."""
+        """Callback du bouton 'Créer le Bidul !'."""
         if not self.input_var.get().strip():
             messagebox.showerror("Erreur", "Veuillez sélectionner un fichier d'entrée.")
             return
+        if not self.pdf_var.get().strip():
+            messagebox.showerror("Erreur", "Veuillez spécifier un chemin pour le PDF de sortie.")
+            return
+        if not self.poster_title_var.get().strip():
+            messagebox.showerror("Erreur", "Le titre du poster ne peut pas être vide.")
+            return
 
-        validated_args = {
-            'cuca_value_val': "",
-            'cuca_font_size_val': 8,
-        }
+        validated_args = {}
 
-        cucaracha_type = self.cucaracha_type_var.get()
-        if cucaracha_type == "text":
-            validated_args['cuca_value_val'] = self.cucaracha_text_widget.get("1.0", tk.END).strip()
-        elif cucaracha_type == "image":
-            validated_args['cuca_value_val'] = self.cucaracha_value_var.get().strip()
+        # Collecter le contenu de la zone de texte Cucaracha, si elle existe.
+        cuca_value = self.cucaracha_text_widget.get("1.0", tk.END).strip() if self.cucaracha_text_widget else ""
+        if self.cucaracha_type_var.get() == "image":
+            cuca_value = self.cucaracha_value_var.get().strip()
+        validated_args['cuca_value_val'] = cuca_value
 
         try:
             validated_args.update({
-                'margin_val': float(self.margin_var.get().strip().replace(',', '.')),
-                'safety_factor_val': float(self.safety_factor_var.get().strip().replace(',', '.')),
-                'date_spacing_val': float(self.date_spacing_var.get().strip().replace(',', '.')),
-                'logos_padding_val': float(self.logos_padding_var.get().strip().replace(',', '.')),
-                'font_size_forced_val': float(self.font_size_forced_var.get().strip().replace(',', '.')),
+                'margin_val': float(self.margin_var.get().strip()),
+                'date_spacing_val': float(self.date_spacing_var.get().strip()),
+                'safety_factor_val': float(self.safety_factor_var.get().strip()),
+                'logos_padding_val': float(self.logos_padding_var.get().strip()),
+                'font_size_forced_val': float(self.font_size_forced_var.get().strip()),
                 'stories_font_size_val': int(self.stories_font_size_var.get().strip()),
                 'cuca_font_size_val': int(self.cucaracha_font_size_var.get().strip())
             })
@@ -250,6 +251,11 @@ class Application(TkinterDnD.Tk):
     def _run_pipeline_in_thread(self, validated_args):
         """Wrapper qui exécute la fonction de traitement lourde."""
         from ._helpers import run_pipeline
+
+        # Collecter l'état des abréviations activées
+        abbreviations_enabled = {}
+        for key, var in self.abbreviation_vars.items():
+            abbreviations_enabled[key] = var.get()
 
         run_pipeline(
             self.result_queue,
@@ -295,7 +301,8 @@ class Application(TkinterDnD.Tk):
             stories_bg_type=self.stories_bg_type_var.get(),
             stories_bg_color=self.stories_bg_color_var.get(),
             stories_bg_image=self.stories_bg_image_var.get().strip(),
-            stories_alpha=self.stories_alpha_var.get()
+            stories_alpha=self.stories_alpha_var.get(),
+            abbreviations_enabled=abbreviations_enabled
         )
 
     def _check_thread_for_results(self):

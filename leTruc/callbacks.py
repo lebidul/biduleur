@@ -1,6 +1,7 @@
 # leTruc/callbacks.py
 # -*- coding: utf-8 -*-
 # MODIFICATIONS : Ajout toggle pour boutons config en mode debug
+# v1.4.2 : Ajout callbacks pour abréviations
 
 import os
 import tkinter as tk
@@ -85,6 +86,12 @@ def assign_all(app):
 
     # ✨ NOUVEAU : Toggle des boutons config quand debug mode change
     app.debug_mode_var.trace_add("write", lambda *args: on_toggle_config_buttons(app))
+
+    # ✨ NOUVEAU v1.4.2 : Callbacks pour les boutons d'abréviations
+    if hasattr(app, 'abbrev_select_all_btn'):
+        app.abbrev_select_all_btn.config(command=lambda: on_abbrev_select_all(app))
+    if hasattr(app, 'abbrev_deselect_all_btn'):
+        app.abbrev_deselect_all_btn.config(command=lambda: on_abbrev_deselect_all(app))
 
     # --- Appels initiaux pour définir l'état de l'interface au démarrage ---
     on_toggle_padding_widget(app)
@@ -335,6 +342,19 @@ def on_toggle_config_buttons(app):
         app.config_buttons_frame.pack(pady=(5, 0))
     else:
         app.config_buttons_frame.pack_forget()
+
+
+# ✨ NOUVEAU v1.4.2 : Callbacks pour les abréviations
+def on_abbrev_select_all(app):
+    """Active toutes les abréviations."""
+    for var in app.abbreviation_vars.values():
+        var.set(True)
+
+
+def on_abbrev_deselect_all(app):
+    """Désactive toutes les abréviations."""
+    for var in app.abbreviation_vars.values():
+        var.set(False)
 
 
 def on_drop_input_file(app, event):

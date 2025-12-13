@@ -26,11 +26,11 @@
 - [x] Ajouter fichier de config.json avec valeurs par défaut (+ config débug) dans build. Fichier ensuite utilisé à runTime mais qui peut-être édité 
 - [x] Améliorer niveaux de débug
 - [x] Config front-end (widgets, helpers, callbacks, etc) dans un fichier config dédié avec wrapper et nouvelle class pour ne pas avoir sur trop de fichiers `chqaue fois` -> pas une bonne idée car trop complexe
-- [ ] Fix csv input
-- [ ] Output separate pdf pages
 - [x] Inactive row
 - [x] Checkbox "au chapeau"
 - [x] Lire logos depuis svg (qui contiendrait tous les logos) pareil pour l'ours
+- [ ] Fix csv input
+- [ ] Output separate pdf pages
 
 ## Priorité Moyenne
 - [x] Refactor dans dossier bidul.biduleur/bidul.
@@ -44,25 +44,25 @@
 - [x] Image de fond dans GUI
 - [x] Ajout helpers.
 - [x] Drag and drop
-- [ ] Ajouter logique de texte gris si poster moyennement foncé
-- [ ] Afficher WARN si le texte de la cucaracha box ne rentre pas
-- [ ] Nouveau paramètre (on peut en ajouter autant qu'on veut pour définir mise en style (police, gras, etc..) pour certaines chaines de caractères
-- [ ] Dans ours l'auteur et les hyperlinks ne suivent pas le .png dans le cas d'une margin (marche bien actuellement avec une marge < 4mm))
-- [ ] Revoir optimisation de l'espace (remplacement de string si ca fait gagner une ligne, S4 pas remplie jusqu'au bout)
-- [ ] GUI qui génère une preview dynamiquement et ensuite propose de sauver le pdf (voir notes_ia/googleAIStudio.solutionGUIdynamique.md).
-- [ ] Revoir résolution GUI
-- [ ] Exe linux + Mac
-- [ ] Changer framework GUI
+- [x] Revoir optimisation de l'espace (remplacement de string si ca fait gagner une ligne, S4 pas remplie jusqu'au bout)
 - [x] Mieux gérer l'erreur dans le cas où les colonnes de l'input csv/xls sont mal configurées
-- [ ] Pouvoir entrer plusieurs dates (csv like) pour une même date pour ne pas avoir à répéter
 - [x] "En Bref" -> "Coups de coeur et en Bref"
 - [x] Pouvoir importer une config dans le GUI
 - [x] SVG output qui ont le même nom que le pdf
 - [x] Nombre d'exemplaires dans ours
+- [ ] Ajouter logique de texte gris si poster moyennement foncé
+- [ ] Afficher WARN si le texte de la cucaracha box ne rentre pas
+- [ ] Nouveau paramètre (on peut en ajouter autant qu'on veut pour définir mise en style (police, gras, etc..) pour certaines chaines de caractères
+- [ ] Dans ours l'auteur et les hyperlinks ne suivent pas le .png dans le cas d'une margin (marche bien actuellement avec une marge < 4mm))
+- [ ] GUI qui génère une preview dynamiquement et ensuite propose de sauver le pdf (voir notes_ia/googleAIStudio.solutionGUIdynamique.md).
+- [ ] Revoir résolution GUI
+- [ ] Exe linux + Mac
+- [ ] Changer framework GUI
+- [ ] Pouvoir entrer plusieurs dates (csv like) pour une même date pour ne pas avoir à répéter
 - [ ] Mettre nouveau logo les arts services (Gëelle) dans ours
 - [ ] config dans GUI: champs pas dans export/import: paths input
 - [ ] amélioration de la performance
-- [ ] Enlever du GUI les paramètres qu ón ne change jamais (ou les mettre dans un onglet config)
+- [ ] Enlever du GUI les paramètres qu'on ne change jamais (ou les mettre dans un onglet config)
 
 ## Documentation
 - [ ] Rédiger un guide utilisateur pour expliquer comment utiliser le module.

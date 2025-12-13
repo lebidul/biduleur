@@ -15,28 +15,29 @@
 - [x] Config qr code
 - [x] Poster (page 3).
 - [x] Qualité pdf. - convert_image affecte qualité ?
-- [ ] Unit tests.
 - [x] Logos SVG
 - [x] URL logos dans export SVG -> trop complex. on accepte de perdre les hyperliens avec le pdf créé depuis le svg 
 - [x] Intégrer nouveaux logos de Gaelle.
 - [x] Enlever watermark pdf2svg dans svg outputs.
 - [x] Améliorer visuel QR code.
 - [x] Empêcher qu'une date (ligne date) commence à la fin d'une section
-- [ ] Déplacer insecabilité dans biduleur (sur lieu et ville) ? (autorise moins de flexibiité though)
+- [x] Déplacer insecabilité dans biduleur (sur lieu et ville) ? (autorise moins de flexibiité though) -> pas fait. géré avec replacement engine
 - [x] Fichiers svg outputs prennent le nom du fichier pdf
 - [x] Améliorer affichage optimisée des logos (plusieurs propals ?)
+- [ ] Unit tests
+- [ ] Cleaner logos de Gaëlle. Càd les avoir en couleur
 
 ## Priorité Moyenne
 - [x] Amélioration lisibilité finale (ex. caractère de bullet point comme paramètre, cadre pour date)
 - [x] Amélioration lisibilité v2 (ex. ligne pour dates).
-- [ ] Réduire espace puce premier caractère event.
-- [ ] Réduire taille de la puce par rapport font-Size.
 - [x] Solution algorithme de "packing" (ou "bin packing") pour une répartition plus fluide des logos.
-- [ ] Générer 2 pdfs en sortie, un pour impression et un pdf pour version digitale (avec ou sans hyperlink) (ajouter à bidul.gui).
-- [ ] Intégration du workflow dans page admin de wordpress.
 - [x] Options d’hyphénation pour rendre des strings insécables.
 - [x] Enlever toutes les références `SVGCanvas` dans `draw_logic` et `drawing`.
+- [ ] Réduire espace puce premier caractère event.
+- [ ] Réduire taille de la puce par rapport font-Size.
+- [ ] Générer 2 pdfs en sortie, un pour impression et un pdf pour version digitale (avec ou sans hyperlink) (ajouter à bidul.gui).
+- [ ] Intégration du workflow dans page admin de wordpress.
 
 ## Documentation
-- [ ] Rédiger un guide utilisateur pour expliquer comment utiliser le module.
 - [x] Ajouter des exemples d'utilisation dans la documentation.
+- [ ] Rédiger un guide utilisateur pour expliquer comment utiliser le module.

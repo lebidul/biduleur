@@ -1,3 +1,316 @@
+# Bidul v1.4.2 - Système d'Abréviations Automatiques
+
+Cette version introduit un système complet d'abréviations pour réduire automatiquement la longueur du texte et optimiser la taille de police. Le système comprend 22 abréviations configurables, un décodage intelligent des entités HTML, une normalisation Unicode, et une protection des noms propres.
+
+## ✨ Nouveautés
+
+*   **Système d'abréviations automatique** : Réduit le texte AVANT le calcul de la taille de police :
+    *   22 abréviations prédéfinies (9 activées par défaut)
+    *   Configuration centralisée dans `abbreviations.yml`
+    *   Interface graphique avec 22 checkboxes organisées en **4 colonnes** (toutes visibles sans scrollbar)
+    *   Boutons "✓ Tout activer" / "✗ Tout désactiver"
+    *   Exemples : `théâtre` → `th.`, `association` → `asso.`, `centre culturel` → `cc`
+
+*   **Préservation intelligente de la casse** : Le remplacement adapte automatiquement la casse d'origine :
+    *   `théâtre` → `th.` (minuscules)
+    *   `Théâtre` → `Th.` (capitalisé)
+    *   `THÉÂTRE` → `TH.` (majuscules)
+    *   `Centre Culturel` → `CC` (Title Case multi-mots)
+
+*   **Décodage automatique des entités HTML** : Les caractères accentués encodés en HTML sont correctement traités :
+    *   `Th&eacute;&acirc;tre` → `Théâtre` (décodage avant remplacement)
+    *   Résout les problèmes d'export Excel avec entités HTML
+    *   Application transparente (pas de configuration requise)
+
+*   **Normalisation Unicode (NFC)** : Compatibilité totale entre Windows, macOS et Linux :
+    *   Gère les deux formes Unicode (NFC composée et NFD décomposée)
+    *   Garantit que `théâtre` (Windows) == `théâtre` (macOS)
+    *   Fonctionne avec tous les caractères accentués français (é, è, ê, à, â, ç, ô, etc.)
+
+*   **Protection des noms propres (nobr)** : Les expressions dans `nobr.txt` ne sont jamais abrégées :
+    *   Fichier : `misenpageur/assets/textes/nobr.txt`
+    *   Protection insensible à la casse
+    *   Exemples protégés : "Théâtre de l'Écluse", "Association Bidul", "Centre Culturel La Chapelle"
+    *   Algorithme en 3 phases : remplacement temporaire → abréviations → restauration
+    *   Log : `[DEBUG] X expression(s) nobr protégée(s)`
+
+*   **Word boundaries intelligents** : Évite les remplacements partiels :
+    *   `Théâtre Municipal` → `Th. Municipal` ✅
+    *   `Théâtralité` → `Théâtralité` (inchangé) ✅
+    *   Tri par longueur décroissante pour traiter les expressions composées en premier
+
+*   **Logging détaillé** : Statistiques complètes des remplacements :
+    *   `[INFO] Application de 7 abréviation(s)...`
+    *   `[INFO] Total: 23 remplacement(s) effectué(s)`
+    *   `[DEBUG] - théâtre → th.: 12x`
+    *   Export debug : `abbreviations.json` avec stats par abréviation
+
+*   **Interface 4 colonnes** : Toutes les abréviations visibles sans scrollbar :
+    *   Ancienne version : 2 colonnes avec scrollbar vertical
+    *   Nouvelle version : 4 colonnes, ~6 lignes par colonne
+    *   Chargement dynamique depuis `abbreviations.yml`
+    *   Gestion des erreurs gracieuse (fallback si fichier absent)
+
+## ⚙️ Pour les Développeuses et Développeurs
+
+*   **Architecture séparée** : Configuration YAML dédiée aux abréviations :
+    ```
+    bidul/
+    └── misenpageur/
+        ├── abbreviations.yml          ← 22 abréviations
+        ├── config.yml                 ← Autres paramètres (sans section abbreviations)
+        └── assets/
+            └── textes/
+                └── nobr.txt           ← Expressions à protéger (optionnel)
+    ```
+
+*   **Module `abbreviations.py`** : Logique complète de traitement :
+    ```python
+    # Fonctions principales
+    load_abbreviations_from_yaml(yaml_path)  # Chargement depuis YAML
+    get_default_abbreviations()              # Cache intelligent
+    reload_abbreviations()                   # Rechargement forcé
+    apply_abbreviations_to_paragraphs(paras, abbrevs, nobr)  # Application
+    
+    # Dataclasses
+    @dataclass
+    class Abbreviation:
+        key: str
+        original: str
+        replacement: str
+        description: str
+        enabled: bool
+    
+    @dataclass
+    class AbbreviationsConfig:
+        abbreviations: Dict[str, Abbreviation]
+    ```
+
+*   **Décodage HTML dans `_helpers.py`** : Avant l'application des abréviations :
+    ```python
+    import html
+    
+    # Décoder les entités HTML : "Th&eacute;&acirc;tre" → "Théâtre"
+    paras_decoded = [html.unescape(p) for p in paras]
+    
+    # Charger les expressions nobr
+    nobr_expressions = []
+    nobr_file = os.path.join(project_root, "assets", "textes", "nobr.txt")
+    if os.path.exists(nobr_file):
+        with open(nobr_file, 'r', encoding='utf-8') as f:
+            nobr_expressions = [line.strip() for line in f if line.strip()]
+    
+    # Appliquer les abréviations avec protection nobr
+    paras, abbreviation_stats = apply_abbreviations_to_paragraphs(
+        paras_decoded,
+        enabled_abbrevs,
+        nobr_expressions
+    )
+    ```
+
+*   **Normalisation Unicode partout** : Cohérence NFC dans tout le pipeline :
+    ```python
+    import unicodedata
+    
+    # Dans load_abbreviations_from_yaml()
+    for key, value in data.items():
+        if isinstance(value, dict) and 'original' in value:
+            value['original'] = unicodedata.normalize('NFC', value['original'])
+    
+    # Dans _create_replacement_pattern()
+    normalized = unicodedata.normalize('NFC', original)
+    
+    # Dans apply_abbreviations_to_paragraphs()
+    modified = unicodedata.normalize('NFC', para)
+    ```
+
+*   **Protection nobr avec placeholders** : Algorithme en 3 phases :
+    ```python
+    # Phase 1 : Remplacement temporaire
+    for i, nobr_expr in enumerate(nobr_expressions):
+        placeholder = f"___NOBR_{i}___"
+        modified = re.sub(re.escape(nobr_expr), placeholder, modified, flags=re.IGNORECASE)
+    
+    # Phase 2 : Application des abréviations (les placeholders ne matchent pas)
+    for abbr in sorted_abbrevs:
+        modified = pattern.sub(replacer, modified)
+    
+    # Phase 3 : Restauration des expressions originales
+    for placeholder, original_text in protected_zones:
+        modified = modified.replace(placeholder, original_text, 1)
+    ```
+
+*   **Interface 4 colonnes dans `widgets.py`** : Calcul automatique des positions :
+    ```python
+    # Configuration pour 4 colonnes
+    keys = list(abbrev_data.keys())
+    num_cols = 4
+    rows_per_col = (len(keys) + num_cols - 1) // num_cols  # Arrondi supérieur
+    
+    for i, key in enumerate(keys):
+        # Calcul position : 4 colonnes
+        col = i // rows_per_col
+        row_in_grid = (i % rows_per_col) + 1  # +1 pour sauter la description
+        
+        cb = tk.Checkbutton(abbrev_frame, text=description, variable=var)
+        cb.grid(row=row_in_grid, column=col, sticky="w", padx=10, pady=2)
+    ```
+
+*   **Pipeline d'exécution** : Ordre critique pour maximiser le gain d'espace :
+    ```python
+    # 1. Extraction des paragraphes HTML
+    paras = extract_paragraphs_from_html(html_text)
+    
+    # 2. Décodage des entités HTML
+    paras = [html.unescape(p) for p in paras]
+    
+    # 3. Chargement nobr
+    nobr_expressions = load_nobr_from_file("nobr.txt")
+    
+    # 4. Application des abréviations (AVANT calcul taille)
+    paras, stats = apply_abbreviations_to_paragraphs(paras, abbrevs, nobr_expressions)
+    
+    # 5. Calcul taille de police optimale
+    font_size = calculate_optimal_font_size(paras)
+    
+    # 6. Génération du PDF
+    build_pdf(paras, font_size)
+    ```
+
+*   **Format YAML des abréviations** : Structure simple et extensible :
+    ```yaml
+    # Préfixes honorifiques
+    sainte:
+      original: "sainte"
+      replacement: "ste"
+      description: "Sainte → Ste"
+      enabled: false
+    
+    # Lieux
+    theatre:
+      original: "théâtre"
+      replacement: "th."
+      description: "Théâtre → Th."
+      enabled: true
+    
+    centre_culturel:
+      original: "centre culturel"
+      replacement: "cc"
+      description: "Centre Culturel → CC"
+      enabled: true
+    ```
+
+*   **Export debug** : Fichier `abbreviations.json` avec statistiques :
+    ```json
+    {
+      "enabled": {
+        "theatre": true,
+        "association": true,
+        "centre_culturel": true
+      },
+      "stats": {
+        "theatre": 12,
+        "association": 5,
+        "centre_culturel": 6
+      }
+    }
+    ```
+
+---
+
+## 📦 Fichiers Modifiés
+
+### Module `misenpageur`
+
+*   `misenpageur/abbreviations.yml` **[NOUVEAU]** (~3,3 Ko)
+    - Configuration complète des 22 abréviations
+    - Organisation par catégories (honorifiques, voies, lieux, événements, pratique, divers)
+    - 9 abréviations activées par défaut
+    - Commentaires explicatifs sur la préservation de la casse
+
+*   `misenpageur/misenpageur/abbreviations.py` **[NOUVEAU]** (~9 Ko)
+    - Module complet de gestion des abréviations
+    - Fonctions : `load_abbreviations_from_yaml()`, `get_default_abbreviations()`, `reload_abbreviations()`
+    - Fonction `apply_abbreviations_to_paragraphs()` avec support nobr
+    - Fonction `_preserve_case()` pour la préservation de casse
+    - Fonction `_create_replacement_pattern()` avec normalisation Unicode
+    - Dataclasses : `Abbreviation`, `AbbreviationsConfig`
+    - Cache global `_cached_abbreviations`
+    - Logging détaillé (INFO, DEBUG)
+
+*   `misenpageur/misenpageur/config.py` (~10 lignes supprimées)
+    - Suppression du champ `abbreviations: Dict[str, Any]` (déplacé vers abbreviations.yml)
+    - Suppression de la méthode `get_abbreviations_config()`
+    - Suppression de l'import du module abbreviations
+    - Note ajoutée : "Les abréviations sont dans abbreviations.yml"
+
+*   `misenpageur/assets/textes/nobr.txt` **[NOUVEAU]** (optionnel)
+    - Fichier texte avec expressions à protéger (une par ligne)
+    - Exemples : "Théâtre de l'Écluse", "Association Bidul", etc.
+    - Commentaires ignorés (lignes vides)
+
+### Module `letruc` (GUI)
+
+*   `letruc/widgets.py` (~80 lignes modifiées)
+    - `_create_abbreviations_section()` : passage de 2 à 4 colonnes
+    - Suppression du Canvas scrollable
+    - Calcul automatique des positions (num_cols = 4, rows_per_col)
+    - Import : `from misenpageur.misenpageur.abbreviations import get_default_abbreviations`
+    - Chargement TOUJOURS depuis abbreviations.yml (ignore app.abbreviations_data)
+    - Logs de debug : `[DEBUG] Chargé X abréviations dans l'interface GUI`
+    - Gestion d'erreur gracieuse avec messages console
+
+*   `letruc/_helpers.py` (~50 lignes modifiées)
+    - Section abréviations : décodage HTML + chargement nobr + application
+    - Import : `html.unescape()` pour décoder les entités HTML
+    - Chargement de `nobr.txt` depuis `misenpageur/assets/textes/`
+    - Passage du paramètre `nobr_expressions` à `apply_abbreviations_to_paragraphs()`
+    - Logs de debug avant/après décodage
+    - Log : `[INFO] Chargé X expression(s) nobr à protéger`
+    - Suppression : import et utilisation de `cfg.abbreviations` (déplacé vers YAML)
+    - Suppression : restauration de l'état des checkboxes depuis config.yml
+
+*   `letruc/app.py` (inchangé)
+    - Conservation : `self.abbreviation_vars = {}` (variables des checkboxes)
+    - Collecte de l'état des checkboxes inchangée
+
+*   `letruc/callbacks.py` (inchangé)
+    - Fonctions `on_abbrev_select_all()` et `on_abbrev_deselect_all()` inchangées
+
+### Documentation
+
+*   `misenpageur/ABBREVIATIONS.md` **[NOUVEAU]** (~15 Ko)
+    - Documentation complète du système d'abréviations
+    - Architecture, utilisation, fonctionnement technique
+    - Liste complète des 22 abréviations avec tableaux
+    - Guide d'ajout de nouvelles abréviations
+    - Section débogage avec problèmes courants
+    - Exemples d'utilisation concrets
+    - API Python pour usage programmatique
+    - Checklist de déploiement
+
+---
+
+## 🔄 Compatibilité
+
+*   Compatible avec toutes les versions antérieures (v1.4.1 et inférieures)
+*   **Aucune modification de `config.yml` requise** (nouveaux champs optionnels)
+    - Si `abbreviations.yml` n'existe pas → aucune abréviation appliquée
+    - Si `nobr.txt` n'existe pas → aucune protection nobr
+*   **Rétrocompatibilité v1.4.1 → v1.4.2** :
+    - Les anciens `config.yml` avec section `abbreviations` sont ignorés
+    - L'état des checkboxes est TOUJOURS chargé depuis `abbreviations.yml`
+    - Les fichiers Excel/CSV sans accents continuent de fonctionner
+*   **Migration recommandée** :
+    - Créer `abbreviations.yml` avec les 22 abréviations
+    - (Optionnel) Créer `nobr.txt` avec les noms propres locaux
+    - Tester avec un fichier Excel contenant des accents
+    - Vérifier les logs : `[INFO] Total: X remplacement(s)`
+*   Fonctionne avec Python 3.10+ sur Windows/Linux/macOS
+*   **Nouvelles dépendances** :
+    - `pyyaml` : Déjà requis pour config.yml
+    - `unicodedata` : Module standard Python (aucune installation)
+
 ---
 
 # Bidul v1.4.1 - SVG Natif, Icônes Dynamiques et Filtrage des Événements

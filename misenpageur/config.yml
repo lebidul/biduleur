@@ -2,18 +2,16 @@
 # Configuration optimisée pour IMPRESSION PROFESSIONNELLE
 # =========================
 #
-# Ce fichier est une version améliorée de config.yml
-# avec tous les paramètres d'impression activés.
-#
 # Usage : python -m misenpageur.main --config misenpageur/config.print.yml
+#
+# Note: Les abréviations sont dans un fichier séparé : abbreviations.yml
 
-# Label du mois (optionnel, juste pour les logs)
 month_label: "2025-11"
 
-# Chemins relatifs Ã  la racine du projet
+# Chemins relatifs à la racine du projet
 input_html: "misenpageur/fichier_biduleur/biduleur_bullets.html"
 template_pdf: "misenpageur/templates/bidul_template.pdf"
-output_pdf: "misenpageur/bidul/bidul_print.pdf"  # ✅ Nom différent pour ne pas écraser
+output_pdf: "misenpageur/bidul/bidul_print.pdf"
 
 logos_dir: "misenpageur/assets/logos.svg"
 cover_image: "misenpageur/assets/couv/couverture.png"
@@ -22,20 +20,14 @@ ours_md: "misenpageur/assets/ours/ours.md"
 ours_svg: "misenpageur/assets/ours/ours_template.svg"
 
 # =========================
-# ParamÃ¨tres typographiques
+# Paramètres typographiques
 # =========================
 
-font_name: "Arial Narrow"  # ✅ Ou "DejaVuSans" pour garantir l'embarquement
-
-# Taille de police : min/max autorisÃ©es pour le shrink
+font_name: "Arial Narrow"
 font_size_min: 5
 font_size_max: 30.0
-
 font_size_mode: auto
-# font_size_mode: force
 font_size_forced: 7.9
-
-# Ratio entre taille et interligne (leading = font_size * leading_ratio)
 leading_ratio: 1.12
 
 # =========================
@@ -45,7 +37,7 @@ leading_ratio: 1.12
 inner_padding: 2
 
 # =========================
-# RÃ©partition du texte HTML
+# Répartition du texte HTML
 # =========================
 
 text_sections_order:
@@ -57,15 +49,13 @@ text_sections_order:
 # Espacement (pt)
 date_spaceBefore: 4
 date_spaceAfter: 4
-
 event_spaceBefore: 1
 event_spaceAfter: 1
-
 event_spaceAfter_perLine: 0.4
 min_event_spaceAfter: 1
 first_non_event_spaceBefore_in_S5: 0
 
-# CÃ©sure utile
+# Césure utile
 split_min_gain_ratio: 0.10
 
 # Bullets / hanging indent
@@ -93,35 +83,20 @@ auteur_couv: ""
 auteur_couv_url: ""
 
 # ======================================================================
-# ✅ CONFIGURATION IMPRESSION PROFESSIONNELLE - ACTIVÉE
+# CONFIGURATION IMPRESSION PROFESSIONNELLE
 # ======================================================================
 
 prepress:
-  # === IMAGES : Conversion CMYK et Optimisation ===
-  convert_images: false              # ✅ ACTIF : Convertit RGB → CMYK
-  jpeg_quality: 95                  # ✅ Qualité maximale (95-100 recommandé)
-  min_effective_dpi: 300            # ✅ Alerte si DPI < 300
-  max_effective_dpi: 450            # ✅ Réduit si trop lourd (>450 DPI)
-
-  # Profil ICC CMYK (optionnel, mais recommandé pour imprimeurs exigeants)
-  # Exemples : "CoatedFOGRA39.icc", "ISOcoated_v2_300_eci.icc"
-  cmyk_profile: ""                  # Laisser vide = conversion basique
-
-  # === REPÈRES D'IMPRESSION ===
-  add_crop_marks: true              # ✅ ACTIF : Traits de coupe aux 4 coins
-  bleed_mm: 3                       # ✅ Fond perdu 3mm (standard)
-
-  # === PDF/X : Standard Professionnel (DÉSACTIVÉ par défaut) ===
-  # ⚠️ Nécessite Ghostscript installé !
-  # Pour activer : changer pdfx: false → pdfx: true
+  convert_images: false
+  jpeg_quality: 95
+  min_effective_dpi: 300
+  max_effective_dpi: 450
+  cmyk_profile: ""
+  add_crop_marks: true
+  bleed_mm: 3
   pdfx: true
-
-  # Chemin vers Ghostscript (adapter selon ton OS)
-  ghostscript_path: "gswin64c"      # Windows : gswin64c
-  # ghostscript_path: "gs"          # Linux/macOS : gs
-
-  # Profil ICC de sortie pour PDF/X (optionnel)
-  pdfx_icc: ""                      # Ex: "ISOcoated_v2_300_eci.icc"
+  ghostscript_path: "gswin64c"
+  pdfx_icc: ""
 
 # ======================================================================
 
@@ -138,27 +113,20 @@ section_1:
   ours_font_size: 7.0
   ours_line_spacing: 1.3
   ours_background_png: "misenpageur/assets/ours/ours_template.png"
-
   qr_code_title: "Agenda culturel"
   qr_code_title_font_name: "Arial-Bold"
   qr_code_title_font_size: 9
-
-
   auteur_pos_x_mm: 25
   auteur_pos_y_mm: 47
   auteur_font_name: "Arial-Bold"
   auteur_font_size: 9
   auteur_align: "center"
-
   qr_code_value: "https://www.lebidul.com"
   qr_code_height_mm: 32
-
-  qr_code_style: "gapped"    # standard|rounded|circles|gapped
-  qr_code_color: "#000000"    # Couleur en hex
-
+  qr_code_style: "gapped"
+  qr_code_color: "#000000"
   additional_box_height_mm: 35
   logo_box_bottom_margin_mm: 0
-
   ours_hyperlinks:
     - href: "https://www.facebook.com/LeBidul"
       rect_mm: [6, 87, 12, 5]
@@ -247,27 +215,16 @@ stories:
   line_spacing_ratio: 2.0
 
 # ======================================================================
-# 📝 NOTES D'UTILISATION
+# NOTES D'UTILISATION
 # ======================================================================
 #
-# 1. GÉNÉRATION STANDARD (impression bureau)
+# ABRÉVIATIONS : Voir le fichier séparé abbreviations.yml
+#
+# 1. GÉNÉRATION STANDARD
 #    python -m misenpageur.main --config misenpageur/config.print.yml
 #
 # 2. GÉNÉRATION PDF/X (impression pro)
-#    - Installer Ghostscript : https://ghostscript.com/releases/gsdnld.html
+#    - Installer Ghostscript
 #    - Changer : pdfx: false → pdfx: true
-#    - Relancer la génération
-#
-# 3. VÉRIFICATION DE LA QUALITÉ
-#    pdffonts bidul_print.pdf    # Polices embarquées ?
-#    pdfinfo bidul_print.pdf     # Infos générales
-#
-# 4. CROP MARKS
-#    Les traits de coupe sont visibles aux 4 coins du PDF.
-#    Ils guident l'imprimeur pour couper précisément.
-#
-# 5. BLEED (Fond perdu)
-#    3mm de débordement sont ajoutés pour éviter les bords blancs
-#    si la découpe n'est pas parfaitement alignée.
 #
 # ======================================================================

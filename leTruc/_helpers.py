@@ -1,4 +1,5 @@
 # leTruc/_helpers.py
+# v1.4.2 : Ajout système d'abréviations
 import os
 import sys
 from pathlib import Path
@@ -78,7 +79,8 @@ def _load_cfg_defaults() -> dict:
         "poster_title": "",
         "cucaracha_type": "none",
         "cucaracha_value": "",
-        "cucaracha_text_font": "Arial"
+        "cucaracha_text_font": "Arial",
+        "abbreviations": {}  # v1.4.2 : Abréviations
     }
 
     # On essaie de lire les vraies valeurs par défaut depuis le config.yml
@@ -151,6 +153,9 @@ def _load_cfg_defaults() -> dict:
             out["stories_font_color"] = cfg.stories.get("text_color", "#000000")
             out["stories_bg_color"] = cfg.stories.get("background_color", "#FFFFFF")
 
+        # v1.4.2 : Les abréviations viennent uniquement de abbreviations.yml
+        # On n'utilise plus cfg.abbreviations
+
     except Exception as e:
         # Si l'import ou la lecture du fichier échoue, on affiche un avertissement
         # mais l'application peut continuer avec les valeurs par défaut.
@@ -192,7 +197,8 @@ def run_pipeline(
         font_size_mode: str, font_size_forced: float,
         stories_font_name: str, stories_font_size: int, stories_font_color: str,
         stories_bg_type: str, stories_bg_color: str, stories_bg_image: str,
-        stories_alpha: float
+        stories_alpha: float,
+        abbreviations_enabled: dict = None  # v1.4.2 : Abréviations activées
 ) -> tuple[bool, str]:
     debug_dir = None
     if debug_mode:
@@ -218,6 +224,8 @@ def run_pipeline(
 
     final_layout_path = None
     report = {}
+    abbreviation_stats = {}  # v1.4.2 : Stats des remplacements
+
     try:
         status_queue.put(('status', "Préparation...", 0, None))
 
@@ -252,6 +260,69 @@ def run_pipeline(
 
         html_text = read_text(out_html)
         paras = extract_paragraphs_from_html(html_text)
+
+        # ==================== v1.4.2 : APPLICATION DES ABRÉVIATIONS ====================
+        if abbreviations_enabled:
+            try:
+                from misenpageur.misenpageur.abbreviations import (
+                    Abbreviation, apply_abbreviations_to_paragraphs, get_default_abbreviations
+                )
+                import html
+
+                # Charger les abréviations depuis abbreviations.yml
+                all_abbreviations = get_default_abbreviations()
+
+                # Construire la liste des abréviations activées
+                enabled_abbrevs = []
+                for key, is_enabled in abbreviations_enabled.items():
+                    if is_enabled and key in all_abbreviations:
+                        data = all_abbreviations[key]
+                        enabled_abbrevs.append(Abbreviation(
+                            key=key,
+                            original=data["original"],
+                            replacement=data["replacement"],
+                            description=data["description"],
+                            enabled=True
+                        ))
+
+                if enabled_abbrevs:
+                    log.info(f"Application de {len(enabled_abbrevs)} abréviation(s)...")
+
+                    # IMPORTANT : Décoder les entités HTML AVANT le remplacement
+                    # "Th&eacute;&acirc;tre" → "Théâtre"
+                    paras_decoded = [html.unescape(p) for p in paras]
+                    log.debug(f"Exemple avant décodage: {paras[0][:100] if paras else 'N/A'}")
+                    log.debug(f"Exemple après décodage: {paras_decoded[0][:100] if paras_decoded else 'N/A'}")
+
+                    # Charger les expressions nobr à protéger
+                    nobr_expressions = []
+                    defaults = _project_defaults()
+                    nobr_file = os.path.join(defaults["root"], "misenpageur", "assets", "textes", "nobr.txt")
+                    if os.path.exists(nobr_file):
+                        try:
+                            with open(nobr_file, 'r', encoding='utf-8') as f:
+                                nobr_expressions = [line.strip() for line in f if line.strip()]
+                            log.info(f"Chargé {len(nobr_expressions)} expression(s) nobr à protéger")
+                        except Exception as e:
+                            log.warning(f"Erreur lors du chargement de nobr.txt: {e}")
+
+                    # Appliquer les abréviations sur les paragraphes décodés (en protégeant les nobr)
+                    paras, abbreviation_stats = apply_abbreviations_to_paragraphs(
+                        paras_decoded,
+                        enabled_abbrevs,
+                        nobr_expressions
+                    )
+                    total_replacements = sum(abbreviation_stats.values())
+                    if total_replacements > 0:
+                        log.info(f"Total: {total_replacements} remplacement(s) effectué(s)")
+                    else:
+                        log.warning("Aucun remplacement effectué ! Vérifiez les logs de debug.")
+
+            except ImportError as e:
+                log.warning(f"Module d'abréviations non disponible: {e}")
+            except Exception as e:
+                log.warning(f"Erreur lors de l'application des abréviations: {e}", exc_info=True)
+        # ==================== FIN ABRÉVIATIONS ====================
 
         defaults = _project_defaults()
         project_root, cfg_path, lay_path = defaults["root"], defaults["config"], defaults["layout"]
@@ -339,6 +410,13 @@ def run_pipeline(
 
         summary_lines.append("\n" + "-" * 40)
         summary_lines.append(f"Nombre d'événements traités : {number_of_lines}")
+
+        # v1.4.2 : Afficher les stats d'abréviations
+        if abbreviation_stats:
+            total_abbrev = sum(abbreviation_stats.values())
+            if total_abbrev > 0:
+                summary_lines.append(f"Abréviations appliquées : {total_abbrev}")
+
         fs_main = report.get("font_size_main")
         if fs_main: summary_lines.append(f"Taille de police (pages 1-2): {fs_main:.2f} pt")
         fs_poster = report.get("font_size_poster_final")
@@ -368,6 +446,20 @@ def run_pipeline(
                     json.dump(config_data, f, indent=2, default=json_converter, ensure_ascii=False)
             except Exception as e:
                 log.error(f"Impossible de sauvegarder le fichier config.json : {e}")
+
+            # v1.4.2 : Sauvegarder les stats d'abréviations
+            if abbreviations_enabled or abbreviation_stats:
+                try:
+                    abbrev_path = debug_dir / "abbreviations.json"
+                    abbrev_data = {
+                        "enabled": abbreviations_enabled or {},
+                        "stats": abbreviation_stats
+                    }
+                    with open(abbrev_path, 'w', encoding='utf-8') as f:
+                        json.dump(abbrev_data, f, indent=2, ensure_ascii=False)
+                    log.info("Sauvegarde des abréviations dans abbreviations.json...")
+                except Exception as e:
+                    log.error(f"Impossible de sauvegarder abbreviations.json : {e}")
 
             # 2. Sauvegarder le résumé de l'exécution
             log.info("Sauvegarde du résumé dans summary.info...")
@@ -437,6 +529,7 @@ def _default_paths_from_input(input_file: str) -> dict:
         "svg_output_dir": str(folder / "svgs"),
         "stories_output": str(folder / "stories")
     }
+
 
 def load_and_apply_config(app_instance, config_path: str):
     """
@@ -606,3 +699,7 @@ def load_and_apply_config(app_instance, config_path: str):
         bg_image = cfg.stories.get("background_image")
         if bg_image:
             app_instance.stories_bg_image_var.set(make_abs(bg_image, config_dir))
+
+    # v1.4.2 : Les abréviations viennent UNIQUEMENT de abbreviations.yml
+    # On ne les importe JAMAIS depuis config.yml/json
+    # L'état des checkboxes est géré par le GUI qui charge abbreviations.yml
