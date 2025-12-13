@@ -1,11 +1,13 @@
 # leTruc/widgets.py
 # -*- coding: utf-8 -*-
+# v1.4.2 : Ajout section abréviations
 import tkinter as tk
 from tkinter import ttk
 
 from tkinterdnd2 import DND_FILES
 from .callbacks import on_drop_input_file, on_drop_cover_file
 from .tooltips import Tooltip
+
 
 # Ce fichier a une responsabilité unique : créer et placer tous les widgets de l'interface. Il ne contiendra aucune logique d'action (pas de command=... qui font des choses compliquées).
 # La stratégie est de créer une fonction principale create_all qui appelle des sous-fonctions pour chaque grande section de l'interface (une pour la section "Fichier d'entrée", une pour la section "Logos", etc.). C'est beaucoup plus propre et lisible.
@@ -37,6 +39,7 @@ def create_all(app):
     _create_cucaracha_section(main_frame, app, ui_row)
     _create_cover_section(main_frame, app, ui_row)
     _create_page_layout_section(main_frame, app, ui_row)
+    _create_abbreviations_section(main_frame, app, ui_row)  # ✨ NOUVEAU v1.4.2
     _create_date_sep_section(main_frame, app, ui_row)
     _create_poster_section(main_frame, app, ui_row)
     _create_stories_section(main_frame, app, ui_row)
@@ -132,7 +135,6 @@ def _create_ours_section(parent, app, ui_row):
 
     r += 1
     ui_row['r'] = r
-
 
 
 def _create_logos_section(parent, app, ui_row):
@@ -244,6 +246,7 @@ def _create_cucaracha_section(parent, app, ui_row):
     r += 1
     ui_row['r'] = r
 
+
 def _create_cover_section(parent, app, ui_row):
     """Crée la section pour les informations de couverture."""
     r = ui_row['r']
@@ -258,13 +261,13 @@ def _create_cover_section(parent, app, ui_row):
     # 1. On crée le cadre qui sert de zone de dépôt.
     cover_drop_zone = ttk.Frame(cover_frame, relief="sunken", borderwidth=2, padding=10)
     cover_drop_zone.grid(row=1, column=0, columnspan=3, sticky="ew", padx=5, pady=5)
-    cover_drop_zone.columnconfigure(0, weight=1) # Colonne pour le texte/bouton
-    cover_drop_zone.columnconfigure(1, weight=2) # Colonne pour l'aperçu, plus large
+    cover_drop_zone.columnconfigure(0, weight=1)  # Colonne pour le texte/bouton
+    cover_drop_zone.columnconfigure(1, weight=2)  # Colonne pour l'aperçu, plus large
 
     # 2. On crée le conteneur pour le texte et le bouton (partie gauche)
     left_pane = ttk.Frame(cover_drop_zone)
     left_pane.grid(row=0, column=0, sticky="nsew")
-    left_pane.rowconfigure(1, weight=1) # Pour centrer le bouton verticalement
+    left_pane.rowconfigure(1, weight=1)  # Pour centrer le bouton verticalement
 
     # 3. Le label dynamique (texte ou nom de fichier)
     app.cover_drop_zone_label = ttk.Label(
@@ -300,7 +303,8 @@ def _create_cover_section(parent, app, ui_row):
     tk.Label(cover_frame, text="Auteur Couverture :").grid(row=3, column=0, sticky="e", padx=5, pady=5)
     tk.Entry(cover_frame, textvariable=app.auteur_var).grid(row=3, column=1, columnspan=2, sticky="ew", padx=5, pady=5)
     tk.Label(cover_frame, text="URL auteur couverture :").grid(row=4, column=0, sticky="e", padx=5, pady=5)
-    tk.Entry(cover_frame, textvariable=app.auteur_url_var).grid(row=4, column=1, columnspan=2, sticky="ew", padx=5, pady=5)
+    tk.Entry(cover_frame, textvariable=app.auteur_url_var).grid(row=4, column=1, columnspan=2, sticky="ew", padx=5,
+                                                                pady=5)
 
     r += 1
     ui_row['r'] = r
@@ -382,6 +386,90 @@ def _create_page_layout_section(parent, app, ui_row):
     ui_row['r'] = r
 
 
+# ✨ NOUVEAU v1.4.2 : Section pour les abréviations
+def _create_abbreviations_section(parent, app, ui_row):
+    """Crée la section pour les abréviations (pour réduire le texte)."""
+    r = ui_row['r']
+
+    abbrev_frame = ttk.LabelFrame(parent, text="Abréviations (pour réduire le texte)", padding="10")
+    abbrev_frame.grid(row=r, column=0, columnspan=3, sticky="ew", pady=10)
+
+    # Description
+    desc_label = tk.Label(
+        abbrev_frame,
+        text="Activez les abréviations pour raccourcir le texte et augmenter la taille de police.\n"
+             "Le remplacement préserve la casse d'origine (MAJUSCULE, Capitalisé, minuscule).",
+        justify="left",
+        wraplength=700
+    )
+    desc_label.grid(row=0, column=0, columnspan=4, sticky="w", pady=(0, 10))
+
+    # Charger les données d'abréviations TOUJOURS depuis abbreviations.yml
+    # (on ignore app.abbreviations_data pour éviter d'avoir des versions partielles)
+    try:
+        from misenpageur.misenpageur.abbreviations import get_default_abbreviations
+        abbrev_data = get_default_abbreviations()
+        print(f"[DEBUG] Chargé {len(abbrev_data)} abréviations dans l'interface GUI")
+        if abbrev_data:
+            print(f"[DEBUG] Clés: {', '.join(sorted(abbrev_data.keys())[:5])}{'...' if len(abbrev_data) > 5 else ''}")
+    except ImportError as e:
+        # Fallback si le module n'existe pas (ne devrait jamais arriver)
+        print(f"[ERREUR] Impossible d'importer le module abbreviations: {e}")
+        abbrev_data = {}
+    except Exception as e:
+        print(f"[ERREUR] Erreur lors du chargement des abréviations: {e}")
+        abbrev_data = {}
+
+    if not abbrev_data:
+        tk.Label(abbrev_frame, text="Aucune abréviation disponible", fg="red").grid(
+            row=1, column=0, columnspan=4, sticky="w", pady=10
+        )
+        r += 1
+        ui_row['r'] = r
+        return
+
+    # Initialiser le dictionnaire pour stocker les variables
+    app.abbreviation_vars = {}
+
+    # Créer les checkboxes en 4 colonnes (sans scrollbar)
+    keys = list(abbrev_data.keys())
+    num_cols = 4
+    rows_per_col = (len(keys) + num_cols - 1) // num_cols  # Arrondi supérieur
+
+    for i, key in enumerate(keys):
+        data = abbrev_data[key]
+        if isinstance(data, dict):
+            description = data.get("description", key)
+            enabled = data.get("enabled", False)
+        else:
+            description = key
+            enabled = False
+
+        # Créer la variable BooleanVar
+        var = tk.BooleanVar(value=enabled)
+        app.abbreviation_vars[key] = var
+
+        # Calcul position : 4 colonnes
+        col = i // rows_per_col
+        row_in_grid = (i % rows_per_col) + 1  # +1 pour sauter la description
+
+        cb = tk.Checkbutton(abbrev_frame, text=description, variable=var)
+        cb.grid(row=row_in_grid, column=col, sticky="w", padx=10, pady=2)
+
+    # Boutons Tout activer / Tout désactiver
+    buttons_frame = ttk.Frame(abbrev_frame)
+    buttons_frame.grid(row=rows_per_col + 1, column=0, columnspan=4, sticky="w", pady=(10, 0))
+
+    app.abbrev_select_all_btn = tk.Button(buttons_frame, text="✓ Tout activer")
+    app.abbrev_select_all_btn.pack(side=tk.LEFT, padx=5)
+
+    app.abbrev_deselect_all_btn = tk.Button(buttons_frame, text="✗ Tout désactiver")
+    app.abbrev_deselect_all_btn.pack(side=tk.LEFT, padx=5)
+
+    r += 1
+    ui_row['r'] = r
+
+
 def _create_date_sep_section(parent, app, ui_row):
     """Crée la section pour le séparateur de dates."""
     r = ui_row['r']
@@ -405,7 +493,8 @@ def _create_date_sep_section(parent, app, ui_row):
 
     # --- Widgets pour la couleur de fond (on garde) ---
     app.back_color_label = tk.Label(app.date_box_colors_frame, text="Couleur de fond :")
-    app.back_color_preview = tk.Label(app.date_box_colors_frame, text="    ", bg=app.date_box_back_color_var.get(), relief="sunken")
+    app.back_color_preview = tk.Label(app.date_box_colors_frame, text="    ", bg=app.date_box_back_color_var.get(),
+                                      relief="sunken")
     app.back_color_btn = tk.Button(app.date_box_colors_frame, text="…", width=3)
 
     # Placer les widgets de couleur de fond dans leur grille
@@ -567,7 +656,8 @@ def _create_output_section(parent, app, ui_row):
     app.svg_output_button.grid(row=4, column=2, padx=5, pady=5)
 
     # Stories
-    tk.Checkbutton(output_frame, text="Générer les images pour les Stories Instagram", variable=app.generate_stories_var).grid(
+    tk.Checkbutton(output_frame, text="Générer les images pour les Stories Instagram",
+                   variable=app.generate_stories_var).grid(
         row=5, column=0, columnspan=3, sticky="w", padx=5, pady=5)
     tk.Label(output_frame, text="Dossier Stories :").grid(row=6, column=0, sticky="e", padx=5, pady=5)
     tk.Entry(output_frame, textvariable=app.stories_output_var).grid(row=6, column=1, sticky="ew", padx=5, pady=5)

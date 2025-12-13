@@ -1,0 +1,160 @@
+# =============================================================================
+# ABRÉVIATIONS - Configuration pour réduire le texte
+# =============================================================================
+# Placement : misenpageur/abbreviations.yml
+#
+# Le remplacement préserve la casse d'origine :
+#   "SAINTE" → "STE", "Sainte" → "Ste", "sainte" → "ste"
+#   "Centre Culturel" → "CC", "centre culturel" → "cc"
+#
+# Structure :
+#   clé:
+#     original: "texte à remplacer"
+#     replacement: "texte de remplacement"
+#     description: "Description pour l'interface"
+#     enabled: true/false (activé par défaut)
+# =============================================================================
+
+# --- Préfixes honorifiques ---
+sainte:
+  original: "sainte"
+  replacement: "ste."
+  description: "Sainte → Ste."
+  enabled: false
+
+saint:
+  original: "saint"
+  replacement: "st"
+  description: "Saint → St"
+  enabled: false
+
+# --- Voies ---
+#place:
+#  original: "place"
+#  replacement: "pl."
+#  description: "Place → Pl."
+#  enabled: false
+#
+#avenue:
+#  original: "avenue"
+#  replacement: "av."
+#  description: "Avenue → Av."
+#  enabled: false
+#
+#quartier:
+#  original: "quartier"
+#  replacement: "qtr"
+#  description: "Quartier → Qtr"
+#  enabled: false
+
+# --- Lieux ---
+espace:
+  original: "espace"
+  replacement: "esp."
+  description: "Espace → Esp."
+  enabled: false
+
+mediatheque:
+  original: "médiathèque"
+  replacement: "média."
+  description: "Médiathèque → Média."
+  enabled: false
+
+association:
+  original: "association"
+  replacement: "asso."
+  description: "Association → Asso."
+  enabled: true
+
+theatres:
+  original: "théâtres"
+  replacement: "th."
+  description: "Théâtres → Th."
+  enabled: true
+
+theatre:
+  original: "théâtre"
+  replacement: "th."
+  description: "Théâtre → Th."
+  enabled: true
+
+musique:
+  original: "musique"
+  replacement: "mus."
+  description: "Musique → Mus."
+  enabled: true
+
+centre_culturel:
+  original: "centre culturel"
+  replacement: "cc"
+  description: "Centre Culturel → CC"
+  enabled: true
+
+sarge:
+  original: "sargé-lès-le-mans"
+  replacement: "sargé"
+  description: "Sargé-lès-le-Mans → Sargé"
+  enabled: true
+
+# --- Événements ---
+spectacle:
+  original: "spectacle"
+  replacement: "spect."
+  description: "Spectacle → Spect."
+  enabled: false
+
+exposition:
+  original: "exposition"
+  replacement: "expo."
+  description: "Exposition → Expo."
+  enabled: true
+
+conference:
+  original: "conférence"
+  replacement: "conf."
+  description: "Conférence → Conf."
+  enabled: false
+
+compagnie:
+  original: "compagnie"
+  replacement: "cie"
+  description: "Compagnie → Cie"
+  enabled: true
+
+# --- Pratique ---
+reservations:
+  original: "réservations"
+  replacement: "résa"
+  description: "Réservations → Résa"
+  enabled: true
+
+reservation:
+  original: "réservation"
+  replacement: "résa"
+  description: "Réservation → Résa"
+  enabled: true
+
+#entree:
+#  original: "entrée"
+#  replacement: "entr."
+#  description: "Entrée → Entr."
+#  enabled: false
+
+# --- Divers ---
+#environ:
+#  original: "environ"
+#  replacement: "env."
+#  description: "Environ → Env."
+#  enabled: false
+
+information:
+  original: "information"
+  replacement: "info"
+  description: "Information → Info"
+  enabled: false
+
+informations:
+  original: "informations"
+  replacement: "infos"
+  description: "Informations → Infos"
+  enabled: false
