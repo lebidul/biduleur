@@ -1,3 +1,49 @@
+# Bidul v1.4.3 - Puces Proportionnelles et Améliorations Debug
+
+Cette version améliore le rendu des puces d'événements et enrichit le mode debug pour faciliter la reproduction des configurations.
+
+## ✨ Nouveautés
+
+### Puces proportionnelles à la taille du texte
+*   **Taille de puce ajustable** : La puce (❑) s'adapte maintenant à la taille de la police du texte
+    *   Nouveau paramètre `bullet_size_ratio` dans `config.yml` (défaut: 0.8 = 80% de la taille du texte)
+    *   Utilise `bulletFontSize` natif de ReportLab pour un rendu optimal
+    *   Résout le problème des puces disproportionnées sur le poster
+
+### Mode Debug amélioré
+*   **Configuration complète dans `config.json`** : Le fichier debug inclut maintenant :
+    *   `_input_file` : Chemin du fichier d'entrée utilisé
+    *   `_abbreviations_enabled` : État des abréviations activées
+    *   Permet de reproduire exactement une génération précédente
+
+*   **Mode debug configurable via `config.yml`** :
+    *   Nouveau paramètre `debug_mode: true/false`
+    *   La checkbox "Mode Debug" du GUI reflète la valeur du fichier config au démarrage
+
+### Import de configuration enrichi
+*   **Import complet depuis `config.json`** : L'import d'une config debug restaure maintenant :
+    *   Le fichier d'entrée (affiché dans la zone de dépôt)
+    *   L'état des checkboxes d'abréviations
+    *   Le mode debug
+    *   Tous les autres paramètres existants
+
+## ⚙️ Nouveaux paramètres config.yml
+
+```yaml
+# Puces
+bullet_size_ratio: 0.8  # Ratio taille puce / taille texte (0.8 = 80%)
+
+# Debug
+debug_mode: false  # Active le mode debug au démarrage du GUI
+```
+
+## 🔧 Corrections
+
+*   Correction de l'alignement des lignes multilignes avec la puce (hanging indent)
+*   La zone de dépôt du fichier d'entrée se met à jour correctement lors de l'import de config
+
+---
+
 # Bidul v1.4.2 - Système d'Abréviations Automatiques
 
 Cette version introduit un système complet d'abréviations pour réduire automatiquement la longueur du texte et optimiser la taille de police. Le système comprend 22 abréviations configurables, un décodage intelligent des entités HTML, une normalisation Unicode, et une protection des noms propres.
