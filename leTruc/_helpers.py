@@ -577,6 +577,17 @@ def load_and_apply_config(app_instance, config_path: str):
         # Mettre à jour la zone de dépôt visuelle
         from .callbacks import _update_drop_zone_text
         _update_drop_zone_text(app_instance, abs_path)
+        # Calculer les chemins dérivés (html, agenda_html, pdf, etc.)
+        derived_paths = _default_paths_from_input(abs_path)
+        app_instance.html_var.set(derived_paths["html"])
+        app_instance.agenda_var.set(derived_paths["agenda_html"])
+        # Les chemins pdf, svg, stories peuvent être écrasés ci-dessous si présents dans la config
+        if not (hasattr(cfg, 'output_pdf') and cfg.output_pdf):
+            app_instance.pdf_var.set(derived_paths["pdf"])
+        if not (hasattr(cfg, 'output_svg_dir') and cfg.output_svg_dir):
+            app_instance.svg_output_var.set(derived_paths["svg_output_dir"])
+        if not (hasattr(cfg, 'stories_output_dir') and cfg.stories_output_dir):
+            app_instance.stories_output_var.set(derived_paths["stories_output"])
     if hasattr(cfg, 'output_pdf') and cfg.output_pdf:
         app_instance.pdf_var.set(make_abs(cfg.output_pdf, config_dir))
     if hasattr(cfg, 'output_svg_dir') and cfg.output_svg_dir:

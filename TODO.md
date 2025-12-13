@@ -29,6 +29,7 @@
 - [x] Inactive row
 - [x] Checkbox "au chapeau"
 - [x] Lire logos depuis svg (qui contiendrait tous les logos) pareil pour l'ours
+- [ ] Bouton STOP
 - [ ] Fix csv input
 - [ ] Output separate pdf pages
 
@@ -61,7 +62,21 @@
 - [ ] Pouvoir entrer plusieurs dates (csv like) pour une même date pour ne pas avoir à répéter
 - [ ] Mettre nouveau logo les arts services (Gëelle) dans ours
 - [ ] config dans GUI: champs pas dans export/import: paths input
-- [ ] amélioration de la performance
+  - [ ] amélioration de la performance:
+    Résumé des optimisations de performance
+🔴 Impact ÉLEVÉ (Quick wins)
+  Optimisation	Fichier	Effort	Gain estimé
+  Cache des icônes	textflow.py:43-68	30 min	3-5x
+  Cache image couverture	draw_logic.py:618-669	15 min	20-30%
+  Regex en module-level	textflow.py:129,163	15 min	5-10%
+  🟡 Impact MOYEN
+  Optimisation	Fichier	Effort	Gain estimé
+  Cache des wrap()	textflow.py, draw_logic.py	2-3h	5-10x
+  Cache des ParagraphStyle	textflow.py:223-243	1-2h	10-20%
+  Font registration guard	draw_logic.py:481-491	15 min	Négligeable sauf batch
+  🟢 Impact FAIBLE (qualité de code)
+  Extraction de la logique "orphan prevention" dupliquée 5 fois
+  Streaming XML pour SVG post-processing
 - [ ] Enlever du GUI les paramètres qu'on ne change jamais (ou les mettre dans un onglet config)
 
 ## Documentation
