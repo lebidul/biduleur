@@ -40,10 +40,15 @@ from .layout import Layout, Section
 from .config import Config
 from .utils import mm_to_pt
 
+# Cache pour les images haute qualité chargées
+# Clé: (chemin, largeur_pt, hauteur_pt, dpi), Valeur: ImageReader
+_HIGH_QUALITY_IMAGE_CACHE: dict[tuple[str, float, float, int], ImageReader] = {}
+
 
 def _load_high_quality_image(image_path: str, target_width_pt: float, target_height_pt: float, min_dpi: int = 300):
     """
     Charge une image avec optimisation pour la qualité d'impression.
+    Utilise un cache pour éviter de recharger/redimensionner la même image.
 
     Args:
         image_path: Chemin vers l'image
@@ -54,6 +59,13 @@ def _load_high_quality_image(image_path: str, target_width_pt: float, target_hei
     Returns:
         ImageReader: Image optimisée prête pour ReportLab
     """
+    # Arrondir les dimensions pour la clé de cache (éviter les variations mineures)
+    cache_key = (image_path, round(target_width_pt, 1), round(target_height_pt, 1), min_dpi)
+
+    if cache_key in _HIGH_QUALITY_IMAGE_CACHE:
+        log.debug(f"Cache hit pour image: {image_path}")
+        return _HIGH_QUALITY_IMAGE_CACHE[cache_key]
+
     img = Image.open(image_path)
 
     # Convertir en RGB si nécessaire
@@ -87,7 +99,14 @@ def _load_high_quality_image(image_path: str, target_width_pt: float, target_hei
         img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
         log.debug(f"Downscaling: {img_width}x{img_height} → {new_width}x{new_height}px")
 
-    return ImageReader(img)
+    result = ImageReader(img)
+    _HIGH_QUALITY_IMAGE_CACHE[cache_key] = result
+    return result
+
+
+def clear_image_cache() -> None:
+    """Vide le cache des images haute qualité. Utile entre plusieurs générations."""
+    _HIGH_QUALITY_IMAGE_CACHE.clear()
 
 
 def list_images(path: str, max_images: int = 100) -> List[str]:

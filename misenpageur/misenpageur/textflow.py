@@ -36,6 +36,49 @@ FREE_ICON_PATH = os.path.join(_PACKAGE_DIR, "assets", "icons", "free.png")
 CHAPEAU_PLACEHOLDER = "{{CHAPEAU}}"
 FREE_PLACEHOLDER = "{{FREE}}"
 
+# Regex compilées au niveau module pour éviter la recompilation à chaque appel
+# Pattern pour "au chapeau" avec espaces normaux, &nbsp; et espaces insécables Unicode
+_CHAPEAU_PATTERN = re.compile(r',?(?:\s|&nbsp;|\u00A0)*au(?:\s|&nbsp;|\u00A0)+chapeau', re.IGNORECASE)
+# Pattern pour "0€" avec gestion des espaces et &euro;
+# (?<![0-9]) = lookbehind négatif pour éviter de matcher "10€", "20€", etc.
+_FREE_PATTERN = re.compile(r',?(?:\s|&nbsp;|\u00A0)*(?<![0-9])0(?:\s|&nbsp;|\u00A0)*(?:€|&euro;)', re.IGNORECASE)
+# Pattern pour nettoyer les balises HTML (utilisé pour date_line)
+_HTML_TAG_PATTERN = re.compile(r'<[^>]+>')
+# Pattern pour nettoyer les <br/> en début/fin de chaîne
+_HEAD_BR_PATTERN = re.compile(r'^(?:\s*<br/>\s*)+')
+_TAIL_BR_PATTERN = re.compile(r'(?:\s*<br/>\s*)+$')
+_MULTI_BR_PATTERN = re.compile(r'(?:\s*<br/>\s*){3,}')
+
+# Cache pour les métadonnées des icônes (aspect ratio)
+# Clé: chemin de l'icône, Valeur: aspect ratio (width/height) ou None si erreur
+_ICON_ASPECT_CACHE: dict[str, float | None] = {}
+
+
+def _get_icon_aspect(icon_path: str) -> float | None:
+    """
+    Récupère l'aspect ratio d'une icône avec mise en cache.
+
+    Returns:
+        float: aspect ratio (width/height) ou None si l'icône n'existe pas ou erreur
+    """
+    if icon_path in _ICON_ASPECT_CACHE:
+        return _ICON_ASPECT_CACHE[icon_path]
+
+    if not os.path.exists(icon_path):
+        _ICON_ASPECT_CACHE[icon_path] = None
+        return None
+
+    try:
+        img = Image.open(icon_path)
+        aspect = img.width / img.height
+        img.close()
+        _ICON_ASPECT_CACHE[icon_path] = aspect
+        return aspect
+    except Exception as e:
+        print(f"[WARN] Erreur chargement icône {icon_path}: {e}")
+        _ICON_ASPECT_CACHE[icon_path] = None
+        return None
+
 
 def mm_to_pt(mm: float) -> float:
     return mm * PT_PER_INCH / MM_PER_INCH
@@ -44,6 +87,7 @@ def mm_to_pt(mm: float) -> float:
 def _get_icon_img_tag(icon_path: str, font_size: float, scale: float = 0.8) -> str:
     """
     Génère la balise img pour une icône, dimensionnée selon la police.
+    Utilise le cache pour éviter de recharger l'image à chaque appel.
 
     Args:
         icon_path: Chemin vers l'icône
@@ -53,19 +97,14 @@ def _get_icon_img_tag(icon_path: str, font_size: float, scale: float = 0.8) -> s
     Returns:
         str: Balise <img> ReportLab ou chaîne vide si l'icône n'existe pas
     """
-    if not os.path.exists(icon_path):
+    aspect = _get_icon_aspect(icon_path)
+    if aspect is None:
         return ""
 
-    try:
-        img = Image.open(icon_path)
-        aspect = img.width / img.height
-        img_h_pt = font_size * scale
-        img_w_pt = img_h_pt * aspect
+    img_h_pt = font_size * scale
+    img_w_pt = img_h_pt * aspect
 
-        return f'<img src="{icon_path}" width="{img_w_pt:.1f}" height="{img_h_pt:.1f}" valign="middle"/>'
-    except Exception as e:
-        print(f"[WARN] Erreur chargement icône {icon_path}: {e}")
-        return ""
+    return f'<img src="{icon_path}" width="{img_w_pt:.1f}" height="{img_h_pt:.1f}" valign="middle"/>'
 
 
 def _get_chapeau_img_tag(font_size: float) -> str:
@@ -126,14 +165,11 @@ def apply_chapeau_to_paragraphs(paras: List[str]) -> List[str]:
         print(f"[WARN] Icône chapeau non trouvée: {CHAPEAU_ICON_PATH}")
         return paras
 
-    # Pattern qui gère les espaces normaux, &nbsp; et espaces insécables Unicode
-    pattern = r',?(?:\s|&nbsp;|\u00A0)*au(?:\s|&nbsp;|\u00A0)+chapeau'
-
     result = []
     count = 0
     for p in paras:
         # Remplacer par ", " + placeholder pour garder la virgule
-        new_p, n = re.subn(pattern, ', ' + CHAPEAU_PLACEHOLDER, p, flags=re.IGNORECASE)
+        new_p, n = _CHAPEAU_PATTERN.subn(', ' + CHAPEAU_PLACEHOLDER, p)
         count += n
         result.append(new_p)
 
@@ -158,16 +194,11 @@ def apply_free_to_paragraphs(paras: List[str]) -> List[str]:
         print(f"[WARN] Icône free non trouvée: {FREE_ICON_PATH}")
         return paras
 
-    # Pattern qui gère ", 0€", ",0€", ", 0 €", "0&euro;", etc.
-    # (?<![0-9]) = lookbehind négatif pour éviter de matcher "10€", "20€", etc.
-    # Gère aussi &nbsp; et espaces insécables, et &euro; pour €
-    pattern = r',?(?:\s|&nbsp;|\u00A0)*(?<![0-9])0(?:\s|&nbsp;|\u00A0)*(?:€|&euro;)'
-
     result = []
     count = 0
     for p in paras:
         # Remplacer par ", " + placeholder pour garder la virgule
-        new_p, n = re.subn(pattern, ', ' + FREE_PLACEHOLDER, p, flags=re.IGNORECASE)
+        new_p, n = _FREE_PATTERN.subn(', ' + FREE_PLACEHOLDER, p)
         count += n
         result.append(new_p)
 
@@ -204,6 +235,15 @@ def apply_icon_replacements(paras: List[str], chapeau_enabled: bool = False, fre
 
 _BULLET_RE = re.compile(r'^\s*(?:❑|□|■|&#9643;)\s*', re.I)
 
+# Cache pour les ParagraphStyle créés par _mk_style_for_kind
+# Clé: tuple des paramètres pertinents, Valeur: ParagraphStyle
+_STYLE_CACHE: dict[tuple, ParagraphStyle] = {}
+
+
+def clear_style_cache() -> None:
+    """Vide le cache des styles. À appeler entre les sessions de rendu si les configs changent."""
+    _STYLE_CACHE.clear()
+
 
 def _is_event(raw: str) -> bool:
     return bool(_BULLET_RE.match(raw or ""))
@@ -215,9 +255,9 @@ def _strip_leading_bullet(raw: str) -> str:
 
 def _strip_head_tail_breaks(s: str) -> str:
     if not s: return ""
-    s = re.sub(r"^(?:\s*<br/>\s*)+", "", s)
-    s = re.sub(r"(?:\s*<br/>\s*)+$", "", s)
-    s = re.sub(r"(?:\s*<br/>\s*){3,}", "<br/><br/>", s)
+    s = _HEAD_BR_PATTERN.sub("", s)
+    s = _TAIL_BR_PATTERN.sub("", s)
+    s = _MULTI_BR_PATTERN.sub("<br/><br/>", s)
     return s.strip()
 
 
@@ -225,24 +265,49 @@ def _mk_style_for_kind(base: ParagraphStyle, kind: str,
                        bullet_cfg: BulletConfig,
                        date_box: DateBoxConfig,
                        font_size: float = 10.0) -> ParagraphStyle:
+    # Créer une clé de cache basée sur les paramètres qui influencent le style
     if kind == "EVENT":
-        # Utiliser bulletFontSize de ReportLab pour contrôler la taille de la puce
+        cache_key = (
+            "EVENT", base.name, font_size,
+            bullet_cfg.event_hanging_indent,
+            bullet_cfg.bullet_text_indent,
+            bullet_cfg.bullet_size_ratio,
+        )
+        if cache_key in _STYLE_CACHE:
+            return _STYLE_CACHE[cache_key]
+
         bullet_font_size = font_size * bullet_cfg.bullet_size_ratio
-        return ParagraphStyle(
+        style = ParagraphStyle(
             name=f"{base.name}_event", parent=base,
             leftIndent=bullet_cfg.event_hanging_indent,
             bulletFontSize=bullet_font_size,
             bulletIndent=bullet_cfg.bullet_text_indent,
             alignment=TA_JUSTIFY,
         )
+        _STYLE_CACHE[cache_key] = style
+        return style
+
     if kind == "DATE" and date_box.enabled:
-        return ParagraphStyle(
+        cache_key = (
+            "DATE", base.name, font_size,
+            date_box.border_width,
+            date_box.border_color,
+            date_box.back_color,
+            date_box.padding,
+        )
+        if cache_key in _STYLE_CACHE:
+            return _STYLE_CACHE[cache_key]
+
+        style = ParagraphStyle(
             name=f"{base.name}_date", parent=base,
             borderWidth=date_box.border_width,
             borderColor=HexColor(date_box.border_color) if date_box.border_color else None,
             backColor=HexColor(date_box.back_color) if date_box.back_color else None,
             borderPadding=date_box.padding,
         )
+        _STYLE_CACHE[cache_key] = style
+        return style
+
     return base
 
 
@@ -386,7 +451,7 @@ def draw_section_fixed_fs_with_prelude(
         # Dessiner le paragraphe
         y -= sb
         if kind == "DATE" and date_line.enabled:
-            plain_text = re.sub(r'<[^>]+>', '', txt)
+            plain_text = _HTML_TAG_PATTERN.sub('', txt)
             text_width = c.stringWidth(plain_text, st.fontName, st.fontSize)
             gap_pt = mm_to_pt(date_line.gap_after_text_mm)
             line_x_start = x0 + text_width + gap_pt
@@ -460,7 +525,7 @@ def draw_section_fixed_fs_with_tail(
         # Dessiner le paragraphe
         y -= sb
         if kind == "DATE" and date_line.enabled:
-            plain_text = re.sub(r'<[^>]+>', '', txt)
+            plain_text = _HTML_TAG_PATTERN.sub('', txt)
             text_width = c.stringWidth(plain_text, st.fontName, st.fontSize)
             gap_pt = mm_to_pt(date_line.gap_after_text_mm)
             line_x_start = x0 + text_width + gap_pt
