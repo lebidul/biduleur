@@ -2,6 +2,7 @@
 # MODIFICATIONS : Ajout boutons import/reset config dans mode debug
 # v1.4.2 : Ajout système d'abréviations
 # v1.4.3 : Ajout bouton Stop pour interrompre le workflow
+# v1.4.5 : Ajout menu Aide (Crédits, Release Notes, Guide utilisateur)
 
 import tkinter as tk
 from tkinter import ttk, messagebox
@@ -13,6 +14,7 @@ from tkinterdnd2 import TkinterDnD, DND_FILES
 # Importe les modules frères
 from . import widgets
 from . import callbacks
+from . import menu
 
 # Importe les helpers globaux
 from ._helpers import _load_cfg_defaults, get_resource_path
@@ -58,6 +60,9 @@ class Application(TkinterDnD.Tk):
         # 4. ENFIN, remplir les conteneurs avec les widgets et leurs callbacks
         widgets.create_all(self)
         callbacks.assign_all(self)
+
+        # 5. Créer la barre de menu (v1.4.5)
+        menu.create_menu_bar(self)
 
         # Lier la molette de la souris pour le scroll
         self.bind_all("<MouseWheel>", self._on_mousewheel)
