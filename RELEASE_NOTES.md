@@ -1,3 +1,38 @@
+# Bidul v2.0.0-dev - Interface NiceGUI (Preview)
+
+Cette version introduit une nouvelle interface graphique basée sur NiceGUI, permettant d'utiliser Le Bidul en mode **Desktop** ET en mode **Web** avec le même code.
+
+## ✨ Nouveautés
+
+### Nouvelle interface NiceGUI
+*   **Interface moderne** : Design contemporain avec thème Material
+*   **Double mode** :
+    *   `python run_gui_nicegui.py` → Mode web (navigateur)
+    *   `python run_gui_nicegui.py --native` → Mode desktop (fenêtre native)
+*   **Code partagé** : Le même code Python fonctionne pour les deux modes
+*   **Préparation web** : Interface prête pour intégration future sur le site Le Bidul
+
+### Fonctionnalités portées depuis leTruc
+*   Upload de fichier Excel/CSV par drag & drop
+*   Configuration des paramètres (titre, police, options)
+*   Génération PDF, SVG, Stories
+*   Option PDF par page
+*   Mode debug
+*   Barre de progression
+
+## 🔧 Détails techniques
+
+*   Nouveau module `leNiceGui/` avec architecture modulaire
+*   État centralisé via dataclass `AppState`
+*   Backend inchangé (`biduleur` + `misenpageur`)
+*   Dépendance : `nicegui>=2.0.0`
+
+## ⚠️ Note
+
+Cette version est un **prototype (dev)**. L'interface Tkinter (`leTruc`) reste disponible et fonctionnelle.
+
+---
+
 # Bidul v1.4.5 - Menu Aide et PDF par page
 
 Cette version ajoute un menu Aide complet dans le GUI et la possibilité de générer un PDF par page.
