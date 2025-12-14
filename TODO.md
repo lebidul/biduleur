@@ -17,7 +17,7 @@
 - [x] Possibilité dans front-end ou config de choisir si taille de police calculée (pour sections ,3,4,5,6) ou forcée. SI forcée est trop grosse alors overflow sections 4.
 - [x] Générer photos post instagram pour le bidul du mois
 - [x] Améliorer progress display dans GUI
-  - [x] Ajouter infos sur fichier stories (qté) da11111111111111111111111111111111111111111111111111111111111111111112221ns boite summary
+- [x] Ajouter infos sur fichier stories (qté)
 - [x] Ajouter au FE fine tuning pour posts instagram (backend color ou image (+ transparency), font, font color)
 - [x] Cucaracha: ajout de saut de ligne dans texte. perte italique si non arial
 - [x] Ajouter stories dans cli misenpageur
@@ -29,7 +29,10 @@
 - [x] Inactive row
 - [x] Checkbox "au chapeau"
 - [x] Lire logos depuis svg (qui contiendrait tous les logos) pareil pour l'ours
+- [ ] Mettre strings des boutons de l'UI dans fichier config séparé pour une meilleure modulairité et adaptabilité
+- [ ] Rendre tout Bidul agnostic
 - [ ] Bouton STOP
+- [ ] Message d'erreur dans le cas ou il n'y a pas de fichier input sélectionné
 - [ ] Fix csv input
 - [ ] Output separate pdf pages
 
@@ -51,6 +54,7 @@
 - [x] Pouvoir importer une config dans le GUI
 - [x] SVG output qui ont le même nom que le pdf
 - [x] Nombre d'exemplaires dans ours
+- [x] amélioration de la performance:
 - [ ] Ajouter logique de texte gris si poster moyennement foncé
 - [ ] Afficher WARN si le texte de la cucaracha box ne rentre pas
 - [ ] Nouveau paramètre (on peut en ajouter autant qu'on veut pour définir mise en style (police, gras, etc..) pour certaines chaines de caractères
@@ -61,22 +65,7 @@
 - [ ] Changer framework GUI
 - [ ] Pouvoir entrer plusieurs dates (csv like) pour une même date pour ne pas avoir à répéter
 - [ ] Mettre nouveau logo les arts services (Gëelle) dans ours
-- [ ] config dans GUI: champs pas dans export/import: paths input
-  - [ ] amélioration de la performance:
-    Résumé des optimisations de performance
-🔴 Impact ÉLEVÉ (Quick wins)
-  Optimisation	Fichier	Effort	Gain estimé
-  Cache des icônes	textflow.py:43-68	30 min	3-5x
-  Cache image couverture	draw_logic.py:618-669	15 min	20-30%
-  Regex en module-level	textflow.py:129,163	15 min	5-10%
-  🟡 Impact MOYEN
-  Optimisation	Fichier	Effort	Gain estimé
-  Cache des wrap()	textflow.py, draw_logic.py	2-3h	5-10x
-  Cache des ParagraphStyle	textflow.py:223-243	1-2h	10-20%
-  Font registration guard	draw_logic.py:481-491	15 min	Négligeable sauf batch
-  🟢 Impact FAIBLE (qualité de code)
-  Extraction de la logique "orphan prevention" dupliquée 5 fois
-  Streaming XML pour SVG post-processing
+- [ ] config dans GUI: champs pas dans export/import: paths input g
 - [ ] Enlever du GUI les paramètres qu'on ne change jamais (ou les mettre dans un onglet config)
 
 ## Documentation

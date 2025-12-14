@@ -1,6 +1,7 @@
 # leTruc/app.py
 # MODIFICATIONS : Ajout boutons import/reset config dans mode debug
 # v1.4.2 : Ajout système d'abréviations
+# v1.4.3 : Ajout bouton Stop pour interrompre le workflow
 
 import tkinter as tk
 from tkinter import ttk, messagebox
@@ -47,6 +48,7 @@ class Application(TkinterDnD.Tk):
         self.cfg_defaults = _load_cfg_defaults()
         self._initialize_variables()
         self.result_queue = queue.Queue()
+        self.stop_event = threading.Event()  # v1.4.3 : Event pour arrêt du pipeline
 
         # 3. ENSUITE, CRÉER les conteneurs principaux de l'interface
         self._create_scrollable_area()
@@ -180,6 +182,11 @@ class Application(TkinterDnD.Tk):
                                     fg="white")
         self.run_button.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(0, 10))
 
+        # v1.4.3 : Bouton Stop (caché par défaut)
+        self.stop_button = tk.Button(button_frame, text="⏹ Stop", font=("Arial", 12, "bold"), bg="#f44336",
+                                     fg="white", command=self._on_stop)
+        # Ne pas afficher au démarrage
+
         # Checkbox mode debug
         self.debug_checkbox = tk.Checkbutton(button_frame, text="Mode Debug", variable=self.debug_mode_var)
         self.debug_checkbox.pack(side=tk.LEFT)
@@ -236,8 +243,11 @@ class Application(TkinterDnD.Tk):
 
         validated_args['stories_font_size_val'] = int(self.stories_font_size_var.get().strip())
 
+        # v1.4.3 : Réinitialiser l'event d'arrêt et afficher le bouton Stop
+        self.stop_event.clear()
         self.status_var.set("Traitement en cours…")
         self.run_button.config(state=tk.DISABLED)
+        self.stop_button.pack(side=tk.LEFT, padx=(0, 10))  # Afficher le bouton Stop
 
         thread = threading.Thread(target=self._run_pipeline_in_thread, args=(validated_args,))
         thread.daemon = True
@@ -302,7 +312,8 @@ class Application(TkinterDnD.Tk):
             stories_bg_color=self.stories_bg_color_var.get(),
             stories_bg_image=self.stories_bg_image_var.get().strip(),
             stories_alpha=self.stories_alpha_var.get(),
-            abbreviations_enabled=abbreviations_enabled
+            abbreviations_enabled=abbreviations_enabled,
+            stop_event=self.stop_event  # v1.4.3 : Passer l'event d'arrêt
         )
 
     def _check_thread_for_results(self):
@@ -327,13 +338,20 @@ class Application(TkinterDnD.Tk):
 
                     self.progress_bar.config(value=self.total_progress_steps)
                     self.run_button.config(state=tk.NORMAL)
+                    # v1.4.3 : Cacher et réactiver le bouton Stop pour la prochaine exécution
+                    self.stop_button.pack_forget()
+                    self.stop_button.config(state=tk.NORMAL)
 
                     if ok:
                         VictoryWindow(self, summary_text=msg)
                         self.status_var.set("Terminé avec succès.")
                     else:
-                        messagebox.showerror("Erreur", msg)
-                        self.status_var.set("Échec.")
+                        # v1.4.3 : Gérer le cas d'interruption utilisateur
+                        if "interrompu" in msg.lower():
+                            self.status_var.set("Interrompu.")
+                        else:
+                            messagebox.showerror("Erreur", msg)
+                            self.status_var.set("Échec.")
 
                     return
 
@@ -343,6 +361,14 @@ class Application(TkinterDnD.Tk):
             print(f"Erreur en lisant la queue : {e}")
 
         self.after(100, self._check_thread_for_results)
+
+    # --- v1.4.3 : Méthode pour arrêter le pipeline ---
+
+    def _on_stop(self):
+        """Callback du bouton Stop pour interrompre le pipeline."""
+        self.stop_event.set()
+        self.status_var.set("Arrêt en cours...")
+        self.stop_button.config(state=tk.DISABLED)
 
     # --- ✨ NOUVELLES MÉTHODES pour import/reset config ---
 
