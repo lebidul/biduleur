@@ -32,9 +32,9 @@
 - [ ] Mettre strings des boutons de l'UI dans fichier config séparé pour une meilleure modulairité et adaptabilité
 - [ ] Rendre tout Bidul agnostic
 - [ ] Bouton STOP
-- [ ] Message d'erreur dans le cas ou il n'y a pas de fichier input sélectionné
+- [x] Message d'erreur dans le cas ou il n'y a pas de fichier input sélectionné
 - [ ] Fix csv input
-- [ ] Output separate pdf pages
+- [x] Output separate pdf pages
 
 ## Priorité Moyenne
 - [x] Refactor dans dossier bidul.biduleur/bidul.
@@ -69,5 +69,5 @@
 - [ ] Enlever du GUI les paramètres qu'on ne change jamais (ou les mettre dans un onglet config)
 
 ## Documentation
-- [ ] Rédiger un guide utilisateur pour expliquer comment utiliser le module.
+- [x] Rédiger un guide utilisateur pour expliquer comment utiliser le module.
 - [ ] Ajouter des exemples d'utilisation dans la documentation.
