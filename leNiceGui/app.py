@@ -126,14 +126,20 @@ def derive_output_paths(input_file: str) -> dict:
 
 async def handle_file_upload(e: events.UploadEventArguments):
     """Gère l'upload d'un fichier Excel/CSV."""
-    content = e.content.read()
-    # Sauvegarder dans un dossier temporaire
-    temp_dir = Path(app.storage.user.get('temp_dir', '/tmp/bidul'))
-    temp_dir.mkdir(parents=True, exist_ok=True)
+    import tempfile
 
-    file_path = temp_dir / e.name
-    with open(file_path, 'wb') as f:
-        f.write(content)
+    # NiceGUI: e.file est un objet FileUpload avec attributs name, content_type
+    # et méthodes async read(), save(), text(), etc.
+    upload_file = e.file
+    filename = upload_file.name
+
+    # Sauvegarder dans un dossier temporaire
+    temp_dir = Path(tempfile.gettempdir()) / "bidul_uploads"
+    temp_dir.mkdir(parents=True, exist_ok=True)
+    file_path = temp_dir / filename
+
+    # save() est async
+    await upload_file.save(str(file_path))
 
     state.input_file = str(file_path)
 
@@ -145,7 +151,7 @@ async def handle_file_upload(e: events.UploadEventArguments):
     state.output_svg_dir = paths.get("svg_dir", "")
     state.stories_output_dir = paths.get("stories_dir", "")
 
-    ui.notify(f"Fichier chargé : {e.name}", type="positive")
+    ui.notify(f"Fichier chargé : {filename}", type="positive")
 
 
 def handle_local_file(path: str):
