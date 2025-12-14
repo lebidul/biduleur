@@ -33,8 +33,8 @@
 - [x] Solution algorithme de "packing" (ou "bin packing") pour une répartition plus fluide des logos.
 - [x] Options d’hyphénation pour rendre des strings insécables.
 - [x] Enlever toutes les références `SVGCanvas` dans `draw_logic` et `drawing`.
+- [x] Réduire taille de la puce par rapport font-Size.
 - [ ] Réduire espace puce premier caractère event.
-- [ ] Réduire taille de la puce par rapport font-Size.
 - [ ] Générer 2 pdfs en sortie, un pour impression et un pdf pour version digitale (avec ou sans hyperlink) (ajouter à bidul.gui).
 - [ ] Intégration du workflow dans page admin de wordpress.
 

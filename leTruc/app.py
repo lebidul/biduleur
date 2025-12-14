@@ -2,6 +2,7 @@
 # MODIFICATIONS : Ajout boutons import/reset config dans mode debug
 # v1.4.2 : Ajout système d'abréviations
 # v1.4.3 : Ajout bouton Stop pour interrompre le workflow
+# v1.4.5 : Ajout menu Aide (Crédits, Release Notes, Guide utilisateur)
 
 import tkinter as tk
 from tkinter import ttk, messagebox
@@ -13,6 +14,7 @@ from tkinterdnd2 import TkinterDnD, DND_FILES
 # Importe les modules frères
 from . import widgets
 from . import callbacks
+from . import menu
 
 # Importe les helpers globaux
 from ._helpers import _load_cfg_defaults, get_resource_path
@@ -58,6 +60,9 @@ class Application(TkinterDnD.Tk):
         # 4. ENFIN, remplir les conteneurs avec les widgets et leurs callbacks
         widgets.create_all(self)
         callbacks.assign_all(self)
+
+        # 5. Créer la barre de menu (v1.4.5)
+        menu.create_menu_bar(self)
 
         # Lier la molette de la souris pour le scroll
         self.bind_all("<MouseWheel>", self._on_mousewheel)
@@ -131,6 +136,7 @@ class Application(TkinterDnD.Tk):
 
         # --- Variables de sortie et de statut ---
         self.generate_svg_var = tk.BooleanVar(value=True)
+        self.split_pdf_var = tk.BooleanVar(value=self.cfg_defaults.get("split_pdf", False))
         self.status_var = tk.StringVar(value="Prêt.")
 
         self.debug_mode_var = tk.BooleanVar(value=self.cfg_defaults.get("debug_mode", False))
@@ -313,7 +319,8 @@ class Application(TkinterDnD.Tk):
             stories_bg_image=self.stories_bg_image_var.get().strip(),
             stories_alpha=self.stories_alpha_var.get(),
             abbreviations_enabled=abbreviations_enabled,
-            stop_event=self.stop_event  # v1.4.3 : Passer l'event d'arrêt
+            stop_event=self.stop_event,  # v1.4.3 : Passer l'event d'arrêt
+            split_pdf=self.split_pdf_var.get()  # v1.4.5 : Générer un PDF par page
         )
 
     def _check_thread_for_results(self):

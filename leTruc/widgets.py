@@ -647,22 +647,27 @@ def _create_output_section(parent, app, ui_row):
     app.pdf_save_button = tk.Button(output_frame, text="…", width=3)
     app.pdf_save_button.grid(row=2, column=2, padx=5, pady=5)
 
+    # Split PDF
+    tk.Checkbutton(output_frame, text="Générer un PDF par page (en plus du PDF complet)",
+                   variable=app.split_pdf_var).grid(
+        row=3, column=0, columnspan=3, sticky="w", padx=5, pady=5)
+
     # SVG
     tk.Checkbutton(output_frame, text="Générer des SVG éditables (pour Inkscape)", variable=app.generate_svg_var).grid(
-        row=3, column=0, columnspan=3, sticky="w", padx=5, pady=5)
-    tk.Label(output_frame, text="Dossier SVG :").grid(row=4, column=0, sticky="e", padx=5, pady=5)
-    tk.Entry(output_frame, textvariable=app.svg_output_var).grid(row=4, column=1, sticky="ew", padx=5, pady=5)
+        row=4, column=0, columnspan=3, sticky="w", padx=5, pady=5)
+    tk.Label(output_frame, text="Dossier SVG :").grid(row=5, column=0, sticky="e", padx=5, pady=5)
+    tk.Entry(output_frame, textvariable=app.svg_output_var).grid(row=5, column=1, sticky="ew", padx=5, pady=5)
     app.svg_output_button = tk.Button(output_frame, text="…", width=3)
-    app.svg_output_button.grid(row=4, column=2, padx=5, pady=5)
+    app.svg_output_button.grid(row=5, column=2, padx=5, pady=5)
 
     # Stories
     tk.Checkbutton(output_frame, text="Générer les images pour les Stories Instagram",
                    variable=app.generate_stories_var).grid(
-        row=5, column=0, columnspan=3, sticky="w", padx=5, pady=5)
-    tk.Label(output_frame, text="Dossier Stories :").grid(row=6, column=0, sticky="e", padx=5, pady=5)
-    tk.Entry(output_frame, textvariable=app.stories_output_var).grid(row=6, column=1, sticky="ew", padx=5, pady=5)
+        row=6, column=0, columnspan=3, sticky="w", padx=5, pady=5)
+    tk.Label(output_frame, text="Dossier Stories :").grid(row=7, column=0, sticky="e", padx=5, pady=5)
+    tk.Entry(output_frame, textvariable=app.stories_output_var).grid(row=7, column=1, sticky="ew", padx=5, pady=5)
     app.stories_output_button = tk.Button(output_frame, text="…", width=3)
-    app.stories_output_button.grid(row=6, column=2, padx=5, pady=5)
+    app.stories_output_button.grid(row=7, column=2, padx=5, pady=5)
 
     r += 1
     ui_row['r'] = r

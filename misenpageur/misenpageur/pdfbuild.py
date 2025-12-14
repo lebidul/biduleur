@@ -8,12 +8,14 @@ Améliorations par rapport à la version originale :
 2. Métadonnées PDF complètes
 3. Support des modes d'impression
 4. Logs détaillés
+5. Split PDF en pages individuelles (v1.4.5)
 """
 from __future__ import annotations
 
 from reportlab.pdfgen import canvas
 from typing import List
 import logging
+import os
 
 log = logging.getLogger(__name__)
 
@@ -133,3 +135,69 @@ def verify_pdf_quality(pdf_path: str) -> dict:
         log.warning(f"Erreur lors de la vérification : {e}")
 
     return result
+
+
+def split_pdf_pages(pdf_path: str, output_dir: str = None) -> List[str]:
+    """
+    Divise un PDF multi-pages en fichiers PDF individuels.
+
+    Args:
+        pdf_path: Chemin vers le PDF source
+        output_dir: Dossier de sortie (défaut: même dossier que le PDF source)
+
+    Returns:
+        Liste des chemins des fichiers PDF créés
+
+    Exemple:
+        bidul.pdf -> bidul_page1.pdf, bidul_page2.pdf, bidul_page3.pdf
+    """
+    if not os.path.exists(pdf_path):
+        log.error(f"Fichier PDF introuvable : {pdf_path}")
+        return []
+
+    try:
+        import fitz  # PyMuPDF
+    except ImportError:
+        log.error("PyMuPDF (fitz) requis pour split_pdf_pages. Installez avec: pip install pymupdf")
+        return []
+
+    # Déterminer le dossier et le préfixe de sortie
+    pdf_dir = os.path.dirname(pdf_path)
+    pdf_basename = os.path.splitext(os.path.basename(pdf_path))[0]
+
+    if output_dir is None:
+        output_dir = pdf_dir
+
+    os.makedirs(output_dir, exist_ok=True)
+
+    created_files = []
+
+    try:
+        doc = fitz.open(pdf_path)
+        num_pages = len(doc)
+
+        log.info(f"Splitting PDF : {num_pages} pages détectées")
+
+        for page_num in range(num_pages):
+            # Créer un nouveau document avec une seule page
+            new_doc = fitz.open()
+            new_doc.insert_pdf(doc, from_page=page_num, to_page=page_num)
+
+            # Nom du fichier de sortie
+            output_filename = f"{pdf_basename}_page{page_num + 1}.pdf"
+            output_path = os.path.join(output_dir, output_filename)
+
+            new_doc.save(output_path)
+            new_doc.close()
+
+            created_files.append(output_path)
+            log.info(f"   ✅ Page {page_num + 1} -> {output_filename}")
+
+        doc.close()
+
+        log.info(f"Split terminé : {len(created_files)} fichiers créés dans {output_dir}")
+
+    except Exception as e:
+        log.error(f"Erreur lors du split PDF : {e}")
+
+    return created_files
