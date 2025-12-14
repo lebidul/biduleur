@@ -1,3 +1,54 @@
+# Bidul v1.4.4 - Optimisations Performance et Bouton Stop
+
+Cette version apporte des améliorations significatives de performance et ajoute un bouton Stop pour interrompre le traitement en cours.
+
+## ✨ Nouveautés
+
+### Bouton Stop pour interrompre le workflow
+*   **Interruption propre du pipeline** : Un bouton "⏹ Stop" apparaît pendant le traitement
+    *   Permet d'arrêter le workflow à tout moment entre les étapes
+    *   Le pipeline s'arrête proprement à la prochaine vérification
+    *   Message "Interrompu." affiché sans popup d'erreur
+    *   Le bouton disparaît automatiquement à la fin du traitement
+
+### Optimisations de performance
+*   **Cache des icônes** (`textflow.py`) : L'aspect ratio des icônes chapeau/free est calculé une seule fois
+    *   Gain estimé : 3-5x pour les documents avec beaucoup d'événements "au chapeau" ou "0€"
+
+*   **Regex compilées au niveau module** (`textflow.py`) : 6 regex compilées au chargement du module
+    *   `_CHAPEAU_PATTERN`, `_FREE_PATTERN`, `_HTML_TAG_PATTERN`
+    *   `_HEAD_BR_PATTERN`, `_TAIL_BR_PATTERN`, `_MULTI_BR_PATTERN`
+    *   Gain estimé : 5-10%
+
+*   **Cache des images haute qualité** (`drawing.py`) : Évite de recharger/redimensionner la même image
+    *   Particulièrement utile pour l'image de couverture du poster
+    *   Gain estimé : 20-30% sur le poster
+
+*   **Cache des ParagraphStyle** (`textflow.py`) : Les styles ReportLab sont réutilisés
+    *   Clé de cache basée sur les paramètres pertinents (kind, font_size, bullet_cfg, date_box)
+    *   Gain estimé : 10-20%
+
+*   **Guard d'enregistrement des polices** (`fonts.py`) : Évite les recherches de fichiers redondantes
+    *   Les polices déjà enregistrées sont ignorées
+    *   Utile en mode batch ou lors de générations multiples
+
+## 🛠️ Fonctions utilitaires ajoutées
+
+```python
+# Vider les caches entre les sessions (si les configs changent)
+from misenpageur.misenpageur.textflow import clear_style_cache
+from misenpageur.misenpageur.drawing import clear_image_cache
+from misenpageur.misenpageur.fonts import is_font_registered
+```
+
+## 🔧 Détails techniques
+
+*   Nouveau paramètre `stop_event` dans `run_pipeline()` pour signaler l'arrêt
+*   Exception `StopRequestedException` pour gérer l'interruption proprement
+*   Vérifications d'arrêt à chaque étape du pipeline (avant analyse, HTML, PDF, SVG, Stories)
+
+---
+
 # Bidul v1.4.3 - Puces Proportionnelles et Améliorations Debug
 
 Cette version améliore le rendu des puces d'événements et enrichit le mode debug pour faciliter la reproduction des configurations.
