@@ -1,6 +1,7 @@
 # leTruc/_helpers.py
 # v1.4.2 : Ajout système d'abréviations
 # v1.4.3 : Ajout support stop_event pour interruption
+# v1.4.5 : Ajout option split_pdf pour générer un PDF par page
 import os
 import sys
 import threading
@@ -214,7 +215,8 @@ def run_pipeline(
         stories_bg_type: str, stories_bg_color: str, stories_bg_image: str,
         stories_alpha: float,
         abbreviations_enabled: dict = None,  # v1.4.2 : Abréviations activées
-        stop_event: threading.Event = None  # v1.4.3 : Event pour arrêt
+        stop_event: threading.Event = None,  # v1.4.3 : Event pour arrêt
+        split_pdf: bool = False  # v1.4.5 : Générer un PDF par page
 ) -> tuple[bool, str]:
     debug_dir = None
     if debug_mode:
@@ -399,11 +401,18 @@ def run_pipeline(
         final_layout_path = build_layout_with_margins(lay_path, cfg)
         lay = Layout.from_yaml(final_layout_path)
 
+        split_pdf_files = []  # v1.4.5 : Liste des fichiers PDF séparés
         if out_pdf:
             check_stop_requested(stop_event)  # v1.4.3
             current_step += 1
             status_queue.put(('status', f"Étape {current_step}/{total_steps} : Création du PDF...", current_step, None))
             report = build_pdf(project_root, cfg, lay, out_pdf, cfg_path, paras)
+
+            # v1.4.5 : Split PDF si demandé
+            if split_pdf:
+                from misenpageur.misenpageur.pdfbuild import split_pdf_pages
+                split_pdf_files = split_pdf_pages(out_pdf)
+
         if generate_svg and out_svg_dir:
             check_stop_requested(stop_event)  # v1.4.3
             if not report:
@@ -428,6 +437,8 @@ def run_pipeline(
         if out_html: summary_lines.append(f"  - HTML: {out_html}")
         if out_agenda_html: summary_lines.append(f"  - HTML (Agenda): {out_agenda_html}")
         if out_pdf: summary_lines.append(f"  - PDF: {out_pdf}")
+        if split_pdf_files:
+            summary_lines.append(f"  - PDF par page: {len(split_pdf_files)} fichiers")
         if generate_svg and out_svg_dir: summary_lines.append(f"  - SVG: {out_svg_dir}")
         if generate_stories and stories_output_dir: summary_lines.append(f"  - Stories: {stories_output_dir}")
 
@@ -468,6 +479,7 @@ def run_pipeline(
                 # Ajouter le fichier input et les abréviations pour permettre l'import complet
                 config_data["_input_file"] = input_file
                 config_data["_abbreviations_enabled"] = abbreviations_enabled or {}
+                config_data["_split_pdf"] = split_pdf  # v1.4.5
                 with open(config_path, 'w', encoding='utf-8') as f:
                     json.dump(config_data, f, indent=2, default=json_converter, ensure_ascii=False)
             except Exception as e:
@@ -770,6 +782,11 @@ def load_and_apply_config(app_instance, config_path: str):
         for key, enabled in abbreviations_enabled.items():
             if key in app_instance.abbreviation_vars:
                 app_instance.abbreviation_vars[key].set(enabled)
+
+    # v1.4.5 : Importer l'option split_pdf
+    split_pdf = raw_data.get('_split_pdf', False)
+    if hasattr(app_instance, 'split_pdf_var'):
+        app_instance.split_pdf_var.set(split_pdf)
 
     # Forcer le rafraîchissement du GUI
     app_instance.update_idletasks()

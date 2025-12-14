@@ -136,6 +136,7 @@ class Application(TkinterDnD.Tk):
 
         # --- Variables de sortie et de statut ---
         self.generate_svg_var = tk.BooleanVar(value=True)
+        self.split_pdf_var = tk.BooleanVar(value=self.cfg_defaults.get("split_pdf", False))
         self.status_var = tk.StringVar(value="Prêt.")
 
         self.debug_mode_var = tk.BooleanVar(value=self.cfg_defaults.get("debug_mode", False))
@@ -318,7 +319,8 @@ class Application(TkinterDnD.Tk):
             stories_bg_image=self.stories_bg_image_var.get().strip(),
             stories_alpha=self.stories_alpha_var.get(),
             abbreviations_enabled=abbreviations_enabled,
-            stop_event=self.stop_event  # v1.4.3 : Passer l'event d'arrêt
+            stop_event=self.stop_event,  # v1.4.3 : Passer l'event d'arrêt
+            split_pdf=self.split_pdf_var.get()  # v1.4.5 : Générer un PDF par page
         )
 
     def _check_thread_for_results(self):

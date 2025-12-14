@@ -1,3 +1,31 @@
+# Bidul v1.4.5 - Menu Aide et PDF par page
+
+Cette version ajoute un menu Aide complet dans le GUI et la possibilité de générer un PDF par page.
+
+## ✨ Nouveautés
+
+### Menu Aide
+*   **Nouveau menu "Aide"** dans la barre de menu avec 3 entrées :
+    *   **Guide utilisateur** : Documentation complète intégrée (démarrage rapide, format d'entrée, options, etc.)
+    *   **Notes de version** : Affiche le contenu du fichier RELEASE_NOTES.md
+    *   **À propos / Crédits** : Version, description et lien cliquable vers le dépôt GitHub
+
+### Génération PDF par page
+*   **Nouvelle option "Générer un PDF par page"** dans la section Sortie
+    *   Génère des fichiers séparés : `bidul_page1.pdf`, `bidul_page2.pdf`, `bidul_page3.pdf`
+    *   Le PDF complet est toujours généré en plus
+    *   Utilise PyMuPDF pour un split rapide et sans perte de qualité
+    *   Option sauvegardée/restaurée avec l'import/export config (mode debug)
+
+## 🔧 Détails techniques
+
+*   Nouveau module `leTruc/menu.py` pour les dialogues du menu
+*   Nouvelle fonction `split_pdf_pages()` dans `pdfbuild.py`
+*   Paramètre `split_pdf` ajouté à `run_pipeline()`
+*   Champ `_split_pdf` ajouté au fichier `config.json` exporté en mode debug
+
+---
+
 # Bidul v1.4.4 - Optimisations Performance et Bouton Stop
 
 Cette version apporte des améliorations significatives de performance et ajoute un bouton Stop pour interrompre le traitement en cours.
