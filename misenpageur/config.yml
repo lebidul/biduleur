@@ -65,7 +65,7 @@ show_event_bullet: true
 event_bullet_replacement: null
 bullet_text_indent: 0
 bullet_size_ratio: 0.9
-event_hanging_indent: 9
+event_hanging_indent: 10
 
 # Date box (bloc)
 date_box:

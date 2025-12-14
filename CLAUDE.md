@@ -2,20 +2,29 @@
 
 ## Project Overview
 
-**Bidul** is a Python-based event management and document generation system that transforms event data (Excel/CSV) into professionally formatted PDF documents and SVG graphics for "Le Bidul" - a monthly cultural agenda publication.
+**Bidul** is a Python-based event management and document generation system that transforms event data (Excel/CSV) into professionally formatted PDF documents and SVG graphics for "Le Bidul" - a monthly cultural agenda publication for the Sarthe region in France.
 
 ## Architecture
 
-Three-module pipeline:
+### Core Pipeline
 ```
 Input (CSV/XLS) → [BIDULEUR] → HTML → [MISENPAGEUR] → PDF/SVG/PNG
                                             ↑
                                       [leTruc GUI]
 ```
 
-- **biduleur/**: Data parsing & HTML generation
-- **misenpageur/**: Layout & PDF/SVG rendering (ReportLab)
-- **leTruc/**: Tkinter GUI application
+### Modules
+
+| Module | Purpose |
+|--------|---------|
+| **biduleur/** | Data parsing & HTML generation from Excel/CSV |
+| **misenpageur/** | Layout engine & PDF/SVG rendering (ReportLab) |
+| **leTruc/** | Tkinter GUI application |
+| **publisher/** | Social media automation (Instagram, Facebook) |
+| **indexer/** | OCR pipeline for PDF archive extraction |
+| **indexer_ia/** | AI-enhanced OCR with Google Drive integration |
+| **tapageur/** | Additional processing utilities |
+| **outils-bidul/** | Utility scripts (gallery, flyers, covers) |
 
 ## Quick Commands
 
@@ -49,7 +58,13 @@ pyinstaller bidul.spec --clean --noconfirm
 | `biduleur/constants.py` | Column names, HTML constants |
 | `misenpageur/misenpageur/draw_logic.py` | Core rendering algorithm |
 | `misenpageur/misenpageur/drawing.py` | ReportLab drawing primitives |
+| `misenpageur/misenpageur/textflow.py` | Text wrapping and icon handling |
+| `misenpageur/misenpageur/config.py` | Config dataclass with YAML loading |
 | `leTruc/app.py` | Main GUI application class |
+| `leTruc/callbacks.py` | GUI event handlers |
+| `leTruc/widgets.py` | Custom Tkinter widgets |
+| `cli.py` | Main CLI entry point |
+| `run_gui.py` | GUI launcher script |
 
 ## Code Conventions
 
@@ -78,14 +93,25 @@ def from_yaml(cls, path: str) -> "Config":
 
 ## Dependencies
 
+### Core
 - **Data**: pandas, openpyxl, beautifulsoup4
 - **Rendering**: reportlab, Pillow, PyYAML, lxml, svglib
 - **GUI**: tkinterdnd2
 - **External**: pdf2svg (for SVG export)
 
+### Optional (for extended modules)
+- **OCR/Indexer**: pytesseract, pdf2image, PyPDF2, opencv-python, langdetect
+- **Publisher**: instagrapi, google-api-python-client
+- **AI**: transformers, torch (for indexer_ia)
+
 ## Testing
 
-No formal test framework. Manual testing via CLI/GUI. GitHub Actions validates builds.
+Limited test coverage in `misenpageur/tests/`. Manual testing via CLI/GUI. GitHub Actions validates builds.
+
+```bash
+# Run existing tests
+python -m pytest misenpageur/tests/
+```
 
 ## Key Features
 
@@ -96,7 +122,41 @@ No formal test framework. Manual testing via CLI/GUI. GitHub Actions validates b
 - INACTIF column for event filtering
 - Instagram Stories export (1080x1920 PNG)
 - Debug mode with timestamped artifacts
+- Config import/export via JSON
+- Drag-and-drop file support in GUI
 
 ## Python Version
 
 Requires Python 3.10+ (uses `match` statement, modern type hints)
+
+## Project Structure
+
+```
+bidul.biduleur/
+├── biduleur/          # Data parsing module
+├── misenpageur/       # Rendering engine
+│   ├── misenpageur/   # Core rendering logic
+│   ├── assets/        # Logos, icons, ours
+│   └── tests/         # Unit tests
+├── leTruc/            # GUI application
+├── publisher/         # Social media automation
+├── indexer/           # OCR pipeline
+├── indexer_ia/        # AI-enhanced OCR
+├── outils-bidul/      # Utility scripts
+├── cli.py             # CLI entry point
+├── run_gui.py         # GUI launcher
+└── bidul.spec         # PyInstaller spec
+```
+
+## Common Workflows
+
+### Generate PDF from Excel
+```bash
+python cli.py -i events.xlsx --out bidul.pdf
+```
+
+### Debug mode (timestamped outputs)
+Set `debug_mode: true` in config.yml or use GUI checkbox.
+
+### Import config in GUI
+Use "Importer Config" button to load a previously exported config.json.

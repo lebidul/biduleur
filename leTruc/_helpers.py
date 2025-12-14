@@ -1,7 +1,9 @@
 # leTruc/_helpers.py
 # v1.4.2 : Ajout système d'abréviations
+# v1.4.3 : Ajout support stop_event pour interruption
 import os
 import sys
+import threading
 from pathlib import Path
 from tkinter import messagebox, filedialog
 import subprocess
@@ -11,6 +13,17 @@ from datetime import datetime
 import json
 from dataclasses import asdict
 import logging
+
+
+class StopRequestedException(Exception):
+    """Exception levée quand l'utilisateur demande l'arrêt du pipeline."""
+    pass
+
+
+def check_stop_requested(stop_event: threading.Event | None) -> None:
+    """Vérifie si l'arrêt a été demandé et lève une exception si c'est le cas."""
+    if stop_event is not None and stop_event.is_set():
+        raise StopRequestedException("Arrêt demandé par l'utilisateur")
 
 from biduleur.csv_utils import parse_bidul
 from biduleur.format_utils import output_html_file
@@ -200,7 +213,8 @@ def run_pipeline(
         stories_font_name: str, stories_font_size: int, stories_font_color: str,
         stories_bg_type: str, stories_bg_color: str, stories_bg_image: str,
         stories_alpha: float,
-        abbreviations_enabled: dict = None  # v1.4.2 : Abréviations activées
+        abbreviations_enabled: dict = None,  # v1.4.2 : Abréviations activées
+        stop_event: threading.Event = None  # v1.4.3 : Event pour arrêt
 ) -> tuple[bool, str]:
     debug_dir = None
     if debug_mode:
@@ -229,6 +243,7 @@ def run_pipeline(
     abbreviation_stats = {}  # v1.4.2 : Stats des remplacements
 
     try:
+        check_stop_requested(stop_event)  # v1.4.3 : Vérifier avant de commencer
         status_queue.put(('status', "Préparation...", 0, None))
 
         # 1. Calculer le nombre total d'étapes à l'avance
@@ -245,6 +260,7 @@ def run_pipeline(
         for p in (out_html, out_agenda_html, out_pdf, out_svg_dir):
             if p: _ensure_parent_dir(p)
 
+        check_stop_requested(stop_event)  # v1.4.3
         current_step += 1
         status_queue.put(('status', f"Étape {current_step}/{total_steps} : Analyse du fichier...", current_step, None))
 
@@ -255,6 +271,7 @@ def run_pipeline(
             status_queue.put(('final', False, str(e)))
             return
 
+        check_stop_requested(stop_event)  # v1.4.3
         current_step += 1
         status_queue.put(('status', f"Étape {current_step}/{total_steps} : Génération des HTML...", current_step, None))
         output_html_file(html_body_bidul, original_file_name=input_file, output_filename=out_html)
@@ -378,14 +395,17 @@ def run_pipeline(
         cfg.stories['background_type'] = stories_bg_type
         cfg.stories['background_image'] = stories_bg_image
 
+        check_stop_requested(stop_event)  # v1.4.3
         final_layout_path = build_layout_with_margins(lay_path, cfg)
         lay = Layout.from_yaml(final_layout_path)
 
         if out_pdf:
+            check_stop_requested(stop_event)  # v1.4.3
             current_step += 1
             status_queue.put(('status', f"Étape {current_step}/{total_steps} : Création du PDF...", current_step, None))
             report = build_pdf(project_root, cfg, lay, out_pdf, cfg_path, paras)
         if generate_svg and out_svg_dir:
+            check_stop_requested(stop_event)  # v1.4.3
             if not report:
                 report = build_pdf(project_root, cfg, lay, os.devnull, cfg_path, paras)
             current_step += 1
@@ -393,6 +413,7 @@ def run_pipeline(
                 ('status', f"Étape {current_step}/{total_steps} : Conversion en SVG...", current_step, None))
             build_svg(project_root, cfg, lay, out_svg_dir, cfg_path, paras)
         if generate_stories:
+            check_stop_requested(stop_event)  # v1.4.3
             current_step += 1
             # Message "en cours"
             status_queue.put(
@@ -478,6 +499,11 @@ def run_pipeline(
         status_queue.put(('final', True, "\n".join(summary_lines)))
 
 
+
+    except StopRequestedException:
+        # v1.4.3 : Arrêt demandé par l'utilisateur
+        log.info("Pipeline interrompu par l'utilisateur")
+        status_queue.put(('final', False, "Traitement interrompu par l'utilisateur."))
 
     except PermissionError as e:
         # On intercepte SPÉCIFIQUEMENT l'erreur de permission
