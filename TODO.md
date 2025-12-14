@@ -17,7 +17,7 @@
 - [x] Possibilité dans front-end ou config de choisir si taille de police calculée (pour sections ,3,4,5,6) ou forcée. SI forcée est trop grosse alors overflow sections 4.
 - [x] Générer photos post instagram pour le bidul du mois
 - [x] Améliorer progress display dans GUI
-- [x] Ajouter infos sur fichier stories (qté) dans boite summary
+  - [x] Ajouter infos sur fichier stories (qté) da11111111111111111111111111111111111111111111111111111111111111111112221ns boite summary
 - [x] Ajouter au FE fine tuning pour posts instagram (backend color ou image (+ transparency), font, font color)
 - [x] Cucaracha: ajout de saut de ligne dans texte. perte italique si non arial
 - [x] Ajouter stories dans cli misenpageur
