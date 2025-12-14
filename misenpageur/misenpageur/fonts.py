@@ -6,6 +6,7 @@ Améliorations :
 1. Subsetting automatique (réduit la taille du PDF)
 2. Meilleure gestion des polices manquantes
 3. Logs détaillés pour debugging
+4. Guard pour éviter les enregistrements multiples
 """
 from __future__ import annotations
 import os
@@ -16,12 +17,21 @@ import logging
 
 log = logging.getLogger(__name__)
 
+# Guard pour éviter d'enregistrer les polices plusieurs fois
+_REGISTERED_FONTS: set[str] = set()
+
+
+def is_font_registered(name: str) -> bool:
+    """Vérifie si une police est déjà enregistrée."""
+    return name in _REGISTERED_FONTS
+
 
 # -------------------- Helpers --------------------
 
 def _register_font(name: str, path: str, subset: bool = True) -> bool:
     """
     Enregistre une police TrueType avec support du subsetting.
+    Utilise un guard pour éviter les enregistrements multiples.
 
     Args:
         name: Nom de la police dans ReportLab
@@ -29,8 +39,13 @@ def _register_font(name: str, path: str, subset: bool = True) -> bool:
         subset: Active le subsetting (recommandé pour l'impression)
 
     Returns:
-        True si succès, False sinon
+        True si succès ou déjà enregistrée, False sinon
     """
+    # Guard : éviter les enregistrements multiples
+    if name in _REGISTERED_FONTS:
+        log.debug(f"Police '{name}' déjà enregistrée (skip)")
+        return True
+
     try:
         font = TTFont(name, path)
 
@@ -40,6 +55,7 @@ def _register_font(name: str, path: str, subset: bool = True) -> bool:
             log.debug(f"✅ Police '{name}' : subsetting activé")
 
         pdfmetrics.registerFont(font)
+        _REGISTERED_FONTS.add(name)
         log.info(f"✅ Police enregistrée : {name} ({os.path.basename(path)})")
         return True
 
@@ -132,6 +148,11 @@ def register_arial_narrow() -> bool:
     Tente d'enregistrer la famille Arial Narrow (ArialNarrow) avec subsetting.
     Cherche dans C:\\Windows\\Fonts et dans assets/fonts/ArialNarrow/.
     """
+    # Guard : éviter les recherches de fichiers si déjà enregistré
+    if "ArialNarrow" in _REGISTERED_FONTS:
+        log.debug("Arial Narrow déjà enregistré (skip)")
+        return True
+
     log.info("Recherche de Arial Narrow...")
 
     # Noms Windows typiques
@@ -180,6 +201,10 @@ def register_arial() -> bool:
     """
     Tente d'enregistrer la famille Arial standard avec subsetting.
     """
+    if "Arial" in _REGISTERED_FONTS:
+        log.debug("Arial déjà enregistré (skip)")
+        return True
+
     log.info("Recherche de Arial...")
 
     win = os.path.join(os.environ.get("WINDIR", "C:\\Windows"), "Fonts")
@@ -226,6 +251,10 @@ def register_dejavu_sans() -> bool:
     Enregistre la famille DejaVuSans avec subsetting.
     Excellente police open-source avec support complet des glyphes (€, →, etc.)
     """
+    if "DejaVuSans" in _REGISTERED_FONTS:
+        log.debug("DejaVu Sans déjà enregistré (skip)")
+        return True
+
     log.info("Recherche de DejaVu Sans...")
 
     roots = _fonts_roots()
@@ -266,6 +295,10 @@ def register_dsnet_stamped() -> bool:
     """
     Tente d'enregistrer la police DS-net Stamped (pour le poster).
     """
+    if "DSNetStamped" in _REGISTERED_FONTS:
+        log.debug("DS-net Stamped déjà enregistré (skip)")
+        return True
+
     log.info("Recherche de DS-net Stamped...")
 
     roots = _fonts_roots()
@@ -289,6 +322,10 @@ def register_dsnet_stamped() -> bool:
 
 def register_helvetica() -> bool:
     """Tente d'enregistrer Helvetica avec subsetting."""
+    if "Helvetica" in _REGISTERED_FONTS:
+        log.debug("Helvetica déjà enregistré (skip)")
+        return True
+
     log.info("Recherche de Helvetica...")
 
     roots = _fonts_roots()
@@ -311,6 +348,10 @@ def register_helvetica() -> bool:
 
 def register_times() -> bool:
     """Tente d'enregistrer Times New Roman avec subsetting."""
+    if "Times" in _REGISTERED_FONTS:
+        log.debug("Times déjà enregistré (skip)")
+        return True
+
     log.info("Recherche de Times New Roman...")
 
     roots = _fonts_roots()
@@ -333,6 +374,10 @@ def register_times() -> bool:
 
 def register_courier() -> bool:
     """Tente d'enregistrer Courier New avec subsetting."""
+    if "Courier New" in _REGISTERED_FONTS:
+        log.debug("Courier New déjà enregistré (skip)")
+        return True
+
     log.info("Recherche de Courier New...")
 
     roots = _fonts_roots()
