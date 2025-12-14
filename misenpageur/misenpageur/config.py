@@ -19,6 +19,7 @@ class BulletConfig:
     event_bullet_replacement: str | None = None
     event_hanging_indent: float = 10.0
     bullet_text_indent: float = -3.0
+    bullet_size_ratio: float = 0.8  # Ratio taille puce / taille texte (0.8 = 80%)
 
 
 @dataclass
@@ -92,6 +93,7 @@ class Config:
     event_bullet_replacement: Optional[str] = None
     event_hanging_indent: float = 10.0
     bullet_text_indent: float = -3.0
+    bullet_size_ratio: float = 0.8  # Ratio taille puce / taille texte (0.8 = 80%)
 
     packing_strategy: PackingStrategy = field(default_factory=PackingStrategy)
 
@@ -106,6 +108,9 @@ class Config:
 
     skip_cover: bool = False
     cucaracha_box: Dict[str, Any] = field(default_factory=dict)
+
+    # --- Debug ---
+    debug_mode: bool = False
 
     # Note : Le champ 'abbreviations' a été supprimé en v1.4.2
     # Les abréviations sont maintenant dans abbreviations.yml

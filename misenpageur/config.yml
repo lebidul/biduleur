@@ -8,6 +8,8 @@
 
 month_label: "2025-11"
 
+debug_mode: false
+
 # Chemins relatifs à la racine du projet
 input_html: "misenpageur/fichier_biduleur/biduleur_bullets.html"
 template_pdf: "misenpageur/templates/bidul_template.pdf"
@@ -19,7 +21,7 @@ nobr_file: "misenpageur/assets/textes/nobr.txt"
 ours_md: "misenpageur/assets/ours/ours.md"
 ours_svg: "misenpageur/assets/ours/ours_template.svg"
 
-# =========================
+# ======================  ===
 # Paramètres typographiques
 # =========================
 
@@ -61,8 +63,9 @@ split_min_gain_ratio: 0.10
 # Bullets / hanging indent
 show_event_bullet: true
 event_bullet_replacement: null
-event_hanging_indent: 13
-bullet_text_indent: 1
+bullet_text_indent: 0
+bullet_size_ratio: 0.9
+event_hanging_indent: 9
 
 # Date box (bloc)
 date_box:

@@ -13,6 +13,7 @@ from reportlab.platypus import Paragraph, Frame, Spacer
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.colors import HexColor
 from reportlab.lib.enums import TA_JUSTIFY
+from reportlab.pdfbase.pdfmetrics import stringWidth
 
 from .layout import Section
 from .drawing import paragraph_style
@@ -222,14 +223,16 @@ def _strip_head_tail_breaks(s: str) -> str:
 
 def _mk_style_for_kind(base: ParagraphStyle, kind: str,
                        bullet_cfg: BulletConfig,
-                       date_box: DateBoxConfig) -> ParagraphStyle:
+                       date_box: DateBoxConfig,
+                       font_size: float = 10.0) -> ParagraphStyle:
     if kind == "EVENT":
-        # On utilise un simple `leftIndent`. C'est lui qui contrôle la position
-        # de TOUT le texte (ligne 1, 2, 3...).
-        # On retire `firstLineIndent`.
+        # Utiliser bulletFontSize de ReportLab pour contrôler la taille de la puce
+        bullet_font_size = font_size * bullet_cfg.bullet_size_ratio
         return ParagraphStyle(
             name=f"{base.name}_event", parent=base,
             leftIndent=bullet_cfg.event_hanging_indent,
+            bulletFontSize=bullet_font_size,
+            bulletIndent=bullet_cfg.bullet_text_indent,
             alignment=TA_JUSTIFY,
         )
     if kind == "DATE" and date_box.enabled:
@@ -251,7 +254,7 @@ def _mk_text_for_kind(
     if kind == "EVENT":
         if bullet_cfg.show_event_bullet:
             bullet_char = bullet_cfg.event_bullet_replacement or "❑"
-            bullet_text = f"{bullet_char}"
+            bullet_text = bullet_char
         txt = _strip_leading_bullet(txt)
 
     # Remplacer tous les placeholders d'icônes par les images
@@ -275,7 +278,7 @@ def measure_fit_at_fs(
 
     for i, raw in enumerate(paras_text):
         kind = "EVENT" if _is_event(raw) else "DATE"
-        st = _mk_style_for_kind(base, kind, bullet_cfg, date_box)
+        st = _mk_style_for_kind(base, kind, bullet_cfg, date_box, font_size)
         txt, bullet = _mk_text_for_kind(raw, kind, bullet_cfg, font_size)
         p = Paragraph(txt, st, bulletText=bullet)
         _w, ph = p.wrap(w, 1e6)
@@ -301,7 +304,7 @@ def measure_fit_at_fs(
                 # Calculer la valeur qu'aura first_non_event_seen_in_S5 APRÈS avoir placé la DATE actuelle
                 first_non_event_after_current = first_non_event_seen_in_S5
 
-                next_st = _mk_style_for_kind(base, next_kind, bullet_cfg, date_box)
+                next_st = _mk_style_for_kind(base, next_kind, bullet_cfg, date_box, font_size)
                 next_txt, next_bullet = _mk_text_for_kind(next_raw, next_kind, bullet_cfg, font_size)
                 next_p = Paragraph(next_txt, next_st, bulletText=next_bullet)
                 _next_w, next_ph = next_p.wrap(w, 1e6)
@@ -346,7 +349,7 @@ def draw_section_fixed_fs_with_prelude(
     # Dessiner les paragraphes principaux
     for i, raw in enumerate(paras_text or []):
         kind = "EVENT" if _is_event(raw) else "DATE"
-        st = _mk_style_for_kind(base, kind, bullet_cfg, date_box)
+        st = _mk_style_for_kind(base, kind, bullet_cfg, date_box, font_size)
         txt, bullet = _mk_text_for_kind(raw, kind, bullet_cfg, font_size)
         p = Paragraph(txt, st, bulletText=bullet)
         _w, ph = p.wrap(w, h)
@@ -369,7 +372,7 @@ def draw_section_fixed_fs_with_prelude(
                 # Calculer la valeur qu'aura first_non_event_seen_in_S5 APRÈS avoir placé la DATE actuelle
                 first_non_event_after_current = first_non_event_seen_in_S5
 
-                next_st = _mk_style_for_kind(base, next_kind, bullet_cfg, date_box)
+                next_st = _mk_style_for_kind(base, next_kind, bullet_cfg, date_box, font_size)
                 next_txt, next_bullet = _mk_text_for_kind(next_raw, next_kind, bullet_cfg, font_size)
                 next_p = Paragraph(next_txt, next_st, bulletText=next_bullet)
                 _next_w, next_ph = next_p.wrap(w, h)
@@ -418,7 +421,7 @@ def draw_section_fixed_fs_with_tail(
     # Dessiner les paragraphes principaux
     for i, raw in enumerate(paras_text or []):
         kind = "EVENT" if _is_event(raw) else "DATE"
-        st = _mk_style_for_kind(base, kind, bullet_cfg, date_box)
+        st = _mk_style_for_kind(base, kind, bullet_cfg, date_box, font_size)
         txt, bullet = _mk_text_for_kind(raw, kind, bullet_cfg, font_size)
         p = Paragraph(txt, st, bulletText=bullet)
         _w, ph = p.wrap(w, h)
@@ -442,7 +445,7 @@ def draw_section_fixed_fs_with_tail(
                 # Calculer la valeur qu'aura first_non_event_seen_in_S5 APRÈS avoir placé la DATE actuelle
                 first_non_event_after_current = first_non_event_seen_in_S5
 
-                next_st = _mk_style_for_kind(base, next_kind, bullet_cfg, date_box)
+                next_st = _mk_style_for_kind(base, next_kind, bullet_cfg, date_box, font_size)
                 next_txt, next_bullet = _mk_text_for_kind(next_raw, next_kind, bullet_cfg, font_size)
                 next_p = Paragraph(next_txt, next_st, bulletText=next_bullet)
                 _next_w, next_ph = next_p.wrap(w, h)
@@ -501,7 +504,7 @@ def plan_pair_with_split(
     while i < n and remA > 0:
         raw = paras_text[i]
         kind = "EVENT" if _is_event(raw) else "DATE"
-        stA = _mk_style_for_kind(base, kind, bullet_cfg, date_box)
+        stA = _mk_style_for_kind(base, kind, bullet_cfg, date_box, font_size)
         txtA, bulletA = _mk_text_for_kind(raw, kind, bullet_cfg, font_size)
         p = Paragraph(txtA, stA, bulletText=bulletA)
         _w, ph = p.wrap(wA, 1e6)
@@ -519,7 +522,7 @@ def plan_pair_with_split(
                 if next_kind == "EVENT":
                     # Calculer si le prochain EVENT peut rentrer dans A
                     first_non_event_after_current = first_non_event_seen_in_S5_A
-                    next_st = _mk_style_for_kind(base, next_kind, bullet_cfg, date_box)
+                    next_st = _mk_style_for_kind(base, next_kind, bullet_cfg, date_box, font_size)
                     next_txt, next_bullet = _mk_text_for_kind(next_raw, next_kind, bullet_cfg, font_size)
                     next_p = Paragraph(next_txt, next_st, bulletText=next_bullet)
                     _next_w, next_ph = next_p.wrap(wA, 1e6)
@@ -557,7 +560,7 @@ def plan_pair_with_split(
     while i < n and remB > 0:
         raw = paras_text[i]
         kind = "EVENT" if _is_event(raw) else "DATE"
-        stB = _mk_style_for_kind(base, kind, bullet_cfg, date_box)
+        stB = _mk_style_for_kind(base, kind, bullet_cfg, date_box, font_size)
         txtB, bulletB = _mk_text_for_kind(raw, kind, bullet_cfg, font_size)
         q = Paragraph(txtB, stB, bulletText=bulletB)
         _w, hq = q.wrap(wB, 1e6)
@@ -575,7 +578,7 @@ def plan_pair_with_split(
                 if next_kind == "EVENT":
                     # Calculer si le prochain EVENT peut rentrer dans B
                     first_non_event_after_current = first_non_event_seen_in_S5_B
-                    next_st = _mk_style_for_kind(base, next_kind, bullet_cfg, date_box)
+                    next_st = _mk_style_for_kind(base, next_kind, bullet_cfg, date_box, font_size)
                     next_txt, next_bullet = _mk_text_for_kind(next_raw, next_kind, bullet_cfg, font_size)
                     next_p = Paragraph(next_txt, next_st, bulletText=next_bullet)
                     _next_w, next_ph = next_p.wrap(wB, 1e6)
@@ -617,7 +620,7 @@ def measure_poster_fit_at_fs(
         while remaining_height > 0 and para_idx < num_paras:
             raw = paras_text[para_idx]
             kind = "EVENT" if _is_event(raw) else "DATE"
-            st = _mk_style_for_kind(base_style, kind, bullet_cfg, DateBoxConfig())
+            st = _mk_style_for_kind(base_style, kind, bullet_cfg, DateBoxConfig(), font_size)
             txt, bullet = _mk_text_for_kind(raw, kind, bullet_cfg, font_size)
             p = Paragraph(txt, st, bulletText=bullet)
 
@@ -653,7 +656,7 @@ def draw_poster_text_in_frames(
     story = []
     for raw in paras_text:
         kind = "EVENT" if _is_event(raw) else "DATE"
-        st = _mk_style_for_kind(base_style, kind, bullet_cfg, DateBoxConfig())
+        st = _mk_style_for_kind(base_style, kind, bullet_cfg, DateBoxConfig(), font_size)
         txt, bullet = _mk_text_for_kind(raw, kind, bullet_cfg, font_size)
 
         # Si c'est une date, on ajoute des objets Spacer à la story

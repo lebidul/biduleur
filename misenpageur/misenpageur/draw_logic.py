@@ -407,7 +407,8 @@ def _read_bullet_config(cfg: Config) -> BulletConfig:
         show_event_bullet=cfg.show_event_bullet,
         event_bullet_replacement=cfg.event_bullet_replacement,
         event_hanging_indent=cfg.event_hanging_indent,
-        bullet_text_indent=cfg.bullet_text_indent
+        bullet_text_indent=cfg.bullet_text_indent,
+        bullet_size_ratio=cfg.bullet_size_ratio
     )
 
 
@@ -464,8 +465,8 @@ def _create_poster_story(
     story = []
     for raw in paras_text:
         kind = "EVENT" if _is_event(raw) else "DATE"
-        st = _mk_style_for_kind(base_style, "EVENT", bullet_cfg, DateBoxConfig())
-        txt = _mk_text_for_kind(raw, kind, bullet_cfg)
+        st = _mk_style_for_kind(base_style, "EVENT", bullet_cfg, DateBoxConfig(), font_size)
+        txt, _ = _mk_text_for_kind(raw, kind, bullet_cfg, font_size)
         story.append(Paragraph(txt, st))
     return story
 
