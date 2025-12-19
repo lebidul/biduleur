@@ -2,9 +2,9 @@ from modules import csv_parser, ocr_parser, fusionner, corrections_regles
 import pandas as pd
 
 if __name__ == "__main__":
-    df_ocr = ocr_parser.parse_ocr_folder("./archives.txt/")
+    df_ocr = ocr_parser.parse_ocr_folder("archives.txt/")
     import os
-    csv_dir = "./csv/"
+    csv_dir = "csv/"
     all_csv = []
     for file in os.listdir(csv_dir):
         if file.endswith(".csv"):

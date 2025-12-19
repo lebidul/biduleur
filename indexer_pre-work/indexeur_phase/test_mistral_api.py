@@ -9,7 +9,7 @@ import threading
 API_KEY = "1UALBtIGHPGTijdBecQeA00b7E3Gejnh"
 API_URL = "https://api.mistral.ai/ocr/v1/process"
 API_URL = "https://api.mistral.ai/v1/ocr"
-PDF_INPUT_DIR = "./samples_pdfs/"
+PDF_INPUT_DIR = "samples_pdfs/"
 
 
 # @app.route('/files/<path:filename>', methods=['GET'])
