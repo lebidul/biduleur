@@ -1,0 +1,174 @@
+# Projet : Indexation archives Bidul
+
+Travaille sur la branche `feature/indexer.claude` (pas de worktree).
+
+## Contexte
+Extraction d'événements culturels depuis 308 PDFs du fanzine Le Bidul (1997-2024).
+Les anciens dossiers indexeur*/ et indexer*/ sont des tentatives avortées, ignore-les.
+
+## Phase 1 : Infrastructure + extraction PDFs texte (n°178-308)
+
+### 1.1 Setup base de données
+Créer `database/schema_v2.sql` avec ce schéma :
+
+-- =============================================================================
+-- Base de données Archives du Bidul - Version simplifiée
+-- =============================================================================
+
+-- -----------------------------------------------------------------------------
+-- Table: bidul
+-- Un exemplaire du fanzine
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS bidul (
+    numero INTEGER PRIMARY KEY,              -- Numéro = clé naturelle
+    mois INTEGER CHECK (mois BETWEEN 1 AND 12),
+    annee INTEGER CHECK (annee BETWEEN 1997 AND 2030),
+    pdf_filename TEXT,                       -- "2018-02 Bidul 230.pdf"
+    type_source TEXT CHECK(type_source IN ('scan', 'texte')),
+    config_extraction TEXT,                  -- JSON snapshot config utilisée
+    extraction_status TEXT DEFAULT 'pending',
+    extraction_date DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- -----------------------------------------------------------------------------
+-- Table: lieu_ref  
+-- Référentiel des lieux (pour normalisation)
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS lieu_ref (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nom TEXT UNIQUE NOT NULL,
+    ville TEXT DEFAULT 'Le Mans',
+    actif BOOLEAN DEFAULT TRUE
+);
+
+-- -----------------------------------------------------------------------------
+-- Table: ville_ref
+-- Référentiel des villes (pour normalisation)
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS ville_ref (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nom TEXT UNIQUE NOT NULL
+);
+
+-- -----------------------------------------------------------------------------
+-- Table: evenement
+-- Entité centrale - un événement extrait
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS evenement (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    bidul_numero INTEGER NOT NULL REFERENCES bidul(numero),
+    
+    -- Texte brut (toujours conservé)
+    raw_text TEXT NOT NULL,
+    
+    -- Champs extraits (texte libre, nettoyés)
+    nom TEXT,                                -- Nom événement si présent
+    date_evenement DATE,
+    heure TEXT,                              -- "20h30" - format brut
+    
+    -- Lieu/Ville : texte brut extrait + FK optionnelle après normalisation
+    lieu_raw TEXT,
+    lieu_ref_id INTEGER REFERENCES lieu_ref(id),
+    ville_raw TEXT,
+    ville_ref_id INTEGER REFERENCES ville_ref(id),
+    
+    -- Artistes : JSON array ["ARTISTE1", "ARTISTE2"]
+    artistes TEXT,
+    
+    -- Spectacle(s) : JSON array ou texte si un seul
+    spectacles TEXT,
+    
+    -- Genres extraits (texte entre parenthèses) : JSON array
+    genres_raw TEXT,
+    
+    -- Prix
+    tarif_raw TEXT,                          -- "5€ / 8€", "gratuit"
+    prix_min REAL,
+    prix_max REAL,
+    gratuit BOOLEAN DEFAULT FALSE,
+    
+    -- Type déduit (concert, theatre, expo...) - texte libre
+    type_evenement TEXT,
+    
+    -- Qualité extraction
+    confidence REAL DEFAULT 0.5,
+    needs_review BOOLEAN DEFAULT FALSE,
+    verified BOOLEAN DEFAULT FALSE,
+    
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_evt_date ON evenement(date_evenement);
+CREATE INDEX idx_evt_bidul ON evenement(bidul_numero);
+CREATE INDEX idx_evt_lieu ON evenement(lieu_ref_id);
+CREATE INDEX idx_evt_ville ON evenement(ville_ref_id);
+CREATE INDEX idx_evt_annee ON evenement(strftime('%Y', date_evenement));
+
+-- =============================================================================
+-- VUES POUR REQUÊTES ANALYTIQUES
+-- =============================================================================
+
+-- Vue : événements avec infos complètes
+CREATE VIEW IF NOT EXISTS v_evenements AS
+SELECT 
+    e.*,
+    b.mois AS bidul_mois,
+    b.annee AS bidul_annee,
+    COALESCE(lr.nom, e.lieu_raw) AS lieu,
+    COALESCE(vr.nom, e.ville_raw) AS ville
+FROM evenement e
+JOIN bidul b ON e.bidul_numero = b.numero
+LEFT JOIN lieu_ref lr ON e.lieu_ref_id = lr.id
+LEFT JOIN ville_ref vr ON e.ville_ref_id = vr.id;
+
+
+Charger les référentiels depuis :
+- `lieu_ref` : liste dans le prompt (179 lieux) - corpus/lieu.csv
+- `ville_ref` : liste dans le prompt (359 villes) - corpus/ville.csv
+
+### 1.2 Config extraction
+Le fichier `config/pdf_config.csv` contient les caractéristiques de chaque PDF.
+Structure des sections A6 sur une page A4 :
+- S1=haut-gauche, S2=bas-gauche, S3=haut-droite, S4=bas-droite
+- Orientation s'adapte au texte (portrait/paysage)
+
+### 1.3 Extraction texte (PDFs 178-308)
+Ces PDFs ont `type_source=texte` → extraction directe sans OCR.
+- Utiliser PyMuPDF (fitz) pour extraire le texte
+- Respecter la config (sections, colonnes, orientation)
+- Stocker le texte brut par page dans un fichier intermédiaire
+
+### 1.4 Parsing événements
+Patterns à détecter :
+- Artistes : MAJUSCULES, séparés par "+"
+- Genres : texte entre parenthèses en italique
+- Spectacles : texte entre guillemets
+- Format type : `ARTISTE (genre) + ARTISTE2, lieu, ville, heure, tarif`
+
+Pour chaque événement extrait :
+- `raw_text` : texte source complet
+- Parser les champs selon les patterns
+- `confidence` : 0.9 si tous champs trouvés, 0.5 si partiel
+
+### 1.5 CLI de validation
+Créer `cli.py` avec commandes :
+```
+python cli.py extract --numero 280        # Extraire un seul PDF
+python cli.py extract --range 178-200     # Extraire une plage
+python cli.py validate --numero 280       # Afficher extraction vs raw
+python cli.py stats                        # Stats globales
+```
+
+### 1.6 Données de référence
+Les CSV dans `biduleur/tapages/toBeConverted/` contiennent des événements déjà structurés des 3 dernières années. Utilise-les pour :
+- Valider le parsing (comparer extraction vs attendu)
+- Enrichir les référentiels (noms d'artistes, lieux)
+
+### Critères de succès Phase 1
+- [ ] Schema créé et référentiels chargés
+- [ ] Extraction fonctionne sur PDF 280 (récent, bien formaté)
+- [ ] CLI `validate` affiche raw_text et champs parsés
+- [ ] >80% des événements extraits avec confidence >= 0.7 sur PDFs 280-290
+
+Ne passe PAS à l'OCR tant que Phase 1 n'est pas validée.

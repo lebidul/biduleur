@@ -1,75 +1,75 @@
-# OCR Pipeline - Bidul
+# Indexer - Extraction des archives du Bidul
 
-Ce projet est un pipeline modulaire pour l'extraction OCR optimisée à partir de fichiers PDF, combinant plusieurs stratégies afin de maximiser la qualité des résultats.
+Pipeline d'extraction d'événements culturels depuis les 308 PDFs archivés du fanzine "Le Bidul" (1997-2024).
 
-## 📁 Structure du projet
+## Structure
 
 ```
-ocr_pipeline/
-├── main.py                      ← Script principal d'extraction OCR
-├── main_rotate.py               ← Script pour corriger définitivement l'orientation des PDF
-└── utils/
-    ├── __init__.py              ← Rend utils importable comme package
-    ├── pdf_helpers.py           ← Détection de la 3e page à ignorer
-    ├── ocr_strategies.py        ← Méthodes OCR + sélection intelligente
-    ├── image_processing.py      ← Prétraitement PIL + OpenCV + sélection auto
-    └── rotate_pdf.py            ← Détection et application de la meilleure rotation par page
+indexer/
+├── cli.py              # CLI principal
+├── core/               # Modules du pipeline
+│   ├── extractor.py    # Extraction texte PDF (PyMuPDF)
+│   ├── parser.py       # Parsing événements (regex)
+│   ├── db.py           # Gestionnaire SQLite
+│   └── csv_importer.py # Import CSV (tapages)
+├── corpus/             # Référentiels
+│   ├── lieu.csv        # 540 lieux connus
+│   └── ville.csv       # 123 villes
+├── database/
+│   ├── schema_v2.sql   # Schéma SQLite
+│   └── bidul_archives.db  # Base de données (généré)
+└── archives/           # PDFs sources (non versionné)
 ```
 
-## ⚙️ Dépendances requises
-
-Installez les bibliothèques nécessaires avec :
+## Installation
 
 ```bash
-pip install pytesseract pdf2image langdetect pyspellchecker pymupdf pillow opencv-python
+pip install PyMuPDF
 ```
 
-> Assurez-vous aussi que **Tesseract OCR** est installé sur votre système, avec les fichiers `fra.traineddata` et `osd.traineddata`.
-
-## 🚀 Lancer le pipeline d'extraction OCR
-
-Depuis le dossier `ocr_pipeline/`, exécutez :
+## Commandes CLI
 
 ```bash
-python main.v0.py
+# Initialiser la base
+python cli.py init
+
+# Peupler avec CSV prioritaire, sinon PDF
+python cli.py populate --range 280-308
+
+# Extraire uniquement depuis PDF
+python cli.py extract --numero 280
+
+# Valider une extraction
+python cli.py validate --numero 280
+
+# Comparer avec CSV de référence
+python cli.py compare --numero 280 --details
+
+# Statistiques
+python cli.py stats
+
+# Lister les PDFs
+python cli.py list --type texte
+
+# Purger la base
+python cli.py purge --all
+python cli.py purge --range 280-290
 ```
 
-Paramètres dans `main.py` :
-- `OCR_MODE = "fast"` / `"smart"` / `"opencv"` → contrôle la méthode d'OCR utilisée
-- `ROTATION_ENABLED = True` / `False` → active ou désactive la rotation dynamique pendant l'extraction
+## Pipeline
 
-## 🔁 Lancer la correction des orientations
+1. **Source CSV prioritaire** : Si un CSV existe dans `biduleur/tapages/toBeConverted/`, import direct (confidence=1.0)
+2. **Extraction PDF** : Sinon, extraction du texte via PyMuPDF avec détection de colonnes
+3. **Parsing** : Découpage par dates, puis par bullets, extraction artistes/lieux/prix
+4. **Stockage** : SQLite avec référentiels lieu/ville pour normalisation
 
-Pour prétraiter et sauvegarder une version **orientée proprement** de tous les PDF :
+## Types de PDFs
 
-```bash
-python main_rotate.py
-```
+- **Texte natif** (n° >= 178) : Extraction directe, ~100-200 événements/mois
+- **Scans** (n° < 178) : OCR requis (non implémenté)
 
-Les fichiers corrigés seront enregistrés dans :
-```
-./indexer/rotated/
-```
+## Schéma base de données
 
-## 📦 Résultats
-
-Les textes extraits seront sauvegardés dans :
-```
-./indexer/archives.txt/
-```
-
-Et le log d'extraction dans :
-```
-./indexer/archives.txt/log_extraction.csv
-```
-
-## ✨ Prochaine étape
-
-Ce projet est conçu pour être étendu avec :
-- Post-correction OCR à partir de dictionnaires
-- Analyse automatique des entités : artistes, lieux, spectacles, etc.
-- Interface de recherche ou dashboard interactif
-
----
-
-© Projet Bidul – OCR sur archives culturelles de la Sarthe.
+- `bidul` : Métadonnées des exemplaires (numero, mois, année, statut)
+- `evenement` : Événements extraits (date, artistes, lieu, prix, confidence)
+- `lieu_ref` / `ville_ref` : Référentiels pour normalisation
