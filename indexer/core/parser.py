@@ -153,8 +153,11 @@ class EventParser:
 
     def _event_signature(self, event: ParsedEvent) -> str:
         """Crée une signature unique pour dédoublonner les événements."""
-        # Normaliser le raw_text en supprimant les espaces/sauts de ligne
-        raw_norm = ' '.join(event.raw_text.split())[:100]
+        # Normaliser le raw_text:
+        # - Supprimer tous les espaces/sauts de ligne
+        # - Mettre en minuscules
+        # - Prendre les 80 premiers caractères (suffisant pour identifier)
+        raw_norm = ''.join(event.raw_text.lower().split())[:80]
         return f"{event.date_str}|{raw_norm}"
 
     def _split_by_dates(self, text: str) -> list[tuple[str, str]]:

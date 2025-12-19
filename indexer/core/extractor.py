@@ -77,15 +77,28 @@ class TextExtractor:
 
     MIN_CHARS_FOR_NATIVE = 500  # Minimum de caractères pour considérer le texte valide
 
-    def __init__(self):
-        pass
+    # Pages à ignorer par défaut pour les PDFs texte (178+)
+    # - Page 1 : souvent un sous-ensemble de la page 2
+    # - Page 3 : résumé qui duplique les événements
+    # On n'extrait que la page 2 qui est la plus complète
+    DEFAULT_SKIP_PAGES_TEXTE = [1, 3]
 
-    def extract(self, pdf_path: str) -> ExtractionResult:
+    def __init__(self, skip_pages: list[int] | None = None):
+        """
+        Initialise l'extracteur.
+
+        Args:
+            skip_pages: Liste des pages à ignorer (1-indexed). Par défaut [3] pour PDFs texte.
+        """
+        self.skip_pages = skip_pages
+
+    def extract(self, pdf_path: str, skip_pages: list[int] | None = None) -> ExtractionResult:
         """
         Extrait le texte d'un PDF.
 
         Args:
             pdf_path: Chemin vers le PDF
+            skip_pages: Pages à ignorer (1-indexed). Si None, utilise le défaut.
 
         Returns:
             ExtractionResult avec le texte et métadonnées
@@ -98,11 +111,25 @@ class TextExtractor:
             doc = fitz.open(pdf_path)
             num_pages = len(doc)
 
+            # Déterminer les pages à ignorer
+            pages_to_skip = skip_pages if skip_pages is not None else self.skip_pages
+            if pages_to_skip is None:
+                # Par défaut, ignorer page 3 pour les PDFs texte (178+)
+                if numero and numero >= 178:
+                    pages_to_skip = self.DEFAULT_SKIP_PAGES_TEXTE
+                else:
+                    pages_to_skip = []
+
             pages = []
             full_text_parts = []
             total_chars = 0
 
             for i in range(num_pages):
+                page_num = i + 1  # 1-indexed
+
+                # Ignorer les pages spécifiées
+                if page_num in pages_to_skip:
+                    continue
                 page = doc[i]
                 text = page.get_text().strip()
                 char_count = len(text)
