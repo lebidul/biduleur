@@ -141,6 +141,10 @@ def cmd_init(args):
     db.init_schema()
     db.load_referentiels()
 
+    # Vider le cache du normalizer après rechargement des référentiels
+    from core.normalizer import clear_caches
+    clear_caches()
+
     stats = db.get_stats()
     print(f"\nBase initialisée:")
     print(f"  Lieux référencés: {stats['lieux_ref']}")
@@ -256,7 +260,9 @@ def cmd_validate(args):
         # Artistes
         artistes = json.loads(e['artistes']) if e['artistes'] else []
         if artistes:
-            print(f"    Artistes: {', '.join(artistes)}")
+            # artistes peut être une liste de dicts ou de strings
+            artiste_names = [a['nom'] if isinstance(a, dict) else a for a in artistes]
+            print(f"    Artistes: {', '.join(artiste_names)}")
 
         # Spectacles
         spectacles = json.loads(e['spectacles']) if e['spectacles'] else []
@@ -534,7 +540,7 @@ def cmd_populate(args):
                     'heure': e.heure,
                     'lieu_raw': e.lieu_raw,
                     'ville_raw': e.ville_raw,
-                    'artistes': json.dumps(e.artistes, ensure_ascii=False) if e.artistes else None,
+                    'artistes': json.dumps([a.to_dict() if hasattr(a, 'to_dict') else a for a in e.artistes], ensure_ascii=False) if e.artistes else None,
                     'spectacles': json.dumps(e.spectacles, ensure_ascii=False) if e.spectacles else None,
                     'genres_raw': json.dumps(e.genres_raw, ensure_ascii=False) if e.genres_raw else None,
                     'genre_evenement': None,

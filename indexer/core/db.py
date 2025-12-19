@@ -173,9 +173,9 @@ class BidulDB:
         """Insère un événement depuis un ParsedEvent (extraction PDF)."""
         conn = self.connect()
 
-        # Chercher les IDs de référence pour lieu et ville
+        # Chercher les IDs de référence pour lieu et ville (matching fuzzy)
         lieu_ref_id = self._find_lieu_ref(event.lieu_raw) if event.lieu_raw else None
-        ville_ref_id = self._find_ville_ref(event.ville_raw) if event.ville_raw else None
+        ville_ref_id, ville_normalized = self._find_ville_ref(event.ville_raw)
 
         cursor = conn.execute("""
             INSERT INTO evenement (
@@ -193,9 +193,9 @@ class BidulDB:
             event.heure,
             event.lieu_raw,
             lieu_ref_id,
-            event.ville_raw,
+            ville_normalized,  # Normalisé (Le Mans si vide)
             ville_ref_id,
-            json.dumps(event.artistes, ensure_ascii=False),
+            json.dumps([a.to_dict() if hasattr(a, 'to_dict') else a for a in event.artistes], ensure_ascii=False) if event.artistes else None,
             json.dumps(event.spectacles, ensure_ascii=False),
             json.dumps(event.genres_raw, ensure_ascii=False),
             event.tarif_raw,
@@ -212,9 +212,9 @@ class BidulDB:
         """Insère un événement depuis un dictionnaire (import CSV)."""
         conn = self.connect()
 
-        # Chercher les IDs de référence pour lieu et ville
+        # Chercher les IDs de référence pour lieu et ville (matching fuzzy)
         lieu_ref_id = self._find_lieu_ref(event.get('lieu_raw')) if event.get('lieu_raw') else None
-        ville_ref_id = self._find_ville_ref(event.get('ville_raw')) if event.get('ville_raw') else None
+        ville_ref_id, ville_normalized = self._find_ville_ref(event.get('ville_raw'))
 
         cursor = conn.execute("""
             INSERT INTO evenement (
@@ -232,7 +232,7 @@ class BidulDB:
             event.get('heure'),
             event.get('lieu_raw'),
             lieu_ref_id,
-            event.get('ville_raw'),
+            ville_normalized,  # Normalisé (Le Mans si vide)
             ville_ref_id,
             event.get('artistes'),
             event.get('spectacles'),
@@ -279,20 +279,19 @@ class BidulDB:
     # -------------------------------------------------------------------------
 
     def _find_lieu_ref(self, lieu_raw: str) -> Optional[int]:
-        """Cherche un lieu dans le référentiel (matching exact)."""
-        conn = self.connect()
-        row = conn.execute(
-            "SELECT id FROM lieu_ref WHERE nom = ?", (lieu_raw,)
-        ).fetchone()
-        return row['id'] if row else None
+        """Cherche un lieu dans le référentiel (matching fuzzy)."""
+        from core.normalizer import normalize_lieu
+        lieu_id, _ = normalize_lieu(lieu_raw, str(self.db_path))
+        return lieu_id
 
-    def _find_ville_ref(self, ville_raw: str) -> Optional[int]:
-        """Cherche une ville dans le référentiel (matching exact)."""
-        conn = self.connect()
-        row = conn.execute(
-            "SELECT id FROM ville_ref WHERE nom = ?", (ville_raw,)
-        ).fetchone()
-        return row['id'] if row else None
+    def _find_ville_ref(self, ville_raw: str) -> tuple[Optional[int], str]:
+        """
+        Cherche une ville dans le référentiel (matching fuzzy).
+        Retourne (ville_id, ville_normalisee).
+        Si ville_raw est vide, retourne Le Mans par défaut.
+        """
+        from core.normalizer import normalize_ville
+        return normalize_ville(ville_raw, str(self.db_path))
 
     # -------------------------------------------------------------------------
     # Stats

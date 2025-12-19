@@ -140,16 +140,17 @@ def parse_price(prix_raw: str) -> tuple[Optional[float], Optional[float], bool, 
     return None, None, False, prix_raw
 
 
-def parse_artists_from_csv(row: dict) -> tuple[list[str], list[str], list[str]]:
+def parse_artists_from_csv(row: dict) -> tuple[list[dict], list[str], list[str]]:
     """
-    Extrait artistes, spectacles et genres du CSV.
+    Extrait artistes avec relations, spectacles et genres du CSV.
 
     Gère les deux formats:
     - 2023+: spectacle1, artiste1, style1, spectacle2, ...
     - 2022: spectacle, artiste1, style1, ...
 
     Returns:
-        (artistes, spectacles, genres)
+        (artistes_avec_relations, spectacles, genres)
+        artistes_avec_relations: [{"nom": "X", "genre": "rock", "spectacle": "Y"}, ...]
     """
     artistes = []
     spectacles = []
@@ -157,19 +158,23 @@ def parse_artists_from_csv(row: dict) -> tuple[list[str], list[str], list[str]]:
 
     # Détecter le format (2023+ a spectacle1, 2022 a spectacle)
     if 'spectacle1' in row:
-        # Format 2023+
+        # Format 2023+: chaque artiste a son propre spectacle/style
         for i in range(1, 5):
             spec = row.get(f'spectacle{i}', '').strip()
             art = row.get(f'artiste{i}', '').strip()
             style = row.get(f'style{i}', '').strip()
             if art:
-                artistes.append(art)
-            if spec:
+                artistes.append({
+                    "nom": art,
+                    "genre": style or None,
+                    "spectacle": spec or None
+                })
+            if spec and spec not in spectacles:
                 spectacles.append(spec)
-            if style:
+            if style and style not in genres:
                 genres.append(style)
     else:
-        # Format 2022
+        # Format 2022: spectacle commun pour tous les artistes
         spec = row.get('spectacle', '').strip()
         if spec:
             spectacles.append(spec)
@@ -177,8 +182,12 @@ def parse_artists_from_csv(row: dict) -> tuple[list[str], list[str], list[str]]:
             art = row.get(f'artiste{i}', '').strip()
             style = row.get(f'style{i}', '').strip()
             if art:
-                artistes.append(art)
-            if style:
+                artistes.append({
+                    "nom": art,
+                    "genre": style or None,
+                    "spectacle": spec or None
+                })
+            if style and style not in genres:
                 genres.append(style)
 
     return artistes, spectacles, genres
@@ -259,7 +268,9 @@ def import_csv(csv_path: Path, bidul_numero: int,
         # Construire raw_text pour référence
         raw_parts = [row.get('date', ''), row.get('horaire', '')]
         if artistes:
-            raw_parts.append(' + '.join(artistes))
+            # artistes est maintenant une liste de dicts avec "nom"
+            artiste_names = [a['nom'] for a in artistes if a.get('nom')]
+            raw_parts.append(' + '.join(artiste_names))
         if spectacles:
             raw_parts.append(', '.join(f'"{s}"' for s in spectacles))
         raw_parts.extend([row.get('lieu', ''), ville, row.get('prix', '')])
@@ -311,7 +322,12 @@ def dedupe_events(events: list[dict]) -> list[dict]:
         # Utiliser artiste principal ou spectacle principal
         identifier = ''
         if artistes:
-            identifier = artistes[0].lower().strip()
+            # artistes peut être une liste de dicts ou de strings
+            first = artistes[0]
+            if isinstance(first, dict):
+                identifier = first.get('nom', '').lower().strip()
+            else:
+                identifier = first.lower().strip()
         elif spectacles:
             identifier = spectacles[0].lower().strip()
         elif e['nom']:
