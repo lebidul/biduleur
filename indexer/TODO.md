@@ -2,6 +2,13 @@
 * #evenements dans table bidul
 * créer fichier CONTEXT.md
 * useful queries / views
+*  améliorer mauvaises extractions détectées avec:
+
+SELECT *
+FROM evenement, json_each(evenement.artistes)
+WHERE json_extract(value, '$.nom') in ('L''E', 'K C', 'L''A', 'K L')
+ORDER BY date_evenement;
+
 * Consolidation pdf: 
 Excellente question. Avec 8000+ événements et 30 ans de formats différents, le full automatique va rater des cas et le full manuel est irréaliste. Voici mon approche hybride :
 

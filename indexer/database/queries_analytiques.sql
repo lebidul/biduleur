@@ -11,13 +11,13 @@
 
 -- Top 20 artistes les plus programmés
 SELECT
-    value AS artiste,
+    json_extract(value, '$.nom') AS artiste,
     COUNT(*) AS nb_concerts,
     MIN(strftime('%Y', date_evenement)) AS premiere_annee,
     MAX(strftime('%Y', date_evenement)) AS derniere_annee
 FROM evenement, json_each(evenement.artistes)
 WHERE artistes IS NOT NULL
-GROUP BY value
+GROUP BY json_extract(value, '$.nom')
 ORDER BY nb_concerts DESC
 LIMIT 20;
 
@@ -39,6 +39,12 @@ SELECT
     tarif_raw AS prix
 FROM evenement, json_each(evenement.artistes)
 WHERE value LIKE '%NOM_ARTISTE%'
+ORDER BY date_evenement;
+
+-- Parcours d'un artiste spécifique (remplacer 'NOM_ARTISTE')
+SELECT *
+FROM evenement, json_each(evenement.artistes)
+WHERE json_extract(value, '$.nom') in ('L''E', 'K C', 'L''A', 'K L')
 ORDER BY date_evenement;
 
 -- -----------------------------------------------------------------------------
