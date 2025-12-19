@@ -1,8 +1,8 @@
-* stocker description biduls dans table ref importable pour exectution (sinon depuis fichier csv) qui puisse être consolidée
-* #evenements dans table bidul
-* créer fichier CONTEXT.md
-* useful queries / views
-*  améliorer mauvaises extractions détectées avec:
+* stocker description biduls dans table ref importable pour execution (sinon depuis fichier csv) qui puisse être consolidée
+* # evenements dans table bidul
+* améliorer stats (par exemple nombre de pdf /csv)
+* source doit être au niveau de la table bidul
+* améliorer mauvaises extractions détectées avec:
 
 SELECT *
 FROM evenement, json_each(evenement.artistes)
