@@ -102,13 +102,14 @@ class EventParser:
     DATE_PATTERN = re.compile(rf"^({JOURS})\s+(\d{{1,2}})(?:ER|er)?\s*$", re.MULTILINE)
 
     # Pattern pour les bullets (• ou caractères similaires)
-    # Inclut: •●○◦▪▫■□►▸‣⁃ et les variantes Unicode (❑❒◇◆★☆✦✧♦)
-    BULLET_CHARS = r"[•●○◦▪▫■□►▸‣⁃❑❒◇◆★☆✦✧♦\uf071\uf0b6]"
+    # Inclut: •●○◦▪▫■□►▸‣⁃ et variantes Unicode (❑❒◇◆★☆✦✧♦❖✳✴✵✶✷✸✹)
+    # U+2750-U+2757 (shadowed squares, question marks), U+F06F, U+F071, U+F0B5, U+F0B6 (Private Use Area - polices Wingdings)
+    BULLET_CHARS = r"[•●○◦▪▫■□►▸‣⁃❑❒◇◆★☆✦✧♦❖✳✴✵✶✷✸✹\u2750-\u2757\uf06f\uf071\uf0b5\uf0b6]"
 
     # Pattern pour détecter un nouveau événement dans un texte multi-événements
     # Un nouvel événement commence par: bullet OU (retour ligne + artiste en MAJUSCULES)
     MULTI_EVENT_SPLIT = re.compile(
-        r'(?:\n\s*[•●○◦▪▫■□►▸‣⁃❑❒◇◆★☆✦✧♦\uf071\uf0b6]\s*)|'  # Bullet sur nouvelle ligne
+        r'(?:\n\s*[•●○◦▪▫■□►▸‣⁃❑❒◇◆★☆✦✧♦❖✳✴✵✶✷✸✹\u2750-\u2757\uf06f\uf071\uf0b5\uf0b6]\s*)|'  # Bullet sur nouvelle ligne
         r'(?:\n\s*(?=[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s\'\-&]{2,}.*?,.*?\d+[hH]))',  # ARTISTE... , ... XXh
         re.MULTILINE
     )
