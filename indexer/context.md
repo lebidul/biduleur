@@ -88,8 +88,8 @@ python cli.py list --type texte
 
 | Fichier | Rôle |
 |---------|------|
-| `core/extractor.py` | Extraction texte PDF (PyMuPDF) |
-| `core/parser.py` | Parsing événements (regex) |
+| `core/extractor.py` | Extraction texte PDF (PyMuPDF) + config pages |
+| `core/parser.py` | Parsing événements (regex, formats standard et inline) |
 | `core/csv_importer.py` | Import depuis CSV tapages |
 | `core/normalizer.py` | Normalisation lieux/villes |
 | `core/db.py` | Accès base SQLite |
@@ -97,6 +97,7 @@ python cli.py list --type texte
 | `database/queries_analytiques.sql` | Requêtes SQL d'analyse |
 | `corpus/lieu.csv` | Référentiel des lieux |
 | `corpus/ville.csv` | Référentiel des villes |
+| `corpus/biduls.description.csv` | Configuration extraction (pages utiles, scan/texte) |
 
 ## Dépendances CSV
 
@@ -105,6 +106,30 @@ Les CSV source sont dans `biduleur/tapages/toBeConverted/` (non versionnés).
 Formats de nommage :
 - `202305_tapage_biduleur_mai_2023.csv` (2023+)
 - `tapage_biduleur_mai_2022.csv` (2022)
+
+## Configuration extraction
+
+Le fichier `corpus/biduls.description.csv` configure l'extraction par numéro :
+
+| Colonne | Description |
+|---------|-------------|
+| `numéros` | Numéro du Bidul |
+| `scan/texte` | Type de PDF (`scan` ou `texte`) |
+| `pages utiles` | Pages à extraire (ex: `2`, `2-4`) |
+
+Logique d'extraction :
+1. Si `scan/texte` = `scan` → skip (OCR nécessaire)
+2. Si page 3 existe → utiliser page 3 (agenda complet)
+3. Sinon → utiliser `pages utiles` du CSV
+
+## Formats de parsing
+
+| Format | Exemple | Biduls |
+|--------|---------|--------|
+| Standard | `• Date\n  ARTISTE, Lieu` | 200+ |
+| Inline | `Je 02 : ARTISTE, Lieu` | 178-199 |
+
+Le parser tente le format standard, puis inline si aucun événement trouvé.
 
 ## Limitations actuelles
 

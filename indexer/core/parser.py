@@ -18,6 +18,64 @@ from datetime import date
 logger = logging.getLogger(__name__)
 
 
+def _normalize_artist_name(name: str) -> str:
+    """
+    Normalise un nom d'artiste en Title Case.
+
+    Gère les cas spéciaux:
+    - Préfixes: "Cie", "DJ", "MC" restent en majuscules
+    - Mots de liaison: "de", "du", "des", "le", "la", "les", "et", "l'" restent en minuscules (sauf en début)
+    - Acronymes courts (2-3 lettres tout en majuscules): conservés si pas un mot de liaison
+    - Noms avec apostrophe: L'Artiste -> L'Artiste
+    """
+    if not name or not name.strip():
+        return name
+
+    name = name.strip()
+
+    # Mots à garder en majuscules (préfixes/titres)
+    KEEP_UPPER = {'DJ', 'MC', 'VJ', 'CIE', 'CIA'}
+
+    # Mots de liaison à garder en minuscules (sauf en début de nom)
+    LIAISON = {'de', 'du', 'des', 'le', 'la', 'les', 'et', 'en', 'aux', 'à'}
+
+    words = name.split()
+    result = []
+
+    for i, word in enumerate(words):
+        word_lower = word.lower()
+
+        # Vérifier si c'est un préfixe à garder en majuscules
+        if word.upper() in KEEP_UPPER:
+            result.append(word.upper())
+            continue
+
+        # Mots de liaison (sauf en première position) - vérifié AVANT les acronymes
+        if i > 0 and word_lower in LIAISON:
+            result.append(word_lower)
+            continue
+
+        # Acronymes courts (2-3 lettres, tout en majuscules): conserver
+        # Mais seulement si ce n'est PAS un mot de liaison
+        if len(word) <= 3 and word.isupper() and word.isalpha() and word_lower not in LIAISON:
+            result.append(word)
+            continue
+
+        # Gestion de l'apostrophe: L'Artiste, D'Arcy
+        if "'" in word:
+            parts = word.split("'", 1)
+            if len(parts) == 2:
+                prefix = parts[0].capitalize()
+                suffix = parts[1].capitalize() if parts[1] else ''
+                result.append(f"{prefix}'{suffix}")
+                continue
+
+        # Cas standard: Title Case
+        result.append(word.capitalize())
+
+    return ' '.join(result)
+
+
 @dataclass
 class ArtisteInfo:
     """Information sur un artiste avec son genre associé."""
@@ -97,9 +155,9 @@ class EventParser:
     """
 
     # Patterns de dates
-    # Supporte: "Samedi 20", "LUNDI 1ER", "Mardi 2", etc.
-    JOURS = r"(?:[Ll]undi|[Mm]ardi|[Mm]ercredi|[Jj]eudi|[Vv]endredi|[Ss]amedi|[Dd]imanche|LUNDI|MARDI|MERCREDI|JEUDI|VENDREDI|SAMEDI|DIMANCHE)"
-    DATE_PATTERN = re.compile(rf"^({JOURS})\s+(\d{{1,2}})(?:ER|er)?\s*$", re.MULTILINE)
+    # Supporte: "Samedi 20", "LUNDI 1ER", "Mardi 2", "Me 1er", "Je 02", etc.
+    JOURS = r"(?:[Ll]undi|[Mm]ardi|[Mm]ercredi|[Jj]eudi|[Vv]endredi|[Ss]amedi|[Dd]imanche|LUNDI|MARDI|MERCREDI|JEUDI|VENDREDI|SAMEDI|DIMANCHE|[Ll]u|[Mm]a|[Mm]e|[Jj]e|[Vv]e|[Ss]a|[Dd]i|LU|MA|ME|JE|VE|SA|DI)"
+    DATE_PATTERN = re.compile(rf"^({JOURS})\s+(\d{{1,2}})(?:ER|er|ème|eme)?\s*:?\s*$", re.MULTILINE)
 
     # Pattern pour les bullets (• ou caractères similaires)
     # Inclut: •●○◦▪▫■□►▸‣⁃ et variantes Unicode (❑❒◇◆★☆✦✧♦❖✳✴✵✶✷✸✹)
@@ -146,9 +204,19 @@ class EventParser:
         self.bidul_mois = bidul_mois
         self.bidul_annee = bidul_annee
 
+    # Pattern pour le format inline: "Je 02 : ARTISTE (genre), Lieu, heure, prix"
+    INLINE_DATE_PATTERN = re.compile(
+        r'^([MLJVSD][aeiou]|[Ll]undi|[Mm]ardi|[Mm]ercredi|[Jj]eudi|[Vv]endredi|[Ss]amedi|[Dd]imanche)\s+(\d{1,2})(?:er|ème|eme)?\s*:\s*(.+)$',
+        re.MULTILINE | re.IGNORECASE
+    )
+
     def parse(self, text: str) -> list[ParsedEvent]:
         """
         Parse le texte complet et extrait les événements.
+
+        Supporte deux formats:
+        1. Format standard: dates sur lignes séparées, événements avec bullets
+        2. Format inline: "Je 02 : ARTISTE (genre), Lieu, heure, prix"
 
         Args:
             text: Texte brut extrait du PDF
@@ -156,8 +224,19 @@ class EventParser:
         Returns:
             Liste d'événements parsés (dédoublonnés)
         """
+        # Essayer d'abord le format standard
+        events = self._parse_standard_format(text)
+
+        # Si aucun événement trouvé, essayer le format inline
+        if not events:
+            events = self._parse_inline_format(text)
+
+        return events
+
+    def _parse_standard_format(self, text: str) -> list[ParsedEvent]:
+        """Parse le format standard avec dates séparées et bullets."""
         events = []
-        seen_signatures = set()  # Pour dédoublonner
+        seen_signatures = set()
 
         # Découper par dates
         date_blocks = self._split_by_dates(text)
@@ -172,11 +251,65 @@ class EventParser:
 
                 event = self._parse_event(event_text.strip(), date_str)
                 if event:
-                    # Créer une signature pour dédoublonner
                     signature = self._event_signature(event)
                     if signature not in seen_signatures:
                         seen_signatures.add(signature)
                         events.append(event)
+
+        return events
+
+    def _parse_inline_format(self, text: str) -> list[ParsedEvent]:
+        """
+        Parse le format inline: "Je 02 : ARTISTE (genre), Lieu, heure, prix"
+
+        Ce format est utilisé dans les anciens Biduls (avant ~2015).
+        """
+        events = []
+        seen_signatures = set()
+
+        # Regrouper les lignes qui appartiennent au même événement
+        # (certains événements sont sur plusieurs lignes)
+        lines = text.split('\n')
+        current_event_lines = []
+        current_date = None
+
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+
+            # Vérifier si c'est une nouvelle ligne d'événement (commence par une date)
+            match = self.INLINE_DATE_PATTERN.match(line)
+            if match:
+                # Traiter l'événement précédent
+                if current_event_lines and current_date:
+                    event_text = ' '.join(current_event_lines)
+                    event = self._parse_event(event_text, current_date)
+                    if event:
+                        signature = self._event_signature(event)
+                        if signature not in seen_signatures:
+                            seen_signatures.add(signature)
+                            events.append(event)
+
+                # Commencer un nouvel événement
+                jour = match.group(1)
+                num = match.group(2)
+                current_date = f"{jour} {num}"
+                current_event_lines = [match.group(3).strip()]
+            else:
+                # Continuation de l'événement précédent
+                if current_event_lines:
+                    current_event_lines.append(line)
+
+        # Traiter le dernier événement
+        if current_event_lines and current_date:
+            event_text = ' '.join(current_event_lines)
+            event = self._parse_event(event_text, current_date)
+            if event:
+                signature = self._event_signature(event)
+                if signature not in seen_signatures:
+                    seen_signatures.add(signature)
+                    events.append(event)
 
         return events
 
@@ -398,11 +531,11 @@ class EventParser:
                 parts = re.split(r'\s*/\s*(?:Cie|Compagnie)\s*', artiste_raw, flags=re.IGNORECASE)
                 if len(parts) >= 2:
                     if parts[0].strip():
-                        artistes.append(ArtisteInfo(nom=parts[0].strip(), genre=genre, spectacle=titre))
+                        artistes.append(ArtisteInfo(nom=_normalize_artist_name(parts[0].strip()), genre=genre, spectacle=titre))
                     if parts[-1].strip():
-                        artistes.append(ArtisteInfo(nom="Cie " + parts[-1].strip(), genre=genre, spectacle=titre))
+                        artistes.append(ArtisteInfo(nom="Cie " + _normalize_artist_name(parts[-1].strip()), genre=genre, spectacle=titre))
             else:
-                artistes.append(ArtisteInfo(nom=artiste_raw, genre=genre, spectacle=titre))
+                artistes.append(ArtisteInfo(nom=_normalize_artist_name(artiste_raw), genre=genre, spectacle=titre))
 
             text = text[:match.start()] + text[match.end():]
             text = re.sub(r'\s+', ' ', text).strip()
@@ -575,7 +708,7 @@ class EventParser:
                 # Ignorer les faux positifs
                 if len(nom) >= 3 and nom not in ('LE', 'LA', 'LES', 'DE', 'DU', 'DES', 'ET', 'EN'):
                     temp_artistes.append(ArtisteInfo(
-                        nom=nom,
+                        nom=_normalize_artist_name(nom),
                         genre=genre,
                         spectacle=spectacle_presenter
                     ))
@@ -590,7 +723,7 @@ class EventParser:
                     nom = m.strip()
                     if len(nom) >= 3 and nom not in ('LE', 'LA', 'LES', 'DE', 'DU', 'DES', 'ET', 'EN'):
                         temp_artistes.append(ArtisteInfo(
-                            nom=nom,
+                            nom=_normalize_artist_name(nom),
                             genre=genre,
                             spectacle=spectacle_presenter
                         ))
