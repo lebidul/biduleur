@@ -1,0 +1,20 @@
+{
+  "fichiers": {
+    "renommage": {
+      "2010-09 Bidul 147 bis.pdf": {"numero": 148}
+    },
+    "ignorer": [
+      "2019-03 Bidul 242 Marion.pdf"
+    ],
+    "notes": {
+      "242": "Garder uniquement '2019-03 Bidul 242 Stef@n.pdf'"
+    }
+  },
+
+  "extraction": {
+    "228": {
+      "use_page3_summary": false,
+      "note": "Page 3 n'est pas un agenda, utiliser la config CSV standard"
+    }
+  }
+}

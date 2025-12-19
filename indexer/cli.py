@@ -14,6 +14,14 @@ Commandes:
     python cli.py purge --numero 280    # Supprime les événements d'un Bidul
     python cli.py stats                 # Statistiques globales
     python cli.py list                  # Liste les PDFs disponibles
+
+Consolidation/Review:
+    python cli.py migrate               # Migration du schéma pour consolidation
+    python cli.py triage                # Triage automatique par confidence
+    python cli.py apply-aliases         # Applique les alias artistes
+    python cli.py review                # Session de review interactive
+    python cli.py quality-report        # Rapport de qualité détaillé
+    python cli.py analyze-corrections   # Analyse des corrections pour feedback
 """
 
 import argparse
@@ -724,6 +732,280 @@ def cmd_purge(args):
     return 0
 
 
+def cmd_migrate(args):
+    """Migration de la base de données pour le système de consolidation."""
+    db = BidulDB()
+    conn = db.connect()
+    cur = conn.cursor()
+
+    print("Migration du schéma pour le système de consolidation...")
+
+    # Ajout des colonnes de review dans evenement
+    migrations = [
+        ("evenement", "verified", "BOOLEAN DEFAULT FALSE"),
+        ("evenement", "verified_by", "TEXT"),
+        ("evenement", "verified_at", "TIMESTAMP"),
+        ("evenement", "review_status", "TEXT DEFAULT 'pending'"),
+        ("evenement", "review_notes", "TEXT"),
+        ("evenement", "style", "TEXT"),  # Style/genre de l'événement (rock, jazz, théâtre, etc.)
+    ]
+
+    for table, column, col_type in migrations:
+        try:
+            cur.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}")
+            print(f"  + {table}.{column}")
+        except Exception as e:
+            if "duplicate column" in str(e).lower():
+                print(f"  = {table}.{column} (existe déjà)")
+            else:
+                print(f"  ! {table}.{column}: {e}")
+
+    # Création de la table correction_log
+    cur.execute('''
+        CREATE TABLE IF NOT EXISTS correction_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            evenement_id INTEGER,
+            champ TEXT NOT NULL,
+            ancienne_valeur TEXT,
+            nouvelle_valeur TEXT,
+            source TEXT DEFAULT 'manual',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (evenement_id) REFERENCES evenement(id)
+        )
+    ''')
+    print("  + Table correction_log")
+
+    # Création de la table artiste_alias
+    cur.execute('''
+        CREATE TABLE IF NOT EXISTS artiste_alias (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nom_variante TEXT UNIQUE NOT NULL,
+            nom_normalise TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    print("  + Table artiste_alias")
+
+    # Index pour les recherches
+    cur.execute('CREATE INDEX IF NOT EXISTS idx_evenement_review_status ON evenement(review_status)')
+    cur.execute('CREATE INDEX IF NOT EXISTS idx_evenement_verified ON evenement(verified)')
+    cur.execute('CREATE INDEX IF NOT EXISTS idx_correction_log_evenement ON correction_log(evenement_id)')
+
+    conn.commit()
+    print("\nMigration terminée.")
+    return 0
+
+
+def cmd_triage(args):
+    """Triage automatique des événements."""
+    from indexer.core.triage import triage_all, detect_duplicates, get_triage_stats
+
+    db_path = Path(__file__).parent / "database" / "bidul_archives.db"
+
+    print("Triage automatique des événements...")
+
+    # Triage par confidence
+    results = triage_all(db_path)
+    print(f"\nRésultats du triage:")
+    print(f"  OK (confidence >= 0.9):     {results['ok']}")
+    print(f"  À revoir (0.7-0.9):         {results['to_review']}")
+    print(f"  Flaggés (< 0.7):            {results['flagged']}")
+
+    # Détection des doublons
+    if not args.skip_duplicates:
+        dups = detect_duplicates(db_path)
+        print(f"  Doublons potentiels:        {dups}")
+
+    # Stats finales
+    stats = get_triage_stats(db_path)
+    print(f"\nStatut global:")
+    for status, count in stats.items():
+        print(f"  {status}: {count}")
+
+    return 0
+
+
+def cmd_apply_aliases(args):
+    """Applique les alias artistes."""
+    from indexer.core.aliases import sync_aliases_from_json, apply_artiste_aliases
+
+    db_path = Path(__file__).parent / "database" / "bidul_archives.db"
+    json_path = Path(__file__).parent / "corpus" / "artistes_aliases.json"
+
+    # Sync depuis JSON si demandé
+    if args.sync_json:
+        count = sync_aliases_from_json(json_path, db_path)
+        print(f"Alias synchronisés depuis JSON: {count}")
+
+    # Appliquer aux événements
+    updated = apply_artiste_aliases(db_path)
+    print(f"Événements mis à jour: {updated}")
+
+    return 0
+
+
+def cmd_review(args):
+    """Session de review interactive."""
+    from indexer.core.review import ReviewSession
+
+    db_path = Path(__file__).parent / "database" / "bidul_archives.db"
+
+    # Filtres
+    filters = {}
+    if args.status:
+        filters['status'] = args.status
+    if args.numero:
+        filters['bidul_numero'] = args.numero
+
+    session = ReviewSession(db_path, filters)
+    session.start()
+
+    return 0
+
+
+def cmd_quality_report(args):
+    """Génère un rapport de qualité."""
+    db = BidulDB()
+    conn = db.connect()
+    cur = conn.cursor()
+
+    print("=" * 60)
+    print("RAPPORT DE QUALITÉ")
+    print("=" * 60)
+
+    # Stats globales
+    cur.execute("SELECT COUNT(*) FROM evenement")
+    total = cur.fetchone()[0]
+    print(f"\nTotal événements: {total}")
+
+    # Par review_status
+    cur.execute('''
+        SELECT review_status, COUNT(*) as cnt
+        FROM evenement
+        GROUP BY review_status
+        ORDER BY cnt DESC
+    ''')
+    print("\nPar statut de review:")
+    for row in cur.fetchall():
+        status = row[0] or 'pending'
+        pct = row[1] / total * 100 if total else 0
+        print(f"  {status}: {row[1]} ({pct:.1f}%)")
+
+    # Vérifiés
+    cur.execute("SELECT COUNT(*) FROM evenement WHERE verified = TRUE OR verified = 1")
+    verified = cur.fetchone()[0]
+    print(f"\nVérifiés: {verified} ({verified/total*100:.1f}%)" if total else "\nVérifiés: 0")
+
+    # Distribution de confidence
+    cur.execute('''
+        SELECT
+            CASE
+                WHEN confidence >= 0.9 THEN '0.9+'
+                WHEN confidence >= 0.8 THEN '0.8-0.9'
+                WHEN confidence >= 0.7 THEN '0.7-0.8'
+                WHEN confidence >= 0.5 THEN '0.5-0.7'
+                ELSE '<0.5'
+            END as bucket,
+            COUNT(*) as cnt
+        FROM evenement
+        GROUP BY bucket
+        ORDER BY bucket DESC
+    ''')
+    print("\nDistribution de confidence:")
+    for row in cur.fetchall():
+        pct = row[1] / total * 100 if total else 0
+        print(f"  {row[0]}: {row[1]} ({pct:.1f}%)")
+
+    # Champs manquants
+    cur.execute("SELECT COUNT(*) FROM evenement WHERE date_evenement IS NULL")
+    no_date = cur.fetchone()[0]
+    cur.execute("SELECT COUNT(*) FROM evenement WHERE lieu_raw IS NULL")
+    no_lieu = cur.fetchone()[0]
+    cur.execute("SELECT COUNT(*) FROM evenement WHERE artistes IS NULL AND spectacles IS NULL")
+    no_content = cur.fetchone()[0]
+
+    print("\nChamps manquants:")
+    print(f"  Sans date: {no_date}")
+    print(f"  Sans lieu: {no_lieu}")
+    print(f"  Sans artiste/spectacle: {no_content}")
+
+    # Lieux non résolus
+    cur.execute("SELECT COUNT(*) FROM evenement WHERE lieu_ref_id IS NULL AND lieu_raw IS NOT NULL")
+    unresolved_lieux = cur.fetchone()[0]
+    print(f"  Lieux non résolus: {unresolved_lieux}")
+
+    return 0
+
+
+def cmd_analyze_corrections(args):
+    """Analyse les corrections pour améliorer l'extraction."""
+    db = BidulDB()
+    conn = db.connect()
+    cur = conn.cursor()
+
+    print("=" * 60)
+    print("ANALYSE DES CORRECTIONS")
+    print("=" * 60)
+
+    # Vérifier si la table existe
+    cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='correction_log'")
+    if not cur.fetchone():
+        print("\nAucune correction enregistrée (table correction_log absente)")
+        print("Lancez d'abord: python cli.py migrate")
+        return 0
+
+    # Stats par champ
+    cur.execute('''
+        SELECT champ, COUNT(*) as cnt
+        FROM correction_log
+        GROUP BY champ
+        ORDER BY cnt DESC
+    ''')
+    results = cur.fetchall()
+
+    if not results:
+        print("\nAucune correction enregistrée.")
+        return 0
+
+    print("\nCorrections par champ:")
+    for champ, count in results:
+        print(f"  {champ}: {count}")
+
+    # Patterns de correction fréquents (pour lieux par exemple)
+    cur.execute('''
+        SELECT ancienne_valeur, nouvelle_valeur, COUNT(*) as cnt
+        FROM correction_log
+        WHERE champ = 'lieu_raw'
+        GROUP BY ancienne_valeur, nouvelle_valeur
+        ORDER BY cnt DESC
+        LIMIT 10
+    ''')
+    lieu_patterns = cur.fetchall()
+
+    if lieu_patterns:
+        print("\nTop 10 corrections de lieux:")
+        for old, new, cnt in lieu_patterns:
+            print(f"  '{old}' -> '{new}' ({cnt}x)")
+
+    # Suggestions d'alias artistes
+    cur.execute('''
+        SELECT ancienne_valeur, nouvelle_valeur, COUNT(*) as cnt
+        FROM correction_log
+        WHERE champ = 'artistes'
+        GROUP BY ancienne_valeur, nouvelle_valeur
+        ORDER BY cnt DESC
+        LIMIT 10
+    ''')
+    artiste_patterns = cur.fetchall()
+
+    if artiste_patterns:
+        print("\nSuggestions d'alias artistes:")
+        for old, new, cnt in artiste_patterns:
+            print(f"  '{old}' -> '{new}' ({cnt}x)")
+
+    return 0
+
+
 # =============================================================================
 # Main
 # =============================================================================
@@ -740,6 +1022,12 @@ Exemples:
   python cli.py validate --numero 280   # Affiche l'extraction du 280
   python cli.py stats                   # Statistiques globales
   python cli.py list --type texte       # Liste les PDFs texte
+  python cli.py migrate                 # Migration pour consolidation
+  python cli.py triage                  # Triage automatique
+  python cli.py apply-aliases --sync-json  # Applique les alias artistes
+  python cli.py review --status to_review  # Review interactive
+  python cli.py quality-report          # Rapport de qualité
+  python cli.py analyze-corrections     # Analyse des corrections
         """
     )
 
@@ -790,6 +1078,29 @@ Exemples:
     p_purge.add_argument('--range', '-r', help='Plage de numéros (ex: 280-290)')
     p_purge.add_argument('--dry-run', action='store_true', help='Affiche sans supprimer')
 
+    # migrate
+    p_migrate = subparsers.add_parser('migrate', help='Migration pour le système de consolidation')
+
+    # triage
+    p_triage = subparsers.add_parser('triage', help='Triage automatique des événements')
+    p_triage.add_argument('--skip-duplicates', action='store_true', help='Ne pas détecter les doublons')
+
+    # apply-aliases
+    p_aliases = subparsers.add_parser('apply-aliases', help='Applique les alias artistes')
+    p_aliases.add_argument('--sync-json', action='store_true', help='Synchroniser depuis le JSON')
+
+    # review
+    p_review = subparsers.add_parser('review', help='Session de review interactive')
+    p_review.add_argument('--status', '-s', choices=['pending', 'to_review', 'flagged', 'ok'],
+                          help='Filtrer par statut')
+    p_review.add_argument('--numero', '-n', type=int, help='Filtrer par numéro de Bidul')
+
+    # quality-report
+    p_quality = subparsers.add_parser('quality-report', help='Rapport de qualité')
+
+    # analyze-corrections
+    p_analyze = subparsers.add_parser('analyze-corrections', help='Analyse des corrections')
+
     args = parser.parse_args()
 
     # Configuration logging
@@ -810,6 +1121,12 @@ Exemples:
         'list': cmd_list,
         'populate': cmd_populate,
         'purge': cmd_purge,
+        'migrate': cmd_migrate,
+        'triage': cmd_triage,
+        'apply-aliases': cmd_apply_aliases,
+        'review': cmd_review,
+        'quality-report': cmd_quality_report,
+        'analyze-corrections': cmd_analyze_corrections,
     }
 
     return commands[args.command](args)
