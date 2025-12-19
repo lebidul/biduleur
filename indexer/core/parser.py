@@ -79,8 +79,9 @@ class EventParser:
     """
 
     # Patterns de dates
-    JOURS = r"(?:Lundi|Mardi|Mercredi|Jeudi|Vendredi|Samedi|Dimanche)"
-    DATE_PATTERN = re.compile(rf"^({JOURS})\s+(\d{{1,2}})\s*$", re.MULTILINE)
+    # Supporte: "Samedi 20", "LUNDI 1ER", "Mardi 2", etc.
+    JOURS = r"(?:[Ll]undi|[Mm]ardi|[Mm]ercredi|[Jj]eudi|[Vv]endredi|[Ss]amedi|[Dd]imanche|LUNDI|MARDI|MERCREDI|JEUDI|VENDREDI|SAMEDI|DIMANCHE)"
+    DATE_PATTERN = re.compile(rf"^({JOURS})\s+(\d{{1,2}})(?:ER|er)?\s*$", re.MULTILINE)
 
     # Pattern pour les bullets (• ou caractères similaires)
     BULLET_CHARS = r"[•●○◦▪▫■□►▸‣⁃\uf071]"

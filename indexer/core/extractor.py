@@ -76,21 +76,73 @@ class TextExtractor:
     """
 
     MIN_CHARS_FOR_NATIVE = 500  # Minimum de caractères pour considérer le texte valide
-
-    # Pages à ignorer par défaut pour les PDFs texte (178+)
-    # - Page 1 : souvent un sous-ensemble de la page 2
-    # - Page 3 : résumé qui duplique les événements
-    # On n'extrait que la page 2 qui est la plus complète
-    DEFAULT_SKIP_PAGES_TEXTE = [1, 3]
+    COL_THRESHOLD = 150  # Distance minimum entre colonnes (en points)
 
     def __init__(self, skip_pages: list[int] | None = None):
         """
         Initialise l'extracteur.
 
         Args:
-            skip_pages: Liste des pages à ignorer (1-indexed). Par défaut [3] pour PDFs texte.
+            skip_pages: Liste des pages à ignorer (1-indexed). Par défaut auto-détecté.
         """
         self.skip_pages = skip_pages
+
+    def _extract_by_columns(self, page) -> str:
+        """
+        Extrait le texte d'une page en respectant l'ordre des colonnes.
+
+        Lit les colonnes de gauche à droite, chaque colonne de haut en bas.
+
+        Args:
+            page: Page PyMuPDF
+
+        Returns:
+            Texte ordonné par colonnes
+        """
+        # Obtenir les blocs de texte avec positions (x0, y0, x1, y1, text, block_no, block_type)
+        blocks = page.get_text('blocks')
+        text_blocks = [b for b in blocks if b[6] == 0]  # Type 0 = texte
+
+        if not text_blocks:
+            return ""
+
+        # Identifier les colonnes par position x0
+        x0_values = sorted(set(round(b[0]) for b in text_blocks))
+
+        # Grouper les x0 proches en colonnes
+        column_starts = []
+        current_col_x = None
+        for x in x0_values:
+            if current_col_x is None or x - current_col_x > self.COL_THRESHOLD:
+                column_starts.append(x)
+                current_col_x = x
+
+        # Assigner chaque bloc à une colonne
+        def get_column(x0):
+            for i, col_x in enumerate(column_starts):
+                if i == len(column_starts) - 1 or x0 < column_starts[i + 1] - self.COL_THRESHOLD / 2:
+                    return i
+            return len(column_starts) - 1
+
+        # Organiser les blocs par colonne puis par position Y
+        columns_content = [[] for _ in column_starts]
+        for block in text_blocks:
+            x0, y0, x1, y1, text, block_no, block_type = block
+            col_idx = get_column(x0)
+            columns_content[col_idx].append((y0, text.strip()))
+
+        # Trier chaque colonne par Y (haut en bas)
+        for col in columns_content:
+            col.sort(key=lambda x: x[0])
+
+        # Assembler le texte: colonne par colonne
+        result_parts = []
+        for col in columns_content:
+            col_text = '\n'.join(text for y, text in col if text)
+            if col_text:
+                result_parts.append(col_text)
+
+        return '\n\n'.join(result_parts)
 
     def extract(self, pdf_path: str, skip_pages: list[int] | None = None) -> ExtractionResult:
         """
@@ -111,12 +163,16 @@ class TextExtractor:
             doc = fitz.open(pdf_path)
             num_pages = len(doc)
 
-            # Déterminer les pages à ignorer
+            # Déterminer les pages à extraire
+            # Pour les PDFs texte (178+) avec exactement 3 pages:
+            # - Page 3 = résumé consolidé de tous les événements (2 colonnes, S1 S2 S3 S4)
+            # - Pages 1 et 2 = versions partielles/dupliquées
+            # → Extraire UNIQUEMENT la page 3
             pages_to_skip = skip_pages if skip_pages is not None else self.skip_pages
             if pages_to_skip is None:
-                # Par défaut, ignorer page 3 pour les PDFs texte (178+)
-                if numero and numero >= 178:
-                    pages_to_skip = self.DEFAULT_SKIP_PAGES_TEXTE
+                if numero and numero >= 178 and num_pages == 3:
+                    # PDF texte standard à 3 pages: extraire uniquement page 3
+                    pages_to_skip = [1, 2]
                 else:
                     pages_to_skip = []
 
@@ -131,7 +187,14 @@ class TextExtractor:
                 if page_num in pages_to_skip:
                     continue
                 page = doc[i]
-                text = page.get_text().strip()
+
+                # Pour les PDFs texte (178+), utiliser l'extraction par colonnes
+                # pour respecter l'ordre de lecture gauche→droite, haut→bas
+                if numero and numero >= 178:
+                    text = self._extract_by_columns(page)
+                else:
+                    text = page.get_text().strip()
+
                 char_count = len(text)
                 total_chars += char_count
 

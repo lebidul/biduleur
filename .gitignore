@@ -59,3 +59,10 @@ output_images/
 
 # Fichier de version généré par le build
 leTruc/_version.py
+
+# Indexer - fichiers générés
+indexer/database/*.db
+indexer/archives/
+indexer/corpus/*.csv
+indexer/corpus/*.json
+indexer/corpus/.~lock.*

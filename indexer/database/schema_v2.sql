@@ -69,6 +69,12 @@ CREATE TABLE IF NOT EXISTS evenement (
     -- Genres extraits (texte entre parenthèses) : JSON array
     genres_raw TEXT,
 
+    -- Genre de l'événement (concert, spectacle vivant, etc.)
+    genre_evenement TEXT,
+
+    -- Source de l'extraction ('csv' ou 'pdf')
+    source TEXT DEFAULT 'pdf',
+
     -- Prix
     tarif_raw TEXT,                          -- "5€ / 8€", "gratuit"
     prix_min REAL,

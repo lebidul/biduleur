@@ -170,7 +170,7 @@ class BidulDB:
     # -------------------------------------------------------------------------
 
     def insert_evenement(self, bidul_numero: int, event: ParsedEvent) -> int:
-        """Insère un événement."""
+        """Insère un événement depuis un ParsedEvent (extraction PDF)."""
         conn = self.connect()
 
         # Chercher les IDs de référence pour lieu et ville
@@ -183,8 +183,8 @@ class BidulDB:
                 lieu_raw, lieu_ref_id, ville_raw, ville_ref_id,
                 artistes, spectacles, genres_raw,
                 tarif_raw, prix_min, prix_max, gratuit,
-                type_evenement, confidence
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                type_evenement, confidence, source
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pdf')
         """, (
             bidul_numero,
             event.raw_text,
@@ -204,6 +204,47 @@ class BidulDB:
             event.gratuit,
             event.type_evenement,
             event.confidence
+        ))
+        conn.commit()
+        return cursor.lastrowid
+
+    def insert_evenement_from_dict(self, event: dict) -> int:
+        """Insère un événement depuis un dictionnaire (import CSV)."""
+        conn = self.connect()
+
+        # Chercher les IDs de référence pour lieu et ville
+        lieu_ref_id = self._find_lieu_ref(event.get('lieu_raw')) if event.get('lieu_raw') else None
+        ville_ref_id = self._find_ville_ref(event.get('ville_raw')) if event.get('ville_raw') else None
+
+        cursor = conn.execute("""
+            INSERT INTO evenement (
+                bidul_numero, raw_text, nom, date_evenement, heure,
+                lieu_raw, lieu_ref_id, ville_raw, ville_ref_id,
+                artistes, spectacles, genres_raw, genre_evenement,
+                tarif_raw, prix_min, prix_max, gratuit,
+                type_evenement, confidence, source
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            event['bidul_numero'],
+            event['raw_text'],
+            event.get('nom'),
+            event.get('date_evenement'),
+            event.get('heure'),
+            event.get('lieu_raw'),
+            lieu_ref_id,
+            event.get('ville_raw'),
+            ville_ref_id,
+            event.get('artistes'),
+            event.get('spectacles'),
+            event.get('genres_raw'),
+            event.get('genre_evenement'),
+            event.get('tarif_raw'),
+            event.get('prix_min'),
+            event.get('prix_max'),
+            event.get('gratuit', False),
+            event.get('type_evenement'),
+            event.get('confidence', 0.5),
+            event.get('source', 'pdf')
         ))
         conn.commit()
         return cursor.lastrowid
