@@ -2,8 +2,10 @@
 Module d'extraction de texte depuis les PDFs.
 
 Gère l'extraction de texte natif (PDFs texte) et prépare pour l'OCR (PDFs scan).
+Utilise biduls.description.csv pour déterminer les pages à extraire.
 """
 
+import csv
 import re
 import logging
 from dataclasses import dataclass, field
@@ -16,6 +18,179 @@ except ImportError:
     raise ImportError("PyMuPDF requis: pip install PyMuPDF")
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class BidulConfig:
+    """Configuration d'extraction pour un numéro de Bidul."""
+    numero: int
+    type_source: str  # 'scan' ou 'texte'
+    pages_utiles: list[int] = field(default_factory=list)  # Pages avec texte utile (1-indexed)
+
+    @classmethod
+    def from_csv_row(cls, row: dict) -> Optional['BidulConfig']:
+        """
+        Crée une config depuis une ligne du CSV biduls.description.csv.
+
+        Note: Le CSV décrit la structure logique du livret (pages 1/2 du format imprimé).
+        Pour les PDFs:
+        - PDFs à 3 pages: page 3 = agenda complet consolidé
+        - PDFs à 2 pages: page 2 = agenda
+        - page1/page2 du CSV indiquent si ces sections contiennent du texte utile
+        """
+        try:
+            # Le nom de colonne peut avoir des variantes d'encodage
+            numero = 0
+            for key in ['numéros', 'numeros', 'num\xe9ros']:
+                if key in row:
+                    try:
+                        numero = int(row[key])
+                        break
+                    except (ValueError, TypeError):
+                        continue
+
+            if numero == 0:
+                return None
+
+            type_source = row.get('scan/texte', 'scan')
+
+            # Déterminer les pages logiques avec texte utile
+            has_page1 = bool(row.get('page1.sections texte utile', '').strip())
+            has_page2 = bool(row.get('page2.sections texte utile', '').strip())
+
+            # Convertir en pages PDF réelles
+            # Pour les PDFs texte: généralement la dernière page contient l'agenda complet
+            # pages_utiles sera interprété différemment selon num_pages du PDF
+            pages_utiles = []
+            if has_page1:
+                pages_utiles.append(1)
+            if has_page2:
+                pages_utiles.append(2)
+
+            # Si aucune page spécifiée mais c'est un texte, défaut
+            if not pages_utiles and type_source == 'texte':
+                pages_utiles = [2]
+
+            return cls(numero=numero, type_source=type_source, pages_utiles=pages_utiles)
+
+        except (ValueError, KeyError) as e:
+            logger.debug(f"Erreur parsing config row: {e}")
+            return None
+
+
+class BidulConfigLoader:
+    """Charge et gère les configurations d'extraction depuis biduls.description.csv."""
+
+    def __init__(self, csv_path: Optional[str] = None):
+        """
+        Initialise le loader.
+
+        Args:
+            csv_path: Chemin vers biduls.description.csv. Si None, cherche dans corpus/.
+        """
+        if csv_path is None:
+            # Chercher dans le répertoire corpus relatif à ce fichier
+            csv_path = Path(__file__).parent.parent / 'corpus' / 'biduls.description.csv'
+
+        self.csv_path = Path(csv_path)
+        self.configs: dict[int, BidulConfig] = {}
+        self._load()
+
+    def _load(self):
+        """Charge les configurations depuis le CSV."""
+        if not self.csv_path.exists():
+            logger.warning(f"Fichier config non trouvé: {self.csv_path}")
+            return
+
+        # Essayer plusieurs encodages
+        encodings = ['utf-8-sig', 'utf-8', 'latin-1', 'cp1252']
+
+        for encoding in encodings:
+            try:
+                with open(self.csv_path, 'r', encoding=encoding) as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        config = BidulConfig.from_csv_row(row)
+                        if config:
+                            self.configs[config.numero] = config
+
+                logger.info(f"Chargé {len(self.configs)} configurations depuis {self.csv_path} ({encoding})")
+                return
+
+            except UnicodeDecodeError:
+                continue
+            except Exception as e:
+                logger.error(f"Erreur chargement config ({encoding}): {e}")
+                continue
+
+        logger.error(f"Impossible de lire {self.csv_path} avec les encodages disponibles")
+
+    def get_config(self, numero: int) -> Optional[BidulConfig]:
+        """Retourne la config pour un numéro, ou None si non trouvée."""
+        return self.configs.get(numero)
+
+    def get_nearest_config(self, numero: int) -> Optional[BidulConfig]:
+        """
+        Retourne la config la plus proche pour un numéro non configuré.
+
+        Cherche d'abord en dessous, puis au-dessus du numéro demandé.
+        """
+        if numero in self.configs:
+            return self.configs[numero]
+
+        # Chercher la config la plus proche (priorité aux numéros inférieurs)
+        lower_nums = [n for n in self.configs.keys() if n < numero]
+        upper_nums = [n for n in self.configs.keys() if n > numero]
+
+        if lower_nums:
+            return self.configs[max(lower_nums)]
+        elif upper_nums:
+            return self.configs[min(upper_nums)]
+
+        return None
+
+    def get_fallback_configs(self, numero: int) -> list[BidulConfig]:
+        """
+        Retourne une liste de configs à essayer, ordonnée par pertinence.
+
+        1. Config exacte pour ce numéro
+        2. Config la plus proche (même type de source si possible)
+        3. Autres configs du même type
+        """
+        result = []
+
+        # Config exacte
+        if numero in self.configs:
+            result.append(self.configs[numero])
+
+        # Trouver le type de source probable
+        exact = self.configs.get(numero)
+        target_type = exact.type_source if exact else ('texte' if numero >= 178 else 'scan')
+
+        # Configs proches du même type
+        all_nums = sorted(self.configs.keys())
+        same_type = [n for n in all_nums if self.configs[n].type_source == target_type]
+
+        # Trier par proximité
+        same_type.sort(key=lambda n: abs(n - numero))
+
+        for n in same_type[:5]:  # Max 5 fallbacks
+            if n != numero and self.configs[n] not in result:
+                result.append(self.configs[n])
+
+        return result
+
+
+# Singleton pour éviter de recharger le CSV à chaque appel
+_config_loader: Optional[BidulConfigLoader] = None
+
+
+def get_config_loader() -> BidulConfigLoader:
+    """Retourne le loader de configuration (singleton)."""
+    global _config_loader
+    if _config_loader is None:
+        _config_loader = BidulConfigLoader()
+    return _config_loader
 
 
 @dataclass
@@ -73,19 +248,17 @@ class TextExtractor:
 
     Pour les PDFs avec texte natif (n° >= 178), extraction directe.
     Pour les scans (n° < 178), signale que l'OCR est nécessaire.
+
+    Utilise biduls.description.csv pour déterminer automatiquement
+    quelles pages contiennent du texte utile.
     """
 
     MIN_CHARS_FOR_NATIVE = 500  # Minimum de caractères pour considérer le texte valide
     COL_THRESHOLD = 150  # Distance minimum entre colonnes (en points)
 
-    def __init__(self, skip_pages: list[int] | None = None):
-        """
-        Initialise l'extracteur.
-
-        Args:
-            skip_pages: Liste des pages à ignorer (1-indexed). Par défaut auto-détecté.
-        """
-        self.skip_pages = skip_pages
+    def __init__(self):
+        """Initialise l'extracteur."""
+        pass
 
     def _extract_by_columns(self, page) -> str:
         """
@@ -144,13 +317,88 @@ class TextExtractor:
 
         return '\n\n'.join(result_parts)
 
-    def extract(self, pdf_path: str, skip_pages: list[int] | None = None) -> ExtractionResult:
+    def _get_pages_to_extract(self, numero: Optional[int], num_pages: int) -> tuple[list[int], bool]:
+        """
+        Détermine les pages PDF à extraire selon la configuration.
+
+        Priorité:
+        1. Vérifier si c'est un scan (pas d'extraction possible)
+        2. Si page 3 existe → extraire page 3 (agenda complet consolidé)
+        3. Sinon, utiliser biduls.description.csv pour déterminer les pages
+
+        Args:
+            numero: Numéro du Bidul
+            num_pages: Nombre total de pages du PDF
+
+        Returns:
+            Tuple (pages à extraire, is_scan)
+            - pages: Liste des pages PDF à extraire (1-indexed)
+            - is_scan: True si c'est un scan (OCR nécessaire)
+        """
+        if numero is None:
+            # Pas de numéro détecté, extraire toutes les pages
+            return list(range(1, num_pages + 1)), False
+
+        # Charger la configuration
+        loader = get_config_loader()
+        config = loader.get_config(numero)
+        if config is None:
+            config = loader.get_nearest_config(numero)
+
+        # Vérifier si c'est un scan
+        if config and config.type_source == 'scan':
+            logger.debug(f"Bidul {numero}: type=scan -> OCR nécessaire")
+            return list(range(1, num_pages + 1)), True
+
+        # C'est un PDF texte - déterminer les pages à extraire
+
+        # PRIORITÉ: Si page 3 existe, c'est l'agenda complet
+        if num_pages >= 3:
+            logger.debug(f"Bidul {numero}: page 3 existe -> extraction page 3")
+            return [3], False
+
+        # Sinon, utiliser la configuration du CSV
+        if config:
+            has_page1 = 1 in config.pages_utiles
+            has_page2 = 2 in config.pages_utiles
+
+            if num_pages == 2:
+                if has_page1 and has_page2:
+                    logger.debug(f"Bidul {numero}: PDF 2 pages, config [1,2] -> pages PDF [1, 2]")
+                    return [1, 2], False
+                elif has_page2:
+                    logger.debug(f"Bidul {numero}: PDF 2 pages, config [2] -> page PDF [2]")
+                    return [2], False
+                elif has_page1:
+                    logger.debug(f"Bidul {numero}: PDF 2 pages, config [1] -> page PDF [1]")
+                    return [1], False
+                else:
+                    # Défaut: page 2
+                    logger.debug(f"Bidul {numero}: PDF 2 pages, pas de config -> page PDF [2]")
+                    return [2], False
+
+            elif num_pages == 1:
+                logger.debug(f"Bidul {numero}: PDF 1 page -> page PDF [1]")
+                return [1], False
+
+            else:
+                # PDF avec autre nombre de pages: extraire toutes
+                logger.debug(f"Bidul {numero}: PDF {num_pages} pages -> toutes")
+                return list(range(1, num_pages + 1)), False
+
+        # Fallback sans config
+        if num_pages >= 2:
+            return [2], False
+        else:
+            return [1], False
+
+    def extract(self, pdf_path: str, pages_to_extract: list[int] | None = None) -> ExtractionResult:
         """
         Extrait le texte d'un PDF.
 
         Args:
             pdf_path: Chemin vers le PDF
-            skip_pages: Pages à ignorer (1-indexed). Si None, utilise le défaut.
+            pages_to_extract: Pages à extraire (1-indexed). Si None, auto-détecté via config.
 
         Returns:
             ExtractionResult avec le texte et métadonnées
@@ -163,37 +411,41 @@ class TextExtractor:
             doc = fitz.open(pdf_path)
             num_pages = len(doc)
 
-            # Déterminer les pages à extraire
-            # Pour les PDFs texte (178+) avec exactement 3 pages:
-            # - Page 3 = résumé consolidé de tous les événements (2 colonnes, S1 S2 S3 S4)
-            # - Pages 1 et 2 = versions partielles/dupliquées
-            # → Extraire UNIQUEMENT la page 3
-            pages_to_skip = skip_pages if skip_pages is not None else self.skip_pages
-            if pages_to_skip is None:
-                if numero and numero >= 178 and num_pages == 3:
-                    # PDF texte standard à 3 pages: extraire uniquement page 3
-                    pages_to_skip = [1, 2]
-                else:
-                    pages_to_skip = []
+            # Déterminer les pages à extraire via biduls.description.csv
+            is_scan = False
+            if pages_to_extract is None:
+                pages_to_extract, is_scan = self._get_pages_to_extract(numero, num_pages)
+
+            # Si c'est un scan, retourner un résultat vide (OCR nécessaire)
+            if is_scan:
+                doc.close()
+                logger.info(f"Bidul {numero}: scan détecté, OCR nécessaire")
+                return ExtractionResult(
+                    pdf_path=pdf_path,
+                    bidul_numero=numero,
+                    mois=mois,
+                    annee=annee,
+                    num_pages=num_pages,
+                    pages=[],
+                    full_text="",
+                    is_native=False
+                )
+
+            logger.debug(f"Extraction {filename}: pages {pages_to_extract} sur {num_pages}")
 
             pages = []
             full_text_parts = []
             total_chars = 0
 
-            for i in range(num_pages):
-                page_num = i + 1  # 1-indexed
-
-                # Ignorer les pages spécifiées
-                if page_num in pages_to_skip:
+            for page_num in pages_to_extract:
+                if page_num < 1 or page_num > num_pages:
                     continue
-                page = doc[i]
 
-                # Pour les PDFs texte (178+), utiliser l'extraction par colonnes
+                page = doc[page_num - 1]  # PyMuPDF utilise l'index 0-based
+
+                # Pour les PDFs texte, utiliser l'extraction par colonnes
                 # pour respecter l'ordre de lecture gauche→droite, haut→bas
-                if numero and numero >= 178:
-                    text = self._extract_by_columns(page)
-                else:
-                    text = page.get_text().strip()
+                text = self._extract_by_columns(page)
 
                 char_count = len(text)
                 total_chars += char_count
@@ -202,7 +454,7 @@ class TextExtractor:
                 is_native = char_count >= 100
 
                 page_result = PageText(
-                    page_num=i + 1,
+                    page_num=page_num,
                     raw_text=text,
                     char_count=char_count,
                     is_native=is_native
@@ -214,7 +466,7 @@ class TextExtractor:
 
             # Le PDF est considéré comme natif si au moins 50% des pages ont du texte
             pages_with_text = sum(1 for p in pages if p.is_native)
-            is_native = pages_with_text >= len(pages) / 2
+            is_native = len(pages) > 0 and pages_with_text >= len(pages) / 2
 
             return ExtractionResult(
                 pdf_path=pdf_path,

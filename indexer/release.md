@@ -1,10 +1,27 @@
-# Release Notes - Indexer v1.1
+# Release Notes - Indexer v1.2
 
 ## Vue d'ensemble
 
-Version améliorée du pipeline d'indexation avec corrections de parsing et nouvelles fonctionnalités CLI.
+Version avec extraction configurable et support des formats anciens (pré-2015).
 
 **Résultat** : ~14 500 événements indexés depuis 122 numéros (178-308)
+
+## Nouveautés v1.2
+
+### Extraction configurable
+- **Configuration via CSV** : `corpus/biduls.description.csv` définit les pages utiles et le type (scan/texte) par numéro
+- **Détection des scans** : Les PDFs scans sont détectés et ignorés (message "OCR nécessaire")
+- **Priorité page 3** : Si page 3 existe, elle est utilisée en priorité (agenda complet)
+
+### Support des anciens formats
+- **Format inline** : Support du pattern `Je 02 : ARTISTE, Lieu` (Biduls pré-2015)
+- **Jours abrégés** : Reconnaissance de `Lu`, `Ma`, `Me`, `Je`, `Ve`, `Sa`, `Di`
+- **Fallback automatique** : Si le format standard échoue, le format inline est tenté
+
+### Normalisation des artistes
+- **Title Case** : Noms d'artistes normalisés (`DJ MACHIN` → `Dj Machin`)
+- **Préfixes préservés** : DJ, MC, Dj, Mc conservent leur casse
+- **Mots de liaison** : `de`, `la`, `le`, `et`, `du` restent en minuscules
 
 ## Nouveautés v1.1
 
@@ -22,8 +39,8 @@ Version améliorée du pipeline d'indexation avec corrections de parsing et nouv
 
 ### Extraction PDF
 - Support des PDFs texte natifs (PyMuPDF)
-- Détection automatique scan vs texte
-- Extraction multi-pages avec skip des pages 1 et 3 (doublons typiques)
+- Configuration via `corpus/biduls.description.csv` (pages utiles, type scan/texte)
+- Priorité page 3 si disponible, sinon pages configurées
 
 ### Import CSV
 - Import prioritaire depuis les CSV de tapages (confidence = 1.0)
