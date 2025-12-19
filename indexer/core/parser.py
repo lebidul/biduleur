@@ -102,12 +102,13 @@ class EventParser:
     DATE_PATTERN = re.compile(rf"^({JOURS})\s+(\d{{1,2}})(?:ER|er)?\s*$", re.MULTILINE)
 
     # Pattern pour les bullets (• ou caractères similaires)
-    BULLET_CHARS = r"[•●○◦▪▫■□►▸‣⁃\uf071\uf0b6]"
+    # Inclut: •●○◦▪▫■□►▸‣⁃ et les variantes Unicode (❑❒◇◆★☆✦✧♦)
+    BULLET_CHARS = r"[•●○◦▪▫■□►▸‣⁃❑❒◇◆★☆✦✧♦\uf071\uf0b6]"
 
     # Pattern pour détecter un nouveau événement dans un texte multi-événements
     # Un nouvel événement commence par: bullet OU (retour ligne + artiste en MAJUSCULES)
     MULTI_EVENT_SPLIT = re.compile(
-        r'(?:\n\s*[•●○◦▪▫■□►▸‣⁃\uf071\uf0b6]\s*)|'  # Bullet sur nouvelle ligne
+        r'(?:\n\s*[•●○◦▪▫■□►▸‣⁃❑❒◇◆★☆✦✧♦\uf071\uf0b6]\s*)|'  # Bullet sur nouvelle ligne
         r'(?:\n\s*(?=[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s\'\-&]{2,}.*?,.*?\d+[hH]))',  # ARTISTE... , ... XXh
         re.MULTILINE
     )
@@ -363,7 +364,12 @@ class EventParser:
                 continue
             cleaned_lines.append(line)
 
-        return '\n'.join(cleaned_lines).strip()
+        result = '\n'.join(cleaned_lines).strip()
+
+        # Supprimer les puces en début de texte (peuvent rester après le split)
+        result = re.sub(rf'^{self.BULLET_CHARS}\s*', '', result)
+
+        return result
 
     def _extract_spectacle_artiste_pattern(self, text: str) -> tuple[list[ArtisteInfo], list[str], list[str], str]:
         """Extrait le pattern 'Spectacle' Cie/Artiste (genre) AVANT le parsing standard."""
