@@ -1,10 +1,22 @@
-# Release Notes - Indexer v1.0
+# Release Notes - Indexer v1.1
 
 ## Vue d'ensemble
 
-Première version fonctionnelle du pipeline d'indexation des archives du Bidul.
+Version améliorée du pipeline d'indexation avec corrections de parsing et nouvelles fonctionnalités CLI.
 
 **Résultat** : ~14 500 événements indexés depuis 122 numéros (178-308)
+
+## Nouveautés v1.1
+
+### Améliorations du parser
+- **Nettoyage des artifacts PDF** : Suppression des lignes "K" isolées et headers "le bidul - mois YYYY"
+- **Pattern spectacle-artiste** : Correction du parsing `"Spectacle" Cie Artiste (genre)` (ex: `"Personne" Cie L'Absente (magie)`)
+- **Séparateur `//"** : Support du pattern `Festival X // ARTISTE1 + ARTISTE2`
+- **Spectacle sans artiste** : Gestion correcte de `"Spectacle" (genre), Lieu` sans faux artiste
+
+### CLI amélioré
+- **`populate --replace`** : Option pour remplacer les événements existants (évite les doublons)
+- **`stats` étendu** : Affiche sources (csv/pdf), types, tarification, top lieux/villes, plage de dates
 
 ## Fonctionnalités
 
@@ -33,11 +45,11 @@ Première version fonctionnelle du pipeline d'indexation des archives du Bidul.
 ### CLI
 - `init` : Initialisation base + référentiels
 - `extract` : Extraction PDF
-- `populate` : Peuplement intelligent (CSV > PDF)
+- `populate` : Peuplement intelligent (CSV > PDF) avec option `--replace`
 - `validate` : Affichage pour validation manuelle
 - `compare` : Comparaison avec CSV de référence
-- `stats` : Statistiques globales
-- `purge` : Nettoyage sélectif
+- `stats` : Statistiques étendues (sources, types, top lieux/villes)
+- `purge` : Nettoyage sélectif (par numéro, plage, ou tout)
 
 ## Statistiques
 
@@ -47,7 +59,7 @@ Première version fonctionnelle du pipeline d'indexation des archives du Bidul.
 | Événements totaux | ~14 500 |
 | Source CSV | ~3 000 (confidence 1.0) |
 | Source PDF | ~11 500 (confidence 0.4-0.9) |
-| Confidence moyenne | 0.90 |
+| Confidence moyenne | 0.91 |
 
 ## Limitations connues
 

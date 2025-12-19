@@ -433,21 +433,66 @@ def cmd_stats(args):
     print(f"{'='*50}")
     print("STATISTIQUES BASE DE DONNÉES")
     print(f"{'='*50}")
-    print(f"Biduls:      {stats.get('biduls', 0)}")
-    print(f"Événements:  {stats.get('evenements', 0)}")
-    print(f"Lieux ref:   {stats.get('lieux_ref', 0)}")
-    print(f"Villes ref:  {stats.get('villes_ref', 0)}")
 
-    if 'par_statut' in stats:
-        print(f"\nPar statut:")
-        for status, count in stats['par_statut'].items():
-            print(f"  {status}: {count}")
+    # Résumé principal
+    print(f"\nBiduls:      {stats.get('biduls', 0)}")
+    if 'bidul_min' in stats:
+        print(f"  Plage: {stats['bidul_min']} - {stats['bidul_max']}")
 
+    print(f"\nÉvénements:  {stats.get('evenements', 0)}")
+    if 'date_min' in stats:
+        print(f"  Période: {stats['date_min']} - {stats['date_max']}")
+
+    # Par source
+    if 'par_source' in stats and stats['par_source']:
+        print(f"\nPar source:")
+        for source, count in sorted(stats['par_source'].items()):
+            print(f"  {source}: {count}")
+
+    # Référentiels
+    print(f"\nRéférentiels:")
+    print(f"  Lieux:  {stats.get('lieux_ref', 0)}")
+    print(f"  Villes: {stats.get('villes_ref', 0)}")
+
+    # Tarification
+    if 'gratuits' in stats:
+        print(f"\nTarification:")
+        print(f"  Gratuits:     {stats['gratuits']}")
+        print(f"  Payants:      {stats['payants']}")
+        print(f"  Prix inconnu: {stats['prix_inconnu']}")
+
+    # Par type d'événement
+    if 'par_type' in stats and stats['par_type']:
+        print(f"\nPar type:")
+        for type_evt, count in stats['par_type'].items():
+            print(f"  {type_evt}: {count}")
+
+    # Top villes
+    if 'top_villes' in stats and stats['top_villes']:
+        print(f"\nTop 5 villes:")
+        for ville, count in stats['top_villes']:
+            print(f"  {ville}: {count}")
+
+    # Top lieux
+    if 'top_lieux' in stats and stats['top_lieux']:
+        print(f"\nTop 5 lieux:")
+        for lieu, count in stats['top_lieux']:
+            # Encoder en ASCII pour éviter les erreurs d'encodage console Windows
+            lieu_safe = lieu.encode('ascii', 'replace').decode('ascii') if lieu else lieu
+            print(f"  {lieu_safe}: {count}")
+
+    # Confidence
     if 'confidence_avg' in stats:
         print(f"\nConfidence:")
         print(f"  Moyenne: {stats['confidence_avg']:.2f}")
         print(f"  Min:     {stats['confidence_min']:.2f}")
         print(f"  Max:     {stats['confidence_max']:.2f}")
+
+    # Par statut
+    if 'par_statut' in stats and stats['par_statut']:
+        print(f"\nPar statut extraction:")
+        for status, count in stats['par_statut'].items():
+            print(f"  {status}: {count}")
 
     return 0
 
@@ -482,8 +527,17 @@ def cmd_populate(args):
     csv_biduls = 0
     pdf_biduls = 0
     skipped = 0
+    already_exists = 0
 
     for numero in numeros:
+        # Vérifier si déjà en base (sauf si --replace)
+        existing_count = db.count_evenements(numero)
+        if existing_count > 0 and not args.replace:
+            if args.verbose:
+                print(f"[{numero}] Déjà en base ({existing_count} événements) - ignoré (utilisez --replace)")
+            already_exists += 1
+            continue
+
         # Trouver le PDF pour avoir mois/année
         pdf_path = find_pdf(numero)
         if not pdf_path:
@@ -592,6 +646,7 @@ def cmd_populate(args):
     print(f"{'='*50}")
     print(f"Biduls depuis CSV: {csv_biduls} ({total_from_csv} événements)")
     print(f"Biduls depuis PDF: {pdf_biduls} ({total_from_pdf} événements)")
+    print(f"Biduls déjà en base: {already_exists}")
     print(f"Biduls ignorés:    {skipped}")
     print(f"Total événements:  {total_events}")
 
@@ -726,6 +781,7 @@ Exemples:
     p_populate.add_argument('--pdf-only', action='store_true', help='Ignorer les CSV (forcer extraction PDF)')
     p_populate.add_argument('--dry-run', action='store_true', help='Affiche sans sauvegarder')
     p_populate.add_argument('--force', action='store_true', help='Forcer extraction des scans')
+    p_populate.add_argument('--replace', action='store_true', help='Remplacer les événements existants')
 
     # purge
     p_purge = subparsers.add_parser('purge', help='Supprime les événements de la base')

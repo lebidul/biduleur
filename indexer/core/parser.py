@@ -348,29 +348,121 @@ class EventParser:
 
         return spectacles, text_cleaned
 
+    def _clean_raw_text(self, text: str) -> str:
+        """Nettoie le texte brut des artifacts d'extraction PDF."""
+        lines = text.split('\n')
+        cleaned_lines = []
+
+        for line in lines:
+            stripped = line.strip()
+            # Ignorer les lignes "K" isolées
+            if stripped in ('K', 'K ', ' K'):
+                continue
+            # Ignorer les headers "le bidul - mois YYYY"
+            if re.match(r'^le bidul\s*-\s*\w+\s+\d{4}$', stripped, re.IGNORECASE):
+                continue
+            cleaned_lines.append(line)
+
+        return '\n'.join(cleaned_lines).strip()
+
+    def _extract_spectacle_artiste_pattern(self, text: str) -> tuple[list[ArtisteInfo], list[str], list[str], str]:
+        """Extrait le pattern 'Spectacle' Cie/Artiste (genre) AVANT le parsing standard."""
+        artistes = []
+        spectacles = []
+        genres = []
+
+        pattern = re.compile(
+            r'[""«]([^""»]+)[""»]\s+'
+            r"([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s'\-/&]+?)"
+            r'\s*\(([^)]+)\)',
+            re.UNICODE
+        )
+
+        match = pattern.search(text)
+        if match:
+            titre = match.group(1).strip()
+            artiste_raw = match.group(2).strip()
+            genre = match.group(3).strip()
+
+            spectacles.append(titre)
+            genres.append(genre)
+
+            if re.search(r'\s*/\s*(?:Cie|Compagnie)\s+', artiste_raw, re.IGNORECASE):
+                parts = re.split(r'\s*/\s*(?:Cie|Compagnie)\s*', artiste_raw, flags=re.IGNORECASE)
+                if len(parts) >= 2:
+                    if parts[0].strip():
+                        artistes.append(ArtisteInfo(nom=parts[0].strip(), genre=genre, spectacle=titre))
+                    if parts[-1].strip():
+                        artistes.append(ArtisteInfo(nom="Cie " + parts[-1].strip(), genre=genre, spectacle=titre))
+            else:
+                artistes.append(ArtisteInfo(nom=artiste_raw, genre=genre, spectacle=titre))
+
+            text = text[:match.start()] + text[match.end():]
+            text = re.sub(r'\s+', ' ', text).strip()
+
+        return artistes, spectacles, genres, text
+
+    def _extract_double_slash_pattern(self, text: str) -> tuple[Optional[str], str]:
+        """
+        Extrait le pattern 'Titre/Nom événement // ARTISTES...'
+
+        Le // sépare le nom de l'événement (festival, soirée) des artistes.
+        Ex: "Festival X #9 (concerts) // ARTISTE1 + ARTISTE2, lieu, heure"
+
+        Returns:
+            (nom_evenement, texte_restant_avec_artistes)
+        """
+        # Pattern: texte // texte (le // doit être entouré d'espaces ou en début/fin)
+        match = re.search(r'^(.+?)\s*//\s*(.+)$', text)
+        if match:
+            nom_evenement = match.group(1).strip()
+            reste = match.group(2).strip()
+
+            # Valider que c'est bien un nom d'événement (pas juste un artiste)
+            # Un nom d'événement contient souvent: festival, soirée, #, ou un genre entre ()
+            is_event_name = (
+                re.search(r'festival|soirée|nuit|journée|#\d+|\(\w+\)', nom_evenement, re.IGNORECASE) or
+                not self.ARTISTE_PATTERN.match(nom_evenement)  # Pas entièrement en majuscules
+            )
+
+            if is_event_name:
+                return nom_evenement, reste
+
+        return None, text
+
     def _parse_event(self, text: str, date_str: Optional[str]) -> Optional[ParsedEvent]:
-        """Parse un texte d'événement individuel."""
+        if not text:
+            return None
+
+        # Nettoyer les artifacts d'extraction
+        text = self._clean_raw_text(text)
         if not text:
             return None
 
         event = ParsedEvent(raw_text=text)
 
-        # Date
         if date_str:
             event.date_str = date_str
             event.date_evenement = self._parse_date(date_str)
 
-        # 1. Spectacles (entre guillemets) - extraire EN PREMIER
-        # Les virgules à l'intérieur des guillemets sont protégées
+        # 0a. Extraire le pattern // (Titre événement // ARTISTES)
+        event_name_from_slash, text = self._extract_double_slash_pattern(text)
+
+        # 0b. Extraire le pattern "Spectacle" Artiste (genre)
+        pre_artistes, pre_spectacles, pre_genres, text = self._extract_spectacle_artiste_pattern(text)
+
+        # 1. Spectacles restants
         spectacles_with_genre, text_cleaned = self._extract_spectacles_with_genre(text)
-        event.spectacles = [s['nom'] for s in spectacles_with_genre]
+        event.spectacles = pre_spectacles + [s['nom'] for s in spectacles_with_genre]
 
-        # Genres extraits des spectacles
-        spectacle_genres = [s['genre'] for s in spectacles_with_genre if s.get('genre')]
+        spectacle_genres = pre_genres + [s['genre'] for s in spectacles_with_genre if s.get('genre')]
 
-        # 2. Artistes (MAJUSCULES) - sur le texte nettoyé
+        # 2. Artistes
         artistes = self._extract_artistes(text_cleaned)
-        event.artistes = artistes
+        if pre_artistes:
+            event.artistes = pre_artistes
+        else:
+            event.artistes = artistes
 
         # 3. Genres (entre parenthèses restantes dans le texte nettoyé)
         genres = self.GENRE_PATTERN.findall(text_cleaned)
@@ -389,7 +481,10 @@ class EventParser:
         event.lieu_raw, event.ville_raw = self._extract_lieu_ville(text_cleaned)
 
         # 7. Nom de l'événement
-        event.nom = self._extract_nom(text, event)
+        if event_name_from_slash:
+            event.nom = event_name_from_slash
+        else:
+            event.nom = self._extract_nom(text, event)
 
         # 8. Type d'événement
         event.type_evenement = self._deduce_type(event)
@@ -427,7 +522,19 @@ class EventParser:
         # Chercher les patterns ARTISTE1 + ARTISTE2
         # D'abord, isoler la partie avant le lieu (avant la virgule principale)
         parts = text.split(',')
-        artiste_zone = parts[0] if parts else text
+        artiste_zone = parts[0].strip() if parts else text.strip()
+
+        # Si la zone artiste est vide ou commence par une virgule, pas d'artiste
+        # Cela arrive quand le texte est juste un spectacle suivi du lieu
+        if not artiste_zone:
+            return []
+
+        # Vérifier si la zone artiste est en fait un lieu connu
+        # (après extraction de spectacle, le lieu peut se retrouver en première position)
+        from core.normalizer import normalize_lieu
+        lieu_id, _ = normalize_lieu(artiste_zone.split(',')[0].strip())
+        if lieu_id is not None:
+            return []
 
         # Chercher un spectacle présentateur (ex: "Merci Connasse présente")
         spectacle_presenter = None
@@ -554,11 +661,18 @@ class EventParser:
         candidates = []
 
         # Déterminer l'index de départ:
+        # - Si le premier segment est un lieu connu, commencer à 0
         # - Si le premier segment contient un artiste (MAJUSCULES), commencer à 1
         # - Sinon (texte nettoyé après spectacle), commencer à 0
         start_idx = 0
-        if parts and self.ARTISTE_PATTERN.match(parts[0]):
-            start_idx = 1
+        if parts:
+            first_part = parts[0].strip()
+            # Vérifier d'abord si c'est un lieu connu
+            lieu_id, _ = normalize_lieu(first_part)
+            if lieu_id is not None:
+                start_idx = 0  # C'est un lieu, commencer à 0
+            elif self.ARTISTE_PATTERN.match(first_part):
+                start_idx = 1  # C'est un artiste, commencer à 1
 
         # Collecter les candidats lieu/ville
         for part in parts[start_idx:]:

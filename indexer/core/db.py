@@ -307,6 +307,13 @@ class BidulDB:
         stats['lieux_ref'] = conn.execute("SELECT COUNT(*) FROM lieu_ref").fetchone()[0]
         stats['villes_ref'] = conn.execute("SELECT COUNT(*) FROM ville_ref").fetchone()[0]
 
+        # Stats par source (csv/pdf)
+        sources = conn.execute("""
+            SELECT source, COUNT(*) as count
+            FROM evenement GROUP BY source
+        """).fetchall()
+        stats['par_source'] = {row['source'] or 'unknown': row['count'] for row in sources}
+
         # Stats par statut
         statuses = conn.execute("""
             SELECT extraction_status, COUNT(*) as count
@@ -323,6 +330,69 @@ class BidulDB:
             stats['confidence_avg'] = round(row['avg_conf'], 3)
             stats['confidence_min'] = round(row['min_conf'], 3)
             stats['confidence_max'] = round(row['max_conf'], 3)
+
+        # Plage de Biduls
+        row = conn.execute("""
+            SELECT MIN(numero) as min_num, MAX(numero) as max_num
+            FROM bidul
+        """).fetchone()
+        if row and row['min_num']:
+            stats['bidul_min'] = row['min_num']
+            stats['bidul_max'] = row['max_num']
+
+        # Plage de dates
+        row = conn.execute("""
+            SELECT MIN(date_evenement) as min_date, MAX(date_evenement) as max_date
+            FROM evenement WHERE date_evenement IS NOT NULL
+        """).fetchone()
+        if row and row['min_date']:
+            stats['date_min'] = row['min_date']
+            stats['date_max'] = row['max_date']
+
+        # Top 5 villes
+        villes = conn.execute("""
+            SELECT ville_raw, COUNT(*) as count
+            FROM evenement
+            WHERE ville_raw IS NOT NULL
+            GROUP BY ville_raw
+            ORDER BY count DESC
+            LIMIT 5
+        """).fetchall()
+        stats['top_villes'] = [(row['ville_raw'], row['count']) for row in villes]
+
+        # Top 5 lieux
+        lieux = conn.execute("""
+            SELECT lieu_raw, COUNT(*) as count
+            FROM evenement
+            WHERE lieu_raw IS NOT NULL
+            GROUP BY lieu_raw
+            ORDER BY count DESC
+            LIMIT 5
+        """).fetchall()
+        stats['top_lieux'] = [(row['lieu_raw'], row['count']) for row in lieux]
+
+        # Événements gratuits vs payants
+        row = conn.execute("""
+            SELECT
+                SUM(CASE WHEN gratuit = 1 THEN 1 ELSE 0 END) as gratuits,
+                SUM(CASE WHEN gratuit = 0 AND prix_min IS NOT NULL THEN 1 ELSE 0 END) as payants,
+                SUM(CASE WHEN gratuit = 0 AND prix_min IS NULL THEN 1 ELSE 0 END) as prix_inconnu
+            FROM evenement
+        """).fetchone()
+        if row:
+            stats['gratuits'] = row['gratuits'] or 0
+            stats['payants'] = row['payants'] or 0
+            stats['prix_inconnu'] = row['prix_inconnu'] or 0
+
+        # Stats par type d'événement
+        types = conn.execute("""
+            SELECT type_evenement, COUNT(*) as count
+            FROM evenement
+            WHERE type_evenement IS NOT NULL
+            GROUP BY type_evenement
+            ORDER BY count DESC
+        """).fetchall()
+        stats['par_type'] = {row['type_evenement']: row['count'] for row in types}
 
         return stats
 

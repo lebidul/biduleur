@@ -68,13 +68,19 @@ python cli.py extract --range 178-308
 python cli.py populate --range 178-308
 python cli.py populate --csv-only    # Uniquement si CSV disponible
 python cli.py populate --pdf-only    # Forcer extraction PDF
+python cli.py populate --replace     # Remplacer les événements existants
+
+# Purge
+python cli.py purge --numero 280     # Purger un Bidul
+python cli.py purge --range 178-308  # Purger une plage
+python cli.py purge --all            # Purger toute la base
 
 # Validation
 python cli.py validate --numero 280
 python cli.py compare --numero 280 --details
 
 # Statistiques
-python cli.py stats
+python cli.py stats                  # Stats étendues (sources, types, top lieux/villes)
 python cli.py list --type texte
 ```
 
