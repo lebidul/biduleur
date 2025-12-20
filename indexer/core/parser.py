@@ -15,7 +15,73 @@ from dataclasses import dataclass, field, asdict
 from typing import Optional
 from datetime import date
 
+from core.text_cleaner import clean_pdf_text, expand_abbreviations, normalize_lieu_name
+
 logger = logging.getLogger(__name__)
+
+
+def is_named_event(text: str) -> bool:
+    """
+    Détermine si le texte représente un événement nommé (festival, soirée thématique).
+
+    Événements nommés (remplir evenement.nom):
+    - "Alpa On The Rock #13"
+    - "Esc Exp #21 TERIAKI"
+    - "Melting Rock"
+    - "Les Spectaculaires"
+    - "Soirée Solidaire"
+
+    PAS événements nommés (ne pas remplir evenement.nom):
+    - Spectacles entre guillemets: "L'itinérance de Maud"
+    - Concerts d'artistes: MENDELSON (poème rock)
+    """
+    # Patterns d'événements nommés
+    named_event_patterns = [
+        r'^Alpa\s+On\s+The\s+Rock\s+#?\d+',
+        r'^Esc\s+Exp\s+#?\d+',
+        r'^Melting\s+Rock',
+        r'^Les\s+Spectaculaires',
+        r'^Soirée\s+\w+',  # Soirée Solidaire, Soirée Electro, etc.
+        r'^Labo\s+d.Impro',
+        r'^[Cc]arte\s+[Bb]lanche\s+[àa]',
+        r'^Festival\s+',
+        r'^Nuit\s+\w+',  # Nuit Blanche, etc.
+    ]
+
+    for pattern in named_event_patterns:
+        if re.match(pattern, text.strip(), re.IGNORECASE):
+            return True
+
+    return False
+
+
+def extract_event_name(text: str) -> Optional[str]:
+    """
+    Extrait le nom de l'événement SI c'est un événement nommé.
+    Retourne None si c'est un spectacle ou concert simple.
+    """
+    if not is_named_event(text):
+        return None
+
+    # Extraire le nom jusqu'au premier ":" ou artiste
+    patterns = [
+        r'^(Alpa\s+On\s+The\s+Rock\s+#?\d+)',
+        r'^(Esc\s+Exp\s+#?\d+\s+\w+)',
+        r'^(Melting\s+Rock)',
+        r'^(Les\s+Spectaculaires)',
+        r'^(Soirée\s+\w+)',
+        r'^(Labo\s+d.Impro\s*:\s*"[^"]+")' ,
+        r'^(Festival\s+[^:,]+)',
+        r'^(Nuit\s+\w+)',
+        r'^([Cc]arte\s+[Bb]lanche\s+[àa]\s+[^:,]+)',
+    ]
+
+    for pattern in patterns:
+        match = re.match(pattern, text.strip(), re.IGNORECASE)
+        if match:
+            return match.group(1).strip()
+
+    return None
 
 
 def _normalize_artist_name(name: str) -> str:
@@ -74,6 +140,243 @@ def _normalize_artist_name(name: str) -> str:
         result.append(word.capitalize())
 
     return ' '.join(result)
+
+
+def split_multi_date_events(raw_text: str, base_month: int, base_year: int) -> list[tuple]:
+    """
+    Détecte et splitte les événements avec plusieurs dates.
+
+    Patterns:
+    - "Sa 07 & di 08 : ..." → 2 événements
+    - "Lu 02 & Ma 03 : ..." → 2 événements
+    - "Je 05, Sa 07, Sa 14 : ..." → 3 événements
+    - "Ve 13 & sa 14 : ..." → 2 événements
+
+    Args:
+        raw_text: Texte brut de l'événement
+        base_month: Mois du Bidul
+        base_year: Année du Bidul
+
+    Returns:
+        Liste de tuples (date_obj, heure, texte_nettoyé, date_str)
+        Si pas de dates multiples, retourne [(None, None, raw_text, None)]
+    """
+    # Pattern pour détecter les dates multiples en début de ligne
+    # Ex: "Sa 07 & di 08 :", "Lu 02 & Ma 03 :", "Je 05, Sa 07, Sa 14 :"
+    # Format jour abrégé: Lu, Ma, Me, Je, Ve, Sa, Di (insensible à la casse)
+    multi_date_pattern = r'^([DLMJVS][a-z]\s*\d{1,2}(?:\s*[&,]\s*[A-Za-z]{2}\s*\d{1,2})+)\s*:\s*(.+)$'
+
+    match = re.match(multi_date_pattern, raw_text.strip(), re.IGNORECASE | re.DOTALL)
+
+    if not match:
+        # Pas de dates multiples, retourner tel quel
+        return [(None, None, raw_text, None)]
+
+    dates_part = match.group(1)
+    event_text = match.group(2)
+
+    # Parser les dates individuelles
+    # Pattern pour Lu, Ma, Me, Je, Ve, Sa, Di suivi d'un numéro
+    day_pattern = r'([DLMJVS][a-z])\s*(\d{1,2})'
+    days_found = re.findall(day_pattern, dates_part, re.IGNORECASE)
+
+    if not days_found:
+        return [(None, None, raw_text, None)]
+
+    results = []
+
+    # Chercher les heures spécifiques par date dans le texte
+    # Ex: "sa 20h30/di 17h" ou "15h (0-3 ans) & 16h30 (4-8 ans)"
+    hours_by_day = {}
+    hour_pattern = r'\b([dlmjvs][a-z])\s*(\d{1,2}h\d{0,2})'
+    hour_matches = re.findall(hour_pattern, event_text.lower())
+    for day_abbr, hour in hour_matches:
+        hours_by_day[day_abbr] = hour
+
+    # Heure par défaut si pas spécifique
+    default_hour_match = re.search(r'(\d{1,2}h\d{0,2})', event_text)
+    default_hour = default_hour_match.group(1) if default_hour_match else None
+
+    for day_abbr, day_num in days_found:
+        day_abbr_lower = day_abbr.lower()
+        day_int = int(day_num)
+
+        # Construire la date
+        try:
+            event_date = date(base_year, base_month, day_int)
+        except ValueError:
+            # Jour invalide pour ce mois
+            continue
+
+        # Trouver l'heure pour cette date
+        hour = hours_by_day.get(day_abbr_lower, default_hour)
+
+        # Construire la date_str pour compatibilité
+        date_str = f"{day_abbr.capitalize()} {day_num}"
+
+        results.append((event_date, hour, event_text, date_str))
+
+    return results if results else [(None, None, raw_text, None)]
+
+
+def split_fused_lines(raw_text: str) -> list[str]:
+    """
+    Sépare les lignes fusionnées contenant plusieurs événements.
+
+    Ex: "Di 01 : Événement1... Lu 02 & Ma 03 : Événement2..."
+
+    Pattern de séparation: une nouvelle date au milieu du texte
+    Ex: "...17h, 3/5€ Lu 02 & Ma 03 : ..."
+
+    Attention: ne pas confondre avec les heures "sa 20h30" ou prix "7€50"
+
+    Returns:
+        Liste de textes d'événements séparés
+    """
+    # Pattern pour détecter une nouvelle date au milieu
+    # Format: "Lu 02", "Ma 03", "Je 05", "Ve 13 & sa 14", etc.
+    # Doit être précédé d'un espace, € ou virgule (éviter "7€50")
+    # Le lookbehind (?<=[€\s,]) assure qu'on ne splitte pas sur les prix
+    split_pattern = r'(?<=[€\s,])\s*([DLMJVS][aeiou]\s*\d{1,2}(?:\s*[&,]\s*[A-Za-z]{2}\s*\d{1,2})*)\s*:\s*'
+
+    parts = re.split(split_pattern, raw_text, flags=re.IGNORECASE)
+
+    if len(parts) <= 1:
+        return [raw_text]
+
+    # Reconstituer: parts[0] = premier événement, puis alternance date/texte
+    events = []
+
+    # Premier événement (avant le premier split)
+    if parts[0].strip():
+        events.append(parts[0].strip())
+
+    # Événements suivants: date + texte
+    i = 1
+    while i < len(parts):
+        date_part = parts[i] if i < len(parts) else ''
+        text_part = parts[i + 1] if i + 1 < len(parts) else ''
+        if date_part and text_part:
+            events.append(f"{date_part} : {text_part}".strip())
+        i += 2
+
+    return events if events else [raw_text]
+
+
+def find_lieu_in_text(text: str, lieu_ref_list: list) -> Optional[tuple]:
+    """
+    Cherche un lieu du référentiel dans le texte.
+
+    Args:
+        text: Texte à analyser
+        lieu_ref_list: Liste de tuples (id, nom, ville, aliases...)
+
+    Returns:
+        (lieu_nom, lieu_ref_id, position_start, position_end) ou None
+    """
+    text_clean = clean_pdf_text(text)
+    text_lower = text_clean.lower()
+
+    best_match = None
+    best_length = 0
+
+    for lieu_ref in lieu_ref_list:
+        lieu_id = lieu_ref[0]
+        lieu_nom = lieu_ref[1]
+
+        # Chercher le nom exact
+        lieu_nom_lower = lieu_nom.lower()
+        pos = text_lower.find(lieu_nom_lower)
+
+        if pos != -1 and len(lieu_nom) > best_length:
+            best_match = (lieu_nom, lieu_id, pos, pos + len(lieu_nom))
+            best_length = len(lieu_nom)
+
+        # Chercher aussi les variantes courtes
+        # Ex: "Bar Le Barouf" dans ref, chercher aussi "Le Barouf" et "Barouf"
+        if lieu_nom_lower.startswith('bar le '):
+            short = lieu_nom_lower[7:]  # sans "bar le "
+            pos = text_lower.find(short)
+            if pos != -1 and len(short) > best_length:
+                best_match = (lieu_nom, lieu_id, pos, pos + len(short))
+                best_length = len(short)
+
+        if lieu_nom_lower.startswith('bar '):
+            short = lieu_nom_lower[4:]  # sans "bar "
+            pos = text_lower.find(short)
+            if pos != -1 and len(short) > best_length:
+                best_match = (lieu_nom, lieu_id, pos, pos + len(short))
+                best_length = len(short)
+
+        if lieu_nom_lower.startswith("l'"):
+            short = lieu_nom_lower[2:]
+            pos = text_lower.find(short)
+            if pos != -1 and len(short) > best_length:
+                best_match = (lieu_nom, lieu_id, pos, pos + len(short))
+                best_length = len(short)
+
+        # Gérer les variantes avec césures nettoyées
+        lieu_nom_cleaned = normalize_lieu_name(lieu_nom)
+        if lieu_nom_cleaned != lieu_nom:
+            lieu_cleaned_lower = lieu_nom_cleaned.lower()
+            pos = text_lower.find(lieu_cleaned_lower)
+            if pos != -1 and len(lieu_nom_cleaned) > best_length:
+                best_match = (lieu_nom_cleaned, lieu_id, pos, pos + len(lieu_nom_cleaned))
+                best_length = len(lieu_nom_cleaned)
+
+    return best_match
+
+
+def extract_tarif_improved(text: str) -> tuple:
+    """
+    Extrait les informations de tarif avec support des décimales et fourchettes.
+
+    Returns:
+        (tarif_raw, prix_min, prix_max, gratuit)
+    """
+    # Patterns gratuit
+    gratuit_patterns = [
+        r'\b0\s*[€eE]',
+        r'\bgratuit\b',
+        r'\bentrée\s+libre\b',
+        r'\bprix\s+libre\b',
+        r'\bau\s+chapeau\b',
+        r'\blibre\s+participation\b',
+    ]
+
+    for pattern in gratuit_patterns:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            return (match.group(0), 0.0, 0.0, True)
+
+    # Pattern tarif avec fourchette et décimales
+    tarif_patterns = [
+        # 3.75/18€ ou 5/7/9€ ou 6.75/18€
+        (r'(\d+[.,]?\d*)\s*/\s*(\d+[.,]?\d*)\s*/\s*(\d+[.,]?\d*)\s*[€eE]', 3),
+        (r'(\d+[.,]?\d*)\s*/\s*(\d+[.,]?\d*)\s*[€eE]', 2),
+        # 7 à 13€
+        (r'(\d+[.,]?\d*)\s*(?:à|a)\s*(\d+[.,]?\d*)\s*[€eE]', 2),
+        # Simple: 8€ ou 3,50€
+        (r'(\d+[.,]\d+)\s*[€eE]', 1),
+        (r'(\d+)\s*[€eE]', 1),
+    ]
+
+    for pattern, num_groups in tarif_patterns:
+        match = re.search(pattern, text)
+        if match:
+            prices = []
+            for i in range(1, num_groups + 1):
+                g = match.group(i)
+                if g:
+                    try:
+                        prices.append(float(g.replace(',', '.')))
+                    except ValueError:
+                        pass
+
+            if prices:
+                return (match.group(0), min(prices), max(prices), False)
+
+    return (None, None, None, False)
 
 
 @dataclass
@@ -485,6 +788,12 @@ class EventParser:
 
     def _clean_raw_text(self, text: str) -> str:
         """Nettoie le texte brut des artifacts d'extraction PDF."""
+        # 1. Appliquer le nettoyage des césures PDF
+        text = clean_pdf_text(text)
+
+        # 2. Expansion des abréviations
+        text = expand_abbreviations(text)
+
         lines = text.split('\n')
         cleaned_lines = []
 
@@ -654,10 +963,22 @@ class EventParser:
 
         Patterns reconnus:
         - ARTISTE (genre)
-        - ARTISTE1 + ARTISTE2 (genre commun)
+        - ARTISTE1 + ARTISTE2 (genre commun ou individuel)
         - "spectacle" ARTISTE (genre)
+        - DJ XXX
+        - Noms composés: BUTCHER and STONE, DR BONES & THE BLUE ROOTS
+        - "par la Cie XXX" ou "par la compagnie XXX" ou "par XXX"
+        - "avec la Cie XXX"
+
+        Style individuel vs global:
+        - "A (rock) + B (jazz)" → chacun garde son style
+        - "A + B + C (rock)" → rock s'applique à tous
         """
         artistes = []
+
+        # 0. Chercher d'abord les patterns "par la Cie XXX" dans le texte complet
+        # (avant de le réduire à la zone artiste)
+        par_cie_artistes = self._extract_par_cie_pattern(text)
 
         # Chercher les patterns ARTISTE1 + ARTISTE2
         # D'abord, isoler la partie avant le lieu (avant la virgule principale)
@@ -665,39 +986,83 @@ class EventParser:
         artiste_zone = parts[0].strip() if parts else text.strip()
 
         # Si la zone artiste est vide ou commence par une virgule, pas d'artiste
-        # Cela arrive quand le texte est juste un spectacle suivi du lieu
         if not artiste_zone:
-            return []
+            return par_cie_artistes if par_cie_artistes else []
 
         # Vérifier si la zone artiste est en fait un lieu connu
-        # (après extraction de spectacle, le lieu peut se retrouver en première position)
         from core.normalizer import normalize_lieu
         lieu_id, _ = normalize_lieu(artiste_zone.split(',')[0].strip())
         if lieu_id is not None:
-            return []
+            return par_cie_artistes if par_cie_artistes else []
+
+        # Nettoyer le texte des préfixes d'événements
+        ignore_prefixes = [
+            r'^concert\s+spécial\s+\w+\s*:\s*',
+            r'^soirée\s+[\w\s]+avec\s+',
+            r'^les\s+spectaculaires\s*:\s*',
+            r'^esc\s+exp\s+#?\d+\s+\w+\s*:\s*',
+            r'^alpa\s+on\s+the\s+rock\s+#?\d+\s*:\s*',
+            r'^melting\s+rock\s+avec\s+',
+            r'^carte\s+blanche\s+à\s+',
+        ]
+        for prefix in ignore_prefixes:
+            artiste_zone = re.sub(prefix, '', artiste_zone, flags=re.IGNORECASE)
 
         # Chercher un spectacle présentateur (ex: "Merci Connasse présente")
         spectacle_presenter = None
         presenter_match = re.search(r'([^,]+?)\s+présente\s+', artiste_zone, re.IGNORECASE)
         if presenter_match:
             spectacle_presenter = presenter_match.group(1).strip()
-            # Retirer le présentateur de la zone artiste pour le parsing
             artiste_zone = artiste_zone[presenter_match.end():]
 
-        # Séparer par + en conservant les genres qui suivent
-        # Pattern: NOM (genre) ou NOM
-        segments = re.split(r'\s*\+\s*', artiste_zone)
+        # Protéger les noms composés avec "and", "&", "THE"
+        # On remplace temporairement les espaces par des underscores
+        composed_names = [
+            r'\bBUTCHER\s+and\s+STONE\b',
+            r'\bDR\s+BONES\s*&\s*THE\s+BLUE\s+ROOTS\b',
+            r'\bFRANCOIS\s+HADJI[- ]?LAZARO\s*&\s*PIGALE\b',
+            r'\bDYNAMIC\s+SOUND\s+STATION\b',
+            r'\b(\w+)\s+and\s+THE\s+(\w+)\b',  # Pattern générique X and THE Y
+            r'\b(\w+)\s*&\s*THE\s+(\w+)\b',    # Pattern générique X & THE Y
+        ]
+
+        artiste_zone_protected = artiste_zone
+        for pattern in composed_names:
+            def protect(m):
+                return m.group(0).replace(' ', '_').replace('&', '_AND_')
+            artiste_zone_protected = re.sub(pattern, protect, artiste_zone_protected, flags=re.IGNORECASE)
+
+        # Séparer par + en conservant les genres
+        segments = re.split(r'\s*\+\s*', artiste_zone_protected)
 
         # Premier passage: extraire tous les artistes avec leurs genres individuels
         temp_artistes = []
         for segment in segments:
-            segment = segment.strip()
+            # Restaurer les espaces dans les noms composés
+            segment = segment.replace('_AND_', ' & ').replace('_', ' ').strip()
             if not segment:
                 continue
 
-            # Chercher le pattern: ARTISTE (genre)
+            # Pattern DJ XXX
+            dj_match = re.match(r'^(Dj\s+[A-Za-zÀ-ÿ0-9\s]+?)(?:\s*\(([^)]+)\))?(?:\s*$|,)', segment, re.IGNORECASE)
+            if dj_match:
+                nom = dj_match.group(1).strip()
+                genre = dj_match.group(2).strip() if dj_match.group(2) else None
+                temp_artistes.append(ArtisteInfo(
+                    nom=nom.upper() if nom.upper().startswith('DJ') else _normalize_artist_name(nom),
+                    genre=genre,
+                    spectacle=spectacle_presenter
+                ))
+                continue
+
+            # Chercher le pattern: ARTISTE (genre) ou "spectacle" ARTISTE (genre)
+            # Le genre peut contenir des espaces: (rock progressif), (dj set techno)
+            # Le nom peut commencer par un chiffre (100 ONCES, 2 MANY DJS, etc.)
             match = re.match(
-                r'^([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s\'\-&0-9]*?)(?:\s*\(([^)]+)\))?(?:\s*$|,)',
+                r'^(?:[""«][^""»]+[""»]\s*)?'  # Optionnel: spectacle entre guillemets
+                r'((?:\d+\s+)?[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s\'\-&0-9]*?)'  # Nom artiste (peut commencer par chiffre)
+                r'(?:\s*\(([^)]+)\))?'  # Optionnel: (genre)
+                r'(?:\s*$|,)',  # Fin de segment
                 segment
             )
 
@@ -715,7 +1080,6 @@ class EventParser:
             else:
                 # Fallback: chercher les mots en majuscules
                 matches = self.ARTISTE_PATTERN.findall(segment)
-                # Chercher un genre après
                 genre_match = self.GENRE_PATTERN.search(segment)
                 genre = genre_match.group(1).strip() if genre_match else None
 
@@ -728,21 +1092,105 @@ class EventParser:
                             spectacle=spectacle_presenter
                         ))
 
-        # Deuxième passage: propager le genre partagé si un seul genre pour plusieurs artistes
-        # Ex: "A + B (rock)" → A et B ont le genre "rock"
+        # Deuxième passage: gérer le style global vs individuel
+        # Règle: Si le DERNIER artiste a un style et que des artistes PRÉCÉDENTS
+        # n'en ont pas, c'est un style global qui s'applique à tous sans style.
+        # Exception: si plusieurs artistes ont chacun leur propre style, on ne propage pas.
         if temp_artistes:
-            # Trouver le dernier genre défini (souvent partagé)
-            shared_genre = None
-            for a in reversed(temp_artistes):
-                if a.genre:
-                    shared_genre = a.genre
-                    break
+            # Compter les artistes avec/sans style
+            artistes_with_style = [a for a in temp_artistes if a.genre]
+            artistes_without_style = [a for a in temp_artistes if not a.genre]
 
-            # Appliquer le genre partagé aux artistes sans genre
-            for a in temp_artistes:
-                if a.genre is None and shared_genre:
-                    a.genre = shared_genre
-                artistes.append(a)
+            # Cas style global: le dernier artiste a un style, d'autres n'en ont pas
+            # ET pas plus d'un style unique parmi tous les artistes
+            if (len(artistes_with_style) == 1 and
+                artistes_with_style[0] == temp_artistes[-1] and
+                artistes_without_style):
+                # C'est un style global - l'appliquer à tous
+                global_style = artistes_with_style[0].genre
+                for a in temp_artistes:
+                    if a.genre is None:
+                        a.genre = global_style
+                    artistes.append(a)
+            else:
+                # Styles individuels - chaque artiste garde son propre style (ou None)
+                artistes = temp_artistes
+
+        # Ajouter les artistes "par la Cie" trouvés (s'ils ne sont pas déjà présents)
+        if par_cie_artistes:
+            existing_noms = {a.nom.lower() for a in artistes}
+            for par_artiste in par_cie_artistes:
+                if par_artiste.nom.lower() not in existing_noms:
+                    artistes.append(par_artiste)
+
+        return artistes
+
+    def _extract_par_cie_pattern(self, text: str) -> list[ArtisteInfo]:
+        """
+        Extrait les artistes depuis les patterns "par la Cie XXX", "par XXX", "avec la Cie XXX".
+
+        Patterns reconnus:
+        - "par la Cie XXX" ou "par la compagnie XXX"
+        - "par XXX" (ex: "par Béatrice Maine")
+        - "avec la Cie XXX"
+        - "par le chœur XXX"
+        """
+        artistes = []
+
+        # Patterns pour "par la Cie" et variantes
+        par_patterns = [
+            # "par la Cie Théâtre d'Air" → "Cie Théâtre d'Air"
+            (r'par\s+la\s+[Cc]ie\s+([^,\(\)]+?)(?:\s*,|\s*\(|$)', 'Cie '),
+            # "par la compagnie XXX"
+            (r'par\s+la\s+[Cc]ompagnie\s+([^,\(\)]+?)(?:\s*,|\s*\(|$)', 'Cie '),
+            # "par la Cie "demain c'est dimanche""
+            (r'par\s+la\s+[Cc]ie\s+"([^"]+)"', 'Cie '),
+            # "par Béatrice Maine" (nom propre)
+            (r'par\s+([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][a-zàâäéèêëïîôùûüç]+(?:\s+[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][a-zàâäéèêëïîôùûüç]+)+)(?:\s*,|\s*\(|$)', ''),
+            # "par le chœur d'Orphée"
+            (r'par\s+le\s+chœur\s+([^,\(\)]+?)(?:\s*,|\s*\(|$)', 'Chœur '),
+            # "par le collectif XXX"
+            (r'par\s+le\s+collectif\s+([^,\(\)]+?)(?:\s*,|\s*\(|$)', 'Collectif '),
+        ]
+
+        for pattern, prefix in par_patterns:
+            matches = re.findall(pattern, text, re.IGNORECASE)
+            for match in matches:
+                nom = match.strip()
+                if nom and len(nom) > 2:
+                    # Éviter les faux positifs
+                    skip_words = ['résa', 'réservation', 'issue', 'le bidul', 'tarif']
+                    if not any(skip in nom.lower() for skip in skip_words):
+                        full_nom = f"{prefix}{nom}" if prefix else nom
+                        artistes.append(ArtisteInfo(
+                            nom=_normalize_artist_name(full_nom),
+                            genre=None,
+                            spectacle=None
+                        ))
+
+        # Patterns "avec la Cie XXX"
+        avec_patterns = [
+            # avec la Cie "demain c'est dimanche"
+            (r'avec\s+la\s+[Cc]ie\s+"([^"]+)"', 'Cie '),
+            # avec LES MOYENS DU BORD (majuscules = artiste)
+            (r'avec\s+([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s\-\']+?)(?:\s*\(|\s*et\s|\s*,|$)', ''),
+        ]
+
+        for pattern, prefix in avec_patterns:
+            matches = re.findall(pattern, text)
+            for match in matches:
+                nom = match.strip()
+                if nom and len(nom) > 2:
+                    # Vérifier qu'il est en majuscules ou qu'on ajoute le préfixe Cie
+                    if prefix or nom.upper() == nom:
+                        # Vérifier que ce n'est pas déjà ajouté
+                        full_nom = f"{prefix}{nom}" if prefix else nom
+                        if not any(a.nom.lower() == full_nom.lower() for a in artistes):
+                            artistes.append(ArtisteInfo(
+                                nom=_normalize_artist_name(full_nom),
+                                genre=None,
+                                spectacle=None
+                            ))
 
         return artistes
 
@@ -786,17 +1234,20 @@ class EventParser:
         Utilise les référentiels pour distinguer lieu et ville:
         - Si un candidat est dans lieu_ref → c'est un lieu
         - Si un candidat est dans ville_ref → c'est une ville
-        - Si pas de ville trouvée → défaut "Le Mans"
+        - Privilégie les villes explicites (non-Le Mans) quand trouvées
         """
         # Import lazy pour éviter les imports circulaires
         from core.normalizer import normalize_lieu, normalize_ville
+
+        # Normaliser d'abord les abréviations de villes dans le texte
+        text_normalized = self._normalize_ville_abbreviations(text)
 
         # Le lieu est généralement après les artistes et avant l'heure
         # Format typique: ARTISTE (genre), Lieu, Ville, 20h, 10€
         # Ou après extraction spectacle: Lieu, Ville, 20h
 
         # Simplification: chercher les segments entre virgules
-        parts = [p.strip() for p in text.split(',')]
+        parts = [p.strip() for p in text_normalized.split(',')]
 
         candidates = []
 
@@ -845,7 +1296,7 @@ class EventParser:
                 continue
 
             candidates.append(part)
-            if len(candidates) >= 3:  # Max 3 candidats
+            if len(candidates) >= 4:  # Max 4 candidats
                 break
 
         if not candidates:
@@ -854,6 +1305,7 @@ class EventParser:
         # Classifier chaque candidat en utilisant les référentiels
         lieu = None
         ville = None
+        villes_trouvees = []  # Collecter toutes les villes trouvées
 
         for candidate in candidates:
             # Vérifier si c'est un lieu connu
@@ -865,37 +1317,83 @@ class EventParser:
 
             # Vérifier si c'est une ville connue
             ville_id, ville_norm = normalize_ville(candidate)
-            if ville_id is not None and ville_norm.lower() != 'le mans':
-                # C'est une ville connue (autre que Le Mans par défaut)
-                if ville is None:
-                    ville = candidate
+            if ville_id is not None:
+                villes_trouvees.append({
+                    'id': ville_id,
+                    'nom': ville_norm,
+                    'raw': candidate,
+                    'is_lemans': ville_norm.lower() == 'le mans'
+                })
                 continue
 
             # Candidat inconnu:
             # - Si pas encore de lieu, l'attribuer comme lieu (candidat inconnu = lieu probable)
-            # - NE PAS attribuer comme ville si non reconnu (éviter les faux positifs)
             if lieu is None:
                 lieu = candidate
-            # Note: on n'attribue pas les candidats inconnus comme ville
-            # La ville sera "Le Mans" par défaut si non trouvée
+
+        # Sélectionner la ville: privilégier les villes non-Le Mans
+        if villes_trouvees:
+            non_lemans = [v for v in villes_trouvees if not v['is_lemans']]
+            if non_lemans:
+                # Prendre la ville non-Le Mans (priorité à la première trouvée)
+                ville = non_lemans[0]['nom']
+            else:
+                # Seulement Le Mans trouvé
+                ville = villes_trouvees[0]['nom']
 
         return lieu, ville
 
+    def _normalize_ville_abbreviations(self, text: str) -> str:
+        """
+        Normalise les abréviations de villes dans le texte.
+
+        Exemples:
+        - "Sablé s/Sarthe" → "Sablé-sur-Sarthe"
+        - "La Ferté Bernard" → "La Ferté-Bernard"
+        """
+        normalizations = [
+            (r'Sablé\s*s/?Sarthe', 'Sablé-sur-Sarthe'),
+            (r'La\s+Ferté\s*Bernard', 'La Ferté-Bernard'),
+            (r'Sargé-lès-Le\s*Mans', 'Sargé-lès-Le Mans'),
+            (r'Yvré\s*l.Évêque', "Yvré-l'Évêque"),
+            (r'Moncé-en-?\s*Belin', 'Moncé-en-Belin'),
+            (r'St[\.\s]+Pavace', 'Saint-Pavace'),
+            (r'St[\.\s]+Saturnin', 'Saint-Saturnin'),
+            (r'Ste[\.\s]+Croix', 'Sainte-Croix'),
+        ]
+
+        result = text
+        for pattern, replacement in normalizations:
+            result = re.sub(pattern, replacement, result, flags=re.IGNORECASE)
+
+        return result
+
     def _extract_nom(self, text: str, event: ParsedEvent) -> Optional[str]:
-        """Extrait ou génère le nom de l'événement."""
-        # Si on a un spectacle entre guillemets, c'est le nom
-        if event.spectacles:
-            return event.spectacles[0]
+        """
+        Extrait le nom de l'événement.
 
-        # Sinon, si on a un festival (pattern "Festival X" ou "X #N")
-        festival_match = re.search(r"([A-Za-zÀ-ÿ\s]+(?:#\d+|\d+))", text)
-        if festival_match and 'festival' in text.lower():
-            return festival_match.group(1).strip()
+        IMPORTANT: La colonne evenement.nom ne doit être remplie QUE pour les
+        événements nommés (festivals, soirées thématiques). Les spectacles entre
+        guillemets vont UNIQUEMENT dans contenu_evenement.nom_spectacle.
 
-        # Sinon, utiliser le premier artiste
-        if event.artistes:
-            return None  # Pas de nom spécifique, juste le(s) artiste(s)
+        Événements nommés → remplir evenement.nom:
+        - "Alpa On The Rock #13"
+        - "Esc Exp #21 TERIAKI"
+        - "Melting Rock"
+        - "Festival X"
 
+        PAS événements nommés → evenement.nom = NULL:
+        - Spectacles entre guillemets: "L'itinérance de Maud"
+        - Concerts d'artistes: MENDELSON (poème rock)
+        """
+        # Utiliser la fonction is_named_event() pour déterminer si on doit
+        # remplir evenement.nom
+        event_name = extract_event_name(text)
+        if event_name:
+            return event_name
+
+        # Pour les concerts/spectacles simples, NE PAS remplir evenement.nom
+        # Les spectacles sont déjà stockés dans contenu_evenement.nom_spectacle
         return None
 
     def _deduce_type(self, event: ParsedEvent) -> Optional[str]:

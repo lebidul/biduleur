@@ -205,8 +205,13 @@ class BidulDB:
             event.type_evenement,
             event.confidence
         ))
+        evenement_id = cursor.lastrowid
+
+        # Insérer dans contenu_evenement
+        self._insert_contenu_evenement(conn, evenement_id, event.artistes, event.spectacles)
+
         conn.commit()
-        return cursor.lastrowid
+        return evenement_id
 
     def insert_evenement_from_dict(self, event: dict) -> int:
         """Insère un événement depuis un dictionnaire (import CSV)."""
@@ -246,8 +251,39 @@ class BidulDB:
             event.get('confidence', 0.5),
             event.get('source', 'pdf')
         ))
+        evenement_id = cursor.lastrowid
+
+        # Insérer dans contenu_evenement (parser le JSON artistes/spectacles)
+        artistes_json = event.get('artistes')
+        spectacles_json = event.get('spectacles')
+        genres_json = event.get('genres_raw')
+
+        artistes = []
+        spectacles = []
+        genres = []
+
+        if artistes_json:
+            try:
+                artistes = json.loads(artistes_json)
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+        if spectacles_json:
+            try:
+                spectacles = json.loads(spectacles_json)
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+        if genres_json:
+            try:
+                genres = json.loads(genres_json)
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+        self._insert_contenu_from_json(conn, evenement_id, artistes, spectacles, genres)
+
         conn.commit()
-        return cursor.lastrowid
+        return evenement_id
 
     def get_evenements(self, bidul_numero: int) -> list[dict]:
         """Récupère tous les événements d'un Bidul."""
@@ -259,8 +295,13 @@ class BidulDB:
         return [dict(row) for row in rows]
 
     def delete_evenements(self, bidul_numero: int):
-        """Supprime tous les événements d'un Bidul."""
+        """Supprime tous les événements d'un Bidul (et leurs contenus associés)."""
         conn = self.connect()
+        # Supprimer d'abord les contenus (FK constraint)
+        conn.execute("""
+            DELETE FROM contenu_evenement
+            WHERE evenement_id IN (SELECT id FROM evenement WHERE bidul_numero = ?)
+        """, (bidul_numero,))
         conn.execute("DELETE FROM evenement WHERE bidul_numero = ?", (bidul_numero,))
         conn.commit()
 
@@ -273,6 +314,83 @@ class BidulDB:
                 (bidul_numero,)
             ).fetchone()[0]
         return conn.execute("SELECT COUNT(*) FROM evenement").fetchone()[0]
+
+    # -------------------------------------------------------------------------
+    # Contenu événement (artistes/spectacles)
+    # -------------------------------------------------------------------------
+
+    def _insert_contenu_evenement(self, conn, evenement_id: int, artistes: list, spectacles: list):
+        """Insère les artistes/spectacles dans contenu_evenement depuis un ParsedEvent."""
+        ordre = 1
+
+        # Artistes (peuvent être des ArtisteInfo ou des dicts)
+        for artiste in artistes:
+            if hasattr(artiste, 'nom'):
+                # ArtisteInfo object
+                conn.execute('''
+                    INSERT INTO contenu_evenement (evenement_id, artiste, nom_spectacle, style, ordre)
+                    VALUES (?, ?, ?, ?, ?)
+                ''', (evenement_id, artiste.nom, artiste.spectacle, artiste.genre, ordre))
+            elif isinstance(artiste, dict):
+                conn.execute('''
+                    INSERT INTO contenu_evenement (evenement_id, artiste, nom_spectacle, style, ordre)
+                    VALUES (?, ?, ?, ?, ?)
+                ''', (evenement_id, artiste.get('nom'), artiste.get('spectacle'), artiste.get('genre'), ordre))
+            elif isinstance(artiste, str):
+                conn.execute('''
+                    INSERT INTO contenu_evenement (evenement_id, artiste, style, ordre)
+                    VALUES (?, ?, ?, ?)
+                ''', (evenement_id, artiste, None, ordre))
+            ordre += 1
+
+        # Spectacles sans artiste (si pas déjà associés à un artiste)
+        for spectacle in spectacles:
+            if isinstance(spectacle, str):
+                conn.execute('''
+                    INSERT INTO contenu_evenement (evenement_id, nom_spectacle, ordre)
+                    VALUES (?, ?, ?)
+                ''', (evenement_id, spectacle, ordre))
+                ordre += 1
+
+    def _insert_contenu_from_json(self, conn, evenement_id: int, artistes: list, spectacles: list, genres: list):
+        """Insère les artistes/spectacles dans contenu_evenement depuis des listes JSON."""
+        ordre = 1
+
+        # Cas 1: artistes est une liste d'objets [{nom, genre, spectacle}, ...]
+        if artistes and isinstance(artistes[0], dict):
+            for art in artistes:
+                conn.execute('''
+                    INSERT INTO contenu_evenement (evenement_id, artiste, nom_spectacle, style, ordre)
+                    VALUES (?, ?, ?, ?, ?)
+                ''', (evenement_id, art.get('nom'), art.get('spectacle'), art.get('genre'), ordre))
+                ordre += 1
+
+        # Cas 2: artistes est une liste de strings ["ARTISTE1", "ARTISTE2"]
+        elif artistes and isinstance(artistes[0], str):
+            for i, art in enumerate(artistes):
+                style = genres[i] if i < len(genres) else None
+                spec = spectacles[i] if i < len(spectacles) else (spectacles[0] if spectacles else None)
+                conn.execute('''
+                    INSERT INTO contenu_evenement (evenement_id, artiste, nom_spectacle, style, ordre)
+                    VALUES (?, ?, ?, ?, ?)
+                ''', (evenement_id, art, spec, style, ordre))
+                ordre += 1
+
+        # Cas 3: spectacles sans artistes
+        elif spectacles:
+            for i, spec in enumerate(spectacles):
+                if isinstance(spec, dict):
+                    conn.execute('''
+                        INSERT INTO contenu_evenement (evenement_id, artiste, nom_spectacle, style, ordre)
+                        VALUES (?, ?, ?, ?, ?)
+                    ''', (evenement_id, None, spec.get('nom'), spec.get('genre'), ordre))
+                else:
+                    style = genres[i] if i < len(genres) else None
+                    conn.execute('''
+                        INSERT INTO contenu_evenement (evenement_id, artiste, nom_spectacle, style, ordre)
+                        VALUES (?, ?, ?, ?, ?)
+                    ''', (evenement_id, None, spec, style, ordre))
+                ordre += 1
 
     # -------------------------------------------------------------------------
     # Référentiels

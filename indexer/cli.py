@@ -698,6 +698,9 @@ def cmd_purge(args):
             print(f"[DRY-RUN] Suppression de {count_before} événements")
             return 0
 
+        # Supprimer d'abord les tables dépendantes (FK)
+        conn.execute("DELETE FROM contenu_evenement")
+        conn.execute("DELETE FROM correction_log")
         conn.execute("DELETE FROM evenement")
         conn.execute("DELETE FROM bidul")
         conn.commit()
@@ -786,10 +789,27 @@ def cmd_migrate(args):
     ''')
     print("  + Table artiste_alias")
 
+    # Création de la table contenu_evenement
+    cur.execute('''
+        CREATE TABLE IF NOT EXISTS contenu_evenement (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            evenement_id INTEGER NOT NULL,
+            artiste TEXT,
+            nom_spectacle TEXT,
+            style TEXT,
+            ordre INTEGER DEFAULT 1,
+            FOREIGN KEY (evenement_id) REFERENCES evenement(id) ON DELETE CASCADE
+        )
+    ''')
+    print("  + Table contenu_evenement")
+
     # Index pour les recherches
     cur.execute('CREATE INDEX IF NOT EXISTS idx_evenement_review_status ON evenement(review_status)')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_evenement_verified ON evenement(verified)')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_correction_log_evenement ON correction_log(evenement_id)')
+    cur.execute('CREATE INDEX IF NOT EXISTS idx_contenu_evenement_id ON contenu_evenement(evenement_id)')
+    cur.execute('CREATE INDEX IF NOT EXISTS idx_contenu_artiste ON contenu_evenement(artiste)')
+    cur.execute('CREATE INDEX IF NOT EXISTS idx_contenu_style ON contenu_evenement(style)')
 
     conn.commit()
     print("\nMigration terminée.")
