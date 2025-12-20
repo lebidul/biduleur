@@ -9,6 +9,20 @@
 -- ARTISTES
 -- -----------------------------------------------------------------------------
 
+SELECT
+    e.nom,
+    e.date_evenement,
+    e.heure,
+    e.lieu_raw,
+    e.ville_raw,
+    c.artiste,
+    c.nom_spectacle
+FROM evenement e
+LEFT JOIN contenu_evenement c ON e.id = c.evenement_id
+WHERE e.bidul_numero = 184
+ORDER BY e.date_evenement, e.heure
+
+
 -- Top 20 artistes les plus programmés
 SELECT
     json_extract(value, '$.nom') AS artiste,

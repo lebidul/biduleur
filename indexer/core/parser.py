@@ -30,6 +30,9 @@ def is_named_event(text: str) -> bool:
     - "Melting Rock"
     - "Les Spectaculaires"
     - "Soirée Solidaire"
+    - "Soirée Mix Généraliste avec Dj Vindu"
+    - "Soirée OULALA Xmas"
+    - "Scène ouverte musicale"
 
     PAS événements nommés (ne pas remplir evenement.nom):
     - Spectacles entre guillemets: "L'itinérance de Maud"
@@ -41,11 +44,14 @@ def is_named_event(text: str) -> bool:
         r'^Esc\s+Exp\s+#?\d+',
         r'^Melting\s+Rock',
         r'^Les\s+Spectaculaires',
-        r'^Soirée\s+\w+',  # Soirée Solidaire, Soirée Electro, etc.
+        r'^Soirée\s+[\w\s]+',  # Soirée Solidaire, Soirée Mix Généraliste, Soirée OULALA Xmas
         r'^Labo\s+d.Impro',
         r'^[Cc]arte\s+[Bb]lanche\s+[àa]',
         r'^Festival\s+',
         r'^Nuit\s+\w+',  # Nuit Blanche, etc.
+        r'^Scène\s+ouverte',  # Scène ouverte musicale, etc.
+        r'^Open\s+mic',
+        r'^Jam\s+session',
     ]
 
     for pattern in named_event_patterns:
@@ -59,21 +65,30 @@ def extract_event_name(text: str) -> Optional[str]:
     """
     Extrait le nom de l'événement SI c'est un événement nommé.
     Retourne None si c'est un spectacle ou concert simple.
+
+    Pour les soirées avec DJ, extrait la partie avant "avec":
+    - "Soirée Mix Généraliste avec Dj Vindu" → "Soirée Mix Généraliste"
     """
     if not is_named_event(text):
         return None
 
-    # Extraire le nom jusqu'au premier ":" ou artiste
+    # Extraire le nom jusqu'au premier ":" ou "avec" ou artiste
     patterns = [
         r'^(Alpa\s+On\s+The\s+Rock\s+#?\d+)',
         r'^(Esc\s+Exp\s+#?\d+\s+\w+)',
         r'^(Melting\s+Rock)',
         r'^(Les\s+Spectaculaires)',
-        r'^(Soirée\s+\w+)',
+        # Soirée X avec DJ → extraire seulement "Soirée X"
+        r'^(Soirée\s+[\w\s]+?)\s+avec\s+',
+        # Soirée X (sans "avec")
+        r'^(Soirée\s+[\w\s]+?)(?:\s*,|$)',
         r'^(Labo\s+d.Impro\s*:\s*"[^"]+")' ,
         r'^(Festival\s+[^:,]+)',
         r'^(Nuit\s+\w+)',
         r'^([Cc]arte\s+[Bb]lanche\s+[àa]\s+[^:,]+)',
+        r'^(Scène\s+ouverte\s*\w*)',
+        r'^(Open\s+mic\s*\w*)',
+        r'^(Jam\s+session)',
     ]
 
     for pattern in patterns:
@@ -377,6 +392,616 @@ def extract_tarif_improved(text: str) -> tuple:
                 return (match.group(0), min(prices), max(prices), False)
 
     return (None, None, None, False)
+
+
+# =============================================================================
+# STRATÉGIE "LIEU D'ABORD" - Nouvelles fonctions de parsing
+# =============================================================================
+
+def load_lieu_patterns(lieu_ref_list: list) -> list:
+    """
+    Prépare les patterns de recherche pour les lieux.
+    Trie par longueur décroissante pour matcher les plus longs d'abord.
+
+    Args:
+        lieu_ref_list: Liste de tuples (id, nom) ou (id, nom, ville)
+
+    Returns:
+        Liste de dicts avec pattern regex compilé, triée par longueur décroissante
+    """
+    patterns = []
+
+    for lieu_tuple in lieu_ref_list:
+        lieu_id = lieu_tuple[0]
+        lieu_nom = lieu_tuple[1]
+
+        # Pattern exact avec limites de mots
+        patterns.append({
+            'id': lieu_id,
+            'nom': lieu_nom,
+            'pattern': re.compile(r'\b' + re.escape(lieu_nom) + r'\b', re.IGNORECASE),
+            'length': len(lieu_nom)
+        })
+
+        lieu_nom_lower = lieu_nom.lower()
+
+        # Variantes courtes pour les bars: "Bar Le Barouf" → "Le Barouf", "Barouf"
+        if lieu_nom_lower.startswith('bar le '):
+            # Variante "Le Barouf" (sans "Bar")
+            short1 = lieu_nom[4:]  # "Le Barouf"
+            patterns.append({
+                'id': lieu_id,
+                'nom': lieu_nom,
+                'pattern': re.compile(r'(?<![a-zA-Z])\b' + re.escape(short1) + r'\b(?!\s*\()', re.IGNORECASE),
+                'length': len(short1)
+            })
+            # Variante "Barouf" (sans "Bar Le")
+            short2 = lieu_nom[7:]  # "Barouf"
+            patterns.append({
+                'id': lieu_id,
+                'nom': lieu_nom,
+                'pattern': re.compile(r'(?<![a-zA-Z])\b' + re.escape(short2) + r'\b(?!\s*\()', re.IGNORECASE),
+                'length': len(short2)
+            })
+
+        elif lieu_nom_lower.startswith('bar '):
+            short = lieu_nom[4:]  # sans "bar "
+            patterns.append({
+                'id': lieu_id,
+                'nom': lieu_nom,
+                'pattern': re.compile(r'(?<![a-zA-Z])\b' + re.escape(short) + r'\b(?!\s*\()', re.IGNORECASE),
+                'length': len(short)
+            })
+
+        # Variantes pour les lieux avec article: "L'Oasis" → "Oasis"
+        if lieu_nom_lower.startswith("l'"):
+            short = lieu_nom[2:]  # "Oasis"
+            patterns.append({
+                'id': lieu_id,
+                'nom': lieu_nom,
+                'pattern': re.compile(r'\b' + re.escape(short) + r'\b', re.IGNORECASE),
+                'length': len(short)
+            })
+
+        # Variantes pour "Le XXX" → "XXX"
+        if lieu_nom_lower.startswith('le ') and not lieu_nom_lower.startswith('le mans'):
+            short = lieu_nom[3:]
+            patterns.append({
+                'id': lieu_id,
+                'nom': lieu_nom,
+                'pattern': re.compile(r'(?<![a-zA-Z])\b' + re.escape(short) + r'\b(?!\s*\()', re.IGNORECASE),
+                'length': len(short)
+            })
+
+        # Variantes pour "La XXX" → "XXX"
+        if lieu_nom_lower.startswith('la '):
+            short = lieu_nom[3:]
+            patterns.append({
+                'id': lieu_id,
+                'nom': lieu_nom,
+                'pattern': re.compile(r'(?<![a-zA-Z])\b' + re.escape(short) + r'\b(?!\s*\()', re.IGNORECASE),
+                'length': len(short)
+            })
+
+    # Trier par longueur décroissante (matcher les plus longs d'abord)
+    patterns.sort(key=lambda x: x['length'], reverse=True)
+
+    return patterns
+
+
+def find_lieu_in_text_v2(text: str, lieu_patterns: list) -> Optional[tuple]:
+    """
+    Trouve le lieu dans le texte en utilisant les patterns préparés.
+
+    Stratégie: matcher les patterns les plus longs en premier pour éviter
+    les faux positifs (ex: "Le Barouf" avant "Barouf").
+
+    Args:
+        text: Texte à analyser
+        lieu_patterns: Patterns préparés par load_lieu_patterns()
+
+    Returns:
+        (lieu_nom, lieu_id, start_pos, end_pos) ou None
+    """
+    for pattern_info in lieu_patterns:
+        match = pattern_info['pattern'].search(text)
+        if match:
+            # Vérifier que ce n'est pas dans un contexte de style (parenthèses)
+            before = text[:match.start()]
+            if before.rstrip().endswith('('):
+                continue
+
+            # Vérifier que ce n'est pas précédé de "de" ou "du" (contexte artiste)
+            # Ex: "Dr Bones & the Blue Roots" ne doit pas matcher "Blue"
+            before_words = before.split()
+            if before_words and before_words[-1].lower() in ('de', 'du', 'the', 'and', '&'):
+                continue
+
+            return (
+                pattern_info['nom'],
+                pattern_info['id'],
+                match.start(),
+                match.end()
+            )
+
+    return None
+
+
+def split_on_dates_v2(raw_text: str) -> list[str]:
+    """
+    Sépare le texte sur les patterns de date au milieu.
+
+    Patterns de séparation:
+    - "Lu 02 & Ma 03 :" au milieu du texte
+    - "Sa 21 & di 22 :" au milieu du texte
+    - "Di 01 :" au milieu du texte
+
+    Ne pas splitter si c'est au début (c'est une date normale).
+    Ne pas splitter sur les prix comme "7€50".
+
+    Exemples:
+    - "...0€ Sa 21 & di 22 : ..." → split
+    - "...7€50" → pas de split (prix décimal)
+
+    Returns:
+        Liste de textes d'événements séparés
+    """
+    # Pattern amélioré:
+    # - Précédé d'un espace, €, ou fin de mot (mais pas un chiffre seul comme 7€50)
+    # - Jour abrégé + numéro, optionnellement avec & ou , et autre jour
+    # - Suivi de ":"
+    # Le lookbehind négatif évite de splitter après un prix décimal comme 7€50
+    split_pattern = r'(?<![0-9]€)(?<=[\s€,])\s*([DLMJVS][aeiou]?\s*\d{1,2}(?:\s*[&,]\s*[A-Za-z]{2,3}\s*\d{1,2})*)\s*:\s*'
+
+    parts = re.split(split_pattern, raw_text, flags=re.IGNORECASE)
+
+    if len(parts) <= 1:
+        return [raw_text]
+
+    events = []
+
+    # Premier événement (avant le premier split)
+    first_part = parts[0].strip()
+    if first_part:
+        # Nettoyer la fin (peut avoir des espaces ou virgules orphelins)
+        first_part = first_part.rstrip(',').rstrip()
+        events.append(first_part)
+
+    # Événements suivants: date + texte
+    i = 1
+    while i < len(parts):
+        date_part = parts[i] if i < len(parts) else ''
+        text_part = parts[i + 1] if i + 1 < len(parts) else ''
+        if date_part and text_part.strip():
+            events.append(f"{date_part} : {text_part}".strip())
+        i += 2
+
+    return events if events else [raw_text]
+
+
+def parse_date_prefix_v2(text: str, base_month: int, base_year: int) -> tuple[list[date], str]:
+    """
+    Parse le préfixe de date d'une ligne.
+
+    Ex: "Lu 02 & Ma 03 : Événement..." → [(2013-12-02), (2013-12-03)], "Événement..."
+    Ex: "Di 01 : Événement..." → [(2013-12-01)], "Événement..."
+    Ex: "Événement..." → [], "Événement..."
+
+    Returns:
+        (liste_dates, texte_restant)
+    """
+    # Pattern: date(s) en début de ligne suivie de ":"
+    date_pattern = r'^([DLMJVS][a-z]\s*\d{1,2}(?:\s*[&,]\s*[A-Za-z]{2}\s*\d{1,2})*)\s*:\s*(.+)$'
+
+    match = re.match(date_pattern, text.strip(), re.IGNORECASE | re.DOTALL)
+
+    if not match:
+        return [], text
+
+    dates_part = match.group(1)
+    event_text = match.group(2)
+
+    # Extraire les jours
+    day_pattern = r'([DLMJVS][a-z])\s*(\d{1,2})'
+    days_found = re.findall(day_pattern, dates_part, re.IGNORECASE)
+
+    dates = []
+    for day_abbr, day_num in days_found:
+        try:
+            dates.append(date(base_year, base_month, int(day_num)))
+        except ValueError:
+            pass
+
+    return dates, event_text
+
+
+def extract_before_lieu(text: str, lieu_start: int) -> dict:
+    """
+    Extrait et parse ce qui est AVANT le lieu.
+    C'est généralement: artiste/spectacle + (style)
+
+    Returns:
+        dict avec 'spectacles', 'artistes', 'nom_evenement'
+    """
+    before = text[:lieu_start].strip().rstrip(',').strip()
+
+    result = {
+        'spectacles': [],
+        'artistes': [],
+        'nom_evenement': None
+    }
+
+    # 0. D'abord extraire "avec la Cie "XXX"" AVANT les spectacles
+    # pour ne pas que le nom de la Cie soit extrait comme spectacle
+    avec_cie_quoted = re.search(r'avec\s+la\s+[Cc]ie\s+"([^"]+)"', before)
+    if avec_cie_quoted:
+        nom = avec_cie_quoted.group(1).strip()
+        if nom and len(nom) > 2:
+            result['artistes'].append({'nom': f"Cie {nom}", 'style': None})
+        # Retirer ce pattern du texte pour ne pas le re-parser
+        before = before[:avec_cie_quoted.start()] + before[avec_cie_quoted.end():]
+        before = re.sub(r'\s+', ' ', before).strip()
+
+    # 1. Extraire les spectacles entre guillemets (seulement ceux qui restent)
+    spectacle_pattern = r'[«""„]([^»""]+)[»""](?:\s*\(([^)]+)\))?'
+    spectacle_matches = list(re.finditer(spectacle_pattern, before))
+
+    for match in spectacle_matches:
+        result['spectacles'].append({
+            'nom': match.group(1).strip(),
+            'style': match.group(2).strip() if match.group(2) else None
+        })
+
+    # Retirer les spectacles du texte pour parser le reste
+    remaining = before
+    for match in spectacle_matches:
+        remaining = remaining.replace(match.group(0), ' ')
+    remaining = re.sub(r'\s+', ' ', remaining).strip()
+
+    # 2. Pattern "par la Cie XXX" ou "par XXX"
+    par_patterns = [
+        (r'par\s+la\s+[Cc]ie\s+"?([^",\(\)]+)"?', 'Cie '),
+        (r'par\s+la\s+[Cc]ompagnie\s+([^,\(\)]+)', 'Cie '),
+        (r'par\s+le\s+chœur\s+([^,\(\)]+)', 'Chœur '),
+        (r'par\s+le\s+collectif\s+([^,\(\)]+)', 'Collectif '),
+        (r'par\s+([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][a-zàâäéèêëïîôùûüç]+(?:\s+[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][a-zàâäéèêëïîôùûüç]+)+)', ''),
+    ]
+
+    for pattern, prefix in par_patterns:
+        matches = re.findall(pattern, remaining, re.IGNORECASE)
+        for nom in matches:
+            nom = nom.strip().rstrip(',')
+            if nom and len(nom) > 2:
+                full_nom = f"{prefix}{nom}" if prefix else nom
+                if not any(a['nom'].lower() == full_nom.lower() for a in result['artistes']):
+                    result['artistes'].append({'nom': full_nom, 'style': None})
+
+    # 3. Pattern "avec la Cie "XXX"" ou "avec la Cie XXX" ou "avec XXX"
+    # D'abord essayer le pattern avec guillemets ASCII (plus spécifique)
+    avec_cie_quoted = re.search(
+        r'avec\s+la\s+[Cc]ie\s+"([^"]+)"',
+        remaining, re.IGNORECASE
+    )
+    if avec_cie_quoted:
+        nom = avec_cie_quoted.group(1).strip()
+        if nom and len(nom) > 2:
+            full_nom = f"Cie {nom}"
+            if not any(a['nom'].lower() == full_nom.lower() for a in result['artistes']):
+                result['artistes'].append({'nom': full_nom, 'style': None})
+
+    # Essayer aussi les guillemets typographiques
+    if not avec_cie_quoted:
+        avec_cie_quoted2 = re.search(
+            r'avec\s+la\s+[Cc]ie\s+[«„]([^»"]+)[»"]',
+            remaining, re.IGNORECASE
+        )
+        if avec_cie_quoted2:
+            nom = avec_cie_quoted2.group(1).strip()
+            if nom and len(nom) > 2:
+                full_nom = f"Cie {nom}"
+                if not any(a['nom'].lower() == full_nom.lower() for a in result['artistes']):
+                    result['artistes'].append({'nom': full_nom, 'style': None})
+
+    # Autres patterns "avec" si pas déjà trouvé
+    if not result['artistes'] or not any('Cie' in a.get('nom', '') for a in result['artistes']):
+        avec_patterns = [
+            # "avec la Cie Théâtre d'Air" - sans guillemets (ne doit pas matcher s'il y a des guillemets)
+            (r'avec\s+la\s+[Cc]ie\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s\'\-]+?)(?:\s*,|\s*\(|$)', 'Cie '),
+            # "avec la compagnie XXX"
+            (r'avec\s+la\s+[Cc]ompagnie\s+([^,\(\)]+?)(?:\s*,|\s*\(|$)', 'Cie '),
+            # "avec ARTISTE" (majuscules)
+            (r'avec\s+([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s\-\'\&]+?)(?:\s*\(|\s*et\s|\s*,|$)', ''),
+        ]
+
+        for pattern, prefix in avec_patterns:
+            matches = re.findall(pattern, remaining, re.IGNORECASE)
+            for nom in matches:
+                nom = nom.strip().rstrip(',')
+                if nom and len(nom) > 2 and nom.lower() not in ('la cie',):
+                    full_nom = f"{prefix}{nom}" if prefix else nom
+                    if not any(a['nom'].lower() == full_nom.lower() for a in result['artistes']):
+                        result['artistes'].append({'nom': full_nom, 'style': None})
+
+    # 4. Pattern DJ: "XXX as Dj" ou "Dj XXX"
+    dj_patterns = [
+        r'(\w+)\s+as\s+Dj',  # "Mister Eleganz as Dj"
+        r'Dj\s+(\w[\w\s]*?\w)(?:\s*,|\s*\(|$)',  # "Dj Vindu"
+    ]
+
+    for pattern in dj_patterns:
+        matches = re.findall(pattern, remaining, re.IGNORECASE)
+        for nom in matches:
+            dj_name = f"DJ {nom.strip().upper()}"
+            if not any(a['nom'].upper() == dj_name for a in result['artistes']):
+                result['artistes'].append({'nom': dj_name, 'style': None})
+
+    # 5. Pattern artistes séparés par "+" (avant guests pour les gérer ensemble)
+    # Ex: "BUTE (crust) + guests!!"
+    if '+' in remaining:
+        parts = remaining.split('+')
+        for part in parts:
+            part = part.strip()
+
+            # Ignorer si c'est "guests" - sera géré après
+            if re.match(r'^guests?!*$', part, re.IGNORECASE):
+                continue
+
+            # Pattern: NOM (style) ou NOM
+            # Le pattern doit capturer le nom ENTIER jusqu'à l'espace avant (
+            artist_match = re.match(r'^([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s\'\-&]+?)\s*(?:\(([^)]+)\))?(?:\s*,|$)', part.strip())
+            if artist_match:
+                nom = artist_match.group(1).strip()
+                style = artist_match.group(2).strip() if artist_match.group(2) else None
+                # Ignorer les faux positifs
+                if nom.upper() not in ('LE', 'LA', 'LES', 'DE', 'DU', 'DES', 'ET'):
+                    if not any(a['nom'].lower() == nom.lower() for a in result['artistes']):
+                        result['artistes'].append({'nom': nom, 'style': style})
+
+    # 6. Pattern "guests" ou "guests!!" (après le split par +)
+    if re.search(r'\bguests?!*\b', remaining, re.IGNORECASE):
+        if not any(a['nom'].lower() == 'guests' for a in result['artistes']):
+            result['artistes'].append({'nom': 'Guests', 'style': None})
+
+    # 7. Pattern artiste simple en MAJUSCULES avec style
+    if not result['artistes'] and not result['spectacles']:
+        # Ex: "MENDELSON (poème rock)" ou "ZAZ (chanson française)"
+        artist_match = re.match(r'^([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][^\(\)]{1,40}?)\s*(?:\(([^)]+)\))?\s*$', remaining)
+        if artist_match:
+            nom = artist_match.group(1).strip()
+            style = artist_match.group(2).strip() if artist_match.group(2) else None
+            if nom.upper() not in ('LE', 'LA', 'LES', 'DE', 'DU', 'DES', 'ET'):
+                result['artistes'].append({'nom': nom, 'style': style})
+
+    # 8. Pattern mixed case: "Les Echappées du Bocal (cabaret d'improvisation)"
+    # ou "Jean-Claude CARRIÈRE (lecture)" ou "Dr Bones & the Blue Roots (blues-rock)"
+    if not result['artistes'] and not result['spectacles']:
+        # Pattern général mixed case avec style optionnel
+        mixed_match = re.match(
+            r'^([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'\-\s&]+(?:\s+[A-Za-zÀ-ÿ\'\-\s&]+)*)\s*(?:\(([^)]+)\))?\s*$',
+            remaining.strip()
+        )
+        if mixed_match:
+            nom = mixed_match.group(1).strip()
+            style = mixed_match.group(2).strip() if mixed_match.group(2) else None
+            # Valider que c'est bien un artiste (au moins 3 caractères, pas un mot simple)
+            if len(nom) > 3 and nom.upper() not in ('LE', 'LA', 'LES', 'DE', 'DU', 'DES', 'ET', 'BAR', 'LIEU'):
+                result['artistes'].append({'nom': nom, 'style': style})
+
+    # 9. Détecter nom d'événement (Soirée XXX, etc.)
+    event_name = extract_event_name(before)
+    if event_name:
+        result['nom_evenement'] = event_name
+
+    return result
+
+
+def extract_after_lieu(text: str, lieu_end: int) -> dict:
+    """
+    Extrait et parse ce qui est APRÈS le lieu.
+    C'est généralement: ville, heure, prix
+
+    Returns:
+        dict avec 'heure', 'tarif_raw', 'prix_min', 'prix_max', 'gratuit'
+    """
+    after = text[lieu_end:].strip().lstrip(',').strip()
+
+    result = {
+        'heure': None,
+        'tarif_raw': None,
+        'prix_min': None,
+        'prix_max': None,
+        'gratuit': False
+    }
+
+    # Extraire l'heure
+    hour_patterns = [
+        r'(\d{1,2}h\d{0,2})\s*(?:à|&|-)\s*(\d{1,2}h?\d{0,2})',  # 23h-4h, 16h à 18h
+        r'(\d{1,2}h\d{0,2})',  # 20h30, 21h
+    ]
+
+    for pattern in hour_patterns:
+        match = re.search(pattern, after)
+        if match:
+            result['heure'] = match.group(0)
+            break
+
+    # Extraire le tarif avec la fonction existante
+    tarif_raw, prix_min, prix_max, gratuit = extract_tarif_improved(after)
+    result['tarif_raw'] = tarif_raw
+    result['prix_min'] = prix_min
+    result['prix_max'] = prix_max
+    result['gratuit'] = gratuit
+
+    return result
+
+
+def extract_ville_from_text_v2(text: str, ville_ref_list: list) -> tuple[Optional[int], str]:
+    """
+    Extrait la ville du texte complet.
+    Priorise les villes explicites (non Le Mans) si présentes.
+
+    Args:
+        text: Texte à analyser
+        ville_ref_list: Liste de tuples (id, nom)
+
+    Returns:
+        (ville_id, ville_nom)
+    """
+    # Normaliser les variantes de villes
+    normalizations = [
+        (r'Sablé\s*s/?Sarthe', 'Sablé-sur-Sarthe'),
+        (r'La\s+Ferté\s*Bernard', 'La Ferté-Bernard'),
+        (r'Sargé-lès-Le\s*Mans', 'Sargé-lès-Le Mans'),
+        (r'Yvré\s*l.Évêque', "Yvré-l'Évêque"),
+        (r'Moncé-en-?\s*Belin', 'Moncé-en-Belin'),
+        (r'St[\.\s]+Pavace', 'Saint-Pavace'),
+        (r'St[\.\s]+Saturnin', 'Saint-Saturnin'),
+        (r'Ste[\.\s]+Croix', 'Sainte-Croix'),
+    ]
+
+    text_normalized = text
+    for pattern, replacement in normalizations:
+        text_normalized = re.sub(pattern, replacement, text_normalized, flags=re.IGNORECASE)
+
+    text_lower = text_normalized.lower()
+
+    found = []
+    for ville_tuple in ville_ref_list:
+        ville_id = ville_tuple[0]
+        ville_nom = ville_tuple[1]
+        ville_lower = ville_nom.lower()
+
+        pattern = r'\b' + re.escape(ville_lower) + r'\b'
+        if re.search(pattern, text_lower):
+            found.append((ville_id, ville_nom))
+
+    if not found:
+        return None, "Le Mans"
+
+    # Prioriser non-Le Mans
+    non_lemans = [(vid, vnom) for vid, vnom in found if vnom.lower() != 'le mans']
+    if non_lemans:
+        # Prendre la plus longue (plus spécifique)
+        return max(non_lemans, key=lambda x: len(x[1]))
+
+    return found[0]
+
+
+def parse_event_line_v2(
+    raw_text: str,
+    base_month: int,
+    base_year: int,
+    lieu_ref_list: list,
+    ville_ref_list: list
+) -> list[dict]:
+    """
+    Parse une ligne d'événement avec la stratégie "lieu d'abord".
+
+    Flux:
+    1. Nettoyer le texte
+    2. Splitter sur les dates (lignes fusionnées)
+    3. Pour chaque ligne:
+       a. Parser le préfixe de date
+       b. Trouver le lieu (référentiel)
+       c. Parser avant le lieu (artistes, spectacles)
+       d. Parser après le lieu (ville, heure, prix)
+
+    Returns:
+        Liste de dicts représentant les événements parsés
+    """
+    results = []
+
+    # Nettoyer
+    text = clean_pdf_text(raw_text)
+    text = expand_abbreviations(text)
+
+    # Préparer les patterns de lieu
+    lieu_patterns = load_lieu_patterns(lieu_ref_list)
+
+    # Splitter sur les dates
+    lines = split_on_dates_v2(text)
+
+    for line in lines:
+        # Parser le préfixe de date
+        dates, event_text = parse_date_prefix_v2(line, base_month, base_year)
+
+        if not dates:
+            # Pas de date dans le préfixe
+            dates = [None]
+
+        # Trouver le lieu
+        lieu_match = find_lieu_in_text_v2(event_text, lieu_patterns)
+
+        if lieu_match:
+            lieu_nom, lieu_id, lieu_start, lieu_end = lieu_match
+
+            # Parser avant et après le lieu
+            before_data = extract_before_lieu(event_text, lieu_start)
+            after_data = extract_after_lieu(event_text, lieu_end)
+
+            # Extraire la ville du texte complet
+            ville_id, ville_nom = extract_ville_from_text_v2(event_text, ville_ref_list)
+
+        else:
+            # Lieu non trouvé - fallback
+            lieu_nom, lieu_id = None, None
+            before_data = extract_before_lieu(event_text, len(event_text))
+            after_data = {
+                'heure': None,
+                'tarif_raw': None,
+                'prix_min': None,
+                'prix_max': None,
+                'gratuit': False
+            }
+
+            # Essayer d'extraire l'heure du texte complet
+            hour_match = re.search(r'(\d{1,2}h\d{0,2})', event_text)
+            if hour_match:
+                after_data['heure'] = hour_match.group(1)
+
+            # Extraire tarif du texte complet
+            tarif_raw, prix_min, prix_max, gratuit = extract_tarif_improved(event_text)
+            after_data['tarif_raw'] = tarif_raw
+            after_data['prix_min'] = prix_min
+            after_data['prix_max'] = prix_max
+            after_data['gratuit'] = gratuit
+
+            ville_id, ville_nom = extract_ville_from_text_v2(event_text, ville_ref_list)
+
+        # Créer un événement par date
+        for event_date in dates:
+            # Construire date_str
+            date_str = None
+            if event_date:
+                jours = ['Lu', 'Ma', 'Me', 'Je', 'Ve', 'Sa', 'Di']
+                date_str = f"{jours[event_date.weekday()]} {event_date.day}"
+
+            event = {
+                'raw_text': raw_text,
+                'nom': before_data.get('nom_evenement'),
+                'date_str': date_str,
+                'date_evenement': event_date,
+                'heure': after_data.get('heure'),
+                'lieu_raw': lieu_nom,
+                'lieu_ref_id': lieu_id,
+                'ville_raw': ville_nom,
+                'ville_ref_id': ville_id,
+                'tarif_raw': after_data.get('tarif_raw'),
+                'prix_min': after_data.get('prix_min'),
+                'prix_max': after_data.get('prix_max'),
+                'gratuit': after_data.get('gratuit', False),
+                'spectacles': before_data.get('spectacles', []),
+                'artistes': before_data.get('artistes', []),
+            }
+
+            results.append(event)
+
+    return results
+
+
+# =============================================================================
+# FIN STRATÉGIE "LIEU D'ABORD"
+# =============================================================================
 
 
 @dataclass
@@ -1450,6 +2075,194 @@ class EventParser:
             score += 0.1
 
         return min(1.0, score)
+
+    def parse_with_referentiel(
+        self,
+        text: str,
+        lieu_ref_list: list,
+        ville_ref_list: list
+    ) -> list[ParsedEvent]:
+        """
+        Parse le texte avec la stratégie "lieu d'abord" utilisant les référentiels.
+
+        Cette méthode est plus précise que parse() car elle:
+        1. Trouve d'abord le lieu dans le référentiel
+        2. Parse ce qui est avant le lieu (artistes, spectacles)
+        3. Parse ce qui est après le lieu (ville, heure, prix)
+
+        Args:
+            text: Texte brut extrait du PDF
+            lieu_ref_list: Liste de tuples (id, nom, ville) pour les lieux
+            ville_ref_list: Liste de tuples (id, nom) pour les villes
+
+        Returns:
+            Liste d'événements parsés (dédoublonnés)
+        """
+        events = []
+        seen_signatures = set()
+
+        # Découper par dates
+        date_blocks = self._split_by_dates(text)
+
+        for date_str, block_text in date_blocks:
+            # Découper par événements (bullets)
+            event_texts = self._split_by_bullets(block_text)
+
+            for event_text in event_texts:
+                if len(event_text.strip()) < 10:
+                    continue
+
+                # Utiliser parse_event_line_v2 pour chaque ligne
+                parsed_events = parse_event_line_v2(
+                    event_text.strip(),
+                    self.bidul_mois or 1,
+                    self.bidul_annee or 2023,
+                    lieu_ref_list,
+                    ville_ref_list
+                )
+
+                for parsed in parsed_events:
+                    # Convertir le dict en ParsedEvent
+                    event = self._dict_to_parsed_event(parsed, date_str)
+                    if event:
+                        signature = self._event_signature(event)
+                        if signature not in seen_signatures:
+                            seen_signatures.add(signature)
+                            events.append(event)
+
+        # Si aucun événement trouvé, essayer le format inline
+        if not events:
+            events = self._parse_inline_with_referentiel(text, lieu_ref_list, ville_ref_list)
+
+        return events
+
+    def _parse_inline_with_referentiel(
+        self,
+        text: str,
+        lieu_ref_list: list,
+        ville_ref_list: list
+    ) -> list[ParsedEvent]:
+        """Parse le format inline avec la stratégie 'lieu d'abord'."""
+        events = []
+        seen_signatures = set()
+
+        lines = text.split('\n')
+        current_event_lines = []
+        current_date = None
+
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+
+            match = self.INLINE_DATE_PATTERN.match(line)
+            if match:
+                # Traiter l'événement précédent
+                if current_event_lines and current_date:
+                    event_text = ' '.join(current_event_lines)
+                    parsed_events = parse_event_line_v2(
+                        event_text,
+                        self.bidul_mois or 1,
+                        self.bidul_annee or 2023,
+                        lieu_ref_list,
+                        ville_ref_list
+                    )
+                    for parsed in parsed_events:
+                        event = self._dict_to_parsed_event(parsed, current_date)
+                        if event:
+                            signature = self._event_signature(event)
+                            if signature not in seen_signatures:
+                                seen_signatures.add(signature)
+                                events.append(event)
+
+                jour = match.group(1)
+                num = match.group(2)
+                current_date = f"{jour} {num}"
+                current_event_lines = [match.group(3).strip()]
+            else:
+                if current_event_lines:
+                    current_event_lines.append(line)
+
+        # Traiter le dernier événement
+        if current_event_lines and current_date:
+            event_text = ' '.join(current_event_lines)
+            parsed_events = parse_event_line_v2(
+                event_text,
+                self.bidul_mois or 1,
+                self.bidul_annee or 2023,
+                lieu_ref_list,
+                ville_ref_list
+            )
+            for parsed in parsed_events:
+                event = self._dict_to_parsed_event(parsed, current_date)
+                if event:
+                    signature = self._event_signature(event)
+                    if signature not in seen_signatures:
+                        seen_signatures.add(signature)
+                        events.append(event)
+
+        return events
+
+    def _dict_to_parsed_event(self, parsed: dict, date_str: Optional[str]) -> Optional[ParsedEvent]:
+        """Convertit un dict de parse_event_line_v2 en ParsedEvent."""
+        if not parsed:
+            return None
+
+        event = ParsedEvent(raw_text=parsed.get('raw_text', ''))
+
+        # Date
+        if date_str:
+            event.date_str = date_str
+            event.date_evenement = self._parse_date(date_str)
+        elif parsed.get('date_evenement'):
+            event.date_evenement = parsed['date_evenement']
+            event.date_str = parsed.get('date_str')
+
+        # Lieu
+        event.lieu_raw = parsed.get('lieu_raw')
+        event.ville_raw = parsed.get('ville_raw')
+
+        # Heure/Prix
+        event.heure = parsed.get('heure')
+        event.tarif_raw = parsed.get('tarif_raw')
+        event.prix_min = parsed.get('prix_min')
+        event.prix_max = parsed.get('prix_max')
+        event.gratuit = parsed.get('gratuit', False)
+
+        # Artistes - convertir les dicts en ArtisteInfo
+        artistes_raw = parsed.get('artistes', [])
+        event.artistes = []
+        for a in artistes_raw:
+            if isinstance(a, dict):
+                event.artistes.append(ArtisteInfo(
+                    nom=a.get('nom', ''),
+                    genre=a.get('genre') or a.get('style'),
+                    spectacle=a.get('spectacle')
+                ))
+            elif isinstance(a, ArtisteInfo):
+                event.artistes.append(a)
+
+        # Spectacles - extraire les noms
+        spectacles_raw = parsed.get('spectacles', [])
+        event.spectacles = []
+        for s in spectacles_raw:
+            if isinstance(s, dict):
+                event.spectacles.append(s.get('nom', ''))
+            else:
+                event.spectacles.append(s)
+
+        # Nom d'événement
+        event.nom = parsed.get('nom')
+
+        # Type et confidence
+        event.type_evenement = self._deduce_type(event)
+        event.confidence = self._calculate_confidence(event)
+
+        # Bonus confidence si lieu trouvé dans référentiel
+        if parsed.get('lieu_ref_id'):
+            event.confidence = min(1.0, event.confidence + 0.1)
+
+        return event
 
 
 # Test standalone
