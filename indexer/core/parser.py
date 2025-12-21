@@ -20,6 +20,117 @@ from core.text_cleaner import clean_pdf_text, expand_abbreviations, normalize_li
 logger = logging.getLogger(__name__)
 
 
+# =============================================================================
+# EXTRACTION BASÉE SUR LE FORMATAGE (gras, italique)
+# =============================================================================
+
+def extract_formatted_spectacles(text: str) -> list[dict]:
+    """
+    Extrait les spectacles en utilisant le formatage.
+
+    Règle: Les spectacles sont en GRAS entre guillemets.
+    Pattern: <b>"Nom du spectacle"</b> ou <b>"Nom"</b> <i>(style)</i>
+
+    Returns:
+        Liste de dicts {'nom': str, 'style': str|None}
+    """
+    spectacles = []
+
+    # Pattern: <b>"Spectacle"</b> suivi optionnellement de <i>(style)</i>
+    # Guillemets typographiques ou ASCII
+    pattern = r'<b>\s*[«""„]([^»""]+)[»""]\s*</b>(?:\s*<i>\s*\(([^)]+)\)\s*</i>)?'
+    matches = re.finditer(pattern, text, re.IGNORECASE)
+
+    for match in matches:
+        nom = match.group(1).strip()
+        style = match.group(2).strip() if match.group(2) else None
+        if nom and len(nom) > 1:
+            spectacles.append({'nom': nom, 'style': style})
+
+    return spectacles
+
+
+def extract_formatted_artistes_musicaux(text: str) -> list[dict]:
+    """
+    Extrait les artistes musicaux en utilisant le formatage.
+
+    Règle: Les artistes musicaux (concerts) sont en GRAS sans guillemets.
+    Pattern: <b>NOM ARTISTE</b> ou <b>NOM</b> <i>(style)</i>
+
+    Returns:
+        Liste de dicts {'nom': str, 'style': str|None, 'is_musical': True}
+    """
+    artistes = []
+
+    # Pattern: <b>ARTISTE</b> suivi optionnellement de <i>(style)</i>
+    # Exclure les spectacles (guillemets) et les textes courts
+    pattern = r'<b>([^<"»"„«]+)</b>(?:\s*<i>\s*\(([^)]+)\)\s*</i>)?'
+    matches = re.finditer(pattern, text, re.IGNORECASE)
+
+    for match in matches:
+        nom = match.group(1).strip()
+        style = match.group(2).strip() if match.group(2) else None
+
+        # Filtrer les faux positifs
+        # - Trop court (moins de 2 caractères)
+        # - Mots de liaison
+        # - Dates (comme "Lu 02")
+        if (len(nom) < 2 or
+            nom.upper() in ('LE', 'LA', 'LES', 'DE', 'DU', 'DES', 'ET', 'À', 'AU') or
+            re.match(r'^[DLMJVS][a-z]\s*\d', nom, re.IGNORECASE)):
+            continue
+
+        artistes.append({
+            'nom': nom,
+            'style': style,
+            'is_musical': True
+        })
+
+    return artistes
+
+
+def extract_formatted_styles(text: str) -> list[str]:
+    """
+    Extrait les styles/genres en utilisant le formatage.
+
+    Règle: Les styles sont en ITALIQUE entre parenthèses.
+    Pattern: <i>(style)</i>
+
+    Returns:
+        Liste de styles
+    """
+    styles = []
+
+    # Pattern: <i>(style)</i>
+    pattern = r'<i>\s*\(([^)]+)\)\s*</i>'
+    matches = re.finditer(pattern, text, re.IGNORECASE)
+
+    for match in matches:
+        style = match.group(1).strip()
+        if style and len(style) > 1:
+            styles.append(style)
+
+    return styles
+
+
+def strip_formatting_tags(text: str) -> str:
+    """
+    Retire les balises de formatage du texte.
+
+    Convertit "<b>texte</b> <i>style</i>" en "texte style"
+    """
+    # Retirer les balises mais garder le contenu
+    text = re.sub(r'</?b>', '', text)
+    text = re.sub(r'</?i>', '', text)
+    text = re.sub(r'</?bi>', '', text)
+    return text
+
+
+def has_formatting_tags(text: str) -> bool:
+    """Vérifie si le texte contient des balises de formatage."""
+    return bool(re.search(r'</?(?:b|i|bi)>', text))
+
+
 def is_named_event(text: str) -> bool:
     """
     Détermine si le texte représente un événement nommé (festival, soirée thématique).
@@ -630,6 +741,12 @@ def extract_before_lieu(text: str, lieu_start: int) -> dict:
     Extrait et parse ce qui est AVANT le lieu.
     C'est généralement: artiste/spectacle + (style)
 
+    Si le texte contient des balises de formatage (<b>, <i>), utilise
+    l'extraction basée sur le formatage pour plus de précision:
+    - <b>"Spectacle"</b> → spectacle
+    - <b>ARTISTE</b> → artiste musical
+    - <i>(style)</i> → style
+
     Returns:
         dict avec 'spectacles', 'artistes', 'nom_evenement'
     """
@@ -640,6 +757,68 @@ def extract_before_lieu(text: str, lieu_start: int) -> dict:
         'artistes': [],
         'nom_evenement': None
     }
+
+    # Utiliser l'extraction basée sur le formatage si disponible
+    if has_formatting_tags(before):
+        # Extraction basée sur le formatage (plus précise)
+        result['spectacles'] = extract_formatted_spectacles(before)
+        result['artistes'] = extract_formatted_artistes_musicaux(before)
+
+        # Pour les artistes de théâtre (non gras), on continue avec le parsing classique
+        # sur le texte sans balises
+        before_stripped = strip_formatting_tags(before)
+
+        # Extraire les artistes de théâtre: "par XXX" après un spectacle
+        # Ces artistes ne sont PAS en gras
+        # IMPORTANT: l'ordre est important - les patterns plus spécifiques d'abord
+        par_patterns = [
+            # "par la Cie XXX" avec guillemets
+            (r'par\s+la\s+[Cc]ie\s+[«""„]([^»""]+)[»""]', 'Cie '),
+            # "par la Cie XXX" sans guillemets - attention à ne pas matcher trop
+            (r'par\s+la\s+[Cc]ie\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s\'\-]+?)(?:\s*,|\s*$)', 'Cie '),
+            (r'par\s+la\s+[Cc]ompagnie\s+([^,\(\)]+?)(?:\s*,|\s*$)', 'Cie '),
+            (r'par\s+le\s+chœur\s+([^,\(\)]+?)(?:\s*,|\s*$)', 'Chœur '),
+            (r'par\s+le\s+collectif\s+([^,\(\)]+?)(?:\s*,|\s*$)', 'Collectif '),
+            # "par Prénom Nom" - nom de personne (Béatrice Maine, etc.)
+            (r'par\s+([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][a-zàâäéèêëïîôùûüç]+(?:\s+[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][a-zàâäéèêëïîôùûüç]+)+)', ''),
+        ]
+
+        for pattern, prefix in par_patterns:
+            match = re.search(pattern, before_stripped, re.IGNORECASE)
+            if match:
+                nom = match.group(1).strip().rstrip(',')
+                if nom and len(nom) > 2:
+                    full_nom = f"{prefix}{nom}" if prefix else nom
+                    # Vérifier que ce n'est pas déjà dans les artistes
+                    if not any(a['nom'].lower() == full_nom.lower() for a in result['artistes']):
+                        result['artistes'].append({'nom': full_nom, 'style': None, 'is_musical': False})
+                # Sortir après le premier match pour éviter les doublons
+                break
+
+        # Pattern "avec la Cie XXX" (pour les artistes de théâtre)
+        avec_patterns = [
+            # "avec la Cie "XXX"" avec guillemets ASCII
+            (r'avec\s+la\s+[Cc]ie\s+"([^"]+)"', 'Cie '),
+            # "avec la Cie «XXX»" avec guillemets typographiques
+            (r'avec\s+la\s+[Cc]ie\s+[«""„]([^»""]+)[»""]', 'Cie '),
+            # "avec la Cie XXX" sans guillemets
+            (r'avec\s+la\s+[Cc]ie\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s\'\-]+?)(?:\s*,|\s*$)', 'Cie '),
+            (r'avec\s+la\s+[Cc]ompagnie\s+([^,\(\)]+?)(?:\s*,|\s*$)', 'Cie '),
+        ]
+
+        for pattern, prefix in avec_patterns:
+            match = re.search(pattern, before_stripped, re.IGNORECASE)
+            if match:
+                nom = match.group(1).strip().rstrip(',')
+                if nom and len(nom) > 2:
+                    full_nom = f"{prefix}{nom}" if prefix else nom
+                    if not any(a['nom'].lower() == full_nom.lower() for a in result['artistes']):
+                        result['artistes'].append({'nom': full_nom, 'style': None, 'is_musical': False})
+                break
+
+        return result
+
+    # === Fallback: extraction classique sans formatage ===
 
     # 0. D'abord extraire "avec la Cie "XXX"" AVANT les spectacles
     # pour ne pas que le nom de la Cie soit extrait comme spectacle
