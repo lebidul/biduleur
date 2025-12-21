@@ -50,6 +50,19 @@ def extract_formatted_spectacles(text: str) -> list[dict]:
     return spectacles
 
 
+def _merge_consecutive_bold_tags(text: str) -> str:
+    """
+    Fusionne les balises <b> consécutives séparées par des espaces/retours.
+
+    Exemple:
+    "<b>LES MOYENS </b> <b>DU BORD </b>" → "<b>LES MOYENS DU BORD </b>"
+    """
+    # Pattern: </b> suivi d'espaces/retours puis <b>
+    # On remplace par un seul espace (les espaces internes seront normalisés après)
+    merged = re.sub(r'\s*</b>\s*<b>\s*', ' ', text)
+    return merged
+
+
 def extract_formatted_artistes_musicaux(text: str) -> list[dict]:
     """
     Extrait les artistes musicaux en utilisant le formatage.
@@ -57,10 +70,15 @@ def extract_formatted_artistes_musicaux(text: str) -> list[dict]:
     Règle: Les artistes musicaux (concerts) sont en GRAS sans guillemets.
     Pattern: <b>NOM ARTISTE</b> ou <b>NOM</b> <i>(style)</i>
 
+    Gère aussi les artistes séparés par "+".
+
     Returns:
         Liste de dicts {'nom': str, 'style': str|None, 'is_musical': True}
     """
     artistes = []
+
+    # D'abord fusionner les <b> consécutifs (sauts de ligne dans le PDF)
+    text = _merge_consecutive_bold_tags(text)
 
     # Pattern: <b>ARTISTE</b> suivi optionnellement de <i>(style)</i>
     # Exclure les spectacles (guillemets) et les textes courts
@@ -123,6 +141,8 @@ def strip_formatting_tags(text: str) -> str:
     text = re.sub(r'</?b>', '', text)
     text = re.sub(r'</?i>', '', text)
     text = re.sub(r'</?bi>', '', text)
+    # Normaliser les espaces multiples
+    text = re.sub(r'  +', ' ', text)
     return text
 
 
@@ -150,19 +170,20 @@ def is_named_event(text: str) -> bool:
     - Concerts d'artistes: MENDELSON (poème rock)
     """
     # Patterns d'événements nommés
+    # Note: ^[«""„]? permet de matcher avec ou sans guillemets au début
     named_event_patterns = [
-        r'^Alpa\s+On\s+The\s+Rock\s+#?\d+',
-        r'^Esc\s+Exp\s+#?\d+',
-        r'^Melting\s+Rock',
-        r'^Les\s+Spectaculaires',
-        r'^Soirée\s+[\w\s]+',  # Soirée Solidaire, Soirée Mix Généraliste, Soirée OULALA Xmas
-        r'^Labo\s+d.Impro',
-        r'^[Cc]arte\s+[Bb]lanche\s+[àa]',
-        r'^Festival\s+',
-        r'^Nuit\s+\w+',  # Nuit Blanche, etc.
-        r'^Scène\s+ouverte',  # Scène ouverte musicale, etc.
-        r'^Open\s+mic',
-        r'^Jam\s+session',
+        r'^[«""„]?Alpa\s+On\s+The\s+Rock\s+#?\d+',
+        r'^[«""„]?Esc\s+Exp\s+#?\d+',
+        r'^[«""„]?Melting\s+Rock',
+        r'^[«""„]?Les\s+Spectaculaires',
+        r'^[«""„]?Soirée\s+[\w\s]+',  # Soirée Solidaire, Soirée Mix Généraliste, Soirée OULALA Xmas
+        r'^[«""„]?Labo\s+d.Impro',
+        r'^[«""„]?[Cc]arte\s+[Bb]lanche\s+[àa]',
+        r'^[«""„]?Festival\s+',
+        r'^[«""„]?Nuit\s+\w+',  # Nuit Blanche, etc.
+        r'^[«""„]?Scène\s+ouverte',  # Scène ouverte musicale, etc.
+        r'^[«""„]?Open\s+mic',
+        r'^[«""„]?Jam\s+session',
     ]
 
     for pattern in named_event_patterns:
@@ -183,12 +204,20 @@ def extract_event_name(text: str) -> Optional[str]:
     if not is_named_event(text):
         return None
 
+    # Retirer les guillemets de début et fin pour simplifier l'extraction
+    clean_text = text.strip()
+    clean_text = re.sub(r'^[«""„]', '', clean_text)
+    clean_text = re.sub(r'[»""]$', '', clean_text)
+    clean_text = clean_text.strip()
+
     # Extraire le nom jusqu'au premier ":" ou "avec" ou artiste
     patterns = [
         r'^(Alpa\s+On\s+The\s+Rock\s+#?\d+)',
         r'^(Esc\s+Exp\s+#?\d+\s+\w+)',
         r'^(Melting\s+Rock)',
         r'^(Les\s+Spectaculaires)',
+        # "Soirée X" entre guillemets → extraire Soirée X sans guillemets
+        r'^(Soirée\s+\w+)[»""]',
         # Soirée X avec DJ → extraire seulement "Soirée X"
         r'^(Soirée\s+[\w\s]+?)\s+avec\s+',
         # Soirée X (sans "avec")
@@ -203,7 +232,7 @@ def extract_event_name(text: str) -> Optional[str]:
     ]
 
     for pattern in patterns:
-        match = re.match(pattern, text.strip(), re.IGNORECASE)
+        match = re.match(pattern, clean_text, re.IGNORECASE)
         if match:
             return match.group(1).strip()
 
@@ -767,6 +796,16 @@ def extract_before_lieu(text: str, lieu_start: int) -> dict:
         # Pour les artistes de théâtre (non gras), on continue avec le parsing classique
         # sur le texte sans balises
         before_stripped = strip_formatting_tags(before)
+
+        # Vérifier si c'est un événement nommé (Soirée X, Festival, etc.)
+        # Note: <bi> = gras+italique est souvent utilisé pour les événements nommés
+        event_name = extract_event_name(before_stripped)
+        if event_name:
+            result['nom_evenement'] = event_name
+
+        # Pattern "guests" ou "guests!!"
+        if re.search(r'\bguests?!*\b', before_stripped, re.IGNORECASE):
+            result['artistes'].append({'nom': 'Guests', 'style': None, 'is_musical': True})
 
         # Extraire les artistes de théâtre: "par XXX" après un spectacle
         # Ces artistes ne sont PAS en gras

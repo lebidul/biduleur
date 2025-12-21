@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Optional
 from datetime import date, datetime
 
-from .parser import ParsedEvent
+from .parser import ParsedEvent, strip_formatting_tags
 
 logger = logging.getLogger(__name__)
 
@@ -177,17 +177,21 @@ class BidulDB:
         lieu_ref_id = self._find_lieu_ref(event.lieu_raw) if event.lieu_raw else None
         ville_ref_id, ville_normalized = self._find_ville_ref(event.ville_raw)
 
+        # Générer raw_text_clean (sans balises de formatage)
+        raw_text_clean = strip_formatting_tags(event.raw_text) if event.raw_text else None
+
         cursor = conn.execute("""
             INSERT INTO evenement (
-                bidul_numero, raw_text, nom, date_evenement, heure,
+                bidul_numero, raw_text, raw_text_clean, nom, date_evenement, heure,
                 lieu_raw, lieu_ref_id, ville_raw, ville_ref_id,
                 artistes, spectacles, genres_raw,
                 tarif_raw, prix_min, prix_max, gratuit,
                 type_evenement, confidence, source
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pdf')
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pdf')
         """, (
             bidul_numero,
             event.raw_text,
+            raw_text_clean,
             event.nom,
             event.date_evenement.isoformat() if event.date_evenement else None,
             event.heure,
@@ -221,17 +225,22 @@ class BidulDB:
         lieu_ref_id = self._find_lieu_ref(event.get('lieu_raw')) if event.get('lieu_raw') else None
         ville_ref_id, ville_normalized = self._find_ville_ref(event.get('ville_raw'))
 
+        # Générer raw_text_clean (sans balises de formatage)
+        raw_text = event.get('raw_text', '')
+        raw_text_clean = strip_formatting_tags(raw_text) if raw_text else None
+
         cursor = conn.execute("""
             INSERT INTO evenement (
-                bidul_numero, raw_text, nom, date_evenement, heure,
+                bidul_numero, raw_text, raw_text_clean, nom, date_evenement, heure,
                 lieu_raw, lieu_ref_id, ville_raw, ville_ref_id,
                 artistes, spectacles, genres_raw, genre_evenement,
                 tarif_raw, prix_min, prix_max, gratuit,
                 type_evenement, confidence, source
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             event['bidul_numero'],
-            event['raw_text'],
+            raw_text,
+            raw_text_clean,
             event.get('nom'),
             event.get('date_evenement'),
             event.get('heure'),
