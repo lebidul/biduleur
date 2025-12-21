@@ -852,13 +852,15 @@ def parse_date_prefix_v2(text: str, base_month: int, base_year: int) -> tuple[li
 
     Ex: "Lu 02 & Ma 03 : Événement..." → [(2013-12-02), (2013-12-03)], "Événement..."
     Ex: "Di 01 : Événement..." → [(2013-12-01)], "Événement..."
+    Ex: "Me 1er : Événement..." → [(2013-05-01)], "Événement..."
     Ex: "Événement..." → [], "Événement..."
 
     Returns:
         (liste_dates, texte_restant)
     """
     # Pattern: date(s) en début de ligne suivie de ":"
-    date_pattern = r'^([DLMJVS][a-z]\s*\d{1,2}(?:\s*[&,]\s*[A-Za-z]{2}\s*\d{1,2})*)\s*:\s*(.+)$'
+    # Gère les suffixes ordinaux: 1er, 2e, 3ème, etc.
+    date_pattern = r'^([DLMJVS][a-z]\s*\d{1,2}(?:er|e|ème)?(?:\s*[&,]\s*[A-Za-z]{2}\s*\d{1,2}(?:er|e|ème)?)*)\s*:\s*(.+)$'
 
     match = re.match(date_pattern, text.strip(), re.IGNORECASE | re.DOTALL)
 
@@ -868,8 +870,8 @@ def parse_date_prefix_v2(text: str, base_month: int, base_year: int) -> tuple[li
     dates_part = match.group(1)
     event_text = match.group(2)
 
-    # Extraire les jours
-    day_pattern = r'([DLMJVS][a-z])\s*(\d{1,2})'
+    # Extraire les jours (ignorer les suffixes ordinaux)
+    day_pattern = r'([DLMJVS][a-z])\s*(\d{1,2})(?:er|e|ème)?'
     days_found = re.findall(day_pattern, dates_part, re.IGNORECASE)
 
     dates = []
@@ -1102,7 +1104,8 @@ def extract_before_lieu(text: str, lieu_start: int) -> dict:
 
             # Pattern: NOM (style) ou NOM
             # Le pattern doit capturer le nom ENTIER jusqu'à l'espace avant (
-            artist_match = re.match(r'^([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s\'\-&]+?)\s*(?:\(([^)]+)\))?(?:\s*,|$)', part.strip())
+            # Note: \u2019 est l'apostrophe typographique courante dans les PDFs
+            artist_match = re.match(r"^([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s'\u2019\-&]+?(?:['\u2019]s)?)\s*(?:\(([^)]+)\))?(?:\s*,|$)", part.strip())
             if artist_match:
                 nom = artist_match.group(1).strip()
                 style = artist_match.group(2).strip() if artist_match.group(2) else None
@@ -1475,8 +1478,8 @@ def parse_event_line_v2(
                 date_str = f"{jours[event_date.weekday()]} {event_date.day}"
 
             event = {
-                # Utiliser le texte splitté (line) et non le texte complet (raw_text)
-                'raw_text': line.strip(),
+                # Utiliser event_text (sans préfixe de date) pour raw_text
+                'raw_text': event_text.strip(),
                 'nom': before_data.get('nom_evenement'),
                 'date_str': date_str,
                 'date_evenement': event_date,
@@ -1608,9 +1611,10 @@ class EventParser:
 
     # Pattern pour détecter un nouveau événement dans un texte multi-événements
     # Un nouvel événement commence par: bullet OU (retour ligne + artiste en MAJUSCULES)
+    # Note: \u2019 est l'apostrophe typographique courante dans les PDFs
     MULTI_EVENT_SPLIT = re.compile(
         r'(?:\n\s*[•●○◦▪▫■□►▸‣⁃❑❒◇◆★☆✦✧♦❖✳✴✵✶✷✸✹\u2750-\u2757\uf06f\uf071\uf0b5\uf0b6]\s*)|'  # Bullet sur nouvelle ligne
-        r'(?:\n\s*(?=[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s\'\-&]{2,}.*?,.*?\d+[hH]))',  # ARTISTE... , ... XXh
+        r"(?:\n\s*(?=[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s'\u2019\-&]{2,}.*?,.*?\d+[hH]))",  # ARTISTE... , ... XXh
         re.MULTILINE
     )
 
@@ -1627,7 +1631,9 @@ class EventParser:
     )
 
     # Pattern pour les artistes en majuscules
-    ARTISTE_PATTERN = re.compile(r"([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s\'\-&]{2,}(?:\s+[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\'\-&]+)*)")
+    # Gère les suffixes comme 's (BLACK ANGEL's, THEE MVP's)
+    # Note: \u2019 est l'apostrophe typographique courante dans les PDFs
+    ARTISTE_PATTERN = re.compile(r"([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s'\u2019\-&]{2,}(?:\s+[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ'\u2019\-&]+)*(?:['\u2019]s)?)")
 
     # Pattern pour les genres entre parenthèses
     GENRE_PATTERN = re.compile(r"\(([^)]+)\)")
@@ -1875,7 +1881,8 @@ class EventParser:
                 is_new_event = False
                 if current_event:
                     # Vérifie si la ligne commence par un artiste en majuscules ET contient une heure
-                    if re.match(r'^[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s\'\-&]{2,}', line_stripped):
+                    # Note: \u2019 est l'apostrophe typographique courante dans les PDFs
+                    if re.match(r"^[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s'\u2019\-&]{2,}", line_stripped):
                         if self.HEURE_PATTERN.search(line_stripped):
                             is_new_event = True
 
@@ -2238,9 +2245,11 @@ class EventParser:
             # Chercher le pattern: ARTISTE (genre) ou "spectacle" ARTISTE (genre)
             # Le genre peut contenir des espaces: (rock progressif), (dj set techno)
             # Le nom peut commencer par un chiffre (100 ONCES, 2 MANY DJS, etc.)
+            # Gère les suffixes comme 's (BLACK ANGEL's, THEE MVP's)
+            # Note: \u2019 est l'apostrophe typographique courante dans les PDFs
             match = re.match(
                 r'^(?:[""«][^""»]+[""»]\s*)?'  # Optionnel: spectacle entre guillemets
-                r'((?:\d+\s+)?[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s\'\-&0-9]*?)'  # Nom artiste (peut commencer par chiffre)
+                r"((?:\d+\s+)?[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s'\u2019\-&0-9]*?(?:['\u2019]s)?)"  # Nom artiste (peut commencer par chiffre, finir par 's)
                 r'(?:\s*\(([^)]+)\))?'  # Optionnel: (genre)
                 r'(?:\s*$|,)',  # Fin de segment
                 segment
