@@ -1,207 +1,255 @@
 -- =============================================================================
 -- Requêtes analytiques - Archives du Bidul
 -- =============================================================================
--- Base: ~14500 événements extraits de 122 numéros (178-308)
--- Sources: CSV (données manuelles, confidence=1.0) et PDF (extraction auto)
+-- Base de données SQLite avec extraction automatique des PDFs
+-- Architecture v2 avec tables normalisées:
+--   - bidul: métadonnées des numéros
+--   - evenement: événements avec raw_text, dates, lieux, tarifs
+--   - contenu_evenement: artistes et spectacles normalisés (relation 1-N)
+--   - lieu_ref / ville_ref: référentiels pour normalisation
+--   - artiste_alias: aliases pour normalisation des noms d'artistes
+--   - correction_log: historique des corrections manuelles
 -- =============================================================================
 
--- -----------------------------------------------------------------------------
--- ARTISTES
--- -----------------------------------------------------------------------------
+-- =============================================================================
+-- REQUÊTES DE BASE - Exploration des événements
+-- =============================================================================
 
+-- Liste des événements d'un Bidul avec artistes et spectacles
 SELECT
+    e.id,
+    e.raw_text,
     e.nom,
     e.date_evenement,
     e.heure,
     e.lieu_raw,
     e.ville_raw,
+    e.tarif_raw,
+    c.nom_spectacle,
     c.artiste,
-    c.nom_spectacle
+    c.style
 FROM evenement e
 LEFT JOIN contenu_evenement c ON e.id = c.evenement_id
 WHERE e.bidul_numero = 184
-ORDER BY e.date_evenement, e.heure
+ORDER BY e.date_evenement, e.heure, c.ordre;
 
-
--- Top 20 artistes les plus programmés
+-- Événements d'une date précise avec détails complets
 SELECT
-    json_extract(value, '$.nom') AS artiste,
-    COUNT(*) AS nb_concerts,
-    MIN(strftime('%Y', date_evenement)) AS premiere_annee,
-    MAX(strftime('%Y', date_evenement)) AS derniere_annee
-FROM evenement, json_each(evenement.artistes)
-WHERE artistes IS NOT NULL
-GROUP BY json_extract(value, '$.nom')
+    e.id,
+    e.heure,
+    e.nom AS evenement,
+    GROUP_CONCAT(DISTINCT c.artiste) AS artistes,
+    GROUP_CONCAT(DISTINCT c.nom_spectacle) AS spectacles,
+    e.lieu_raw AS lieu,
+    e.ville_raw AS ville,
+    e.tarif_raw AS prix,
+    e.type_evenement AS type
+FROM evenement e
+LEFT JOIN contenu_evenement c ON e.id = c.evenement_id
+WHERE e.date_evenement = '2023-05-14'  -- Modifier cette date
+GROUP BY e.id
+ORDER BY e.heure;
+
+-- =============================================================================
+-- ARTISTES - Statistiques et recherche
+-- =============================================================================
+
+-- Top 30 artistes les plus programmés (via contenu_evenement)
+SELECT
+    c.artiste,
+    COUNT(DISTINCT e.id) AS nb_concerts,
+    COUNT(DISTINCT e.bidul_numero) AS nb_biduls,
+    MIN(strftime('%Y', e.date_evenement)) AS premiere_annee,
+    MAX(strftime('%Y', e.date_evenement)) AS derniere_annee,
+    GROUP_CONCAT(DISTINCT c.style) AS styles
+FROM contenu_evenement c
+JOIN evenement e ON c.evenement_id = e.id
+WHERE c.artiste IS NOT NULL
+GROUP BY c.artiste
+HAVING nb_concerts >= 2
 ORDER BY nb_concerts DESC
-LIMIT 20;
+LIMIT 30;
 
--- Artistes par année
+-- Recherche d'un artiste (parcours complet)
 SELECT
-    strftime('%Y', date_evenement) AS annee,
-    value AS artiste,
+    e.date_evenement,
+    e.heure,
+    e.lieu_raw AS lieu,
+    e.ville_raw AS ville,
+    c.style,
+    e.tarif_raw AS prix,
+    e.bidul_numero
+FROM contenu_evenement c
+JOIN evenement e ON c.evenement_id = e.id
+WHERE c.artiste LIKE '%MOONLIGHT%'  -- Modifier le nom de l'artiste
+ORDER BY e.date_evenement;
+
+-- Artistes par style/genre
+SELECT
+    c.style,
+    c.artiste,
     COUNT(*) AS nb_concerts
-FROM evenement, json_each(evenement.artistes)
-WHERE artistes IS NOT NULL AND date_evenement IS NOT NULL
-GROUP BY annee, artiste
-ORDER BY annee DESC, nb_concerts DESC;
+FROM contenu_evenement c
+WHERE c.style IS NOT NULL AND c.artiste IS NOT NULL
+GROUP BY c.style, c.artiste
+HAVING COUNT(*) >= 2
+ORDER BY c.style, nb_concerts DESC;
 
--- Parcours d'un artiste spécifique (remplacer 'NOM_ARTISTE')
+-- Duo/groupes qui jouent souvent ensemble
 SELECT
-    date_evenement,
-    lieu_raw AS lieu,
-    ville_raw AS ville,
-    tarif_raw AS prix
-FROM evenement, json_each(evenement.artistes)
-WHERE value LIKE '%NOM_ARTISTE%'
-ORDER BY date_evenement;
-
--- Parcours d'un artiste spécifique (remplacer 'NOM_ARTISTE')
-SELECT *
-FROM evenement, json_each(evenement.artistes)
-WHERE json_extract(value, '$.nom') in ('L''E', 'K C', 'L''A', 'K L')
-ORDER BY date_evenement;
-
--- -----------------------------------------------------------------------------
--- QUE S'EST-IL PASSÉ TEL JOUR ?
--- -----------------------------------------------------------------------------
-
--- Événements d'une date précise (format: YYYY-MM-DD)
-SELECT
-    heure,
-    COALESCE(
-        (SELECT GROUP_CONCAT(value, ' + ') FROM json_each(artistes)),
-        nom,
-        'Événement'
-    ) AS qui,
-    lieu_raw AS lieu,
-    ville_raw AS ville,
-    type_evenement AS type,
-    tarif_raw AS prix
-FROM evenement
-WHERE date_evenement = '2023-05-14'  -- Modifier cette date
-ORDER BY heure;
-
--- Événements d'un mois (ex: mai 2023)
-SELECT
-    date_evenement,
-    heure,
-    COALESCE(
-        (SELECT GROUP_CONCAT(value, ' + ') FROM json_each(artistes)),
-        nom
-    ) AS qui,
-    lieu_raw AS lieu,
-    type_evenement
-FROM evenement
-WHERE strftime('%Y-%m', date_evenement) = '2023-05'  -- Modifier ce mois
-ORDER BY date_evenement, heure;
-
--- Historique d'un jour de l'année (ex: tous les 14 mai)
-SELECT
-    strftime('%Y', date_evenement) AS annee,
-    COALESCE(
-        (SELECT GROUP_CONCAT(value, ' + ') FROM json_each(artistes)),
-        nom
-    ) AS qui,
-    lieu_raw AS lieu
-FROM evenement
-WHERE strftime('%m-%d', date_evenement) = '05-14'  -- Modifier jour-mois
-ORDER BY annee DESC;
-
--- -----------------------------------------------------------------------------
--- PRIX ET TARIFS
--- -----------------------------------------------------------------------------
-
--- Prix moyen par type d'événement
-SELECT
-    type_evenement,
-    COUNT(*) AS nb_events,
-    ROUND(AVG(prix_min), 2) AS prix_min_moyen,
-    ROUND(AVG(prix_max), 2) AS prix_max_moyen,
-    ROUND(AVG((COALESCE(prix_min, 0) + COALESCE(prix_max, 0)) / 2), 2) AS prix_moyen,
-    SUM(CASE WHEN gratuit = 1 THEN 1 ELSE 0 END) AS nb_gratuits,
-    ROUND(100.0 * SUM(CASE WHEN gratuit = 1 THEN 1 ELSE 0 END) / COUNT(*), 1) AS pct_gratuit
-FROM evenement
-WHERE type_evenement IS NOT NULL
-GROUP BY type_evenement
-ORDER BY nb_events DESC;
-
--- Évolution du prix moyen par année
-SELECT
-    strftime('%Y', date_evenement) AS annee,
-    COUNT(*) AS nb_events,
-    ROUND(AVG(prix_min), 2) AS prix_min_moyen,
-    ROUND(AVG(prix_max), 2) AS prix_max_moyen,
-    ROUND(100.0 * SUM(CASE WHEN gratuit = 1 THEN 1 ELSE 0 END) / COUNT(*), 1) AS pct_gratuit
-FROM evenement
-WHERE date_evenement IS NOT NULL AND (prix_min IS NOT NULL OR gratuit = 1)
-GROUP BY annee
-ORDER BY annee;
-
--- Événements les plus chers
-SELECT
-    date_evenement,
-    COALESCE(
-        (SELECT GROUP_CONCAT(value, ' + ') FROM json_each(artistes)),
-        nom
-    ) AS qui,
-    lieu_raw AS lieu,
-    tarif_raw,
-    prix_max
-FROM evenement
-WHERE prix_max IS NOT NULL
-ORDER BY prix_max DESC
+    c1.artiste AS artiste1,
+    c2.artiste AS artiste2,
+    COUNT(*) AS nb_concerts_ensemble
+FROM contenu_evenement c1
+JOIN contenu_evenement c2 ON c1.evenement_id = c2.evenement_id
+    AND c1.artiste < c2.artiste  -- Évite les doublons A-B et B-A
+WHERE c1.artiste IS NOT NULL AND c2.artiste IS NOT NULL
+GROUP BY c1.artiste, c2.artiste
+HAVING COUNT(*) >= 3
+ORDER BY nb_concerts_ensemble DESC
 LIMIT 20;
 
--- -----------------------------------------------------------------------------
--- LIEUX
--- -----------------------------------------------------------------------------
+-- =============================================================================
+-- SPECTACLES - Théâtre, danse, etc.
+-- =============================================================================
 
--- Top 20 lieux les plus actifs
+-- Top spectacles les plus joués
 SELECT
-    COALESCE(lieu_raw, 'Inconnu') AS lieu,
-    ville_raw AS ville,
+    c.nom_spectacle,
+    c.style AS genre,
+    COUNT(DISTINCT e.id) AS nb_representations,
+    MIN(e.date_evenement) AS premiere,
+    MAX(e.date_evenement) AS derniere
+FROM contenu_evenement c
+JOIN evenement e ON c.evenement_id = e.id
+WHERE c.nom_spectacle IS NOT NULL
+GROUP BY c.nom_spectacle
+HAVING nb_representations >= 2
+ORDER BY nb_representations DESC
+LIMIT 20;
+
+-- Spectacles par style (théâtre, danse, cirque, etc.)
+SELECT
+    c.style,
+    COUNT(DISTINCT c.nom_spectacle) AS nb_spectacles,
+    COUNT(DISTINCT e.id) AS nb_representations
+FROM contenu_evenement c
+JOIN evenement e ON c.evenement_id = e.id
+WHERE c.nom_spectacle IS NOT NULL AND c.style IS NOT NULL
+GROUP BY c.style
+ORDER BY nb_representations DESC;
+
+-- =============================================================================
+-- LIEUX - Analyse géographique
+-- =============================================================================
+
+-- Top 20 lieux les plus actifs (avec référentiel)
+SELECT
+    COALESCE(lr.nom, e.lieu_raw) AS lieu,
+    COALESCE(lr.ville, e.ville_raw, 'Le Mans') AS ville,
     COUNT(*) AS nb_events,
-    MIN(strftime('%Y', date_evenement)) AS depuis,
-    MAX(strftime('%Y', date_evenement)) AS jusqua
-FROM evenement
-WHERE lieu_raw IS NOT NULL
-GROUP BY lieu_raw, ville_raw
+    COUNT(DISTINCT e.bidul_numero) AS nb_biduls,
+    MIN(strftime('%Y', e.date_evenement)) AS depuis,
+    MAX(strftime('%Y', e.date_evenement)) AS jusqua
+FROM evenement e
+LEFT JOIN lieu_ref lr ON e.lieu_ref_id = lr.id
+WHERE e.lieu_raw IS NOT NULL OR e.lieu_ref_id IS NOT NULL
+GROUP BY COALESCE(lr.nom, e.lieu_raw), COALESCE(lr.ville, e.ville_raw)
 ORDER BY nb_events DESC
 LIMIT 20;
 
 -- Programmation d'un lieu spécifique
 SELECT
-    date_evenement,
-    heure,
-    COALESCE(
-        (SELECT GROUP_CONCAT(value, ' + ') FROM json_each(artistes)),
-        nom
-    ) AS qui,
-    type_evenement,
-    tarif_raw
-FROM evenement
-WHERE lieu_raw LIKE '%Oasis%'  -- Modifier le nom du lieu
-ORDER BY date_evenement DESC
+    e.date_evenement,
+    e.heure,
+    e.nom AS evenement,
+    GROUP_CONCAT(DISTINCT c.artiste) AS artistes,
+    GROUP_CONCAT(DISTINCT c.nom_spectacle) AS spectacles,
+    e.type_evenement,
+    e.tarif_raw
+FROM evenement e
+LEFT JOIN contenu_evenement c ON e.id = c.evenement_id
+LEFT JOIN lieu_ref lr ON e.lieu_ref_id = lr.id
+WHERE lr.nom LIKE '%Oasis%' OR e.lieu_raw LIKE '%Oasis%'
+GROUP BY e.id
+ORDER BY e.date_evenement DESC
 LIMIT 50;
 
 -- Répartition géographique (par ville)
 SELECT
-    COALESCE(ville_raw, 'Le Mans') AS ville,
+    COALESCE(vr.nom, e.ville_raw, 'Le Mans') AS ville,
     COUNT(*) AS nb_events,
     ROUND(100.0 * COUNT(*) / (SELECT COUNT(*) FROM evenement), 1) AS pct
-FROM evenement
-GROUP BY ville_raw
+FROM evenement e
+LEFT JOIN ville_ref vr ON e.ville_ref_id = vr.id
+GROUP BY COALESCE(vr.nom, e.ville_raw)
 ORDER BY nb_events DESC
 LIMIT 20;
 
--- -----------------------------------------------------------------------------
+-- Lieux non résolus (pas dans le référentiel)
+SELECT
+    e.lieu_raw,
+    e.ville_raw,
+    COUNT(*) AS nb_events
+FROM evenement e
+WHERE e.lieu_ref_id IS NULL AND e.lieu_raw IS NOT NULL
+GROUP BY e.lieu_raw, e.ville_raw
+ORDER BY nb_events DESC
+LIMIT 30;
+
+-- =============================================================================
+-- PRIX ET TARIFS
+-- =============================================================================
+
+-- Prix moyen par type d'événement
+SELECT
+    e.type_evenement,
+    COUNT(*) AS nb_events,
+    ROUND(AVG(e.prix_min), 2) AS prix_min_moyen,
+    ROUND(AVG(e.prix_max), 2) AS prix_max_moyen,
+    SUM(CASE WHEN e.gratuit = 1 THEN 1 ELSE 0 END) AS nb_gratuits,
+    ROUND(100.0 * SUM(CASE WHEN e.gratuit = 1 THEN 1 ELSE 0 END) / COUNT(*), 1) AS pct_gratuit
+FROM evenement e
+WHERE e.type_evenement IS NOT NULL
+GROUP BY e.type_evenement
+ORDER BY nb_events DESC;
+
+-- Évolution du prix moyen par année
+SELECT
+    strftime('%Y', e.date_evenement) AS annee,
+    COUNT(*) AS nb_events,
+    ROUND(AVG(e.prix_min), 2) AS prix_min_moyen,
+    ROUND(AVG(e.prix_max), 2) AS prix_max_moyen,
+    ROUND(100.0 * SUM(CASE WHEN e.gratuit = 1 THEN 1 ELSE 0 END) / COUNT(*), 1) AS pct_gratuit
+FROM evenement e
+WHERE e.date_evenement IS NOT NULL AND (e.prix_min IS NOT NULL OR e.gratuit = 1)
+GROUP BY annee
+ORDER BY annee;
+
+-- Événements les plus chers
+SELECT
+    e.date_evenement,
+    e.nom AS evenement,
+    GROUP_CONCAT(DISTINCT c.artiste) AS artistes,
+    e.lieu_raw AS lieu,
+    e.tarif_raw,
+    e.prix_max
+FROM evenement e
+LEFT JOIN contenu_evenement c ON e.id = c.evenement_id
+WHERE e.prix_max IS NOT NULL
+GROUP BY e.id
+ORDER BY e.prix_max DESC
+LIMIT 20;
+
+-- =============================================================================
 -- TEMPORALITÉ
--- -----------------------------------------------------------------------------
+-- =============================================================================
 
 -- Événements par année
 SELECT
     strftime('%Y', date_evenement) AS annee,
-    COUNT(*) AS nb_events
+    COUNT(*) AS nb_events,
+    COUNT(DISTINCT bidul_numero) AS nb_biduls
 FROM evenement
 WHERE date_evenement IS NOT NULL
 GROUP BY annee
@@ -245,40 +293,61 @@ SELECT
 FROM evenement
 WHERE date_evenement IS NOT NULL
 GROUP BY strftime('%w', date_evenement)
-ORDER BY strftime('%w', date_evenement);
+ORDER BY
+    CASE strftime('%w', date_evenement)
+        WHEN '1' THEN 1
+        WHEN '2' THEN 2
+        WHEN '3' THEN 3
+        WHEN '4' THEN 4
+        WHEN '5' THEN 5
+        WHEN '6' THEN 6
+        WHEN '0' THEN 7
+    END;
 
--- -----------------------------------------------------------------------------
--- GENRES MUSICAUX
--- -----------------------------------------------------------------------------
-
--- Top genres musicaux
+-- Historique d'un jour de l'année (ex: tous les 14 mai)
 SELECT
-    value AS genre,
-    COUNT(*) AS nb_events
-FROM evenement, json_each(evenement.genres_raw)
-WHERE genres_raw IS NOT NULL
-GROUP BY value
+    strftime('%Y', e.date_evenement) AS annee,
+    GROUP_CONCAT(DISTINCT c.artiste) AS artistes,
+    e.lieu_raw AS lieu
+FROM evenement e
+LEFT JOIN contenu_evenement c ON e.id = c.evenement_id
+WHERE strftime('%m-%d', e.date_evenement) = '05-14'  -- Modifier jour-mois
+GROUP BY e.id
+ORDER BY annee DESC;
+
+-- =============================================================================
+-- STYLES ET GENRES MUSICAUX
+-- =============================================================================
+
+-- Top styles/genres
+SELECT
+    c.style,
+    COUNT(DISTINCT e.id) AS nb_events,
+    COUNT(DISTINCT c.artiste) AS nb_artistes
+FROM contenu_evenement c
+JOIN evenement e ON c.evenement_id = e.id
+WHERE c.style IS NOT NULL
+GROUP BY c.style
 ORDER BY nb_events DESC
 LIMIT 30;
 
--- Artistes par genre
+-- Évolution des styles par année
 SELECT
-    g.value AS genre,
-    a.value AS artiste,
+    strftime('%Y', e.date_evenement) AS annee,
+    c.style,
     COUNT(*) AS nb_events
-FROM evenement e,
-     json_each(e.genres_raw) g,
-     json_each(e.artistes) a
-WHERE e.genres_raw IS NOT NULL AND e.artistes IS NOT NULL
-GROUP BY g.value, a.value
-HAVING COUNT(*) >= 2
-ORDER BY genre, nb_events DESC;
+FROM contenu_evenement c
+JOIN evenement e ON c.evenement_id = e.id
+WHERE c.style IS NOT NULL AND e.date_evenement IS NOT NULL
+GROUP BY annee, c.style
+HAVING COUNT(*) >= 5
+ORDER BY annee, nb_events DESC;
 
--- -----------------------------------------------------------------------------
--- QUALITÉ DES DONNÉES
--- -----------------------------------------------------------------------------
+-- =============================================================================
+-- QUALITÉ DES DONNÉES ET REVIEW
+-- =============================================================================
 
--- Répartition par source
+-- Répartition par source (CSV vs PDF)
 SELECT
     source,
     COUNT(*) AS nb_events,
@@ -287,15 +356,55 @@ SELECT
 FROM evenement
 GROUP BY source;
 
--- Événements à faible confidence (à vérifier)
+-- Répartition par statut de review
 SELECT
-    bidul_numero,
-    date_evenement,
-    raw_text,
-    confidence
+    COALESCE(review_status, 'pending') AS statut,
+    COUNT(*) AS nb_events,
+    ROUND(AVG(confidence), 2) AS confidence_moyenne
 FROM evenement
-WHERE confidence < 0.6
-ORDER BY confidence
+GROUP BY review_status
+ORDER BY nb_events DESC;
+
+-- Événements vérifiés vs non vérifiés
+SELECT
+    CASE WHEN verified = 1 THEN 'Vérifié' ELSE 'Non vérifié' END AS statut,
+    COUNT(*) AS nb_events,
+    ROUND(100.0 * COUNT(*) / (SELECT COUNT(*) FROM evenement), 1) AS pct
+FROM evenement
+GROUP BY verified;
+
+-- Distribution de confidence
+SELECT
+    CASE
+        WHEN confidence >= 0.9 THEN '0.9+ (excellent)'
+        WHEN confidence >= 0.8 THEN '0.8-0.9 (bon)'
+        WHEN confidence >= 0.7 THEN '0.7-0.8 (correct)'
+        WHEN confidence >= 0.5 THEN '0.5-0.7 (à vérifier)'
+        ELSE '<0.5 (problématique)'
+    END AS niveau,
+    COUNT(*) AS nb_events,
+    ROUND(100.0 * COUNT(*) / (SELECT COUNT(*) FROM evenement), 1) AS pct
+FROM evenement
+GROUP BY niveau
+ORDER BY
+    CASE niveau
+        WHEN '0.9+ (excellent)' THEN 1
+        WHEN '0.8-0.9 (bon)' THEN 2
+        WHEN '0.7-0.8 (correct)' THEN 3
+        WHEN '0.5-0.7 (à vérifier)' THEN 4
+        ELSE 5
+    END;
+
+-- Événements à faible confidence (à vérifier en priorité)
+SELECT
+    e.bidul_numero,
+    e.date_evenement,
+    e.lieu_raw,
+    e.confidence,
+    SUBSTR(e.raw_text, 1, 100) AS raw_text_apercu
+FROM evenement e
+WHERE e.confidence < 0.6
+ORDER BY e.confidence
 LIMIT 50;
 
 -- Complétude des champs
@@ -308,8 +417,12 @@ UNION ALL
 SELECT 'lieu_raw', COUNT(*), ROUND(100.0 * COUNT(*) / (SELECT COUNT(*) FROM evenement), 1)
 FROM evenement WHERE lieu_raw IS NOT NULL
 UNION ALL
-SELECT 'artistes', COUNT(*), ROUND(100.0 * COUNT(*) / (SELECT COUNT(*) FROM evenement), 1)
-FROM evenement WHERE artistes IS NOT NULL
+SELECT 'lieu_ref_id', COUNT(*), ROUND(100.0 * COUNT(*) / (SELECT COUNT(*) FROM evenement), 1)
+FROM evenement WHERE lieu_ref_id IS NOT NULL
+UNION ALL
+SELECT 'contenu (artiste/spectacle)', COUNT(DISTINCT evenement_id),
+    ROUND(100.0 * COUNT(DISTINCT evenement_id) / (SELECT COUNT(*) FROM evenement), 1)
+FROM contenu_evenement
 UNION ALL
 SELECT 'prix', COUNT(*), ROUND(100.0 * COUNT(*) / (SELECT COUNT(*) FROM evenement), 1)
 FROM evenement WHERE prix_min IS NOT NULL OR gratuit = 1
@@ -317,26 +430,127 @@ UNION ALL
 SELECT 'type_evenement', COUNT(*), ROUND(100.0 * COUNT(*) / (SELECT COUNT(*) FROM evenement), 1)
 FROM evenement WHERE type_evenement IS NOT NULL;
 
--- -----------------------------------------------------------------------------
+-- =============================================================================
+-- ALIASES ARTISTES
+-- =============================================================================
+
+-- Liste des aliases définis
+SELECT
+    nom_variante,
+    nom_normalise,
+    created_at
+FROM artiste_alias
+ORDER BY nom_normalise, nom_variante;
+
+-- Artistes avec le plus de variantes
+SELECT
+    nom_normalise,
+    COUNT(*) AS nb_variantes,
+    GROUP_CONCAT(nom_variante, ', ') AS variantes
+FROM artiste_alias
+GROUP BY nom_normalise
+HAVING COUNT(*) > 1
+ORDER BY nb_variantes DESC;
+
+-- =============================================================================
+-- CORRECTIONS ET HISTORIQUE
+-- =============================================================================
+
+-- Corrections récentes
+SELECT
+    cl.created_at,
+    e.bidul_numero,
+    cl.champ,
+    cl.ancienne_valeur,
+    cl.nouvelle_valeur,
+    cl.source
+FROM correction_log cl
+JOIN evenement e ON cl.evenement_id = e.id
+ORDER BY cl.created_at DESC
+LIMIT 50;
+
+-- Corrections par champ
+SELECT
+    champ,
+    COUNT(*) AS nb_corrections
+FROM correction_log
+GROUP BY champ
+ORDER BY nb_corrections DESC;
+
+-- Patterns de correction fréquents (pour améliorer l'extraction)
+SELECT
+    champ,
+    ancienne_valeur,
+    nouvelle_valeur,
+    COUNT(*) AS nb_fois
+FROM correction_log
+GROUP BY champ, ancienne_valeur, nouvelle_valeur
+HAVING COUNT(*) >= 2
+ORDER BY nb_fois DESC
+LIMIT 30;
+
+-- =============================================================================
 -- RECHERCHE FULL-TEXT
--- -----------------------------------------------------------------------------
+-- =============================================================================
 
 -- Recherche dans le texte brut
 SELECT
-    bidul_numero,
-    date_evenement,
-    lieu_raw,
-    raw_text
-FROM evenement
-WHERE raw_text LIKE '%jazz%'  -- Modifier le terme recherché
-ORDER BY date_evenement DESC
+    e.bidul_numero,
+    e.date_evenement,
+    e.lieu_raw,
+    SUBSTR(e.raw_text, 1, 200) AS raw_text_apercu
+FROM evenement e
+WHERE e.raw_text LIKE '%jazz%'  -- Modifier le terme recherché
+ORDER BY e.date_evenement DESC
 LIMIT 20;
 
--- Recherche d'artiste (insensible à la casse)
-SELECT DISTINCT
-    value AS artiste,
-    COUNT(*) AS nb_concerts
-FROM evenement, json_each(evenement.artistes)
-WHERE LOWER(value) LIKE '%noir%'  -- Modifier le terme
-GROUP BY value
+-- Recherche d'artiste
+SELECT
+    c.artiste,
+    COUNT(DISTINCT e.id) AS nb_concerts,
+    MIN(e.date_evenement) AS premier,
+    MAX(e.date_evenement) AS dernier
+FROM contenu_evenement c
+JOIN evenement e ON c.evenement_id = e.id
+WHERE c.artiste LIKE '%noir%'  -- Modifier le terme
+GROUP BY c.artiste
 ORDER BY nb_concerts DESC;
+
+-- Recherche de spectacle
+SELECT
+    c.nom_spectacle,
+    c.style,
+    COUNT(DISTINCT e.id) AS nb_representations
+FROM contenu_evenement c
+JOIN evenement e ON c.evenement_id = e.id
+WHERE c.nom_spectacle LIKE '%roi%'  -- Modifier le terme
+GROUP BY c.nom_spectacle
+ORDER BY nb_representations DESC;
+
+-- =============================================================================
+-- STATISTIQUES GLOBALES
+-- =============================================================================
+
+-- Vue d'ensemble de la base
+SELECT
+    (SELECT COUNT(*) FROM bidul) AS nb_biduls,
+    (SELECT COUNT(*) FROM evenement) AS nb_evenements,
+    (SELECT COUNT(DISTINCT artiste) FROM contenu_evenement WHERE artiste IS NOT NULL) AS nb_artistes_uniques,
+    (SELECT COUNT(DISTINCT nom_spectacle) FROM contenu_evenement WHERE nom_spectacle IS NOT NULL) AS nb_spectacles_uniques,
+    (SELECT COUNT(*) FROM lieu_ref) AS nb_lieux_ref,
+    (SELECT COUNT(*) FROM ville_ref) AS nb_villes_ref,
+    (SELECT MIN(date_evenement) FROM evenement) AS date_min,
+    (SELECT MAX(date_evenement) FROM evenement) AS date_max;
+
+-- Couverture des Biduls
+SELECT
+    b.numero,
+    b.mois || '/' || b.annee AS periode,
+    b.type_source,
+    b.extraction_status,
+    COUNT(e.id) AS nb_events,
+    ROUND(AVG(e.confidence), 2) AS confidence_moy
+FROM bidul b
+LEFT JOIN evenement e ON b.numero = e.bidul_numero
+GROUP BY b.numero
+ORDER BY b.numero;
