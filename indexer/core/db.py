@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Optional
 from datetime import date, datetime
 
-from .parser import ParsedEvent, strip_formatting_tags
+from .parser import ParsedEvent
 
 logger = logging.getLogger(__name__)
 
@@ -177,21 +177,17 @@ class BidulDB:
         lieu_ref_id = self._find_lieu_ref(event.lieu_raw) if event.lieu_raw else None
         ville_ref_id, ville_normalized = self._find_ville_ref(event.ville_raw)
 
-        # Générer raw_text_clean (sans balises de formatage)
-        raw_text_clean = strip_formatting_tags(event.raw_text) if event.raw_text else None
-
         cursor = conn.execute("""
             INSERT INTO evenement (
-                bidul_numero, raw_text, raw_text_clean, nom, date_evenement, heure,
+                bidul_numero, raw_text, nom, date_evenement, heure,
                 lieu_raw, lieu_ref_id, ville_raw, ville_ref_id,
                 artistes, spectacles, genres_raw,
                 tarif_raw, prix_min, prix_max, gratuit,
                 type_evenement, confidence, source
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pdf')
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pdf')
         """, (
             bidul_numero,
             event.raw_text,
-            raw_text_clean,
             event.nom,
             event.date_evenement.isoformat() if event.date_evenement else None,
             event.heure,
@@ -209,13 +205,8 @@ class BidulDB:
             event.type_evenement,
             event.confidence
         ))
-        evenement_id = cursor.lastrowid
-
-        # Insérer dans contenu_evenement
-        self._insert_contenu_evenement(conn, evenement_id, event.artistes, event.spectacles)
-
         conn.commit()
-        return evenement_id
+        return cursor.lastrowid
 
     def insert_evenement_from_dict(self, event: dict) -> int:
         """Insère un événement depuis un dictionnaire (import CSV)."""
@@ -225,22 +216,17 @@ class BidulDB:
         lieu_ref_id = self._find_lieu_ref(event.get('lieu_raw')) if event.get('lieu_raw') else None
         ville_ref_id, ville_normalized = self._find_ville_ref(event.get('ville_raw'))
 
-        # Générer raw_text_clean (sans balises de formatage)
-        raw_text = event.get('raw_text', '')
-        raw_text_clean = strip_formatting_tags(raw_text) if raw_text else None
-
         cursor = conn.execute("""
             INSERT INTO evenement (
-                bidul_numero, raw_text, raw_text_clean, nom, date_evenement, heure,
+                bidul_numero, raw_text, nom, date_evenement, heure,
                 lieu_raw, lieu_ref_id, ville_raw, ville_ref_id,
                 artistes, spectacles, genres_raw, genre_evenement,
                 tarif_raw, prix_min, prix_max, gratuit,
                 type_evenement, confidence, source
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             event['bidul_numero'],
-            raw_text,
-            raw_text_clean,
+            event['raw_text'],
             event.get('nom'),
             event.get('date_evenement'),
             event.get('heure'),
@@ -260,39 +246,8 @@ class BidulDB:
             event.get('confidence', 0.5),
             event.get('source', 'pdf')
         ))
-        evenement_id = cursor.lastrowid
-
-        # Insérer dans contenu_evenement (parser le JSON artistes/spectacles)
-        artistes_json = event.get('artistes')
-        spectacles_json = event.get('spectacles')
-        genres_json = event.get('genres_raw')
-
-        artistes = []
-        spectacles = []
-        genres = []
-
-        if artistes_json:
-            try:
-                artistes = json.loads(artistes_json)
-            except (json.JSONDecodeError, TypeError):
-                pass
-
-        if spectacles_json:
-            try:
-                spectacles = json.loads(spectacles_json)
-            except (json.JSONDecodeError, TypeError):
-                pass
-
-        if genres_json:
-            try:
-                genres = json.loads(genres_json)
-            except (json.JSONDecodeError, TypeError):
-                pass
-
-        self._insert_contenu_from_json(conn, evenement_id, artistes, spectacles, genres)
-
         conn.commit()
-        return evenement_id
+        return cursor.lastrowid
 
     def get_evenements(self, bidul_numero: int) -> list[dict]:
         """Récupère tous les événements d'un Bidul."""
@@ -304,13 +259,8 @@ class BidulDB:
         return [dict(row) for row in rows]
 
     def delete_evenements(self, bidul_numero: int):
-        """Supprime tous les événements d'un Bidul (et leurs contenus associés)."""
+        """Supprime tous les événements d'un Bidul."""
         conn = self.connect()
-        # Supprimer d'abord les contenus (FK constraint)
-        conn.execute("""
-            DELETE FROM contenu_evenement
-            WHERE evenement_id IN (SELECT id FROM evenement WHERE bidul_numero = ?)
-        """, (bidul_numero,))
         conn.execute("DELETE FROM evenement WHERE bidul_numero = ?", (bidul_numero,))
         conn.commit()
 
@@ -325,205 +275,8 @@ class BidulDB:
         return conn.execute("SELECT COUNT(*) FROM evenement").fetchone()[0]
 
     # -------------------------------------------------------------------------
-    # Contenu événement (artistes/spectacles)
-    # -------------------------------------------------------------------------
-
-    def _insert_contenu_evenement(self, conn, evenement_id: int, artistes: list, spectacles: list):
-        """
-        Insère les artistes/spectacles dans contenu_evenement depuis un ParsedEvent.
-
-        Logique de combinaison:
-        - Si spectacles + artistes → combine le premier spectacle avec le premier artiste
-        - Si un artiste a déjà un spectacle associé (ArtisteInfo.spectacle), l'utiliser
-        - Les spectacles supplémentaires sont insérés seuls
-        """
-        ordre = 1
-
-        # Normaliser les artistes
-        norm_artistes = []
-        for artiste in artistes:
-            if hasattr(artiste, 'nom'):
-                # ArtisteInfo object
-                norm_artistes.append({
-                    'nom': artiste.nom,
-                    'spectacle': artiste.spectacle,
-                    'style': artiste.genre
-                })
-            elif isinstance(artiste, dict):
-                norm_artistes.append({
-                    'nom': artiste.get('nom'),
-                    'spectacle': artiste.get('spectacle'),
-                    'style': artiste.get('genre') or artiste.get('style')
-                })
-            elif isinstance(artiste, str):
-                norm_artistes.append({
-                    'nom': artiste,
-                    'spectacle': None,
-                    'style': None
-                })
-
-        # Normaliser les spectacles
-        norm_spectacles = []
-        for spectacle in spectacles:
-            if isinstance(spectacle, dict):
-                norm_spectacles.append({
-                    'nom': spectacle.get('nom'),
-                    'style': spectacle.get('style') or spectacle.get('genre')
-                })
-            elif isinstance(spectacle, str):
-                norm_spectacles.append({'nom': spectacle, 'style': None})
-
-        # Cas 1: Spectacles + Artistes → combiner intelligemment
-        if norm_spectacles and norm_artistes:
-            # Premier spectacle avec premier artiste
-            first_spec = norm_spectacles[0]
-            first_art = norm_artistes[0]
-            # Le style vient du spectacle en priorité, sinon de l'artiste
-            style = first_spec.get('style') or first_art.get('style')
-            conn.execute('''
-                INSERT INTO contenu_evenement (evenement_id, artiste, nom_spectacle, style, ordre)
-                VALUES (?, ?, ?, ?, ?)
-            ''', (evenement_id, first_art.get('nom'), first_spec.get('nom'), style, ordre))
-            ordre += 1
-
-            # Artistes supplémentaires
-            for art in norm_artistes[1:]:
-                conn.execute('''
-                    INSERT INTO contenu_evenement (evenement_id, artiste, nom_spectacle, style, ordre)
-                    VALUES (?, ?, ?, ?, ?)
-                ''', (evenement_id, art.get('nom'), art.get('spectacle'), art.get('style'), ordre))
-                ordre += 1
-
-            # Spectacles supplémentaires (sans artiste)
-            for spec in norm_spectacles[1:]:
-                conn.execute('''
-                    INSERT INTO contenu_evenement (evenement_id, nom_spectacle, style, ordre)
-                    VALUES (?, ?, ?, ?)
-                ''', (evenement_id, spec.get('nom'), spec.get('style'), ordre))
-                ordre += 1
-
-        # Cas 2: Artistes seuls (avec leur spectacle associé si présent)
-        elif norm_artistes:
-            for art in norm_artistes:
-                conn.execute('''
-                    INSERT INTO contenu_evenement (evenement_id, artiste, nom_spectacle, style, ordre)
-                    VALUES (?, ?, ?, ?, ?)
-                ''', (evenement_id, art.get('nom'), art.get('spectacle'), art.get('style'), ordre))
-                ordre += 1
-
-        # Cas 3: Spectacles seuls
-        elif norm_spectacles:
-            for spec in norm_spectacles:
-                conn.execute('''
-                    INSERT INTO contenu_evenement (evenement_id, nom_spectacle, style, ordre)
-                    VALUES (?, ?, ?, ?)
-                ''', (evenement_id, spec.get('nom'), spec.get('style'), ordre))
-                ordre += 1
-
-    def _insert_contenu_from_json(self, conn, evenement_id: int, artistes: list, spectacles: list, genres: list):
-        """
-        Insère les artistes/spectacles dans contenu_evenement depuis des listes JSON.
-
-        Logique de combinaison:
-        - Si 1 spectacle + N artistes → 1 ligne avec spectacle + premier artiste, puis N-1 lignes artistes seuls
-        - Si N spectacles + M artistes → combiner par index quand possible
-        - Chaque ligne a: artiste, nom_spectacle, style
-        """
-        ordre = 1
-
-        # Normaliser les spectacles en liste de dicts
-        norm_spectacles = []
-        for spec in (spectacles or []):
-            if isinstance(spec, dict):
-                norm_spectacles.append({
-                    'nom': spec.get('nom'),
-                    'style': spec.get('style') or spec.get('genre')
-                })
-            else:
-                norm_spectacles.append({'nom': spec, 'style': None})
-
-        # Normaliser les artistes en liste de dicts
-        norm_artistes = []
-        for i, art in enumerate(artistes or []):
-            if isinstance(art, dict):
-                norm_artistes.append({
-                    'nom': art.get('nom'),
-                    'style': art.get('genre') or art.get('style')
-                })
-            else:
-                style = genres[i] if i < len(genres) else None
-                norm_artistes.append({'nom': art, 'style': style})
-
-        # Cas 1: Spectacles + Artistes → combiner intelligemment
-        if norm_spectacles and norm_artistes:
-            # Premier spectacle avec premier artiste (cas typique: 1 spectacle, 1+ artistes)
-            first_spec = norm_spectacles[0]
-            first_art = norm_artistes[0]
-            # Le style vient du spectacle en priorité, sinon de l'artiste
-            style = first_spec.get('style') or first_art.get('style')
-            conn.execute('''
-                INSERT INTO contenu_evenement (evenement_id, artiste, nom_spectacle, style, ordre)
-                VALUES (?, ?, ?, ?, ?)
-            ''', (evenement_id, first_art.get('nom'), first_spec.get('nom'), style, ordre))
-            ordre += 1
-
-            # Artistes supplémentaires (sans spectacle, juste l'artiste)
-            for art in norm_artistes[1:]:
-                conn.execute('''
-                    INSERT INTO contenu_evenement (evenement_id, artiste, nom_spectacle, style, ordre)
-                    VALUES (?, ?, ?, ?, ?)
-                ''', (evenement_id, art.get('nom'), None, art.get('style'), ordre))
-                ordre += 1
-
-            # Spectacles supplémentaires (sans artiste)
-            for spec in norm_spectacles[1:]:
-                conn.execute('''
-                    INSERT INTO contenu_evenement (evenement_id, artiste, nom_spectacle, style, ordre)
-                    VALUES (?, ?, ?, ?, ?)
-                ''', (evenement_id, None, spec.get('nom'), spec.get('style'), ordre))
-                ordre += 1
-
-        # Cas 2: Spectacles seuls
-        elif norm_spectacles:
-            for spec in norm_spectacles:
-                conn.execute('''
-                    INSERT INTO contenu_evenement (evenement_id, artiste, nom_spectacle, style, ordre)
-                    VALUES (?, ?, ?, ?, ?)
-                ''', (evenement_id, None, spec.get('nom'), spec.get('style'), ordre))
-                ordre += 1
-
-        # Cas 3: Artistes seuls
-        elif norm_artistes:
-            for art in norm_artistes:
-                conn.execute('''
-                    INSERT INTO contenu_evenement (evenement_id, artiste, nom_spectacle, style, ordre)
-                    VALUES (?, ?, ?, ?, ?)
-                ''', (evenement_id, art.get('nom'), None, art.get('style'), ordre))
-                ordre += 1
-
-    # -------------------------------------------------------------------------
     # Référentiels
     # -------------------------------------------------------------------------
-
-    def get_lieu_ref_list(self) -> list[tuple]:
-        """Retourne la liste des lieux du référentiel pour le parser.
-
-        Returns:
-            Liste de tuples (id, nom, ville)
-        """
-        conn = self.connect()
-        rows = conn.execute("SELECT id, nom, ville FROM lieu_ref").fetchall()
-        return [(row['id'], row['nom'], row['ville']) for row in rows]
-
-    def get_ville_ref_list(self) -> list[tuple]:
-        """Retourne la liste des villes du référentiel pour le parser.
-
-        Returns:
-            Liste de tuples (id, nom)
-        """
-        conn = self.connect()
-        rows = conn.execute("SELECT id, nom FROM ville_ref").fetchall()
-        return [(row['id'], row['nom']) for row in rows]
 
     def _find_lieu_ref(self, lieu_raw: str) -> Optional[int]:
         """Cherche un lieu dans le référentiel (matching fuzzy)."""

@@ -251,126 +251,36 @@ class TextExtractor:
 
     Utilise biduls.description.csv pour déterminer automatiquement
     quelles pages contiennent du texte utile.
-
-    Préserve les informations de formatage (gras, italique) via des balises:
-    - <b>texte</b> pour le gras
-    - <i>texte</i> pour l'italique
-    - <bi>texte</bi> pour gras+italique
     """
 
     MIN_CHARS_FOR_NATIVE = 500  # Minimum de caractères pour considérer le texte valide
     COL_THRESHOLD = 150  # Distance minimum entre colonnes (en points)
 
-    def __init__(self, preserve_formatting: bool = True):
-        """
-        Initialise l'extracteur.
-
-        Args:
-            preserve_formatting: Si True, ajoute des balises <b>, <i> pour le formatage
-        """
-        self.preserve_formatting = preserve_formatting
-
-    def _detect_formatting(self, span: dict) -> tuple[bool, bool]:
-        """
-        Détecte si un span est en gras et/ou italique.
-
-        Args:
-            span: Dictionnaire span de PyMuPDF avec 'font' et 'flags'
-
-        Returns:
-            Tuple (is_bold, is_italic)
-        """
-        font_name = span.get('font', '').lower()
-        flags = span.get('flags', 0)
-
-        # Détection gras: via nom de police ou flags
-        is_bold = any(kw in font_name for kw in ['bold', 'black', 'heavy', 'demi'])
-
-        # Détection italique: via nom de police ou flags (bit 1)
-        is_italic = any(kw in font_name for kw in ['italic', 'oblique']) or bool(flags & 2)
-
-        return is_bold, is_italic
-
-    def _wrap_with_formatting(self, text: str, is_bold: bool, is_italic: bool) -> str:
-        """
-        Enveloppe le texte avec les balises de formatage appropriées.
-
-        Args:
-            text: Texte à envelopper
-            is_bold: True si gras
-            is_italic: True si italique
-
-        Returns:
-            Texte avec balises
-        """
-        if not text.strip():
-            return text
-
-        if is_bold and is_italic:
-            return f"<bi>{text}</bi>"
-        elif is_bold:
-            return f"<b>{text}</b>"
-        elif is_italic:
-            return f"<i>{text}</i>"
-        return text
+    def __init__(self):
+        """Initialise l'extracteur."""
+        pass
 
     def _extract_by_columns(self, page) -> str:
         """
         Extrait le texte d'une page en respectant l'ordre des colonnes.
 
         Lit les colonnes de gauche à droite, chaque colonne de haut en bas.
-        Préserve les informations de formatage (gras, italique) via des balises.
 
         Args:
             page: Page PyMuPDF
 
         Returns:
-            Texte ordonné par colonnes avec balises de formatage
+            Texte ordonné par colonnes
         """
-        # Utiliser get_text('dict') pour avoir accès aux infos de formatage (font, flags)
-        page_dict = page.get_text('dict')
-        blocks = page_dict.get('blocks', [])
-
-        # Filtrer les blocs de texte (type 0)
-        text_blocks = [b for b in blocks if b.get('type') == 0]
+        # Obtenir les blocs de texte avec positions (x0, y0, x1, y1, text, block_no, block_type)
+        blocks = page.get_text('blocks')
+        text_blocks = [b for b in blocks if b[6] == 0]  # Type 0 = texte
 
         if not text_blocks:
             return ""
 
-        # Construire une liste de (x0, y0, formatted_text) pour chaque bloc
-        block_data = []
-        for block in text_blocks:
-            x0 = block.get('bbox', [0, 0, 0, 0])[0]
-            y0 = block.get('bbox', [0, 0, 0, 0])[1]
-
-            # Extraire le texte avec formatage depuis les lignes et spans
-            block_text_parts = []
-            for line in block.get('lines', []):
-                line_text_parts = []
-                for span in line.get('spans', []):
-                    text = span.get('text', '')
-                    if not text:
-                        continue
-
-                    if self.preserve_formatting:
-                        is_bold, is_italic = self._detect_formatting(span)
-                        formatted_text = self._wrap_with_formatting(text, is_bold, is_italic)
-                        line_text_parts.append(formatted_text)
-                    else:
-                        line_text_parts.append(text)
-
-                if line_text_parts:
-                    block_text_parts.append(''.join(line_text_parts))
-
-            block_text = '\n'.join(block_text_parts).strip()
-            if block_text:
-                block_data.append((x0, y0, block_text))
-
-        if not block_data:
-            return ""
-
         # Identifier les colonnes par position x0
-        x0_values = sorted(set(round(b[0]) for b in block_data))
+        x0_values = sorted(set(round(b[0]) for b in text_blocks))
 
         # Grouper les x0 proches en colonnes
         column_starts = []
@@ -389,9 +299,10 @@ class TextExtractor:
 
         # Organiser les blocs par colonne puis par position Y
         columns_content = [[] for _ in column_starts]
-        for x0, y0, text in block_data:
+        for block in text_blocks:
+            x0, y0, x1, y1, text, block_no, block_type = block
             col_idx = get_column(x0)
-            columns_content[col_idx].append((y0, text))
+            columns_content[col_idx].append((y0, text.strip()))
 
         # Trier chaque colonne par Y (haut en bas)
         for col in columns_content:
