@@ -11,4 +11,5 @@
 * bidul #233 page 3 pas bonne (vérifier si pas d'autres comme ça)
 * ajouter html ou csv tapages manquants
 * colonne description dans table bidul (ex. bidul covid)
+* revoir avec grouping tous les lieux n'ayant pas de ref
 * consolidation pdf à continuer
