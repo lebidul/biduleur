@@ -366,6 +366,8 @@ def extract_tarif_improved(text: str) -> tuple:
 
     # Pattern tarif avec fourchette et décimales
     tarif_patterns = [
+        # Format 7€50 (euro au milieu) - doit être en premier
+        (r'(\d+)\s*[€]\s*(\d{2})\b', 'euro_middle'),
         # 3.75/18€ ou 5/7/9€ ou 6.75/18€
         (r'(\d+[.,]?\d*)\s*/\s*(\d+[.,]?\d*)\s*/\s*(\d+[.,]?\d*)\s*[€eE]', 3),
         (r'(\d+[.,]?\d*)\s*/\s*(\d+[.,]?\d*)\s*[€eE]', 2),
@@ -379,6 +381,14 @@ def extract_tarif_improved(text: str) -> tuple:
     for pattern, num_groups in tarif_patterns:
         match = re.search(pattern, text)
         if match:
+            # Cas spécial: format 7€50 (euro au milieu)
+            if num_groups == 'euro_middle':
+                euros = match.group(1)
+                cents = match.group(2)
+                price = float(euros) + float(cents) / 100
+                raw = f"{euros}€{cents}"
+                return (raw, price, price, False)
+
             prices = []
             for i in range(1, num_groups + 1):
                 g = match.group(i)
@@ -659,15 +669,17 @@ def extract_before_lieu(text: str, lieu_start: int) -> dict:
     remaining = re.sub(r'\s+', ' ', remaining).strip()
 
     # 2. Pattern "par la Cie XXX" ou "par XXX"
+    # IMPORTANT: les patterns sont testés dans l'ordre, et le texte matché est retiré
+    # pour éviter les doublons
     par_patterns = [
-        (r'par\s+la\s+[Cc]ie\s+"?([^",\(\)]+)"?', 'Cie '),
-        (r'par\s+la\s+[Cc]ompagnie\s+([^,\(\)]+)', 'Cie '),
-        (r'par\s+le\s+chœur\s+([^,\(\)]+)', 'Chœur '),
-        (r'par\s+le\s+collectif\s+([^,\(\)]+)', 'Collectif '),
-        (r'par\s+([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][a-zàâäéèêëïîôùûüç]+(?:\s+[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][a-zàâäéèêëïîôùûüç]+)+)', ''),
+        (r'par\s+la\s+[Cc]ie\s+"?([^",\(\)]+)"?', 'Cie ', r'par\s+la\s+[Cc]ie\s+"?[^",\(\)]+"?'),
+        (r'par\s+la\s+[Cc]ompagnie\s+([^,\(\)]+)', 'Cie ', r'par\s+la\s+[Cc]ompagnie\s+[^,\(\)]+'),
+        (r'par\s+le\s+chœur\s+([^,\(\)]+)', 'Chœur ', r'par\s+le\s+chœur\s+[^,\(\)]+'),
+        (r'par\s+le\s+collectif\s+([^,\(\)]+)', 'Collectif ', r'par\s+le\s+collectif\s+[^,\(\)]+'),
+        (r'par\s+([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][a-zàâäéèêëïîôùûüç]+(?:\s+[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][a-zàâäéèêëïîôùûüç]+)+)', '', r'par\s+[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][a-zàâäéèêëïîôùûüç]+(?:\s+[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][a-zàâäéèêëïîôùûüç]+)+'),
     ]
 
-    for pattern, prefix in par_patterns:
+    for pattern, prefix, removal_pattern in par_patterns:
         matches = re.findall(pattern, remaining, re.IGNORECASE)
         for nom in matches:
             nom = nom.strip().rstrip(',')
@@ -675,6 +687,10 @@ def extract_before_lieu(text: str, lieu_start: int) -> dict:
                 full_nom = f"{prefix}{nom}" if prefix else nom
                 if not any(a['nom'].lower() == full_nom.lower() for a in result['artistes']):
                     result['artistes'].append({'nom': full_nom, 'style': None})
+        # Retirer le pattern matché du remaining pour éviter les doublons
+        if matches:
+            remaining = re.sub(removal_pattern, ' ', remaining, flags=re.IGNORECASE)
+            remaining = re.sub(r'\s+', ' ', remaining).strip()
 
     # 3. Pattern "avec la Cie "XXX"" ou "avec la Cie XXX" ou "avec XXX"
     # D'abord essayer le pattern avec guillemets ASCII (plus spécifique)
@@ -977,7 +993,8 @@ def parse_event_line_v2(
                 date_str = f"{jours[event_date.weekday()]} {event_date.day}"
 
             event = {
-                'raw_text': raw_text,
+                # Utiliser le texte splitté (line) et non le texte complet (raw_text)
+                'raw_text': line.strip(),
                 'nom': before_data.get('nom_evenement'),
                 'date_str': date_str,
                 'date_evenement': event_date,
