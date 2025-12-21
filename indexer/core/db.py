@@ -356,41 +356,42 @@ class BidulDB:
         """Insère les artistes/spectacles dans contenu_evenement depuis des listes JSON."""
         ordre = 1
 
-        # Cas 1: artistes est une liste d'objets [{nom, genre, spectacle}, ...]
-        if artistes and isinstance(artistes[0], dict):
-            for art in artistes:
-                conn.execute('''
-                    INSERT INTO contenu_evenement (evenement_id, artiste, nom_spectacle, style, ordre)
-                    VALUES (?, ?, ?, ?, ?)
-                ''', (evenement_id, art.get('nom'), art.get('spectacle'), art.get('genre'), ordre))
-                ordre += 1
-
-        # Cas 2: artistes est une liste de strings ["ARTISTE1", "ARTISTE2"]
-        elif artistes and isinstance(artistes[0], str):
-            for i, art in enumerate(artistes):
-                style = genres[i] if i < len(genres) else None
-                spec = spectacles[i] if i < len(spectacles) else (spectacles[0] if spectacles else None)
-                conn.execute('''
-                    INSERT INTO contenu_evenement (evenement_id, artiste, nom_spectacle, style, ordre)
-                    VALUES (?, ?, ?, ?, ?)
-                ''', (evenement_id, art, spec, style, ordre))
-                ordre += 1
-
-        # Cas 3: spectacles sans artistes
-        elif spectacles:
-            for i, spec in enumerate(spectacles):
+        # D'abord insérer les spectacles (ils ont priorité pour le nom_spectacle)
+        if spectacles:
+            for spec in spectacles:
                 if isinstance(spec, dict):
+                    # Format: {'nom': 'Théâtre sauvage', 'style': 'théâtre'}
                     conn.execute('''
                         INSERT INTO contenu_evenement (evenement_id, artiste, nom_spectacle, style, ordre)
                         VALUES (?, ?, ?, ?, ?)
-                    ''', (evenement_id, None, spec.get('nom'), spec.get('genre'), ordre))
+                    ''', (evenement_id, None, spec.get('nom'), spec.get('style') or spec.get('genre'), ordre))
                 else:
+                    # Format string simple
+                    conn.execute('''
+                        INSERT INTO contenu_evenement (evenement_id, artiste, nom_spectacle, style, ordre)
+                        VALUES (?, ?, ?, ?, ?)
+                    ''', (evenement_id, None, spec, None, ordre))
+                ordre += 1
+
+        # Ensuite insérer les artistes
+        if artistes:
+            if isinstance(artistes[0], dict):
+                # Format: [{'nom': 'Cie X', 'genre': 'théâtre', 'spectacle': None}, ...]
+                for art in artistes:
+                    conn.execute('''
+                        INSERT INTO contenu_evenement (evenement_id, artiste, nom_spectacle, style, ordre)
+                        VALUES (?, ?, ?, ?, ?)
+                    ''', (evenement_id, art.get('nom'), art.get('spectacle'), art.get('genre') or art.get('style'), ordre))
+                    ordre += 1
+            else:
+                # Format string simple: ["ARTISTE1", "ARTISTE2"]
+                for i, art in enumerate(artistes):
                     style = genres[i] if i < len(genres) else None
                     conn.execute('''
                         INSERT INTO contenu_evenement (evenement_id, artiste, nom_spectacle, style, ordre)
                         VALUES (?, ?, ?, ?, ?)
-                    ''', (evenement_id, None, spec, style, ordre))
-                ordre += 1
+                    ''', (evenement_id, art, None, style, ordre))
+                    ordre += 1
 
     # -------------------------------------------------------------------------
     # Référentiels

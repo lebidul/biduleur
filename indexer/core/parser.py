@@ -1033,8 +1033,9 @@ class ParsedEvent:
     # Artistes avec relations (liste d'ArtisteInfo ou dicts)
     artistes: list = field(default_factory=list)
 
-    # Spectacles (noms entre guillemets)
-    spectacles: list[str] = field(default_factory=list)
+    # Spectacles (noms entre guillemets avec style optionnel)
+    # Format: [{'nom': 'spectacle', 'style': 'théâtre'}, ...]
+    spectacles: list = field(default_factory=list)
 
     # Genres (texte entre parenthèses) - conservé pour compatibilité
     genres_raw: list[str] = field(default_factory=list)
@@ -2243,14 +2244,16 @@ class EventParser:
             elif isinstance(a, ArtisteInfo):
                 event.artistes.append(a)
 
-        # Spectacles - extraire les noms
+        # Spectacles - garder le format dict avec nom et style
         spectacles_raw = parsed.get('spectacles', [])
         event.spectacles = []
         for s in spectacles_raw:
             if isinstance(s, dict):
-                event.spectacles.append(s.get('nom', ''))
-            else:
+                # Garder le dict complet avec nom et style
                 event.spectacles.append(s)
+            else:
+                # String simple -> convertir en dict
+                event.spectacles.append({'nom': s, 'style': None})
 
         # Nom d'événement
         event.nom = parsed.get('nom')
