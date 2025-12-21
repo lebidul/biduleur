@@ -353,45 +353,85 @@ class BidulDB:
                 ordre += 1
 
     def _insert_contenu_from_json(self, conn, evenement_id: int, artistes: list, spectacles: list, genres: list):
-        """Insère les artistes/spectacles dans contenu_evenement depuis des listes JSON."""
+        """
+        Insère les artistes/spectacles dans contenu_evenement depuis des listes JSON.
+
+        Logique de combinaison:
+        - Si 1 spectacle + N artistes → 1 ligne avec spectacle + premier artiste, puis N-1 lignes artistes seuls
+        - Si N spectacles + M artistes → combiner par index quand possible
+        - Chaque ligne a: artiste, nom_spectacle, style
+        """
         ordre = 1
 
-        # D'abord insérer les spectacles (ils ont priorité pour le nom_spectacle)
-        if spectacles:
-            for spec in spectacles:
-                if isinstance(spec, dict):
-                    # Format: {'nom': 'Théâtre sauvage', 'style': 'théâtre'}
-                    conn.execute('''
-                        INSERT INTO contenu_evenement (evenement_id, artiste, nom_spectacle, style, ordre)
-                        VALUES (?, ?, ?, ?, ?)
-                    ''', (evenement_id, None, spec.get('nom'), spec.get('style') or spec.get('genre'), ordre))
-                else:
-                    # Format string simple
-                    conn.execute('''
-                        INSERT INTO contenu_evenement (evenement_id, artiste, nom_spectacle, style, ordre)
-                        VALUES (?, ?, ?, ?, ?)
-                    ''', (evenement_id, None, spec, None, ordre))
+        # Normaliser les spectacles en liste de dicts
+        norm_spectacles = []
+        for spec in (spectacles or []):
+            if isinstance(spec, dict):
+                norm_spectacles.append({
+                    'nom': spec.get('nom'),
+                    'style': spec.get('style') or spec.get('genre')
+                })
+            else:
+                norm_spectacles.append({'nom': spec, 'style': None})
+
+        # Normaliser les artistes en liste de dicts
+        norm_artistes = []
+        for i, art in enumerate(artistes or []):
+            if isinstance(art, dict):
+                norm_artistes.append({
+                    'nom': art.get('nom'),
+                    'style': art.get('genre') or art.get('style')
+                })
+            else:
+                style = genres[i] if i < len(genres) else None
+                norm_artistes.append({'nom': art, 'style': style})
+
+        # Cas 1: Spectacles + Artistes → combiner intelligemment
+        if norm_spectacles and norm_artistes:
+            # Premier spectacle avec premier artiste (cas typique: 1 spectacle, 1+ artistes)
+            first_spec = norm_spectacles[0]
+            first_art = norm_artistes[0]
+            # Le style vient du spectacle en priorité, sinon de l'artiste
+            style = first_spec.get('style') or first_art.get('style')
+            conn.execute('''
+                INSERT INTO contenu_evenement (evenement_id, artiste, nom_spectacle, style, ordre)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (evenement_id, first_art.get('nom'), first_spec.get('nom'), style, ordre))
+            ordre += 1
+
+            # Artistes supplémentaires (sans spectacle, juste l'artiste)
+            for art in norm_artistes[1:]:
+                conn.execute('''
+                    INSERT INTO contenu_evenement (evenement_id, artiste, nom_spectacle, style, ordre)
+                    VALUES (?, ?, ?, ?, ?)
+                ''', (evenement_id, art.get('nom'), None, art.get('style'), ordre))
                 ordre += 1
 
-        # Ensuite insérer les artistes
-        if artistes:
-            if isinstance(artistes[0], dict):
-                # Format: [{'nom': 'Cie X', 'genre': 'théâtre', 'spectacle': None}, ...]
-                for art in artistes:
-                    conn.execute('''
-                        INSERT INTO contenu_evenement (evenement_id, artiste, nom_spectacle, style, ordre)
-                        VALUES (?, ?, ?, ?, ?)
-                    ''', (evenement_id, art.get('nom'), art.get('spectacle'), art.get('genre') or art.get('style'), ordre))
-                    ordre += 1
-            else:
-                # Format string simple: ["ARTISTE1", "ARTISTE2"]
-                for i, art in enumerate(artistes):
-                    style = genres[i] if i < len(genres) else None
-                    conn.execute('''
-                        INSERT INTO contenu_evenement (evenement_id, artiste, nom_spectacle, style, ordre)
-                        VALUES (?, ?, ?, ?, ?)
-                    ''', (evenement_id, art, None, style, ordre))
-                    ordre += 1
+            # Spectacles supplémentaires (sans artiste)
+            for spec in norm_spectacles[1:]:
+                conn.execute('''
+                    INSERT INTO contenu_evenement (evenement_id, artiste, nom_spectacle, style, ordre)
+                    VALUES (?, ?, ?, ?, ?)
+                ''', (evenement_id, None, spec.get('nom'), spec.get('style'), ordre))
+                ordre += 1
+
+        # Cas 2: Spectacles seuls
+        elif norm_spectacles:
+            for spec in norm_spectacles:
+                conn.execute('''
+                    INSERT INTO contenu_evenement (evenement_id, artiste, nom_spectacle, style, ordre)
+                    VALUES (?, ?, ?, ?, ?)
+                ''', (evenement_id, None, spec.get('nom'), spec.get('style'), ordre))
+                ordre += 1
+
+        # Cas 3: Artistes seuls
+        elif norm_artistes:
+            for art in norm_artistes:
+                conn.execute('''
+                    INSERT INTO contenu_evenement (evenement_id, artiste, nom_spectacle, style, ordre)
+                    VALUES (?, ?, ?, ?, ?)
+                ''', (evenement_id, art.get('nom'), None, art.get('style'), ordre))
+                ordre += 1
 
     # -------------------------------------------------------------------------
     # Référentiels
