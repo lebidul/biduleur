@@ -62,6 +62,7 @@ Classe `EventParser` avec deux stratégies de parsing:
 - Artistes: texte en **gras** suivi optionnellement de (style) en *italique*
 - Spectacles: texte en **gras** entre guillemets « »
 - Styles/genres: texte en *italique* entre parenthèses
+- Artistes multiples: séparés par `+` (ex: `<b>ARTISTE1 + ARTISTE2</b>`)
 
 ```python
 parser = EventParser(bidul_mois=5, bidul_annee=2023)
@@ -69,8 +70,10 @@ events = parser.parse_with_referentiel(text, lieu_ref_list, ville_ref_list)
 ```
 
 **Fonctions utilitaires importantes:**
-- `extract_formatted_artistes()` - Extrait artistes depuis balises `<b>`
+- `extract_formatted_artistes_musicaux()` - Extrait artistes depuis balises `<b>`, sépare sur `+`
 - `extract_formatted_spectacles()` - Extrait spectacles entre guillemets gras
+- `extract_event_name()` - Extrait le nom d'événement (festivals, soirées thématiques)
+- `is_named_event()` - Détecte si un texte représente un événement nommé
 - `extract_lieu_fallback()` - Extraction heuristique quand le lieu n'est pas dans le référentiel
 - `strip_formatting_tags()` - Retire les balises pour comparaison
 
@@ -165,15 +168,18 @@ Chaque événement a un score `confidence` (0.0 - 1.0) basé sur:
 ## Référentiels
 
 Les référentiels sont chargés depuis `corpus/`:
-- `lieu.csv` - ~540 lieux connus (bars, salles, théâtres...)
-- `ville.csv` - ~120 villes de la Sarthe et environs
+- `lieu.csv` - ~543 lieux connus (bars, salles, théâtres...)
+- `ville.csv` - ~123 villes de la Sarthe et environs
 
 Format CSV:
 ```csv
 nom,ville
 Bar le Lézard,Le Mans
 L'Oasis,Le Mans
+Parking rotonde du CROUS,Le Mans
 ```
+
+**Alias de lieux:** Un même lieu peut avoir plusieurs entrées pour couvrir les variantes d'orthographe (ex: "p. rotonde du CLOUS" → "Parking rotonde du CROUS").
 
 ## Système de consolidation
 
@@ -185,14 +191,21 @@ Après extraction, les événements peuvent être triés et vérifiés:
 
 ## Tests et benchmarks
 
-### Benchmark Bidul 184
+### Benchmarks
 
-Fichier de référence pour valider l'extraction:
+Fichiers de référence pour valider l'extraction:
 ```bash
+# Benchmark Bidul 184 (score cible: 97.9%)
 python benchmark/compare_bidul_184.py
+
+# Benchmark Bidul 190 (score cible: 96.8%)
+python benchmark/compare_bidul.py 190
+
+# Benchmark générique pour n'importe quel Bidul
+python benchmark/compare_bidul.py <numero>
 ```
 
-Compare les résultats extraits avec `benchmark/bidul_184_expected.csv`.
+Compare les résultats extraits avec `benchmark/bidul_<numero>_expected.csv`.
 
 ### Tests unitaires
 ```bash
@@ -203,14 +216,25 @@ python -m pytest tests/
 
 ### Dates
 ```python
-# Format: "Ve 3" ou "Sa 4-5" ou "Di 12"
-DATE_PATTERN = r'^(Lu|Ma|Me|Je|Ve|Sa|Di)\s+(\d{1,2})(?:\s*[-–]\s*(\d{1,2}))?'
+# Format inline: "Ve 3" ou "Sa 4-5" ou "Di 12"
+INLINE_DATE_PATTERN = r'^(Lu|Ma|Me|Je|Ve|Sa|Di)\s+(\d{1,2})(?:\s*[-–]\s*(\d{1,2}))?'
+
+# Format bloc: "Samedi 2", "Samedi 2 & Dimanche 3", "Du 6 au 10 juin"
+DATE_PATTERN = r'^(?:({JOURS})\s+(\d{1,2})(?:ER|er)?(?:\s*[&,]\s*({JOURS})\s+(\d{1,2}))?|[Dd]u\s+(\d{1,2})\s*[aà]u?\s+(\d{1,2}))'
 ```
 
 ### Artistes (en gras)
 ```python
 # <b>NOM ARTISTE</b> optionnel: <i>(style)</i>
+# Sépare automatiquement sur "+" : <b>ARTISTE1 + ARTISTE2</b>
 ARTISTE_PATTERN = r'<b>([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][^<]+)</b>(?:\s*<i>\s*\(([^)]+)\)\s*</i>)?'
+```
+
+### Noms d'événements
+```python
+# Événements nommés: Soirée X, Festival Y, SPRINGROCK : <b>artistes</b>
+is_named_event()  # Détecte si c'est un événement nommé
+extract_event_name()  # Extrait le nom (ex: "SPRINGROCK", "Fête interculturelle")
 ```
 
 ### Spectacles (guillemets + gras)

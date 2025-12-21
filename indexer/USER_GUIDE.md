@@ -41,7 +41,7 @@ Sortie:
 Initialisation de la base: database/bidul_archives.db
 
 Base initialisée:
-  Lieux référencés: 541
+  Lieux référencés: 543
   Villes référencées: 123
 ```
 
@@ -91,7 +91,7 @@ Par source:
   pdf: 5202
 
 Référentiels:
-  Lieux:  541
+  Lieux:  543
   Villes: 123
 
 Top 5 villes:
@@ -438,7 +438,10 @@ indexer/
 │   ├── db.py
 │   └── ...
 └── benchmark/             # Tests de qualité
-    └── compare_bidul_184.py
+    ├── compare_bidul.py       # Benchmark générique
+    ├── compare_bidul_184.py   # Benchmark Bidul 184
+    ├── bidul_184_expected.csv # Référence Bidul 184
+    └── bidul_190_expected.csv # Référence Bidul 190
 ```
 
 ---

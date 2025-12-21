@@ -128,7 +128,7 @@ def extract_formatted_artistes_musicaux(text: str) -> list[dict]:
 
     Exception: Si le gras est suivi de "par" (artiste de théâtre), c'est un spectacle.
 
-    Gère aussi les artistes séparés par "+".
+    Gère aussi les artistes séparés par "+" (dans ou hors balises).
 
     Returns:
         Liste de dicts {'nom': str, 'style': str|None, 'is_musical': True}
@@ -149,15 +149,6 @@ def extract_formatted_artistes_musicaux(text: str) -> list[dict]:
         nom = match.group(1).strip()
         style = _clean_style(match.group(2)) if match.group(2) else None
 
-        # Filtrer les faux positifs
-        # - Trop court (moins de 2 caractères)
-        # - Mots de liaison
-        # - Dates (comme "Lu 02")
-        if (len(nom) < 2 or
-            nom.upper() in ('LE', 'LA', 'LES', 'DE', 'DU', 'DES', 'ET', 'À', 'AU') or
-            re.match(r'^[DLMJVS][a-z]\s*\d', nom, re.IGNORECASE)):
-            continue
-
         # Vérifier si c'est un spectacle sans guillemets (suivi de "par")
         # Dans ce cas, on ne l'ajoute pas aux artistes
         after_match = text[match.end():]
@@ -165,11 +156,29 @@ def extract_formatted_artistes_musicaux(text: str) -> list[dict]:
             # C'est un spectacle, pas un artiste
             continue
 
-        artistes.append({
-            'nom': nom,
-            'style': style,
-            'is_musical': True
-        })
+        # Séparer les artistes multiples sur "+" uniquement (ex: "HOLLYSIZ + MEDI")
+        # Note: "&" n'est PAS un séparateur car souvent utilisé dans les noms de groupe
+        # (ex: "Dr Bones & the Blue Roots", "FRANCOIS HADJI-LAZARO & PIGALE")
+        # Le style s'applique à tous les artistes du groupe
+        artist_names = re.split(r'\s*\+\s*', nom)
+
+        for artist_name in artist_names:
+            artist_name = artist_name.strip()
+
+            # Filtrer les faux positifs
+            # - Trop court (moins de 2 caractères)
+            # - Mots de liaison
+            # - Dates (comme "Lu 02")
+            if (len(artist_name) < 2 or
+                artist_name.upper() in ('LE', 'LA', 'LES', 'DE', 'DU', 'DES', 'ET', 'À', 'AU') or
+                re.match(r'^[DLMJVS][a-z]\s*\d', artist_name, re.IGNORECASE)):
+                continue
+
+            artistes.append({
+                'nom': artist_name,
+                'style': style,
+                'is_musical': True
+            })
 
     return artistes
 
@@ -280,6 +289,12 @@ def is_named_event(text: str) -> bool:
         r'^[«""„]?Scène\s+ouverte',  # Scène ouverte musicale, etc.
         r'^[«""„]?Open\s+mic',
         r'^[«""„]?Jam\s+session',
+        r'^[«""„]?Fête\s+',  # Fête interculturelle, Fête de la musique
+        r'^[«""„]?Répét\.\s+publique',  # Répétition publique
+        r'^[«""„]?Bellevue\s+en\s+balade',  # Événement spécifique
+        # Nom d'événement en MAJUSCULES suivi de ":" puis artistes en gras
+        # Ex: "SPRINGROCK : <b>AS YOU WANT</b>"
+        r'^[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s\-]+\s*:\s*<b>',
     ]
 
     for pattern in named_event_patterns:
@@ -325,6 +340,12 @@ def extract_event_name(text: str) -> Optional[str]:
         r'^(Scène\s+ouverte\s*\w*)',
         r'^(Open\s+mic\s*\w*)',
         r'^(Jam\s+session)',
+        r'^(Fête\s+[\w\s]+?)(?:\s+avec\s+|\s*,|$)',  # Fête interculturelle
+        r'^(Répét\.\s+publique\s*)',  # Répétition publique
+        r'^(Bellevue\s+en\s+balade\s*)',  # Événement spécifique
+        # Nom d'événement en MAJUSCULES suivi de ":" puis artistes
+        # Ex: "SPRINGROCK : <b>AS YOU WANT</b>" → "SPRINGROCK"
+        r'^([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s\-]+?)\s*:\s*<b>',
     ]
 
     for pattern in patterns:
@@ -896,8 +917,9 @@ def extract_before_lieu(text: str, lieu_start: int) -> dict:
         before_stripped = strip_formatting_tags(before)
 
         # Vérifier si c'est un événement nommé (Soirée X, Festival, etc.)
-        # Note: <bi> = gras+italique est souvent utilisé pour les événements nommés
-        event_name = extract_event_name(before_stripped)
+        # Note: On teste d'abord avec les balises (pour matcher "NOM : <b>artiste</b>")
+        # puis sans balises pour les autres patterns
+        event_name = extract_event_name(before) or extract_event_name(before_stripped)
         if event_name:
             result['nom_evenement'] = event_name
 
@@ -1752,13 +1774,16 @@ class EventParser:
 
         for line in lines:
             # Vérifier si c'est une ligne de date
-            match = self.DATE_PATTERN.match(line.strip())
+            # Nettoyer les balises de formatage avant de matcher
+            line_clean = strip_formatting_tags(line.strip())
+            match = self.DATE_PATTERN.match(line_clean)
             if match:
                 # Sauvegarder le bloc précédent
                 if current_date and current_block:
                     blocks.append((current_date, '\n'.join(current_block)))
 
-                current_date = line.strip()
+                # Utiliser la ligne nettoyée comme date
+                current_date = line_clean
                 current_block = []
             else:
                 current_block.append(line)
