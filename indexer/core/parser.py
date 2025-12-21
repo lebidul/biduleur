@@ -31,21 +31,41 @@ def extract_formatted_spectacles(text: str) -> list[dict]:
     Règle: Les spectacles sont en GRAS entre guillemets.
     Pattern: <b>"Nom du spectacle"</b> ou <b>"Nom"</b> <i>(style)</i>
 
+    Aussi: spectacles entre guillemets (sans gras) suivis d'un style en italique.
+
     Returns:
         Liste de dicts {'nom': str, 'style': str|None}
     """
     spectacles = []
 
-    # Pattern: <b>"Spectacle"</b> suivi optionnellement de <i>(style)</i>
+    # D'abord fusionner les <i> consécutifs (styles coupés par saut de ligne)
+    text = _merge_consecutive_italic_tags(text)
+
+    # Pattern 1: <b>"Spectacle"</b> suivi optionnellement de <i>(style),</i>
+    # Note: la virgule peut être dans ou après les parenthèses
     # Guillemets typographiques ou ASCII
-    pattern = r'<b>\s*[«""„]([^»""]+)[»""]\s*</b>(?:\s*<i>\s*\(([^)]+)\)\s*</i>)?'
+    pattern = r'<b>\s*[«""„]([^»""]+)[»""]\s*</b>(?:\s*<i>\s*\(([^)]+)\)[,;]?\s*</i>)?'
     matches = re.finditer(pattern, text, re.IGNORECASE)
 
     for match in matches:
         nom = match.group(1).strip()
-        style = match.group(2).strip() if match.group(2) else None
+        style = _clean_style(match.group(2)) if match.group(2) else None
         if nom and len(nom) > 1:
             spectacles.append({'nom': nom, 'style': style})
+
+    # Pattern 2: "Spectacle" (sans gras) suivi de <i>(style)</i>
+    # Cas spécial: "Ma tata, mon pingouin..." <i>(concert jeune public)</i>
+    # Note: pas de <b> autour du spectacle lui-même, mais peut être après </b> d'un artiste
+    pattern2 = r'[«""„]([^»""]+)[»""]\s*<i>\s*\(([^)]+)\)[,;]?\s*</i>'
+    matches2 = re.finditer(pattern2, text, re.IGNORECASE)
+
+    for match in matches2:
+        nom = match.group(1).strip()
+        style = _clean_style(match.group(2)) if match.group(2) else None
+        if nom and len(nom) > 1:
+            # Vérifier que ce n'est pas déjà dans la liste
+            if not any(s['nom'] == nom for s in spectacles):
+                spectacles.append({'nom': nom, 'style': style})
 
     return spectacles
 
@@ -63,12 +83,50 @@ def _merge_consecutive_bold_tags(text: str) -> str:
     return merged
 
 
+def _merge_consecutive_italic_tags(text: str) -> str:
+    """
+    Fusionne les balises <i> consécutives séparées par des espaces/retours.
+
+    Exemple:
+    "<i>(post-</i> <i>punk)</i>" → "<i>(post-punk)</i>"
+    """
+    # Pattern: </i> suivi d'espaces/retours puis <i>
+    merged = re.sub(r'\s*</i>\s*<i>\s*', ' ', text)
+    return merged
+
+
+def _clean_style(style: str) -> str:
+    """
+    Nettoie un style extrait.
+
+    - Retire la virgule finale
+    - Retire les balises résiduelles
+    - Normalise les espaces
+    - Corrige les tirets avec espaces (post- punk → post-punk)
+    """
+    if not style:
+        return style
+
+    # Retirer les balises résiduelles
+    style = re.sub(r'</?[bi]+>', '', style)
+    # Retirer virgule/point-virgule final
+    style = style.rstrip(',;').strip()
+    # Normaliser les espaces
+    style = re.sub(r'\s+', ' ', style)
+    # Corriger les tirets avec espace (post- punk → post-punk)
+    style = re.sub(r'-\s+', '-', style)
+    style = re.sub(r'\s+-', '-', style)
+    return style
+
+
 def extract_formatted_artistes_musicaux(text: str) -> list[dict]:
     """
     Extrait les artistes musicaux en utilisant le formatage.
 
     Règle: Les artistes musicaux (concerts) sont en GRAS sans guillemets.
     Pattern: <b>NOM ARTISTE</b> ou <b>NOM</b> <i>(style)</i>
+
+    Exception: Si le gras est suivi de "par" (artiste de théâtre), c'est un spectacle.
 
     Gère aussi les artistes séparés par "+".
 
@@ -77,17 +135,19 @@ def extract_formatted_artistes_musicaux(text: str) -> list[dict]:
     """
     artistes = []
 
-    # D'abord fusionner les <b> consécutifs (sauts de ligne dans le PDF)
+    # D'abord fusionner les balises consécutives (sauts de ligne dans le PDF)
     text = _merge_consecutive_bold_tags(text)
+    text = _merge_consecutive_italic_tags(text)
 
-    # Pattern: <b>ARTISTE</b> suivi optionnellement de <i>(style)</i>
+    # Pattern: <b>ARTISTE</b> suivi optionnellement de <i>(style),</i>
+    # Note: la virgule peut être dans ou après les parenthèses
     # Exclure les spectacles (guillemets) et les textes courts
-    pattern = r'<b>([^<"»"„«]+)</b>(?:\s*<i>\s*\(([^)]+)\)\s*</i>)?'
+    pattern = r'<b>([^<"»"„«]+)</b>(?:\s*<i>\s*\(([^)]+)\)[,;]?\s*</i>)?'
     matches = re.finditer(pattern, text, re.IGNORECASE)
 
     for match in matches:
         nom = match.group(1).strip()
-        style = match.group(2).strip() if match.group(2) else None
+        style = _clean_style(match.group(2)) if match.group(2) else None
 
         # Filtrer les faux positifs
         # - Trop court (moins de 2 caractères)
@@ -98,6 +158,13 @@ def extract_formatted_artistes_musicaux(text: str) -> list[dict]:
             re.match(r'^[DLMJVS][a-z]\s*\d', nom, re.IGNORECASE)):
             continue
 
+        # Vérifier si c'est un spectacle sans guillemets (suivi de "par")
+        # Dans ce cas, on ne l'ajoute pas aux artistes
+        after_match = text[match.end():]
+        if re.match(r'\s*par\s+', after_match, re.IGNORECASE):
+            # C'est un spectacle, pas un artiste
+            continue
+
         artistes.append({
             'nom': nom,
             'style': style,
@@ -105,6 +172,35 @@ def extract_formatted_artistes_musicaux(text: str) -> list[dict]:
         })
 
     return artistes
+
+
+def extract_formatted_spectacles_unquoted(text: str) -> list[dict]:
+    """
+    Extrait les spectacles en gras SANS guillemets.
+
+    Règle: Un texte en gras suivi d'un style puis "par" est un spectacle.
+    Pattern: <b>Nom spectacle</b> <i>(style)</i> par ...
+
+    Returns:
+        Liste de dicts {'nom': str, 'style': str|None}
+    """
+    spectacles = []
+
+    # D'abord fusionner les balises consécutives
+    text = _merge_consecutive_bold_tags(text)
+    text = _merge_consecutive_italic_tags(text)
+
+    # Pattern: <b>Spectacle</b> <i>(style)</i> par ...
+    pattern = r'<b>([^<"»"„«]+)</b>\s*<i>\s*\(([^)]+)\)[,;]?\s*</i>\s*par\s+'
+    matches = re.finditer(pattern, text, re.IGNORECASE)
+
+    for match in matches:
+        nom = match.group(1).strip()
+        style = _clean_style(match.group(2)) if match.group(2) else None
+        if nom and len(nom) > 1:
+            spectacles.append({'nom': nom, 'style': style})
+
+    return spectacles
 
 
 def extract_formatted_styles(text: str) -> list[str]:
@@ -791,6 +887,8 @@ def extract_before_lieu(text: str, lieu_start: int) -> dict:
     if has_formatting_tags(before):
         # Extraction basée sur le formatage (plus précise)
         result['spectacles'] = extract_formatted_spectacles(before)
+        # Ajouter aussi les spectacles sans guillemets (suivis de "par")
+        result['spectacles'].extend(extract_formatted_spectacles_unquoted(before))
         result['artistes'] = extract_formatted_artistes_musicaux(before)
 
         # Pour les artistes de théâtre (non gras), on continue avec le parsing classique
@@ -1069,6 +1167,135 @@ def extract_after_lieu(text: str, lieu_end: int) -> dict:
     return result
 
 
+def extract_lieu_fallback(text: str, ville_ref_list: list) -> tuple[Optional[str], Optional[str]]:
+    """
+    Extrait le lieu et la ville du texte quand le lieu n'est pas dans le référentiel.
+
+    Utilise une approche heuristique:
+    - Split par virgule
+    - Ignore les spectacles, artistes, genres, heures, prix
+    - Premier candidat valide (ressemble à un lieu) = lieu
+    - Villes identifiées par le référentiel ville_ref
+
+    Args:
+        text: Texte à analyser
+        ville_ref_list: Liste de tuples (id, nom) pour les villes
+
+    Returns:
+        (lieu_raw, ville_raw)
+    """
+    from core.normalizer import normalize_ville
+
+    # Retirer les balises de formatage
+    text_clean = strip_formatting_tags(text)
+
+    # Split par virgule
+    parts = [p.strip() for p in text_clean.split(',')]
+
+    # Patterns à ignorer
+    heure_pattern = re.compile(r'\d{1,2}h\d{0,2}')
+    prix_pattern = re.compile(r'\d+[.,]?\d*\s*€|gratuit|libre|prix libre|participation libre', re.IGNORECASE)
+    genre_pattern = re.compile(r'^\([^)]+\)$')
+    # Spectacles entre guillemets (avec ou sans genre)
+    spectacle_pattern = re.compile(r'^[«""„\"].*[»""\"]')
+    # Artistes en MAJUSCULES (avec ou sans genre entre parenthèses)
+    # Inclut les artistes séparés par + (ARTISTE1 + ARTISTE2)
+    artiste_pattern = re.compile(r'^[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s\'\-\&\.0-9]+(?:\s*\([^)]+\))?(?:\s*\+\s*[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s\'\-\&\.0-9]+(?:\s*\([^)]+\))?)*$')
+    # Texte avec genre entre parenthèses (probablement artiste ou spectacle)
+    with_genre_pattern = re.compile(r'.+\s*\([^)]+\)\s*$')
+    # Texte contenant "+" suivi de texte (probablement artistes/guests)
+    multi_artiste_pattern = re.compile(r'\+\s*(?:[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ]|guests)', re.IGNORECASE)
+    # Noms d'événements: contient "avec", "invite", ":", "soirée", "concert", etc.
+    event_name_pattern = re.compile(r'\b(?:avec|featuring|feat\.?|invite)\b|^(?:soirée|concert|carte blanche)', re.IGNORECASE)
+    # Pattern pour extraire un lieu bar/espace/salle/centre/théâtre en fin de chaîne
+    lieu_in_text_pattern = re.compile(r'\b((?:bar|espace|salle|centre|théâtre|pub|médiathèque|péniche|café)\s+(?:le\s+|la\s+|l\'|du\s+|de\s+la\s+|des\s+)?[A-Za-zÀ-ÿ\s\-\']+)$', re.IGNORECASE)
+    # Fragments de parenthèses (genre coupé) - inclut les artistes avec parenthèse non fermée
+    fragment_pattern = re.compile(r'^[^(]*\)|\([^)]*$|^[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s\'\-\&\.0-9]+\s*\([^)]*$')
+
+    lieu = None
+    villes_trouvees = []
+
+    for part in parts:
+        if not part:
+            continue
+
+        # Ignorer les heures et prix
+        if heure_pattern.search(part) or prix_pattern.search(part):
+            continue
+
+        # Ignorer les genres seuls entre parenthèses
+        if genre_pattern.match(part):
+            continue
+
+        # Ignorer "par Cie X"
+        if part.lower().startswith('par '):
+            continue
+
+        # Ignorer les spectacles entre guillemets
+        if spectacle_pattern.match(part):
+            continue
+
+        # Ignorer les artistes en MAJUSCULES
+        if artiste_pattern.match(part):
+            continue
+
+        # Ignorer les segments contenant "+" suivi d'artistes (multi-artistes)
+        # Mais d'abord, essayer d'extraire un lieu embarqué (ex: "ARTISTE + guests!! Bar le Lézard")
+        if multi_artiste_pattern.search(part):
+            lieu_match = lieu_in_text_pattern.search(part)
+            if lieu_match and lieu is None:
+                lieu = lieu_match.group(1).strip()
+            continue
+
+        # Ignorer les segments avec genre entre parenthèses (probablement artiste/spectacle)
+        if with_genre_pattern.match(part):
+            continue
+
+        # Ignorer les noms d'événements (contient "avec", "soirée", "concert", etc.)
+        # Mais d'abord, essayer d'extraire un lieu embarqué (ex: "soirée X avec Y, Bar le Z")
+        if event_name_pattern.search(part):
+            lieu_match = lieu_in_text_pattern.search(part)
+            if lieu_match and lieu is None:
+                lieu = lieu_match.group(1).strip()
+            continue
+
+        # Ignorer les fragments de parenthèses (genre coupé comme "dès 6 ans)")
+        if fragment_pattern.match(part):
+            continue
+
+        # Ignorer les segments trop longs
+        if len(part) > 50:
+            continue
+
+        # Ignorer les segments trop courts (moins de 3 caractères)
+        if len(part) < 3:
+            continue
+
+        # Vérifier si c'est une ville connue (priorité)
+        ville_id, ville_norm = normalize_ville(part)
+        if ville_id is not None:
+            villes_trouvees.append({
+                'nom': ville_norm,
+                'is_lemans': ville_norm.lower() == 'le mans'
+            })
+            continue
+
+        # Candidat valide pour un lieu
+        if lieu is None:
+            lieu = part
+
+    # Sélectionner la ville
+    ville = None
+    if villes_trouvees:
+        non_lemans = [v for v in villes_trouvees if not v['is_lemans']]
+        if non_lemans:
+            ville = non_lemans[0]['nom']
+        else:
+            ville = villes_trouvees[0]['nom']
+
+    return lieu, ville
+
+
 def extract_ville_from_text_v2(text: str, ville_ref_list: list) -> tuple[Optional[int], str]:
     """
     Extrait la ville du texte complet.
@@ -1166,6 +1393,19 @@ def parse_event_line_v2(
         # Trouver le lieu
         lieu_match = find_lieu_in_text_v2(event_text, lieu_patterns)
 
+        # Vérifier si le lieu trouvé est en fait une ville (erreur du référentiel)
+        # Exemple: "La Flèche" est dans lieu_ref mais c'est une ville
+        if lieu_match:
+            lieu_nom, lieu_id, lieu_start, lieu_end = lieu_match
+
+            # Si le lieu trouvé correspond aussi à une ville, c'est probablement une erreur
+            # du référentiel. Dans ce cas, on utilise l'extraction heuristique.
+            from core.normalizer import normalize_ville
+            ville_id_check, _ = normalize_ville(lieu_nom)
+            if ville_id_check is not None:
+                # Le "lieu" est en fait une ville - invalider le match
+                lieu_match = None
+
         if lieu_match:
             lieu_nom, lieu_id, lieu_start, lieu_end = lieu_match
 
@@ -1177,8 +1417,8 @@ def parse_event_line_v2(
             ville_id, ville_nom = extract_ville_from_text_v2(event_text, ville_ref_list)
 
         else:
-            # Lieu non trouvé - fallback
-            lieu_nom, lieu_id = None, None
+            # Lieu non trouvé dans le référentiel - utiliser extraction heuristique
+            lieu_id = None
             before_data = extract_before_lieu(event_text, len(event_text))
             after_data = {
                 'heure': None,
@@ -1200,7 +1440,9 @@ def parse_event_line_v2(
             after_data['prix_max'] = prix_max
             after_data['gratuit'] = gratuit
 
-            ville_id, ville_nom = extract_ville_from_text_v2(event_text, ville_ref_list)
+            # Utiliser l'extraction heuristique pour lieu et ville
+            lieu_nom, ville_nom = extract_lieu_fallback(event_text, ville_ref_list)
+            ville_id = None  # Pas de correspondance référentiel pour la ville non plus
 
         # Créer un événement par date
         for event_date in dates:
@@ -1787,8 +2029,9 @@ class EventParser:
         # 5. Prix
         event.tarif_raw, event.prix_min, event.prix_max, event.gratuit = self._parse_prix(text_cleaned)
 
-        # 6. Lieu et ville - sur le texte nettoyé
-        event.lieu_raw, event.ville_raw = self._extract_lieu_ville(text_cleaned)
+        # 6. Lieu et ville - sur le texte nettoyé SANS balises de formatage
+        text_for_lieu = strip_formatting_tags(text_cleaned)
+        event.lieu_raw, event.ville_raw = self._extract_lieu_ville(text_for_lieu)
 
         # 7. Nom de l'événement
         if event_name_from_slash:
@@ -2164,19 +2407,14 @@ class EventParser:
             return None, None
 
         # Classifier chaque candidat en utilisant les référentiels
+        # IMPORTANT: vérifier les villes EN PREMIER car le référentiel lieu_ref peut
+        # contenir des erreurs (ex: "La Flèche" comme lieu alors que c'est une ville)
         lieu = None
         ville = None
         villes_trouvees = []  # Collecter toutes les villes trouvées
 
         for candidate in candidates:
-            # Vérifier si c'est un lieu connu
-            lieu_id, lieu_norm = normalize_lieu(candidate)
-            if lieu_id is not None:
-                if lieu is None:
-                    lieu = candidate
-                continue
-
-            # Vérifier si c'est une ville connue
+            # Vérifier d'abord si c'est une ville connue (priorité sur lieu)
             ville_id, ville_norm = normalize_ville(candidate)
             if ville_id is not None:
                 villes_trouvees.append({
@@ -2185,6 +2423,13 @@ class EventParser:
                     'raw': candidate,
                     'is_lemans': ville_norm.lower() == 'le mans'
                 })
+                continue
+
+            # Vérifier si c'est un lieu connu
+            lieu_id, lieu_norm = normalize_lieu(candidate)
+            if lieu_id is not None:
+                if lieu is None:
+                    lieu = candidate
                 continue
 
             # Candidat inconnu:

@@ -329,36 +329,95 @@ class BidulDB:
     # -------------------------------------------------------------------------
 
     def _insert_contenu_evenement(self, conn, evenement_id: int, artistes: list, spectacles: list):
-        """Insère les artistes/spectacles dans contenu_evenement depuis un ParsedEvent."""
+        """
+        Insère les artistes/spectacles dans contenu_evenement depuis un ParsedEvent.
+
+        Logique de combinaison:
+        - Si spectacles + artistes → combine le premier spectacle avec le premier artiste
+        - Si un artiste a déjà un spectacle associé (ArtisteInfo.spectacle), l'utiliser
+        - Les spectacles supplémentaires sont insérés seuls
+        """
         ordre = 1
 
-        # Artistes (peuvent être des ArtisteInfo ou des dicts)
+        # Normaliser les artistes
+        norm_artistes = []
         for artiste in artistes:
             if hasattr(artiste, 'nom'):
                 # ArtisteInfo object
-                conn.execute('''
-                    INSERT INTO contenu_evenement (evenement_id, artiste, nom_spectacle, style, ordre)
-                    VALUES (?, ?, ?, ?, ?)
-                ''', (evenement_id, artiste.nom, artiste.spectacle, artiste.genre, ordre))
+                norm_artistes.append({
+                    'nom': artiste.nom,
+                    'spectacle': artiste.spectacle,
+                    'style': artiste.genre
+                })
             elif isinstance(artiste, dict):
-                conn.execute('''
-                    INSERT INTO contenu_evenement (evenement_id, artiste, nom_spectacle, style, ordre)
-                    VALUES (?, ?, ?, ?, ?)
-                ''', (evenement_id, artiste.get('nom'), artiste.get('spectacle'), artiste.get('genre'), ordre))
+                norm_artistes.append({
+                    'nom': artiste.get('nom'),
+                    'spectacle': artiste.get('spectacle'),
+                    'style': artiste.get('genre') or artiste.get('style')
+                })
             elif isinstance(artiste, str):
-                conn.execute('''
-                    INSERT INTO contenu_evenement (evenement_id, artiste, style, ordre)
-                    VALUES (?, ?, ?, ?)
-                ''', (evenement_id, artiste, None, ordre))
+                norm_artistes.append({
+                    'nom': artiste,
+                    'spectacle': None,
+                    'style': None
+                })
+
+        # Normaliser les spectacles
+        norm_spectacles = []
+        for spectacle in spectacles:
+            if isinstance(spectacle, dict):
+                norm_spectacles.append({
+                    'nom': spectacle.get('nom'),
+                    'style': spectacle.get('style') or spectacle.get('genre')
+                })
+            elif isinstance(spectacle, str):
+                norm_spectacles.append({'nom': spectacle, 'style': None})
+
+        # Cas 1: Spectacles + Artistes → combiner intelligemment
+        if norm_spectacles and norm_artistes:
+            # Premier spectacle avec premier artiste
+            first_spec = norm_spectacles[0]
+            first_art = norm_artistes[0]
+            # Le style vient du spectacle en priorité, sinon de l'artiste
+            style = first_spec.get('style') or first_art.get('style')
+            conn.execute('''
+                INSERT INTO contenu_evenement (evenement_id, artiste, nom_spectacle, style, ordre)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (evenement_id, first_art.get('nom'), first_spec.get('nom'), style, ordre))
             ordre += 1
 
-        # Spectacles sans artiste (si pas déjà associés à un artiste)
-        for spectacle in spectacles:
-            if isinstance(spectacle, str):
+            # Artistes supplémentaires
+            for art in norm_artistes[1:]:
                 conn.execute('''
-                    INSERT INTO contenu_evenement (evenement_id, nom_spectacle, ordre)
-                    VALUES (?, ?, ?)
-                ''', (evenement_id, spectacle, ordre))
+                    INSERT INTO contenu_evenement (evenement_id, artiste, nom_spectacle, style, ordre)
+                    VALUES (?, ?, ?, ?, ?)
+                ''', (evenement_id, art.get('nom'), art.get('spectacle'), art.get('style'), ordre))
+                ordre += 1
+
+            # Spectacles supplémentaires (sans artiste)
+            for spec in norm_spectacles[1:]:
+                conn.execute('''
+                    INSERT INTO contenu_evenement (evenement_id, nom_spectacle, style, ordre)
+                    VALUES (?, ?, ?, ?)
+                ''', (evenement_id, spec.get('nom'), spec.get('style'), ordre))
+                ordre += 1
+
+        # Cas 2: Artistes seuls (avec leur spectacle associé si présent)
+        elif norm_artistes:
+            for art in norm_artistes:
+                conn.execute('''
+                    INSERT INTO contenu_evenement (evenement_id, artiste, nom_spectacle, style, ordre)
+                    VALUES (?, ?, ?, ?, ?)
+                ''', (evenement_id, art.get('nom'), art.get('spectacle'), art.get('style'), ordre))
+                ordre += 1
+
+        # Cas 3: Spectacles seuls
+        elif norm_spectacles:
+            for spec in norm_spectacles:
+                conn.execute('''
+                    INSERT INTO contenu_evenement (evenement_id, nom_spectacle, style, ordre)
+                    VALUES (?, ?, ?, ?)
+                ''', (evenement_id, spec.get('nom'), spec.get('style'), ordre))
                 ordre += 1
 
     def _insert_contenu_from_json(self, conn, evenement_id: int, artistes: list, spectacles: list, genres: list):
