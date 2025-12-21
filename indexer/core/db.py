@@ -396,6 +396,26 @@ class BidulDB:
     # Référentiels
     # -------------------------------------------------------------------------
 
+    def get_lieu_ref_list(self) -> list[tuple]:
+        """Retourne la liste des lieux du référentiel pour le parser.
+
+        Returns:
+            Liste de tuples (id, nom, ville)
+        """
+        conn = self.connect()
+        rows = conn.execute("SELECT id, nom, ville FROM lieu_ref").fetchall()
+        return [(row['id'], row['nom'], row['ville']) for row in rows]
+
+    def get_ville_ref_list(self) -> list[tuple]:
+        """Retourne la liste des villes du référentiel pour le parser.
+
+        Returns:
+            Liste de tuples (id, nom)
+        """
+        conn = self.connect()
+        rows = conn.execute("SELECT id, nom FROM ville_ref").fetchall()
+        return [(row['id'], row['nom']) for row in rows]
+
     def _find_lieu_ref(self, lieu_raw: str) -> Optional[int]:
         """Cherche un lieu dans le référentiel (matching fuzzy)."""
         from core.normalizer import normalize_lieu

@@ -517,6 +517,11 @@ def cmd_populate(args):
 
     extractor = TextExtractor()
 
+    # Charger les référentiels pour le parsing "lieu d'abord"
+    lieu_ref_list = db.get_lieu_ref_list()
+    ville_ref_list = db.get_ville_ref_list()
+    print(f"Référentiels chargés: {len(lieu_ref_list)} lieux, {len(ville_ref_list)} villes")
+
     # Déterminer les numéros à traiter
     if args.numero:
         numeros = [args.numero]
@@ -589,7 +594,12 @@ def cmd_populate(args):
                 continue
 
             parser = EventParser(bidul_mois=mois, bidul_annee=annee)
-            parsed_events = parser.parse(result.full_text)
+            # Utiliser parse_with_referentiel pour la stratégie "lieu d'abord"
+            parsed_events = parser.parse_with_referentiel(
+                result.full_text,
+                lieu_ref_list,
+                ville_ref_list
+            )
 
             # Convertir ParsedEvent en dict pour uniformité
             events = []

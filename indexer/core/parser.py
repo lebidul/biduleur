@@ -2210,13 +2210,14 @@ class EventParser:
 
         event = ParsedEvent(raw_text=parsed.get('raw_text', ''))
 
-        # Date
-        if date_str:
-            event.date_str = date_str
-            event.date_evenement = self._parse_date(date_str)
-        elif parsed.get('date_evenement'):
+        # Date - priorité à la date extraite par parse_event_line_v2
+        # (qui peut avoir splitté sur des dates mid-text comme "Lu 02 & Ma 03")
+        if parsed.get('date_evenement'):
             event.date_evenement = parsed['date_evenement']
             event.date_str = parsed.get('date_str')
+        elif date_str:
+            event.date_str = date_str
+            event.date_evenement = self._parse_date(date_str)
 
         # Lieu
         event.lieu_raw = parsed.get('lieu_raw')
