@@ -1,7 +1,6 @@
 * stocker description biduls dans table ref importable pour execution (sinon depuis fichier csv) qui puisse être consolidée
 * #evenements dans table bidul
 * source doit être au niveau de la table bidul
-* table contenu evenement pour éviter json
 * #228 page 3 != agenda
 * Smac FLY = Smak FLY -> normalisation artistes
 * [212] 06/2016 - 0 événements (pdf)
