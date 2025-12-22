@@ -40,6 +40,8 @@ from indexer.core.extractor import TextExtractor, extract_bidul_info
 from indexer.core.parser import EventParser
 from indexer.core.db import BidulDB
 from indexer.core.csv_importer import find_csv_for_bidul as find_csv_files, import_bidul_from_csv
+from indexer.core.ocr import ScanExtractor, load_bidul_config
+from indexer.core.ocr_postprocess import OCRPostProcessor
 
 # Configuration
 ARCHIVES_DIR = Path(__file__).parent / "archives"
@@ -165,6 +167,8 @@ def cmd_extract(args):
     db.init_schema()
 
     extractor = TextExtractor()
+    ocr_extractor = None
+    ocr_postprocessor = None
 
     # Déterminer les numéros à traiter
     if args.numero:
@@ -190,20 +194,61 @@ def cmd_extract(args):
         # Extraction du texte
         result = extractor.extract(str(pdf_path))
 
-        if not result.success:
+        # Vérifier si c'est un scan qui nécessite OCR
+        is_scan = not result.is_native
+
+        # Si erreur ET pas un scan, abandonner
+        if result.error and not is_scan:
             print(f"  Erreur: {result.error}")
             continue
 
-        if not result.is_native:
-            print(f"  ATTENTION: PDF scan détecté, OCR nécessaire")
+        full_text = result.full_text
+        mois = result.mois
+        annee = result.annee
+        num_pages = result.num_pages
+
+        # Si c'est un scan et OCR non désactivé, utiliser l'OCR
+        if is_scan and not getattr(args, 'no_ocr', False):
+            print(f"  PDF scan détecté, lancement OCR...")
+
+            # Initialisation lazy de l'OCR (une seule fois)
+            if ocr_extractor is None:
+                try:
+                    ocr_extractor = ScanExtractor(dpi=getattr(args, 'dpi', 200))
+                    ocr_postprocessor = OCRPostProcessor()
+                except Exception as e:
+                    print(f"  Erreur init OCR: {e}")
+                    print(f"  Conseil: pip install paddleocr pdf2image opencv-python-headless")
+                    if not args.force:
+                        continue
+                    # Fallback au texte natif (même si vide)
+
+            if ocr_extractor:
+                config = load_bidul_config(numero)
+                ocr_result = ocr_extractor.extract_from_pdf(str(pdf_path), config)
+
+                if ocr_result.error:
+                    print(f"  Erreur OCR: {ocr_result.error}")
+                    if not args.force:
+                        continue
+                else:
+                    # Utiliser le texte OCR
+                    full_text = ocr_postprocessor.process(ocr_result.full_text)
+                    mois = ocr_result.mois or mois
+                    annee = ocr_result.annee or annee
+                    num_pages = ocr_result.num_pages
+                    print(f"  OCR: {len(full_text)} caractères extraits")
+
+        elif is_scan and getattr(args, 'no_ocr', False):
+            print(f"  PDF scan détecté (OCR désactivé)")
             if not args.force:
                 continue
 
         # Parsing des événements
-        parser = EventParser(bidul_mois=result.mois, bidul_annee=result.annee)
-        events = parser.parse(result.full_text)
+        parser = EventParser(bidul_mois=mois, bidul_annee=annee)
+        events = parser.parse(full_text)
 
-        print(f"  Pages: {result.num_pages}, Caractères: {len(result.full_text)}")
+        print(f"  Pages: {num_pages}, Caractères: {len(full_text)}")
         print(f"  Événements trouvés: {len(events)}")
 
         if events:
@@ -1330,7 +1375,9 @@ OCR (PDFs scannés):
     p_extract.add_argument('--numero', '-n', type=int, help='Numéro du Bidul')
     p_extract.add_argument('--range', '-r', help='Plage de numéros (ex: 280-290)')
     p_extract.add_argument('--dry-run', action='store_true', help='Ne pas sauvegarder en base')
-    p_extract.add_argument('--force', action='store_true', help='Forcer l\'extraction des scans')
+    p_extract.add_argument('--force', action='store_true', help='Forcer l\'extraction même en cas d\'erreur')
+    p_extract.add_argument('--no-ocr', action='store_true', help='Désactiver l\'OCR pour les scans')
+    p_extract.add_argument('--dpi', type=int, default=200, help='Résolution OCR (défaut: 200)')
 
     # validate
     p_validate = subparsers.add_parser('validate', help='Valide une extraction')
@@ -1398,20 +1445,20 @@ OCR (PDFs scannés):
     p_ocr.add_argument('--numero', '-n', type=int, help='Numéro du Bidul (auto-détecté si non fourni)')
     p_ocr.add_argument('--engine', '-e', default='paddleocr', choices=['paddleocr', 'easyocr'],
                        help='Moteur OCR (défaut: paddleocr)')
-    p_ocr.add_argument('--dpi', '-d', type=int, default=300, help='Résolution pour conversion PDF (défaut: 300)')
+    p_ocr.add_argument('--dpi', '-d', type=int, default=200, help='Résolution pour conversion PDF (défaut: 200)')
     p_ocr.add_argument('--output', '-o', help='Fichier de sortie pour le texte extrait')
     p_ocr.add_argument('--raw', action='store_true', help='Ne pas appliquer le post-traitement')
 
     # ocr-test - Teste l'OCR sur un échantillon
     p_ocr_test = subparsers.add_parser('ocr-test', help='Teste l\'OCR sur un échantillon de PDFs scannés')
     p_ocr_test.add_argument('--samples', '-s', type=int, default=5, help='Nombre de PDFs à tester (défaut: 5)')
-    p_ocr_test.add_argument('--dpi', '-d', type=int, default=300, help='Résolution pour conversion PDF (défaut: 300)')
+    p_ocr_test.add_argument('--dpi', '-d', type=int, default=200, help='Résolution pour conversion PDF (défaut: 200)')
 
     # ocr-extract - Extrait et parse les événements
     p_ocr_extract = subparsers.add_parser('ocr-extract', help='Extrait et parse les événements d\'un PDF scanné')
     p_ocr_extract.add_argument('--numero', '-n', type=int, help='Numéro du Bidul')
     p_ocr_extract.add_argument('--range', '-r', help='Plage de numéros (ex: 1-50)')
-    p_ocr_extract.add_argument('--dpi', '-d', type=int, default=300, help='Résolution pour conversion PDF (défaut: 300)')
+    p_ocr_extract.add_argument('--dpi', '-d', type=int, default=200, help='Résolution pour conversion PDF (défaut: 200)')
     p_ocr_extract.add_argument('--dry-run', action='store_true', help='Ne pas sauvegarder en base')
 
     args = parser.parse_args()

@@ -245,10 +245,13 @@ def print_result(result: dict, verbose: bool = False):
             total = cat_data['total']
             if total > 0:
                 items_status = ', '.join(
-                    f"{'✓' if f else '✗'}{i}"
+                    f"{'[OK]' if f else '[X]'}{i}"
                     for i, f in cat_data['items']
                 )
-                print(f"    {category}: {found}/{total} - {items_status}")
+                try:
+                    print(f"    {category}: {found}/{total} - {items_status}")
+                except UnicodeEncodeError:
+                    print(f"    {category}: {found}/{total} - {items_status}".encode('ascii', 'replace').decode())
 
     if verbose:
         print(f"    Aperçu: {result['text_preview'][:200]}...")
@@ -260,7 +263,7 @@ def main():
     )
     parser.add_argument('--bidul', '-b', type=int, help='Numéro de Bidul spécifique à tester')
     parser.add_argument('--all', '-a', action='store_true', help='Tester tous les Biduls avec données attendues')
-    parser.add_argument('--dpi', '-d', type=int, default=300, help='Résolution DPI (défaut: 300)')
+    parser.add_argument('--dpi', '-d', type=int, default=200, help='Résolution DPI (défaut: 200)')
     parser.add_argument('--verbose', '-v', action='store_true', help='Affichage détaillé')
 
     args = parser.parse_args()

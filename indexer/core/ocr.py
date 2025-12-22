@@ -468,13 +468,13 @@ class OCRResult:
 class ScanExtractor:
     """Extracteur de texte pour PDFs scannés."""
 
-    def __init__(self, ocr_engine: str = 'paddleocr', dpi: int = 300):
+    def __init__(self, ocr_engine: str = 'paddleocr', dpi: int = 200):
         """
         Initialise l'extracteur OCR.
 
         Args:
             ocr_engine: Moteur OCR à utiliser ('paddleocr' ou 'easyocr')
-            dpi: Résolution pour la conversion PDF → Image
+            dpi: Résolution pour la conversion PDF → Image (200 par défaut, bon compromis vitesse/qualité)
         """
         self.ocr = OCREngine(engine=ocr_engine)
         self.preprocessor = ImagePreprocessor()
