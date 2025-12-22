@@ -31,6 +31,9 @@ class ScanConfig:
     numero: int
     type_source: str = 'scan'
 
+    # Format de date: 'inline' (date sur chaque ligne) ou 'par bloc' (date en en-tête)
+    date_format: str = 'inline'
+
     # Page 1 config
     page1_orientation_pdf: str = 'portrait'  # Orientation du PDF
     page1_orientation_texte: str = 'portrait'  # Orientation du texte
@@ -45,7 +48,7 @@ class ScanConfig:
 
     # Flags spéciaux
     fond_colore: bool = False  # Nécessite suppression du fond coloré
-    date_par_evenement: bool = False  # Chaque événement a sa propre date
+    date_par_evenement: bool = False  # Chaque événement a sa propre date (legacy, use date_format)
 
     @classmethod
     def from_csv_row(cls, row: dict) -> Optional['ScanConfig']:
@@ -68,9 +71,13 @@ class ScanConfig:
             if type_source != 'scan':
                 return None  # Ne charge que les scans
 
+            # Lire le format de date: 'inline' ou 'par bloc'
+            date_format = row.get('date', 'inline') or 'inline'
+
             return cls(
                 numero=numero,
                 type_source=type_source,
+                date_format=date_format,
                 page1_orientation_pdf=row.get('page1.orientation pdf', 'portrait') or 'portrait',
                 page1_orientation_texte=row.get('page1.orientation texte', 'portrait') or 'portrait',
                 page1_sections=row.get('page1.sections texte utile', '') or '',
@@ -79,7 +86,7 @@ class ScanConfig:
                 page2_orientation_texte=row.get('page2.orientation texte', 'portrait') or 'portrait',
                 page2_sections=row.get('page2.sections texte utile', '') or '',
                 page2_colonnes=int(row.get('page2.colonne par section', 1) or 1),
-                date_par_evenement=row.get('date par evenement', 'non') == 'oui',
+                date_par_evenement=date_format == 'inline',  # Compatibilité: inline = date par événement
             )
         except (ValueError, KeyError) as e:
             logger.debug(f"Erreur parsing config row: {e}")
@@ -100,6 +107,14 @@ class ScanConfig:
     def get_colonnes(self, page_num: int) -> int:
         """Retourne le nombre de colonnes pour une page."""
         return self.page1_colonnes if page_num == 1 else self.page2_colonnes
+
+    def is_date_inline(self) -> bool:
+        """True si les dates sont sur chaque ligne, False si en bloc (header)."""
+        return self.date_format == 'inline'
+
+    def is_date_par_bloc(self) -> bool:
+        """True si les dates sont en bloc (header de section)."""
+        return self.date_format == 'par bloc'
 
 
 class ScanConfigLoader:
@@ -518,6 +533,9 @@ class ScanExtractor:
                     'dpi': self.dpi,
                     'ocr_engine': self.ocr.engine_name,
                     'config_numero': config.numero if config else None,
+                    'date_format': config.date_format if config else 'inline',
+                    'page1_sections': config.page1_sections if config else '',
+                    'page2_sections': config.page2_sections if config else '',
                 }
             )
 
@@ -566,7 +584,8 @@ class ScanExtractor:
                 'rotate': False,
                 'remove_background': False,
                 'colonnes': 1,
-                'sections': []
+                'sections': [],
+                'date_format': 'inline',
             }
 
         return {
@@ -574,6 +593,7 @@ class ScanExtractor:
             'remove_background': config.fond_colore,
             'colonnes': config.get_colonnes(page_num),
             'sections': config.get_sections(page_num),
+            'date_format': config.date_format,
         }
 
     def _preprocess(self, image: np.ndarray, config: dict) -> np.ndarray:

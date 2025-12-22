@@ -555,12 +555,14 @@ def cmd_populate(args):
     Peuple la base avec CSV (prioritaire) ou PDF.
 
     Si un CSV existe pour un Bidul, importe depuis CSV (confidence=1.0).
-    Sinon, extrait depuis PDF.
+    Sinon, extrait depuis PDF (texte natif ou OCR pour scans).
     """
     db = BidulDB()
     db.init_schema()
 
     extractor = TextExtractor()
+    ocr_extractor = None
+    ocr_postprocessor = None
 
     # Charger les référentiels pour le parsing "lieu d'abord"
     lieu_ref_list = db.get_lieu_ref_list()
@@ -628,25 +630,56 @@ def cmd_populate(args):
         elif not args.csv_only:
             result = extractor.extract(str(pdf_path))
 
-            if not result.success:
+            if result.error and result.is_native:
                 print(f"[{numero}] Erreur extraction PDF: {result.error}")
                 skipped += 1
                 continue
 
-            if not result.is_native and not args.force:
-                print(f"[{numero}] PDF scan détecté, ignoré (utilisez --force)")
-                skipped += 1
-                continue
+            # Déterminer si c'est un scan et extraire le texte approprié
+            is_scan = not result.is_native
+            full_text = result.full_text
+
+            if is_scan:
+                # Utiliser l'OCR pour les scans (sauf --no-ocr)
+                if getattr(args, 'no_ocr', False):
+                    print(f"[{numero}] PDF scan détecté (OCR désactivé)")
+                    skipped += 1
+                    continue
+
+                # Initialisation lazy de l'OCR
+                if ocr_extractor is None:
+                    try:
+                        ocr_extractor = ScanExtractor(dpi=getattr(args, 'dpi', 200))
+                        ocr_postprocessor = OCRPostProcessor()
+                        print("OCR initialisé (PaddleOCR)")
+                    except Exception as e:
+                        print(f"[{numero}] Erreur init OCR: {e}")
+                        skipped += 1
+                        continue
+
+                # Extraction OCR
+                config = load_bidul_config(numero)
+                ocr_result = ocr_extractor.extract_from_pdf(str(pdf_path), config)
+
+                if ocr_result.error:
+                    print(f"[{numero}] Erreur OCR: {ocr_result.error}")
+                    skipped += 1
+                    continue
+
+                full_text = ocr_postprocessor.process(ocr_result.full_text)
+                print(f"[{numero}] OCR: {len(full_text)} caractères extraits")
 
             parser = EventParser(bidul_mois=mois, bidul_annee=annee)
             # Utiliser parse_with_referentiel pour la stratégie "lieu d'abord"
             parsed_events = parser.parse_with_referentiel(
-                result.full_text,
+                full_text,
                 lieu_ref_list,
                 ville_ref_list
             )
 
             # Convertir ParsedEvent en dict pour uniformité
+            # Source = 'scan' pour les PDFs scannés, 'pdf' pour les natifs
+            event_source = 'scan' if is_scan else 'pdf'
             events = []
             for e in parsed_events:
                 events.append({
@@ -667,10 +700,10 @@ def cmd_populate(args):
                     'gratuit': e.gratuit,
                     'type_evenement': e.type_evenement,
                     'confidence': e.confidence,
-                    'source': 'pdf'
+                    'source': event_source
                 })
 
-            source = 'pdf'
+            source = event_source
             pdf_biduls += 1
             total_from_pdf += len(events)
         else:
@@ -1402,8 +1435,9 @@ OCR (PDFs scannés):
     p_populate.add_argument('--csv-only', action='store_true', help='Uniquement les Biduls avec CSV')
     p_populate.add_argument('--pdf-only', action='store_true', help='Ignorer les CSV (forcer extraction PDF)')
     p_populate.add_argument('--dry-run', action='store_true', help='Affiche sans sauvegarder')
-    p_populate.add_argument('--force', action='store_true', help='Forcer extraction des scans')
     p_populate.add_argument('--replace', action='store_true', help='Remplacer les événements existants')
+    p_populate.add_argument('--no-ocr', action='store_true', help='Désactiver l\'OCR pour les scans')
+    p_populate.add_argument('--dpi', type=int, default=200, help='Résolution OCR (défaut: 200)')
 
     # purge
     p_purge = subparsers.add_parser('purge', help='Supprime les événements de la base')
