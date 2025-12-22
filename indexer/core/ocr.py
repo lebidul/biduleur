@@ -202,6 +202,51 @@ def load_bidul_config(numero: int, csv_path: str = None) -> Optional[ScanConfig]
     return loader.get_config(numero) or loader.get_nearest_config(numero)
 
 
+def is_scan_from_csv(numero: int) -> Optional[bool]:
+    """
+    Vérifie si un Bidul est un scan selon le fichier biduls.description.csv.
+
+    Returns:
+        True si scan, False si texte, None si non trouvé dans le CSV
+    """
+    csv_path = Path(__file__).parent.parent / 'corpus' / 'biduls.description.csv'
+    if not csv_path.exists():
+        return None
+
+    # Lire le CSV pour trouver le type
+    encodings = ['utf-8-sig', 'utf-8', 'latin-1', 'cp1252']
+
+    for encoding in encodings:
+        try:
+            with open(csv_path, 'r', encoding=encoding) as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    # Chercher le numéro
+                    row_numero = 0
+                    for key in ['numéros', 'numeros', 'num\xe9ros']:
+                        if key in row:
+                            try:
+                                row_numero = int(row[key])
+                                break
+                            except (ValueError, TypeError):
+                                continue
+
+                    if row_numero == numero:
+                        type_source = row.get('scan/texte', '').strip().lower()
+                        if type_source == 'scan':
+                            return True
+                        elif type_source == 'texte':
+                            return False
+                        return None
+            return None  # Numéro non trouvé
+        except UnicodeDecodeError:
+            continue
+        except Exception:
+            continue
+
+    return None
+
+
 class OCREngine:
     """Wrapper unifié pour différents moteurs OCR."""
 
@@ -230,8 +275,37 @@ class OCREngine:
         elif self.engine_name == 'easyocr':
             import easyocr
             self._engine = easyocr.Reader(['fr'], gpu=False)
+        elif self.engine_name == 'google':
+            self._init_google_vision()
         else:
             raise ValueError(f"Engine non supporté: {self.engine_name}")
+
+    def _init_google_vision(self):
+        """Initialise Google Cloud Vision API."""
+        import os
+        from google.cloud import vision
+
+        # Chercher les credentials (priorité au projet biduleur)
+        creds_paths = [
+            os.environ.get('GOOGLE_APPLICATION_CREDENTIALS'),
+            Path(__file__).parent.parent.parent / 'gcp_creds_biduleur.json',  # Projet lebidul-biduleur
+            Path(__file__).parent.parent.parent / 'gcp_creds.json',  # Projet lebidul (legacy)
+            Path.home() / '.config' / 'gcloud' / 'application_default_credentials.json',
+        ]
+
+        creds_found = None
+        for creds_path in creds_paths:
+            if creds_path and Path(creds_path).exists():
+                os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = str(creds_path)
+                creds_found = creds_path
+                break
+
+        if creds_found:
+            logger.info(f"Google Cloud Vision: credentials = {Path(creds_found).name}")
+        else:
+            logger.warning("Google Cloud Vision: aucun fichier credentials trouvé")
+
+        self._engine = vision.ImageAnnotatorClient()
 
     def ocr_image(self, image: np.ndarray) -> str:
         """Effectue l'OCR sur une image numpy."""
@@ -239,6 +313,8 @@ class OCREngine:
             return self._ocr_paddle(image)
         elif self.engine_name == 'easyocr':
             return self._ocr_easyocr(image)
+        elif self.engine_name == 'google':
+            return self._ocr_google(image)
         return ""
 
     def _ocr_paddle(self, image: np.ndarray) -> str:
@@ -328,6 +404,37 @@ class OCREngine:
             lines.append(text)
 
         return '\n'.join(lines)
+
+    def _ocr_google(self, image: np.ndarray) -> str:
+        """OCR avec Google Cloud Vision API."""
+        import io
+        from PIL import Image
+        from google.cloud import vision
+
+        # Convertir numpy array en PNG bytes
+        if len(image.shape) == 3 and image.shape[2] == 3:
+            # BGR to RGB
+            image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        else:
+            image_rgb = image
+
+        pil_image = Image.fromarray(image_rgb)
+        img_byte_arr = io.BytesIO()
+        pil_image.save(img_byte_arr, format='PNG')
+        content = img_byte_arr.getvalue()
+
+        # Appel API
+        vision_image = vision.Image(content=content)
+        response = self._engine.document_text_detection(image=vision_image)
+
+        if response.error.message:
+            logger.error(f"Google Vision error: {response.error.message}")
+            return ""
+
+        # Extraire le texte
+        if response.full_text_annotation:
+            return response.full_text_annotation.text
+        return ""
 
 
 class ImagePreprocessor:

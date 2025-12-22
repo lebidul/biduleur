@@ -36,11 +36,11 @@ from datetime import datetime
 # Ajouter le parent au path pour les imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from indexer.core.extractor import TextExtractor, extract_bidul_info
+from indexer.core.extractor import TextExtractor, extract_bidul_info, detect_pdf_type
 from indexer.core.parser import EventParser
 from indexer.core.db import BidulDB
 from indexer.core.csv_importer import find_csv_for_bidul as find_csv_files, import_bidul_from_csv
-from indexer.core.ocr import ScanExtractor, load_bidul_config
+from indexer.core.ocr import ScanExtractor, load_bidul_config, is_scan_from_csv
 from indexer.core.ocr_postprocess import OCRPostProcessor
 
 # Configuration
@@ -195,7 +195,15 @@ def cmd_extract(args):
         result = extractor.extract(str(pdf_path))
 
         # Vérifier si c'est un scan qui nécessite OCR
-        is_scan = not result.is_native
+        # Priorité au CSV biduls.description.csv, sinon détection avancée
+        csv_is_scan = is_scan_from_csv(numero)
+        if csv_is_scan is not None:
+            is_scan = csv_is_scan
+        else:
+            # Détection avancée basée sur structure du PDF
+            is_scan, detection_details = detect_pdf_type(str(pdf_path))
+            if args.verbose:
+                print(f"  Détection auto: {'scan' if is_scan else 'texte'} ({detection_details['reason']})")
 
         # Si erreur ET pas un scan, abandonner
         if result.error and not is_scan:
@@ -261,14 +269,17 @@ def cmd_extract(args):
             # Supprimer les anciens événements
             db.delete_evenements(numero)
 
-            # Insérer le bidul
+            # Insérer le bidul avec source et raw_text
             type_source = 'texte' if result.is_native else 'scan'
+            source = 'scan' if is_scan else 'pdf'
             db.insert_bidul(
                 numero=numero,
                 mois=result.mois,
                 annee=result.annee,
                 pdf_filename=pdf_path.name,
-                type_source=type_source
+                type_source=type_source,
+                source=source,
+                raw_text=full_text
             )
 
             # Insérer les événements
@@ -618,11 +629,13 @@ def cmd_populate(args):
 
         source = None
         events = []
+        full_text = None  # Pour stocker le texte brut extrait (PDF/scan)
 
         # Priorité au CSV si disponible et non --pdf-only
         if csv_paths and not args.pdf_only:
             events = import_bidul_from_csv(numero, csv_paths, annee, mois)
             source = 'csv'
+            # Pas de raw_text pour les imports CSV (données déjà structurées)
             csv_biduls += 1
             total_from_csv += len(events)
 
@@ -635,9 +648,22 @@ def cmd_populate(args):
                 skipped += 1
                 continue
 
-            # Déterminer si c'est un scan et extraire le texte approprié
-            is_scan = not result.is_native
+            # Déterminer si c'est un scan:
+            # 1. D'abord vérifier le CSV biduls.description.csv (source de vérité)
+            # 2. Sinon, utiliser la détection avancée (fonts, images, texte)
+            csv_is_scan = is_scan_from_csv(numero)
+            if csv_is_scan is not None:
+                is_scan = csv_is_scan
+            else:
+                # Fallback: détection avancée basée sur structure du PDF
+                is_scan, detection_details = detect_pdf_type(str(pdf_path))
+                if args.verbose:
+                    print(f"[{numero}] Détection auto: {'scan' if is_scan else 'texte'} ({detection_details['reason']})")
+
             full_text = result.full_text
+
+            # Charger la config du Bidul (pour date_format notamment)
+            config = load_bidul_config(numero)
 
             if is_scan:
                 # Utiliser l'OCR pour les scans (sauf --no-ocr)
@@ -649,16 +675,16 @@ def cmd_populate(args):
                 # Initialisation lazy de l'OCR
                 if ocr_extractor is None:
                     try:
-                        ocr_extractor = ScanExtractor(dpi=getattr(args, 'dpi', 200))
+                        engine = getattr(args, 'engine', 'google')
+                        ocr_extractor = ScanExtractor(ocr_engine=engine, dpi=getattr(args, 'dpi', 200))
                         ocr_postprocessor = OCRPostProcessor()
-                        print("OCR initialisé (PaddleOCR)")
+                        print(f"OCR initialisé ({engine})")
                     except Exception as e:
                         print(f"[{numero}] Erreur init OCR: {e}")
                         skipped += 1
                         continue
 
                 # Extraction OCR
-                config = load_bidul_config(numero)
                 ocr_result = ocr_extractor.extract_from_pdf(str(pdf_path), config)
 
                 if ocr_result.error:
@@ -669,7 +695,9 @@ def cmd_populate(args):
                 full_text = ocr_postprocessor.process(ocr_result.full_text)
                 print(f"[{numero}] OCR: {len(full_text)} caractères extraits")
 
-            parser = EventParser(bidul_mois=mois, bidul_annee=annee)
+            # Récupérer le date_format depuis la config (si disponible)
+            date_format = config.date_format if config else None
+            parser = EventParser(bidul_mois=mois, bidul_annee=annee, date_format=date_format)
             # Utiliser parse_with_referentiel pour la stratégie "lieu d'abord"
             parsed_events = parser.parse_with_referentiel(
                 full_text,
@@ -679,7 +707,7 @@ def cmd_populate(args):
 
             # Convertir ParsedEvent en dict pour uniformité
             # Source = 'scan' pour les PDFs scannés, 'pdf' pour les natifs
-            event_source = 'scan' if is_scan else 'pdf'
+            source = 'scan' if is_scan else 'pdf'
             events = []
             for e in parsed_events:
                 events.append({
@@ -699,11 +727,8 @@ def cmd_populate(args):
                     'prix_max': e.prix_max,
                     'gratuit': e.gratuit,
                     'type_evenement': e.type_evenement,
-                    'confidence': e.confidence,
-                    'source': event_source
+                    'confidence': e.confidence
                 })
-
-            source = event_source
             pdf_biduls += 1
             total_from_pdf += len(events)
         else:
@@ -717,14 +742,16 @@ def cmd_populate(args):
         # Purger les anciens événements
         db.delete_evenements(numero)
 
-        # Insérer le bidul
+        # Insérer le bidul avec source et raw_text
         type_source = 'texte' if numero >= 178 else 'scan'
         db.insert_bidul(
             numero=numero,
             mois=mois,
             annee=annee,
             pdf_filename=pdf_path.name,
-            type_source=type_source
+            type_source=type_source,
+            source=source,
+            raw_text=full_text  # None pour CSV, texte extrait pour PDF/scan
         )
 
         # Insérer les événements
@@ -839,6 +866,9 @@ def cmd_migrate(args):
         ("evenement", "review_status", "TEXT DEFAULT 'pending'"),
         ("evenement", "review_notes", "TEXT"),
         ("evenement", "style", "TEXT"),  # Style/genre de l'événement (rock, jazz, théâtre, etc.)
+        # Nouvelles colonnes sur bidul pour source et raw_text
+        ("bidul", "source", "TEXT CHECK(source IN ('csv', 'pdf', 'scan'))"),
+        ("bidul", "raw_text", "TEXT"),
     ]
 
     for table, column, col_type in migrations:
@@ -1286,7 +1316,8 @@ def cmd_ocr_extract(args):
         print("Erreur: spécifiez --numero ou --range")
         return 1
 
-    extractor = ScanExtractor(dpi=args.dpi)
+    engine = getattr(args, 'engine', 'google')
+    extractor = ScanExtractor(ocr_engine=engine, dpi=args.dpi)
     postprocessor = OCRPostProcessor()
 
     # Charger les référentiels pour le parsing
@@ -1323,8 +1354,9 @@ def cmd_ocr_extract(args):
 
         print(f"  OCR: {len(text)} caractères en {elapsed:.1f}s")
 
-        # Parsing des événements
-        parser = EventParser(bidul_mois=mois, bidul_annee=annee)
+        # Parsing des événements avec le date_format depuis la config
+        date_format = config.date_format if config else None
+        parser = EventParser(bidul_mois=mois, bidul_annee=annee, date_format=date_format)
         events = parser.parse_with_referentiel(text, lieu_ref_list, ville_ref_list)
 
         print(f"  Événements trouvés: {len(events)}")
@@ -1339,13 +1371,15 @@ def cmd_ocr_extract(args):
             # Supprimer les anciens événements
             db.delete_evenements(numero)
 
-            # Insérer le bidul
+            # Insérer le bidul avec source et raw_text
             db.insert_bidul(
                 numero=numero,
                 mois=mois,
                 annee=annee,
                 pdf_filename=pdf_path.name,
-                type_source='scan'
+                type_source='scan',
+                source='scan',
+                raw_text=text
             )
 
             # Insérer les événements
@@ -1437,6 +1471,8 @@ OCR (PDFs scannés):
     p_populate.add_argument('--dry-run', action='store_true', help='Affiche sans sauvegarder')
     p_populate.add_argument('--replace', action='store_true', help='Remplacer les événements existants')
     p_populate.add_argument('--no-ocr', action='store_true', help='Désactiver l\'OCR pour les scans')
+    p_populate.add_argument('--engine', '-e', default='google', choices=['paddleocr', 'easyocr', 'google'],
+                           help='Moteur OCR (défaut: google)')
     p_populate.add_argument('--dpi', type=int, default=200, help='Résolution OCR (défaut: 200)')
 
     # purge
@@ -1477,7 +1513,7 @@ OCR (PDFs scannés):
     p_ocr = subparsers.add_parser('ocr', help='Extrait le texte d\'un PDF scanné par OCR')
     p_ocr.add_argument('pdf_path', help='Chemin vers le PDF à traiter')
     p_ocr.add_argument('--numero', '-n', type=int, help='Numéro du Bidul (auto-détecté si non fourni)')
-    p_ocr.add_argument('--engine', '-e', default='paddleocr', choices=['paddleocr', 'easyocr'],
+    p_ocr.add_argument('--engine', '-e', default='paddleocr', choices=['paddleocr', 'easyocr', 'google'],
                        help='Moteur OCR (défaut: paddleocr)')
     p_ocr.add_argument('--dpi', '-d', type=int, default=200, help='Résolution pour conversion PDF (défaut: 200)')
     p_ocr.add_argument('--output', '-o', help='Fichier de sortie pour le texte extrait')
@@ -1492,6 +1528,8 @@ OCR (PDFs scannés):
     p_ocr_extract = subparsers.add_parser('ocr-extract', help='Extrait et parse les événements d\'un PDF scanné')
     p_ocr_extract.add_argument('--numero', '-n', type=int, help='Numéro du Bidul')
     p_ocr_extract.add_argument('--range', '-r', help='Plage de numéros (ex: 1-50)')
+    p_ocr_extract.add_argument('--engine', '-e', default='google', choices=['paddleocr', 'easyocr', 'google'],
+                               help='Moteur OCR (défaut: google)')
     p_ocr_extract.add_argument('--dpi', '-d', type=int, default=200, help='Résolution pour conversion PDF (défaut: 200)')
     p_ocr_extract.add_argument('--dry-run', action='store_true', help='Ne pas sauvegarder en base')
 

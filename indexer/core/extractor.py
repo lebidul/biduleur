@@ -602,6 +602,133 @@ class TextExtractor:
             return None
 
 
+def detect_pdf_type(pdf_path: str) -> tuple[bool, dict]:
+    """
+    Détecte si un PDF est un scan ou du texte natif.
+
+    Utilise plusieurs heuristiques combinées:
+    1. Nombre de caractères extraits par page
+    2. Présence de fonts embarquées
+    3. Ratio images/texte (images pleine page = scan)
+    4. Présence d'objets texte vs images
+
+    Args:
+        pdf_path: Chemin vers le PDF
+
+    Returns:
+        (is_scan, details): True si scan, False si texte natif,
+                           avec un dict de détails d'analyse
+    """
+    details = {
+        'pages': 0,
+        'chars_total': 0,
+        'chars_per_page': 0,
+        'has_fonts': False,
+        'has_fullpage_images': False,
+        'image_pages': 0,
+        'text_pages': 0,
+        'fonts_count': 0,
+        'reason': ''
+    }
+
+    try:
+        doc = fitz.open(pdf_path)
+        details['pages'] = len(doc)
+
+        if len(doc) == 0:
+            details['reason'] = 'PDF vide'
+            doc.close()
+            return True, details
+
+        total_chars = 0
+        image_pages = 0
+        text_pages = 0
+        all_fonts = set()
+
+        for page_num in range(len(doc)):
+            page = doc[page_num]
+
+            # 1. Extraire le texte
+            text = page.get_text().strip()
+            char_count = len(text)
+            total_chars += char_count
+
+            # 2. Collecter les fonts utilisées sur la page
+            fonts = page.get_fonts()
+            for font in fonts:
+                font_name = font[3] if len(font) > 3 else ''
+                if font_name:
+                    all_fonts.add(font_name)
+
+            # 3. Vérifier les images
+            images = page.get_images()
+            page_rect = page.rect
+            page_area = page_rect.width * page_rect.height
+
+            has_fullpage_image = False
+            for img in images:
+                try:
+                    # Obtenir la bbox de l'image
+                    img_rects = page.get_image_rects(img[0])
+                    for img_rect in img_rects:
+                        img_area = img_rect.width * img_rect.height
+                        # Image couvre plus de 80% de la page = scan probable
+                        if img_area > 0.8 * page_area:
+                            has_fullpage_image = True
+                            break
+                except:
+                    pass
+
+            if has_fullpage_image:
+                image_pages += 1
+
+            # Page considérée comme texte si > 200 caractères
+            if char_count > 200:
+                text_pages += 1
+
+        doc.close()
+
+        # Remplir les détails
+        details['chars_total'] = total_chars
+        details['chars_per_page'] = total_chars // details['pages'] if details['pages'] > 0 else 0
+        details['has_fonts'] = len(all_fonts) > 0
+        details['fonts_count'] = len(all_fonts)
+        details['image_pages'] = image_pages
+        details['text_pages'] = text_pages
+        details['has_fullpage_images'] = image_pages > 0
+
+        # Décision basée sur plusieurs critères
+
+        # Critère 1: Majorité de pages avec images pleine page
+        if image_pages > details['pages'] / 2:
+            details['reason'] = f'Majorité de pages avec images pleine page ({image_pages}/{details["pages"]})'
+            return True, details
+
+        # Critère 2: Très peu de texte (< 100 chars/page en moyenne)
+        if details['chars_per_page'] < 100:
+            details['reason'] = f'Peu de texte ({details["chars_per_page"]} chars/page)'
+            return True, details
+
+        # Critère 3: Pas de fonts mais des images
+        if not details['has_fonts'] and details['has_fullpage_images']:
+            details['reason'] = 'Pas de fonts embarquées + images pleine page'
+            return True, details
+
+        # Critère 4: Moins de 50% de pages avec texte significatif
+        if text_pages < details['pages'] / 2:
+            details['reason'] = f'Peu de pages avec texte ({text_pages}/{details["pages"]})'
+            return True, details
+
+        # Sinon, c'est probablement du texte natif
+        details['reason'] = f'Texte natif ({details["chars_per_page"]} chars/page, {details["fonts_count"]} fonts)'
+        return False, details
+
+    except Exception as e:
+        details['reason'] = f'Erreur: {e}'
+        logger.error(f"Erreur détection type PDF {pdf_path}: {e}")
+        return True, details  # Par défaut, considérer comme scan en cas d'erreur
+
+
 # Test standalone
 if __name__ == "__main__":
     import sys
@@ -619,6 +746,13 @@ if __name__ == "__main__":
     print(f"Pages: {result.num_pages}")
     print(f"Texte natif: {result.is_native}")
     print(f"Caractères: {len(result.full_text)}")
+
+    # Test de la nouvelle détection
+    is_scan, details = detect_pdf_type(sys.argv[1])
+    print(f"\nDétection avancée:")
+    print(f"  Est un scan: {is_scan}")
+    for k, v in details.items():
+        print(f"  {k}: {v}")
 
     if result.error:
         print(f"Erreur: {result.error}")

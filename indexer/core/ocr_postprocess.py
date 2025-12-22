@@ -114,8 +114,9 @@ class OCRPostProcessor:
             (r'(\d{1,2})hO0', r'\1h00'),
             (r'(\d{1,2})H(\d{2})', r'\1h\2'),  # 20H30 → 20h30
 
-            # Tirets et espaces
-            (r'\s+', ' '),  # Multiples espaces
+            # Multiples espaces (mais préserver les newlines)
+            (r'[^\S\n]+', ' '),  # Espaces multiples → un seul espace
+            (r'\n{3,}', '\n\n'),  # Plus de 2 newlines → 2 newlines
 
             # Ponctuation
             (r'\s+,', ','),
@@ -202,50 +203,56 @@ class OCRPostProcessor:
 
         Recherche les mots/groupes de mots qui ressemblent aux entités connues
         et les corrige si le match est suffisamment bon.
+        Préserve la structure des lignes (newlines).
         """
         if not self.known_lieux and not self.known_villes:
             return text
 
-        # Construire un set de tous les mots à potentiellement corriger
-        # On ne corrige que les mots longs (>4 caractères) pour éviter les faux positifs
-        words = text.split()
-        corrected_words = []
+        # Traiter ligne par ligne pour préserver les newlines
+        lines = text.split('\n')
+        corrected_lines = []
 
-        i = 0
-        while i < len(words):
-            word = words[i]
+        for line in lines:
+            words = line.split(' ')
+            corrected_words = []
 
-            # Essayer de matcher des groupes de 2-3 mots d'abord (noms de lieux composés)
-            matched = False
+            i = 0
+            while i < len(words):
+                word = words[i]
 
-            for group_size in [3, 2]:
-                if i + group_size <= len(words):
-                    group = ' '.join(words[i:i + group_size])
-                    if len(group) > 6:  # Au moins 7 caractères pour les groupes
-                        # Chercher dans les lieux
-                        match = self._find_best_match(group, self.known_lieux, threshold=0.85)
-                        if match:
-                            corrected_words.append(match)
-                            i += group_size
-                            matched = True
-                            break
+                # Essayer de matcher des groupes de 2-3 mots d'abord (noms de lieux composés)
+                matched = False
 
-            if matched:
-                continue
+                for group_size in [3, 2]:
+                    if i + group_size <= len(words):
+                        group = ' '.join(words[i:i + group_size])
+                        if len(group) > 6:  # Au moins 7 caractères pour les groupes
+                            # Chercher dans les lieux
+                            match = self._find_best_match(group, self.known_lieux, threshold=0.85)
+                            if match:
+                                corrected_words.append(match)
+                                i += group_size
+                                matched = True
+                                break
 
-            # Si pas de match pour un groupe, essayer le mot seul
-            if len(word) > 5:  # Au moins 6 caractères
-                # Priorité aux villes (plus court généralement)
-                match = self._find_best_match(word, self.known_villes, threshold=0.85)
-                if match:
-                    corrected_words.append(match)
-                    i += 1
+                if matched:
                     continue
 
-            corrected_words.append(word)
-            i += 1
+                # Si pas de match pour un groupe, essayer le mot seul
+                if len(word) > 5:  # Au moins 6 caractères
+                    # Priorité aux villes (plus court généralement)
+                    match = self._find_best_match(word, self.known_villes, threshold=0.85)
+                    if match:
+                        corrected_words.append(match)
+                        i += 1
+                        continue
 
-        return ' '.join(corrected_words)
+                corrected_words.append(word)
+                i += 1
+
+            corrected_lines.append(' '.join(corrected_words))
+
+        return '\n'.join(corrected_lines)
 
     def _find_best_match(self, text: str, candidates: set[str], threshold: float = 0.8) -> Optional[str]:
         """

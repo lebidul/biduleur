@@ -12,6 +12,8 @@ CREATE TABLE IF NOT EXISTS bidul (
     annee INTEGER CHECK (annee BETWEEN 1997 AND 2030),
     pdf_filename TEXT,                       -- "2018-02 Bidul 230.pdf"
     type_source TEXT CHECK(type_source IN ('scan', 'texte')),
+    source TEXT CHECK(source IN ('csv', 'pdf', 'scan')),  -- Source d'extraction
+    raw_text TEXT,                           -- Texte brut extrait du PDF (OCR ou texte natif)
     config_extraction TEXT,                  -- JSON snapshot config utilisée
     extraction_status TEXT DEFAULT 'pending',
     extraction_date DATETIME,
@@ -72,9 +74,6 @@ CREATE TABLE IF NOT EXISTS evenement (
     -- Genre de l'événement (concert, spectacle vivant, etc.)
     genre_evenement TEXT,
 
-    -- Source de l'extraction ('csv' ou 'pdf')
-    source TEXT DEFAULT 'pdf',
-
     -- Prix
     tarif_raw TEXT,                          -- "5€ / 8€", "gratuit"
     prix_min REAL,
@@ -108,6 +107,7 @@ SELECT
     e.*,
     b.mois AS bidul_mois,
     b.annee AS bidul_annee,
+    b.source AS bidul_source,
     COALESCE(lr.nom, e.lieu_raw) AS lieu,
     COALESCE(vr.nom, e.ville_raw) AS ville
 FROM evenement e

@@ -4,6 +4,7 @@
 * #228 page 3 != agenda
 * Smac FLY = Smak FLY -> normalisation artistes
 * [212] 06/2016 - 0 événements (pdf)
+* [212] Erreur extraction PDF: None; [215] Erreur extraction PDF: None
 * 2010-09 Bidul 147 bis.pdf
 * 2019-03 Bidul 242 Marion.pdf, 2019-03 Bidul 242 Stef@n.pdf
 * pas d'événement Bidul 255 (covid)
@@ -11,4 +12,5 @@
 * ajouter html ou csv tapages manquants
 * colonne description dans table bidul (ex. bidul covid)
 * revoir avec grouping tous les lieux n'ayant pas de ref
+* stocker texte extrait dans table bidul pour csv
 * consolidation pdf à continuer
