@@ -1641,16 +1641,22 @@ class EventParser:
     # Pattern pour les spectacles entre guillemets
     SPECTACLE_PATTERN = re.compile(r'[""«]([^""»]+)[""»]')
 
-    def __init__(self, bidul_mois: Optional[int] = None, bidul_annee: Optional[int] = None):
+    def __init__(self, bidul_mois: Optional[int] = None, bidul_annee: Optional[int] = None,
+                 date_format: Optional[str] = None):
         """
         Initialise le parser.
 
         Args:
             bidul_mois: Mois du Bidul (pour construire les dates complètes)
             bidul_annee: Année du Bidul
+            date_format: Format des dates dans le texte:
+                - 'inline': chaque ligne commence par la date (ex: "Je 02 : CONCERT...")
+                - 'par bloc': dates en en-têtes de sections, événements listés en dessous
+                - None: auto-détection (essaie les deux formats)
         """
         self.bidul_mois = bidul_mois
         self.bidul_annee = bidul_annee
+        self.date_format = date_format
 
     # Pattern pour le format inline: "Je 02 : ARTISTE (genre), Lieu, heure, prix"
     INLINE_DATE_PATTERN = re.compile(
@@ -1663,8 +1669,10 @@ class EventParser:
         Parse le texte complet et extrait les événements.
 
         Supporte deux formats:
-        1. Format standard: dates sur lignes séparées, événements avec bullets
+        1. Format standard (par bloc): dates sur lignes séparées, événements avec bullets
         2. Format inline: "Je 02 : ARTISTE (genre), Lieu, heure, prix"
+
+        Le format peut être spécifié via self.date_format ou auto-détecté.
 
         Args:
             text: Texte brut extrait du PDF
@@ -1672,7 +1680,21 @@ class EventParser:
         Returns:
             Liste d'événements parsés (dédoublonnés)
         """
-        # Essayer d'abord le format standard
+        # Si le format est spécifié, l'utiliser directement
+        if self.date_format == 'inline':
+            events = self._parse_inline_format(text)
+            # Fallback sur l'autre format si rien trouvé
+            if not events:
+                events = self._parse_standard_format(text)
+            return events
+        elif self.date_format == 'par bloc':
+            events = self._parse_standard_format(text)
+            # Fallback sur l'autre format si rien trouvé
+            if not events:
+                events = self._parse_inline_format(text)
+            return events
+
+        # Auto-détection: essayer d'abord le format standard (par bloc)
         events = self._parse_standard_format(text)
 
         # Si aucun événement trouvé, essayer le format inline
@@ -2656,6 +2678,11 @@ class EventParser:
         2. Parse ce qui est avant le lieu (artistes, spectacles)
         3. Parse ce qui est après le lieu (ville, heure, prix)
 
+        Le format peut être spécifié via self.date_format:
+        - 'inline': chaque ligne commence par la date (ex: "Je 02 : CONCERT...")
+        - 'par bloc': dates en en-têtes de sections, événements listés en dessous
+        - None: auto-détection (essaie les deux formats)
+
         Args:
             text: Texte brut extrait du PDF
             lieu_ref_list: Liste de tuples (id, nom, ville) pour les lieux
@@ -2664,6 +2691,36 @@ class EventParser:
         Returns:
             Liste d'événements parsés (dédoublonnés)
         """
+        # Si le format est spécifié, l'utiliser directement
+        if self.date_format == 'inline':
+            events = self._parse_inline_with_referentiel(text, lieu_ref_list, ville_ref_list)
+            # Fallback sur l'autre format si rien trouvé
+            if not events:
+                events = self._parse_bloc_with_referentiel(text, lieu_ref_list, ville_ref_list)
+            return events
+        elif self.date_format == 'par bloc':
+            events = self._parse_bloc_with_referentiel(text, lieu_ref_list, ville_ref_list)
+            # Fallback sur l'autre format si rien trouvé
+            if not events:
+                events = self._parse_inline_with_referentiel(text, lieu_ref_list, ville_ref_list)
+            return events
+
+        # Auto-détection: essayer d'abord le format par bloc
+        events = self._parse_bloc_with_referentiel(text, lieu_ref_list, ville_ref_list)
+
+        # Si aucun événement trouvé, essayer le format inline
+        if not events:
+            events = self._parse_inline_with_referentiel(text, lieu_ref_list, ville_ref_list)
+
+        return events
+
+    def _parse_bloc_with_referentiel(
+        self,
+        text: str,
+        lieu_ref_list: list,
+        ville_ref_list: list
+    ) -> list[ParsedEvent]:
+        """Parse le format par bloc (dates en en-têtes) avec les référentiels."""
         events = []
         seen_signatures = set()
 
@@ -2716,10 +2773,6 @@ class EventParser:
                                 if signature not in seen_signatures:
                                     seen_signatures.add(signature)
                                     events.append(event)
-
-        # Si aucun événement trouvé, essayer le format inline
-        if not events:
-            events = self._parse_inline_with_referentiel(text, lieu_ref_list, ville_ref_list)
 
         return events
 

@@ -11,6 +11,13 @@ pip install -r requirements.txt
 
 Dépendances principales: `PyMuPDF`, `sqlite3` (inclus Python).
 
+Pour l'OCR (PDFs scannés):
+```bash
+pip install google-cloud-vision pdf2image opencv-python
+```
+
+**Note:** L'OCR avec Google Cloud Vision nécessite un fichier de credentials GCP (`gcp_creds_biduleur.json`).
+
 ## Démarrage rapide
 
 ```bash
@@ -141,7 +148,9 @@ Options:
 | `--pdf-only` | Ignorer les CSV, forcer extraction PDF |
 | `--dry-run` | Simulation sans sauvegarde |
 | `--replace` | Remplacer les données existantes |
-| `--force` | Forcer l'extraction des scans |
+| `--no-ocr` | Désactiver l'OCR pour les scans |
+| `--engine` | Moteur OCR: `google` (défaut), `paddleocr`, `easyocr` |
+| `--dpi` | Résolution OCR (défaut: 200) |
 
 ### `extract` - Extraire un PDF
 
@@ -159,6 +168,65 @@ python cli.py extract --numero 280 --dry-run
 
 # Forcer extraction d'un scan
 python cli.py extract --numero 150 --force
+```
+
+---
+
+## Commandes OCR
+
+### `ocr` - Extraire le texte d'un PDF scanné
+
+Extrait le texte d'un PDF scanné via OCR.
+
+```bash
+# Extraction avec Google Cloud Vision (recommandé)
+python cli.py ocr "archives/2011-07 Bidul 158.pdf" --engine google -o output.txt
+
+# Extraction avec PaddleOCR (local, gratuit)
+python cli.py ocr "archives/2011-07 Bidul 158.pdf" --engine paddleocr
+
+# Sans post-traitement
+python cli.py ocr "archives/bidul_158.pdf" --raw
+```
+
+Options:
+| Option | Description |
+|--------|-------------|
+| `--engine` | Moteur: `google`, `paddleocr`, `easyocr` |
+| `--dpi` | Résolution de conversion (défaut: 200) |
+| `--output` | Fichier de sortie pour le texte |
+| `--raw` | Ne pas appliquer le post-traitement |
+
+### `ocr-extract` - OCR + parsing des événements
+
+Extrait le texte via OCR et parse les événements en une seule commande.
+
+```bash
+# Un seul Bidul
+python cli.py ocr-extract --numero 158 --dry-run
+
+# Plage de Biduls
+python cli.py ocr-extract --range 150-160
+
+# Avec moteur spécifique
+python cli.py ocr-extract --numero 158 --engine paddleocr
+```
+
+Options:
+| Option | Description |
+|--------|-------------|
+| `--numero N` | Traiter le Bidul N |
+| `--range N-M` | Traiter les Biduls de N à M |
+| `--engine` | Moteur OCR (défaut: `google`) |
+| `--dpi` | Résolution (défaut: 200) |
+| `--dry-run` | Simulation sans sauvegarde |
+
+### `ocr-test` - Tester l'OCR
+
+Teste l'OCR sur un échantillon de PDFs scannés.
+
+```bash
+python cli.py ocr-test --samples 5
 ```
 
 ---

@@ -7,8 +7,8 @@ Extraction et indexation des événements culturels depuis les archives PDF du f
 ## Périmètre
 
 - **308 numéros** du Bidul (1997-2025)
-- **PDFs texte** (178-308) : extraction directe du texte
-- **PDFs scans** (1-177) : OCR à implémenter (Phase 2)
+- **PDFs texte** (178-308) : extraction directe du texte via PyMuPDF
+- **PDFs scans** (1-177) : extraction via OCR (Google Cloud Vision, PaddleOCR, EasyOCR)
 
 ## Sources de données
 
@@ -16,6 +16,7 @@ Extraction et indexation des événements culturels depuis les archives PDF du f
 |--------|---------|------------|-------------|
 | CSV | 2022-2025 | 1.0 | Données saisies manuellement (source de vérité) |
 | PDF | 178-308 | 0.4-0.9 | Extraction automatique PyMuPDF + parsing regex |
+| OCR | 1-177 | 0.7-0.9 | Extraction via OCR (scans) + parsing regex |
 
 Les CSV sont prioritaires : si un CSV existe pour un mois donné, il remplace l'extraction PDF.
 
@@ -64,11 +65,18 @@ python cli.py init
 python cli.py extract --numero 280
 python cli.py extract --range 178-308
 
-# Peuplement intelligent (CSV prioritaire, PDF fallback)
+# Peuplement intelligent (CSV prioritaire, PDF/OCR fallback)
 python cli.py populate --range 178-308
 python cli.py populate --csv-only    # Uniquement si CSV disponible
 python cli.py populate --pdf-only    # Forcer extraction PDF
 python cli.py populate --replace     # Remplacer les événements existants
+python cli.py populate --no-ocr      # Désactiver OCR pour les scans
+python cli.py populate --engine google  # Moteur OCR (google, paddleocr, easyocr)
+
+# OCR (PDFs scannés)
+python cli.py ocr "archives/bidul_158.pdf" --engine google -o output.txt
+python cli.py ocr-extract --numero 158 --dry-run
+python cli.py ocr-extract --range 150-160
 
 # Purge
 python cli.py purge --numero 280     # Purger un Bidul
@@ -82,6 +90,7 @@ python cli.py compare --numero 280 --details
 # Statistiques
 python cli.py stats                  # Stats étendues (sources, types, top lieux/villes)
 python cli.py list --type texte
+python cli.py list --type scan       # Lister PDFs scannés
 ```
 
 ## Fichiers clés
@@ -89,7 +98,9 @@ python cli.py list --type texte
 | Fichier | Rôle |
 |---------|------|
 | `core/extractor.py` | Extraction texte PDF (PyMuPDF) + config pages |
-| `core/parser.py` | Parsing événements (regex, formats standard et inline) |
+| `core/ocr.py` | Extraction OCR pour PDFs scannés (Google Vision, PaddleOCR, EasyOCR) |
+| `core/ocr_postprocess.py` | Post-traitement texte OCR (corrections, normalisation) |
+| `core/parser.py` | Parsing événements (regex, formats standard, inline, par bloc) |
 | `core/csv_importer.py` | Import depuis CSV tapages |
 | `core/normalizer.py` | Normalisation lieux/villes |
 | `core/db.py` | Accès base SQLite |
@@ -97,7 +108,7 @@ python cli.py list --type texte
 | `database/queries_analytiques.sql` | Requêtes SQL d'analyse |
 | `corpus/lieu.csv` | Référentiel des lieux |
 | `corpus/ville.csv` | Référentiel des villes |
-| `corpus/biduls.description.csv` | Configuration extraction (pages utiles, scan/texte) |
+| `corpus/biduls.description.csv` | Configuration extraction (pages utiles, scan/texte, format date) |
 
 ## Dépendances CSV
 
@@ -116,23 +127,62 @@ Le fichier `corpus/biduls.description.csv` configure l'extraction par numéro :
 | `numéros` | Numéro du Bidul |
 | `scan/texte` | Type de PDF (`scan` ou `texte`) |
 | `pages utiles` | Pages à extraire (ex: `2`, `2-4`) |
+| `date` | Format de date (`inline` ou `par bloc`) |
 
 Logique d'extraction :
-1. Si `scan/texte` = `scan` → skip (OCR nécessaire)
+1. Si `scan/texte` = `scan` → utilise OCR (sauf si `--no-ocr`)
 2. Si page 3 existe → utiliser page 3 (agenda complet)
 3. Sinon → utiliser `pages utiles` du CSV
+
+## Architecture OCR
+
+```
+PDF Scan
+    │
+    ▼
+┌─────────────────┐
+│  ScanExtractor  │  ← Conversion PDF → images (pdf2image)
+│   (ocr.py)      │    OCR via Google Cloud Vision / PaddleOCR / EasyOCR
+└────────┬────────┘
+         │ texte brut
+         ▼
+┌─────────────────┐
+│ OCRPostProcessor│  ← Corrections OCR (heures, entités, caractères)
+│(ocr_postprocess)│    Fuzzy matching sur lieux/villes connus
+└────────┬────────┘
+         │ texte nettoyé
+         ▼
+┌─────────────────┐
+│   EventParser   │  ← Parsing selon date_format (inline/par bloc)
+│   (parser.py)   │
+└─────────────────┘
+```
+
+### Moteurs OCR
+
+| Moteur | Vitesse | Qualité | Coût |
+|--------|---------|---------|------|
+| `google` | ~50s/PDF | Excellente | Cloud API |
+| `paddleocr` | ~135s/PDF | Bonne | Local/gratuit |
+| `easyocr` | ~200s/PDF | Moyenne | Local/gratuit |
+
+### Configuration Google Cloud Vision
+
+Fichier de credentials : `gcp_creds_biduleur.json` à la racine du projet.
 
 ## Formats de parsing
 
 | Format | Exemple | Biduls |
 |--------|---------|--------|
 | Standard | `• Date\n  ARTISTE, Lieu` | 200+ |
-| Inline | `Je 02 : ARTISTE, Lieu` | 178-199 |
+| Inline | `Je 02 : ARTISTE, Lieu` | 178-199, certains scans |
+| Par bloc | `Jeudi 2\n• ARTISTE, Lieu` | Certains scans |
 
-Le parser tente le format standard, puis inline si aucun événement trouvé.
+Le format est spécifié dans `biduls.description.csv` (colonne `date`). Si non spécifié, le parser tente le format standard, puis inline.
 
 ## Limitations actuelles
 
-1. **PDFs scans (1-177)** : Non indexés, nécessitent OCR
+1. **OCR** : Qualité variable selon l'état des scans (anciens numéros)
 2. **Parsing** : Certains formats d'événements non reconnus (confidence < 0.6)
 3. **Normalisation** : Lieux/villes non systématiquement liés aux référentiels
+4. **Événements multi-dates** : Support partiel ("Ve 3-4" → 2 événements)

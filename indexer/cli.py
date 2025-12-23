@@ -36,10 +36,12 @@ from datetime import datetime
 # Ajouter le parent au path pour les imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from indexer.core.extractor import TextExtractor, extract_bidul_info
+from indexer.core.extractor import TextExtractor, extract_bidul_info, detect_pdf_type
 from indexer.core.parser import EventParser
 from indexer.core.db import BidulDB
 from indexer.core.csv_importer import find_csv_for_bidul as find_csv_files, import_bidul_from_csv
+from indexer.core.ocr import ScanExtractor, load_bidul_config, is_scan_from_csv
+from indexer.core.ocr_postprocess import OCRPostProcessor
 
 # Configuration
 ARCHIVES_DIR = Path(__file__).parent / "archives"
@@ -165,6 +167,8 @@ def cmd_extract(args):
     db.init_schema()
 
     extractor = TextExtractor()
+    ocr_extractor = None
+    ocr_postprocessor = None
 
     # Déterminer les numéros à traiter
     if args.numero:
@@ -190,20 +194,69 @@ def cmd_extract(args):
         # Extraction du texte
         result = extractor.extract(str(pdf_path))
 
-        if not result.success:
+        # Vérifier si c'est un scan qui nécessite OCR
+        # Priorité au CSV biduls.description.csv, sinon détection avancée
+        csv_is_scan = is_scan_from_csv(numero)
+        if csv_is_scan is not None:
+            is_scan = csv_is_scan
+        else:
+            # Détection avancée basée sur structure du PDF
+            is_scan, detection_details = detect_pdf_type(str(pdf_path))
+            if args.verbose:
+                print(f"  Détection auto: {'scan' if is_scan else 'texte'} ({detection_details['reason']})")
+
+        # Si erreur ET pas un scan, abandonner
+        if result.error and not is_scan:
             print(f"  Erreur: {result.error}")
             continue
 
-        if not result.is_native:
-            print(f"  ATTENTION: PDF scan détecté, OCR nécessaire")
+        full_text = result.full_text
+        mois = result.mois
+        annee = result.annee
+        num_pages = result.num_pages
+
+        # Si c'est un scan et OCR non désactivé, utiliser l'OCR
+        if is_scan and not getattr(args, 'no_ocr', False):
+            print(f"  PDF scan détecté, lancement OCR...")
+
+            # Initialisation lazy de l'OCR (une seule fois)
+            if ocr_extractor is None:
+                try:
+                    ocr_extractor = ScanExtractor(dpi=getattr(args, 'dpi', 200))
+                    ocr_postprocessor = OCRPostProcessor()
+                except Exception as e:
+                    print(f"  Erreur init OCR: {e}")
+                    print(f"  Conseil: pip install paddleocr pdf2image opencv-python-headless")
+                    if not args.force:
+                        continue
+                    # Fallback au texte natif (même si vide)
+
+            if ocr_extractor:
+                config = load_bidul_config(numero)
+                ocr_result = ocr_extractor.extract_from_pdf(str(pdf_path), config)
+
+                if ocr_result.error:
+                    print(f"  Erreur OCR: {ocr_result.error}")
+                    if not args.force:
+                        continue
+                else:
+                    # Utiliser le texte OCR
+                    full_text = ocr_postprocessor.process(ocr_result.full_text)
+                    mois = ocr_result.mois or mois
+                    annee = ocr_result.annee or annee
+                    num_pages = ocr_result.num_pages
+                    print(f"  OCR: {len(full_text)} caractères extraits")
+
+        elif is_scan and getattr(args, 'no_ocr', False):
+            print(f"  PDF scan détecté (OCR désactivé)")
             if not args.force:
                 continue
 
         # Parsing des événements
-        parser = EventParser(bidul_mois=result.mois, bidul_annee=result.annee)
-        events = parser.parse(result.full_text)
+        parser = EventParser(bidul_mois=mois, bidul_annee=annee)
+        events = parser.parse(full_text)
 
-        print(f"  Pages: {result.num_pages}, Caractères: {len(result.full_text)}")
+        print(f"  Pages: {num_pages}, Caractères: {len(full_text)}")
         print(f"  Événements trouvés: {len(events)}")
 
         if events:
@@ -216,14 +269,17 @@ def cmd_extract(args):
             # Supprimer les anciens événements
             db.delete_evenements(numero)
 
-            # Insérer le bidul
+            # Insérer le bidul avec source et raw_text
             type_source = 'texte' if result.is_native else 'scan'
+            source = 'scan' if is_scan else 'pdf'
             db.insert_bidul(
                 numero=numero,
                 mois=result.mois,
                 annee=result.annee,
                 pdf_filename=pdf_path.name,
-                type_source=type_source
+                type_source=type_source,
+                source=source,
+                raw_text=full_text
             )
 
             # Insérer les événements
@@ -510,12 +566,14 @@ def cmd_populate(args):
     Peuple la base avec CSV (prioritaire) ou PDF.
 
     Si un CSV existe pour un Bidul, importe depuis CSV (confidence=1.0).
-    Sinon, extrait depuis PDF.
+    Sinon, extrait depuis PDF (texte natif ou OCR pour scans).
     """
     db = BidulDB()
     db.init_schema()
 
     extractor = TextExtractor()
+    ocr_extractor = None
+    ocr_postprocessor = None
 
     # Charger les référentiels pour le parsing "lieu d'abord"
     lieu_ref_list = db.get_lieu_ref_list()
@@ -571,11 +629,13 @@ def cmd_populate(args):
 
         source = None
         events = []
+        full_text = None  # Pour stocker le texte brut extrait (PDF/scan)
 
         # Priorité au CSV si disponible et non --pdf-only
         if csv_paths and not args.pdf_only:
             events = import_bidul_from_csv(numero, csv_paths, annee, mois)
             source = 'csv'
+            # Pas de raw_text pour les imports CSV (données déjà structurées)
             csv_biduls += 1
             total_from_csv += len(events)
 
@@ -583,25 +643,71 @@ def cmd_populate(args):
         elif not args.csv_only:
             result = extractor.extract(str(pdf_path))
 
-            if not result.success:
+            if result.error and result.is_native:
                 print(f"[{numero}] Erreur extraction PDF: {result.error}")
                 skipped += 1
                 continue
 
-            if not result.is_native and not args.force:
-                print(f"[{numero}] PDF scan détecté, ignoré (utilisez --force)")
-                skipped += 1
-                continue
+            # Déterminer si c'est un scan:
+            # 1. D'abord vérifier le CSV biduls.description.csv (source de vérité)
+            # 2. Sinon, utiliser la détection avancée (fonts, images, texte)
+            csv_is_scan = is_scan_from_csv(numero)
+            if csv_is_scan is not None:
+                is_scan = csv_is_scan
+            else:
+                # Fallback: détection avancée basée sur structure du PDF
+                is_scan, detection_details = detect_pdf_type(str(pdf_path))
+                if args.verbose:
+                    print(f"[{numero}] Détection auto: {'scan' if is_scan else 'texte'} ({detection_details['reason']})")
 
-            parser = EventParser(bidul_mois=mois, bidul_annee=annee)
+            full_text = result.full_text
+
+            # Charger la config du Bidul (pour date_format notamment)
+            config = load_bidul_config(numero)
+
+            if is_scan:
+                # Utiliser l'OCR pour les scans (sauf --no-ocr)
+                if getattr(args, 'no_ocr', False):
+                    print(f"[{numero}] PDF scan détecté (OCR désactivé)")
+                    skipped += 1
+                    continue
+
+                # Initialisation lazy de l'OCR
+                if ocr_extractor is None:
+                    try:
+                        engine = getattr(args, 'engine', 'google')
+                        ocr_extractor = ScanExtractor(ocr_engine=engine, dpi=getattr(args, 'dpi', 200))
+                        ocr_postprocessor = OCRPostProcessor()
+                        print(f"OCR initialisé ({engine})")
+                    except Exception as e:
+                        print(f"[{numero}] Erreur init OCR: {e}")
+                        skipped += 1
+                        continue
+
+                # Extraction OCR
+                ocr_result = ocr_extractor.extract_from_pdf(str(pdf_path), config)
+
+                if ocr_result.error:
+                    print(f"[{numero}] Erreur OCR: {ocr_result.error}")
+                    skipped += 1
+                    continue
+
+                full_text = ocr_postprocessor.process(ocr_result.full_text)
+                print(f"[{numero}] OCR: {len(full_text)} caractères extraits")
+
+            # Récupérer le date_format depuis la config (si disponible)
+            date_format = config.date_format if config else None
+            parser = EventParser(bidul_mois=mois, bidul_annee=annee, date_format=date_format)
             # Utiliser parse_with_referentiel pour la stratégie "lieu d'abord"
             parsed_events = parser.parse_with_referentiel(
-                result.full_text,
+                full_text,
                 lieu_ref_list,
                 ville_ref_list
             )
 
             # Convertir ParsedEvent en dict pour uniformité
+            # Source = 'scan' pour les PDFs scannés, 'pdf' pour les natifs
+            source = 'scan' if is_scan else 'pdf'
             events = []
             for e in parsed_events:
                 events.append({
@@ -621,11 +727,8 @@ def cmd_populate(args):
                     'prix_max': e.prix_max,
                     'gratuit': e.gratuit,
                     'type_evenement': e.type_evenement,
-                    'confidence': e.confidence,
-                    'source': 'pdf'
+                    'confidence': e.confidence
                 })
-
-            source = 'pdf'
             pdf_biduls += 1
             total_from_pdf += len(events)
         else:
@@ -639,14 +742,16 @@ def cmd_populate(args):
         # Purger les anciens événements
         db.delete_evenements(numero)
 
-        # Insérer le bidul
+        # Insérer le bidul avec source et raw_text
         type_source = 'texte' if numero >= 178 else 'scan'
         db.insert_bidul(
             numero=numero,
             mois=mois,
             annee=annee,
             pdf_filename=pdf_path.name,
-            type_source=type_source
+            type_source=type_source,
+            source=source,
+            raw_text=full_text  # None pour CSV, texte extrait pour PDF/scan
         )
 
         # Insérer les événements
@@ -761,6 +866,9 @@ def cmd_migrate(args):
         ("evenement", "review_status", "TEXT DEFAULT 'pending'"),
         ("evenement", "review_notes", "TEXT"),
         ("evenement", "style", "TEXT"),  # Style/genre de l'événement (rock, jazz, théâtre, etc.)
+        # Nouvelles colonnes sur bidul pour source et raw_text
+        ("bidul", "source", "TEXT CHECK(source IN ('csv', 'pdf', 'scan'))"),
+        ("bidul", "raw_text", "TEXT"),
     ]
 
     for table, column, col_type in migrations:
@@ -1037,6 +1145,260 @@ def cmd_analyze_corrections(args):
 
 
 # =============================================================================
+# OCR Commands
+# =============================================================================
+
+def cmd_ocr(args):
+    """Extrait le texte d'un PDF scanné par OCR."""
+    import time
+    from indexer.core.ocr import ScanExtractor, load_bidul_config
+    from indexer.core.ocr_postprocess import OCRPostProcessor
+
+    pdf_path = args.pdf_path
+
+    # Détecter le numéro du Bidul depuis le nom de fichier ou argument
+    numero = args.numero
+    if numero is None:
+        match = re.search(r'Bidul[_\s-]*(\d+)', pdf_path, re.IGNORECASE)
+        numero = int(match.group(1)) if match else None
+
+    # Charger la config si disponible
+    config = load_bidul_config(numero) if numero else None
+
+    print(f"Extraction OCR de {pdf_path}")
+    print(f"  Moteur: {args.engine}, DPI: {args.dpi}")
+    if config:
+        print(f"  Config Bidul {numero}: rotation={config.needs_rotation(2)}, colonnes={config.get_colonnes(2)}")
+
+    start_time = time.time()
+
+    # Extraction
+    extractor = ScanExtractor(ocr_engine=args.engine, dpi=args.dpi)
+    result = extractor.extract_from_pdf(pdf_path, config)
+
+    if result.error:
+        print(f"  Erreur: {result.error}")
+        return 1
+
+    elapsed = time.time() - start_time
+    print(f"  Pages: {result.num_pages}, Caractères: {len(result.full_text)}")
+    print(f"  Temps: {elapsed:.1f}s")
+
+    # Post-traitement si demandé
+    text = result.full_text
+    if not args.raw:
+        postprocessor = OCRPostProcessor()
+        text = postprocessor.process(text)
+        print(f"  Caractères après correction: {len(text)}")
+
+    # Afficher ou sauvegarder
+    if args.output:
+        with open(args.output, 'w', encoding='utf-8') as f:
+            f.write(text)
+        print(f"\nTexte sauvegardé dans {args.output}")
+    else:
+        print("\n" + "=" * 60)
+        # Encoder en ASCII avec remplacement pour la console Windows
+        display_text = text[:3000] if len(text) > 3000 else text
+        try:
+            print(display_text)
+        except UnicodeEncodeError:
+            print(display_text.encode('ascii', 'replace').decode('ascii'))
+        if len(text) > 3000:
+            print(f"\n... ({len(text)} caractères au total)")
+
+    return 0
+
+
+def cmd_ocr_test(args):
+    """Teste l'OCR sur un échantillon de PDFs scannés."""
+    import time
+    from indexer.core.ocr import ScanExtractor
+    from indexer.core.ocr_postprocess import OCRPostProcessor
+
+    # Trouver les PDFs scannés
+    scan_pdfs = []
+
+    # Priorité aux PDFs représentatifs mentionnés dans le prompt
+    priority_nums = ['002', '013', '035', '103', '174']
+
+    for num in priority_nums:
+        matches = list(ARCHIVES_DIR.glob(f'*Bidul*{num}*.pdf'))
+        if matches:
+            scan_pdfs.append(matches[0])
+
+    # Compléter avec d'autres scans si nécessaire
+    if len(scan_pdfs) < args.samples:
+        # Biduls 1-177 sont des scans
+        for pdf in sorted(ARCHIVES_DIR.glob('*.pdf')):
+            n, _, _ = extract_bidul_info(pdf.name)
+            if n and n < 178 and pdf not in scan_pdfs:
+                scan_pdfs.append(pdf)
+                if len(scan_pdfs) >= args.samples:
+                    break
+
+    scan_pdfs = scan_pdfs[:args.samples]
+
+    print(f"Test OCR sur {len(scan_pdfs)} PDFs\n")
+    print(f"{'='*60}")
+
+    extractor = ScanExtractor(dpi=args.dpi)
+    postprocessor = OCRPostProcessor()
+
+    results = []
+
+    for pdf in scan_pdfs:
+        print(f"\n[PDF] {pdf.name}")
+        start = time.time()
+
+        try:
+            result = extractor.extract_from_pdf(str(pdf))
+            elapsed = time.time() - start
+
+            if result.error:
+                print(f"  ERREUR: {result.error}")
+                results.append({'pdf': pdf.name, 'success': False, 'error': result.error})
+                continue
+
+            # Post-traitement
+            text = postprocessor.process(result.full_text)
+
+            print(f"  OK - {len(text)} caractères en {elapsed:.1f}s")
+            print(f"  Apercu: {text[:200].replace(chr(10), ' ')}...")
+
+            results.append({
+                'pdf': pdf.name,
+                'success': True,
+                'chars': len(text),
+                'time': elapsed,
+                'pages': result.num_pages
+            })
+
+        except Exception as e:
+            print(f"  ERREUR: {e}")
+            results.append({'pdf': pdf.name, 'success': False, 'error': str(e)})
+
+    # Résumé
+    print(f"\n{'='*60}")
+    print("RÉSUMÉ")
+    print(f"{'='*60}")
+
+    success_count = sum(1 for r in results if r.get('success'))
+    total_chars = sum(r.get('chars', 0) for r in results)
+    total_time = sum(r.get('time', 0) for r in results)
+
+    print(f"Réussis: {success_count}/{len(results)}")
+    print(f"Total caractères: {total_chars}")
+    print(f"Temps total: {total_time:.1f}s")
+    if success_count > 0:
+        print(f"Moyenne chars/PDF: {total_chars // success_count}")
+        print(f"Moyenne temps/PDF: {total_time / success_count:.1f}s")
+
+    return 0
+
+
+def cmd_ocr_extract(args):
+    """Extrait et parse les événements d'un PDF scanné via OCR."""
+    import time
+    from indexer.core.ocr import ScanExtractor, load_bidul_config
+    from indexer.core.ocr_postprocess import OCRPostProcessor
+
+    db = BidulDB()
+    db.init_schema()
+
+    # Déterminer les numéros à traiter
+    if args.numero:
+        numeros = [args.numero]
+    elif args.range:
+        start, end = map(int, args.range.split('-'))
+        numeros = list(range(start, end + 1))
+    else:
+        print("Erreur: spécifiez --numero ou --range")
+        return 1
+
+    engine = getattr(args, 'engine', 'google')
+    extractor = ScanExtractor(ocr_engine=engine, dpi=args.dpi)
+    postprocessor = OCRPostProcessor()
+
+    # Charger les référentiels pour le parsing
+    lieu_ref_list = db.get_lieu_ref_list()
+    ville_ref_list = db.get_ville_ref_list()
+
+    total_events = 0
+    success_count = 0
+
+    for numero in numeros:
+        pdf_path = find_pdf(numero)
+        if not pdf_path:
+            print(f"[{numero}] PDF non trouvé")
+            continue
+
+        n, mois, annee = extract_bidul_info(pdf_path.name)
+
+        print(f"[{numero}] OCR: {pdf_path.name}")
+        start = time.time()
+
+        # Charger la config
+        config = load_bidul_config(numero)
+
+        # Extraction OCR
+        result = extractor.extract_from_pdf(str(pdf_path), config)
+
+        if result.error:
+            print(f"  Erreur OCR: {result.error}")
+            continue
+
+        # Post-traitement
+        text = postprocessor.process(result.full_text)
+        elapsed = time.time() - start
+
+        print(f"  OCR: {len(text)} caractères en {elapsed:.1f}s")
+
+        # Parsing des événements avec le date_format depuis la config
+        date_format = config.date_format if config else None
+        parser = EventParser(bidul_mois=mois, bidul_annee=annee, date_format=date_format)
+        events = parser.parse_with_referentiel(text, lieu_ref_list, ville_ref_list)
+
+        print(f"  Événements trouvés: {len(events)}")
+
+        if events:
+            confidences = [e.confidence for e in events]
+            avg_conf = sum(confidences) / len(confidences)
+            print(f"  Confidence moyenne: {avg_conf:.2f}")
+
+        # Sauvegarder en base (sauf dry-run)
+        if not args.dry_run and events:
+            # Supprimer les anciens événements
+            db.delete_evenements(numero)
+
+            # Insérer le bidul avec source et raw_text
+            db.insert_bidul(
+                numero=numero,
+                mois=mois,
+                annee=annee,
+                pdf_filename=pdf_path.name,
+                type_source='scan',
+                source='scan',
+                raw_text=text
+            )
+
+            # Insérer les événements
+            for event in events:
+                db.insert_evenement(numero, event)
+
+            db.update_bidul_status(numero, 'extracted')
+            print(f"  Sauvegardé en base")
+
+        total_events += len(events)
+        success_count += 1
+
+    print(f"\n{'='*50}")
+    print(f"Terminé: {success_count}/{len(numeros)} PDFs, {total_events} événements")
+
+    return 0
+
+
+# =============================================================================
 # Main
 # =============================================================================
 
@@ -1058,6 +1420,13 @@ Exemples:
   python cli.py review --status to_review  # Review interactive
   python cli.py quality-report          # Rapport de qualité
   python cli.py analyze-corrections     # Analyse des corrections
+
+OCR (PDFs scannés):
+  python cli.py ocr archives/1997-03_Bidul_002.pdf  # OCR d'un PDF
+  python cli.py ocr archives/1997-03_Bidul_002.pdf -o output.txt  # Sauvegarde
+  python cli.py ocr-test --samples 5    # Teste l'OCR sur 5 PDFs
+  python cli.py ocr-extract --numero 35 # Extrait les événements du Bidul 35
+  python cli.py ocr-extract --range 1-50 --dry-run  # Prévisualise l'extraction
         """
     )
 
@@ -1073,7 +1442,9 @@ Exemples:
     p_extract.add_argument('--numero', '-n', type=int, help='Numéro du Bidul')
     p_extract.add_argument('--range', '-r', help='Plage de numéros (ex: 280-290)')
     p_extract.add_argument('--dry-run', action='store_true', help='Ne pas sauvegarder en base')
-    p_extract.add_argument('--force', action='store_true', help='Forcer l\'extraction des scans')
+    p_extract.add_argument('--force', action='store_true', help='Forcer l\'extraction même en cas d\'erreur')
+    p_extract.add_argument('--no-ocr', action='store_true', help='Désactiver l\'OCR pour les scans')
+    p_extract.add_argument('--dpi', type=int, default=200, help='Résolution OCR (défaut: 200)')
 
     # validate
     p_validate = subparsers.add_parser('validate', help='Valide une extraction')
@@ -1098,8 +1469,11 @@ Exemples:
     p_populate.add_argument('--csv-only', action='store_true', help='Uniquement les Biduls avec CSV')
     p_populate.add_argument('--pdf-only', action='store_true', help='Ignorer les CSV (forcer extraction PDF)')
     p_populate.add_argument('--dry-run', action='store_true', help='Affiche sans sauvegarder')
-    p_populate.add_argument('--force', action='store_true', help='Forcer extraction des scans')
     p_populate.add_argument('--replace', action='store_true', help='Remplacer les événements existants')
+    p_populate.add_argument('--no-ocr', action='store_true', help='Désactiver l\'OCR pour les scans')
+    p_populate.add_argument('--engine', '-e', default='google', choices=['paddleocr', 'easyocr', 'google'],
+                           help='Moteur OCR (défaut: google)')
+    p_populate.add_argument('--dpi', type=int, default=200, help='Résolution OCR (défaut: 200)')
 
     # purge
     p_purge = subparsers.add_parser('purge', help='Supprime les événements de la base')
@@ -1131,6 +1505,34 @@ Exemples:
     # analyze-corrections
     p_analyze = subparsers.add_parser('analyze-corrections', help='Analyse des corrections')
 
+    # ==========================================================================
+    # OCR Commands
+    # ==========================================================================
+
+    # ocr - Extrait le texte d'un PDF scanné
+    p_ocr = subparsers.add_parser('ocr', help='Extrait le texte d\'un PDF scanné par OCR')
+    p_ocr.add_argument('pdf_path', help='Chemin vers le PDF à traiter')
+    p_ocr.add_argument('--numero', '-n', type=int, help='Numéro du Bidul (auto-détecté si non fourni)')
+    p_ocr.add_argument('--engine', '-e', default='paddleocr', choices=['paddleocr', 'easyocr', 'google'],
+                       help='Moteur OCR (défaut: paddleocr)')
+    p_ocr.add_argument('--dpi', '-d', type=int, default=200, help='Résolution pour conversion PDF (défaut: 200)')
+    p_ocr.add_argument('--output', '-o', help='Fichier de sortie pour le texte extrait')
+    p_ocr.add_argument('--raw', action='store_true', help='Ne pas appliquer le post-traitement')
+
+    # ocr-test - Teste l'OCR sur un échantillon
+    p_ocr_test = subparsers.add_parser('ocr-test', help='Teste l\'OCR sur un échantillon de PDFs scannés')
+    p_ocr_test.add_argument('--samples', '-s', type=int, default=5, help='Nombre de PDFs à tester (défaut: 5)')
+    p_ocr_test.add_argument('--dpi', '-d', type=int, default=200, help='Résolution pour conversion PDF (défaut: 200)')
+
+    # ocr-extract - Extrait et parse les événements
+    p_ocr_extract = subparsers.add_parser('ocr-extract', help='Extrait et parse les événements d\'un PDF scanné')
+    p_ocr_extract.add_argument('--numero', '-n', type=int, help='Numéro du Bidul')
+    p_ocr_extract.add_argument('--range', '-r', help='Plage de numéros (ex: 1-50)')
+    p_ocr_extract.add_argument('--engine', '-e', default='google', choices=['paddleocr', 'easyocr', 'google'],
+                               help='Moteur OCR (défaut: google)')
+    p_ocr_extract.add_argument('--dpi', '-d', type=int, default=200, help='Résolution pour conversion PDF (défaut: 200)')
+    p_ocr_extract.add_argument('--dry-run', action='store_true', help='Ne pas sauvegarder en base')
+
     args = parser.parse_args()
 
     # Configuration logging
@@ -1157,6 +1559,10 @@ Exemples:
         'review': cmd_review,
         'quality-report': cmd_quality_report,
         'analyze-corrections': cmd_analyze_corrections,
+        # OCR commands
+        'ocr': cmd_ocr,
+        'ocr-test': cmd_ocr_test,
+        'ocr-extract': cmd_ocr_extract,
     }
 
     return commands[args.command](args)

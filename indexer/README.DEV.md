@@ -284,12 +284,91 @@ print(normalize_lieu("bar lézard"))     # Recherche floue
 print(normalize_ville("la fleche"))     # Normalise accents
 ```
 
+## Module OCR (`core/ocr.py`)
+
+Le module OCR permet d'extraire le texte des PDFs scannés (numéros 1-177).
+
+### Moteurs OCR supportés
+
+| Moteur | Performance | Qualité | Coût |
+|--------|-------------|---------|------|
+| `google` | ~50s/PDF | Excellente | Cloud API |
+| `paddleocr` | ~135s/PDF | Bonne | Local/gratuit |
+| `easyocr` | ~200s/PDF | Moyenne | Local/gratuit |
+
+**Recommandation:** Utiliser `google` (Google Cloud Vision) pour la qualité et la vitesse.
+
+### Configuration Google Cloud Vision
+
+1. Créer un compte de service GCP avec l'API Vision activée
+2. Télécharger le fichier JSON de credentials
+3. Le placer à la racine du projet sous le nom `gcp_creds_biduleur.json`
+
+### Classes principales
+
+**`ScanExtractor`** - Extracteur OCR pour PDFs scannés
+```python
+from core.ocr import ScanExtractor, load_bidul_config
+
+extractor = ScanExtractor(ocr_engine='google', dpi=200)
+config = load_bidul_config(158)  # Charge config depuis biduls.description.csv
+result = extractor.extract_from_pdf("archives/bidul_158.pdf", config)
+print(result.full_text)
+```
+
+**`ScanConfig`** - Configuration d'extraction par Bidul
+```python
+@dataclass
+class ScanConfig:
+    numero: int
+    date_format: str = 'inline'  # 'inline' ou 'par bloc'
+    page1_orientation_pdf: str = 'portrait'
+    page1_orientation_texte: str = 'portrait'
+    # ...
+```
+
+**`OCREngine`** - Wrapper unifié pour les moteurs OCR
+```python
+from core.ocr import OCREngine
+
+engine = OCREngine(engine='google')
+text = engine.ocr_image(numpy_image)
+```
+
+### Post-traitement (`core/ocr_postprocess.py`)
+
+Le post-processeur corrige les erreurs OCR courantes :
+- Confusion lettres/chiffres (`1e` → `le`, `hOO` → `h00`)
+- Normalisation des heures (`20H30` → `20h30`)
+- Correction des entités connues (lieux, villes) par fuzzy matching
+
+```python
+from core.ocr_postprocess import OCRPostProcessor
+
+processor = OCRPostProcessor()
+corrected_text = processor.process(raw_ocr_text)
+```
+
+### Formats de date
+
+Le fichier `corpus/biduls.description.csv` spécifie le format de date pour chaque Bidul :
+
+| Format | Description | Exemple |
+|--------|-------------|---------|
+| `inline` | Date au début de chaque ligne | `Je 02 : CONCERT, Lieu, 21h` |
+| `par bloc` | Date en en-tête de section | `Jeudi 2\n• CONCERT, Lieu, 21h` |
+
+Le parser utilise automatiquement le bon format via `date_format` :
+```python
+parser = EventParser(bidul_mois=7, bidul_annee=2011, date_format='inline')
+```
+
 ## Limitations connues
 
-1. **PDFs scannés (n° < 178)** - Nécessitent OCR externe, non supporté
-2. **Événements multi-dates** - Support partiel ("Ve 3-4" → 2 événements)
-3. **Lieux non référencés** - Extraction heuristique moins fiable
-4. **Formatage incohérent** - Certains vieux numéros ont un formatage variable
+1. **Événements multi-dates** - Support partiel ("Ve 3-4" → 2 événements)
+2. **Lieux non référencés** - Extraction heuristique moins fiable
+3. **Formatage incohérent** - Certains vieux numéros ont un formatage variable
+4. **OCR des très anciens Biduls** - Qualité variable selon l'état du scan
 
 ## Contribution
 

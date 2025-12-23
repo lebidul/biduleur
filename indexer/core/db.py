@@ -130,6 +130,8 @@ class BidulDB:
         annee: Optional[int] = None,
         pdf_filename: Optional[str] = None,
         type_source: str = 'texte',
+        source: Optional[str] = None,
+        raw_text: Optional[str] = None,
         config_extraction: Optional[str] = None
     ) -> int:
         """Insère ou met à jour un Bidul."""
@@ -143,14 +145,16 @@ class BidulDB:
                     annee = COALESCE(?, annee),
                     pdf_filename = COALESCE(?, pdf_filename),
                     type_source = COALESCE(?, type_source),
+                    source = COALESCE(?, source),
+                    raw_text = COALESCE(?, raw_text),
                     config_extraction = COALESCE(?, config_extraction)
                 WHERE numero = ?
-            """, (mois, annee, pdf_filename, type_source, config_extraction, numero))
+            """, (mois, annee, pdf_filename, type_source, source, raw_text, config_extraction, numero))
         else:
             conn.execute("""
-                INSERT INTO bidul (numero, mois, annee, pdf_filename, type_source, config_extraction)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (numero, mois, annee, pdf_filename, type_source, config_extraction))
+                INSERT INTO bidul (numero, mois, annee, pdf_filename, type_source, source, raw_text, config_extraction)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (numero, mois, annee, pdf_filename, type_source, source, raw_text, config_extraction))
 
         conn.commit()
         return numero
@@ -186,8 +190,8 @@ class BidulDB:
                 lieu_raw, lieu_ref_id, ville_raw, ville_ref_id,
                 artistes, spectacles, genres_raw,
                 tarif_raw, prix_min, prix_max, gratuit,
-                type_evenement, confidence, source
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pdf')
+                type_evenement, confidence
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             bidul_numero,
             event.raw_text,
@@ -235,8 +239,8 @@ class BidulDB:
                 lieu_raw, lieu_ref_id, ville_raw, ville_ref_id,
                 artistes, spectacles, genres_raw, genre_evenement,
                 tarif_raw, prix_min, prix_max, gratuit,
-                type_evenement, confidence, source
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                type_evenement, confidence
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             event['bidul_numero'],
             raw_text,
@@ -257,8 +261,7 @@ class BidulDB:
             event.get('prix_max'),
             event.get('gratuit', False),
             event.get('type_evenement'),
-            event.get('confidence', 0.5),
-            event.get('source', 'pdf')
+            event.get('confidence', 0.5)
         ))
         evenement_id = cursor.lastrowid
 
@@ -554,10 +557,12 @@ class BidulDB:
         stats['lieux_ref'] = conn.execute("SELECT COUNT(*) FROM lieu_ref").fetchone()[0]
         stats['villes_ref'] = conn.execute("SELECT COUNT(*) FROM ville_ref").fetchone()[0]
 
-        # Stats par source (csv/pdf)
+        # Stats par source (csv/pdf/scan) - maintenant sur la table bidul
         sources = conn.execute("""
-            SELECT source, COUNT(*) as count
-            FROM evenement GROUP BY source
+            SELECT b.source, COUNT(e.id) as count
+            FROM bidul b
+            LEFT JOIN evenement e ON e.bidul_numero = b.numero
+            GROUP BY b.source
         """).fetchall()
         stats['par_source'] = {row['source'] or 'unknown': row['count'] for row in sources}
 
