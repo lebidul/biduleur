@@ -331,6 +331,16 @@ class BidulDB:
     # Contenu événement (artistes/spectacles)
     # -------------------------------------------------------------------------
 
+    def _insert_contenu_row(self, conn, evenement_id: int, artiste: str, nom_spectacle: str, style: str, ordre: int):
+        """
+        Insère une ligne dans contenu_evenement avec matching artiste_ref_id.
+        """
+        artiste_ref_id = self._find_artiste_ref(artiste) if artiste else None
+        conn.execute('''
+            INSERT INTO contenu_evenement (evenement_id, artiste, artiste_ref_id, nom_spectacle, style, ordre)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (evenement_id, artiste, artiste_ref_id, nom_spectacle, style, ordre))
+
     def _insert_contenu_evenement(self, conn, evenement_id: int, artistes: list, spectacles: list):
         """
         Insère les artistes/spectacles dans contenu_evenement depuis un ParsedEvent.
@@ -383,44 +393,29 @@ class BidulDB:
             first_art = norm_artistes[0]
             # Le style vient du spectacle en priorité, sinon de l'artiste
             style = first_spec.get('style') or first_art.get('style')
-            conn.execute('''
-                INSERT INTO contenu_evenement (evenement_id, artiste, nom_spectacle, style, ordre)
-                VALUES (?, ?, ?, ?, ?)
-            ''', (evenement_id, first_art.get('nom'), first_spec.get('nom'), style, ordre))
+            self._insert_contenu_row(conn, evenement_id, first_art.get('nom'), first_spec.get('nom'), style, ordre)
             ordre += 1
 
             # Artistes supplémentaires
             for art in norm_artistes[1:]:
-                conn.execute('''
-                    INSERT INTO contenu_evenement (evenement_id, artiste, nom_spectacle, style, ordre)
-                    VALUES (?, ?, ?, ?, ?)
-                ''', (evenement_id, art.get('nom'), art.get('spectacle'), art.get('style'), ordre))
+                self._insert_contenu_row(conn, evenement_id, art.get('nom'), art.get('spectacle'), art.get('style'), ordre)
                 ordre += 1
 
             # Spectacles supplémentaires (sans artiste)
             for spec in norm_spectacles[1:]:
-                conn.execute('''
-                    INSERT INTO contenu_evenement (evenement_id, nom_spectacle, style, ordre)
-                    VALUES (?, ?, ?, ?)
-                ''', (evenement_id, spec.get('nom'), spec.get('style'), ordre))
+                self._insert_contenu_row(conn, evenement_id, None, spec.get('nom'), spec.get('style'), ordre)
                 ordre += 1
 
         # Cas 2: Artistes seuls (avec leur spectacle associé si présent)
         elif norm_artistes:
             for art in norm_artistes:
-                conn.execute('''
-                    INSERT INTO contenu_evenement (evenement_id, artiste, nom_spectacle, style, ordre)
-                    VALUES (?, ?, ?, ?, ?)
-                ''', (evenement_id, art.get('nom'), art.get('spectacle'), art.get('style'), ordre))
+                self._insert_contenu_row(conn, evenement_id, art.get('nom'), art.get('spectacle'), art.get('style'), ordre)
                 ordre += 1
 
         # Cas 3: Spectacles seuls
         elif norm_spectacles:
             for spec in norm_spectacles:
-                conn.execute('''
-                    INSERT INTO contenu_evenement (evenement_id, nom_spectacle, style, ordre)
-                    VALUES (?, ?, ?, ?)
-                ''', (evenement_id, spec.get('nom'), spec.get('style'), ordre))
+                self._insert_contenu_row(conn, evenement_id, None, spec.get('nom'), spec.get('style'), ordre)
                 ordre += 1
 
     def _insert_contenu_from_json(self, conn, evenement_id: int, artistes: list, spectacles: list, genres: list):
@@ -464,44 +459,29 @@ class BidulDB:
             first_art = norm_artistes[0]
             # Le style vient du spectacle en priorité, sinon de l'artiste
             style = first_spec.get('style') or first_art.get('style')
-            conn.execute('''
-                INSERT INTO contenu_evenement (evenement_id, artiste, nom_spectacle, style, ordre)
-                VALUES (?, ?, ?, ?, ?)
-            ''', (evenement_id, first_art.get('nom'), first_spec.get('nom'), style, ordre))
+            self._insert_contenu_row(conn, evenement_id, first_art.get('nom'), first_spec.get('nom'), style, ordre)
             ordre += 1
 
             # Artistes supplémentaires (sans spectacle, juste l'artiste)
             for art in norm_artistes[1:]:
-                conn.execute('''
-                    INSERT INTO contenu_evenement (evenement_id, artiste, nom_spectacle, style, ordre)
-                    VALUES (?, ?, ?, ?, ?)
-                ''', (evenement_id, art.get('nom'), None, art.get('style'), ordre))
+                self._insert_contenu_row(conn, evenement_id, art.get('nom'), None, art.get('style'), ordre)
                 ordre += 1
 
             # Spectacles supplémentaires (sans artiste)
             for spec in norm_spectacles[1:]:
-                conn.execute('''
-                    INSERT INTO contenu_evenement (evenement_id, artiste, nom_spectacle, style, ordre)
-                    VALUES (?, ?, ?, ?, ?)
-                ''', (evenement_id, None, spec.get('nom'), spec.get('style'), ordre))
+                self._insert_contenu_row(conn, evenement_id, None, spec.get('nom'), spec.get('style'), ordre)
                 ordre += 1
 
         # Cas 2: Spectacles seuls
         elif norm_spectacles:
             for spec in norm_spectacles:
-                conn.execute('''
-                    INSERT INTO contenu_evenement (evenement_id, artiste, nom_spectacle, style, ordre)
-                    VALUES (?, ?, ?, ?, ?)
-                ''', (evenement_id, None, spec.get('nom'), spec.get('style'), ordre))
+                self._insert_contenu_row(conn, evenement_id, None, spec.get('nom'), spec.get('style'), ordre)
                 ordre += 1
 
         # Cas 3: Artistes seuls
         elif norm_artistes:
             for art in norm_artistes:
-                conn.execute('''
-                    INSERT INTO contenu_evenement (evenement_id, artiste, nom_spectacle, style, ordre)
-                    VALUES (?, ?, ?, ?, ?)
-                ''', (evenement_id, art.get('nom'), None, art.get('style'), ordre))
+                self._insert_contenu_row(conn, evenement_id, art.get('nom'), None, art.get('style'), ordre)
                 ordre += 1
 
     # -------------------------------------------------------------------------
@@ -529,10 +509,16 @@ class BidulDB:
         return [(row['id'], row['nom']) for row in rows]
 
     def _find_lieu_ref(self, lieu_raw: str) -> Optional[int]:
-        """Cherche un lieu dans le référentiel (matching fuzzy)."""
-        from core.normalizer import normalize_lieu
-        lieu_id, _ = normalize_lieu(lieu_raw, str(self.db_path))
+        """Cherche un lieu dans le référentiel (matching avec aliases)."""
+        from core.normalizer import find_lieu_ref_id
+        lieu_id, _ = find_lieu_ref_id(lieu_raw, str(self.db_path))
         return lieu_id
+
+    def _find_artiste_ref(self, artiste_raw: str) -> Optional[int]:
+        """Cherche un artiste dans le référentiel (matching avec aliases)."""
+        from core.normalizer import find_artiste_ref_id
+        artiste_id, _ = find_artiste_ref_id(artiste_raw, str(self.db_path))
+        return artiste_id
 
     def _find_ville_ref(self, ville_raw: str) -> tuple[Optional[int], str]:
         """
