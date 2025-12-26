@@ -33,6 +33,10 @@ def extract_formatted_spectacles(text: str) -> list[dict]:
 
     Aussi: spectacles entre guillemets (sans gras) suivis d'un style en italique.
 
+    Guillemets supportés:
+    - Ouvrants: « " " „ <<
+    - Fermants: » " " >>
+
     Returns:
         Liste de dicts {'nom': str, 'style': str|None}
     """
@@ -41,10 +45,15 @@ def extract_formatted_spectacles(text: str) -> list[dict]:
     # D'abord fusionner les <i> consécutifs (styles coupés par saut de ligne)
     text = _merge_consecutive_italic_tags(text)
 
+    # Classes de guillemets (ouvrants et fermants)
+    # Inclut << et >> pour l'OCR qui peut confondre les guillemets
+    open_quotes = r'[«""„]|<<'
+    close_quotes = r'[»""]|>>'
+
     # Pattern 1: <b>"Spectacle"</b> suivi optionnellement de <i>(style),</i>
     # Note: la virgule peut être dans ou après les parenthèses
     # Guillemets typographiques ou ASCII
-    pattern = r'<b>\s*[«""„]([^»""]+)[»""]\s*</b>(?:\s*<i>\s*\(([^)]+)\)[,;]?\s*</i>)?'
+    pattern = rf'<b>\s*(?:{open_quotes})([^»""<>]+)(?:{close_quotes})\s*</b>(?:\s*<i>\s*\(([^)]+)\)[,;]?\s*</i>)?'
     matches = re.finditer(pattern, text, re.IGNORECASE)
 
     for match in matches:
@@ -56,13 +65,27 @@ def extract_formatted_spectacles(text: str) -> list[dict]:
     # Pattern 2: "Spectacle" (sans gras) suivi de <i>(style)</i>
     # Cas spécial: "Ma tata, mon pingouin..." <i>(concert jeune public)</i>
     # Note: pas de <b> autour du spectacle lui-même, mais peut être après </b> d'un artiste
-    pattern2 = r'[«""„]([^»""]+)[»""]\s*<i>\s*\(([^)]+)\)[,;]?\s*</i>'
+    pattern2 = rf'(?:{open_quotes})([^»""<>]+)(?:{close_quotes})\s*<i>\s*\(([^)]+)\)[,;]?\s*</i>'
     matches2 = re.finditer(pattern2, text, re.IGNORECASE)
 
     for match in matches2:
         nom = match.group(1).strip()
         style = _clean_style(match.group(2)) if match.group(2) else None
         if nom and len(nom) > 1:
+            # Vérifier que ce n'est pas déjà dans la liste
+            if not any(s['nom'] == nom for s in spectacles):
+                spectacles.append({'nom': nom, 'style': style})
+
+    # Pattern 3: "Spectacle" (style) - sans balises du tout (OCR brut)
+    # Cas: << Bois d'ébène " (lecture, conte)
+    # Note: le style est entre parenthèses mais pas en italique
+    pattern3 = rf'(?:{open_quotes})\s*([^»""<>]+?)\s*(?:{close_quotes})\s*\(([^)]+)\)'
+    matches3 = re.finditer(pattern3, text, re.IGNORECASE)
+
+    for match in matches3:
+        nom = match.group(1).strip()
+        style = _clean_style(match.group(2)) if match.group(2) else None
+        if nom and len(nom) > 2:
             # Vérifier que ce n'est pas déjà dans la liste
             if not any(s['nom'] == nom for s in spectacles):
                 spectacles.append({'nom': nom, 'style': style})
