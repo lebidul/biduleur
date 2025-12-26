@@ -175,26 +175,26 @@ python cli.py extract --numero 280 --reparse
 
 ### `--reparse` - Re-parser les evenements existants
 
-L'option `--reparse` permet de re-parser les evenements deja en base sans re-extraire le PDF. Utile apres correction des patterns de parsing.
+L'option `--reparse` permet de re-parser les evenements depuis le texte brut complet (`bidul.raw_text`) sans re-extraire le PDF. Utile apres correction des patterns de parsing.
 
 **Fonctionnement:**
-1. Collecte tous les `raw_text` uniques des evenements du Bidul
+1. Recupere le texte brut complet du Bidul (`bidul.raw_text`)
 2. Supprime TOUS les evenements et contenus associes du Bidul
-3. Re-parse chaque `raw_text` avec l'algorithme actuel
+3. Re-parse le texte complet avec l'algorithme actuel (split sur dates inclus)
 4. Insere les nouveaux evenements
 
 ```bash
 # Re-parser un Bidul
-python cli.py extract --numero 102 --reparse
+python cli.py populate --numero 102 --reparse
 
 # Re-parser en mode simulation
-python cli.py extract --numero 102 --reparse --dry-run
+python cli.py populate --numero 102 --reparse --dry-run
 
 # Re-parser une plage
-python cli.py extract --range 100-110 --reparse
+python cli.py populate --range 100-110 --reparse
 ```
 
-**Note:** Le reparse peut generer plus ou moins d'evenements que l'original si les patterns de split ont change (ex: dates multiples `Lu 12/Ma 13/Me 14:` → 3 evenements).
+**Note:** Le reparse utilise `bidul.raw_text` (texte complet) et non `evenement.raw_text` (deja splitte). Cela permet de beneficier des nouvelles regles de split (ex: dates multiples `Lu 12/Ma 13/Me 14:` → 3 evenements).
 
 ---
 

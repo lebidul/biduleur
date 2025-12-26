@@ -605,94 +605,84 @@ def cmd_populate(args):
     reparsed_biduls = 0
 
     for numero in numeros:
-        # Mode --reparse: re-parser les événements existants depuis raw_text
+        # Mode --reparse: re-parser depuis bidul.raw_text (texte complet)
         if getattr(args, 'reparse', False):
-            existing_events = db.get_evenements_for_bidul(numero)
-            if not existing_events:
+            # Récupérer le bidul avec son raw_text complet
+            bidul = db.get_bidul(numero)
+            if not bidul:
                 if args.verbose:
-                    print(f"[{numero}] Aucun événement en base - ignoré")
+                    print(f"[{numero}] Bidul non trouvé en base - ignoré")
                 skipped += 1
                 continue
 
-            # Récupérer mois/année depuis le premier événement ou le PDF
-            pdf_path = find_pdf(numero)
-            if pdf_path:
-                n, mois, annee = extract_bidul_info(pdf_path.name)
-            else:
-                # Fallback: extraire depuis la date_evenement du premier événement
-                first_event = existing_events[0]
-                if first_event.get('date_evenement'):
-                    from datetime import datetime
-                    dt = datetime.strptime(first_event['date_evenement'], '%Y-%m-%d')
-                    mois, annee = dt.month, dt.year
+            bidul_raw_text = bidul.get('raw_text')
+            if not bidul_raw_text:
+                if args.verbose:
+                    print(f"[{numero}] Pas de raw_text dans bidul - ignoré")
+                skipped += 1
+                continue
+
+            # Récupérer mois/année depuis le bidul ou le PDF
+            mois = bidul.get('mois')
+            annee = bidul.get('annee')
+            if not mois or not annee:
+                pdf_path = find_pdf(numero)
+                if pdf_path:
+                    n, mois, annee = extract_bidul_info(pdf_path.name)
                 else:
                     print(f"[{numero}] Impossible de déterminer mois/année - ignoré")
                     skipped += 1
                     continue
 
-            # Collecter les raw_text uniques (pour éviter les doublons après split)
-            unique_raw_texts = []
-            seen_raw_texts = set()
-            for event in existing_events:
-                raw_text = event.get('raw_text')
-                if raw_text and raw_text not in seen_raw_texts:
-                    unique_raw_texts.append(raw_text)
-                    seen_raw_texts.add(raw_text)
-
-            if not unique_raw_texts:
-                if args.verbose:
-                    print(f"[{numero}] Aucun raw_text à re-parser - ignoré")
-                skipped += 1
-                continue
+            # Compter les événements existants avant suppression
+            existing_count = db.count_evenements(numero)
 
             # Supprimer TOUS les événements du bidul avant de re-parser
             if not args.dry_run:
                 db.delete_evenements(numero)
 
-            # Re-parser chaque raw_text unique
+            # Re-parser le texte brut complet du bidul
             from indexer.core.parser import parse_event_line_v2
+            parsed_events = parse_event_line_v2(
+                bidul_raw_text,
+                mois,
+                annee,
+                lieu_ref_list,
+                ville_ref_list
+            )
+
             reparsed_count = 0
+            if parsed_events and not args.dry_run:
+                for parsed in parsed_events:
+                    # Convertir date en string ISO si nécessaire
+                    date_evt = parsed.get('date_evenement')
+                    if hasattr(date_evt, 'isoformat'):
+                        date_evt = date_evt.isoformat()
+                    # Convertir artistes/spectacles en JSON si nécessaire
+                    artistes = parsed.get('artistes')
+                    if artistes is not None and not isinstance(artistes, str):
+                        artistes = json.dumps(artistes, ensure_ascii=False)
+                    spectacles = parsed.get('spectacles')
+                    if spectacles is not None and not isinstance(spectacles, str):
+                        spectacles = json.dumps(spectacles, ensure_ascii=False)
+                    db.insert_evenement_from_dict({
+                        'bidul_numero': numero,
+                        'raw_text': parsed.get('raw_text'),
+                        'nom': parsed.get('nom'),
+                        'date_evenement': date_evt,
+                        'heure': parsed.get('heure'),
+                        'lieu_raw': parsed.get('lieu_raw'),
+                        'ville_raw': parsed.get('ville_raw'),
+                        'tarif_raw': parsed.get('tarif_raw'),
+                        'prix_min': parsed.get('prix_min'),
+                        'prix_max': parsed.get('prix_max'),
+                        'gratuit': parsed.get('gratuit', False),
+                        'artistes': artistes,
+                        'spectacles': spectacles
+                    })
+                    reparsed_count += 1
 
-            for raw_text in unique_raw_texts:
-                parsed_events = parse_event_line_v2(
-                    raw_text,
-                    mois,
-                    annee,
-                    lieu_ref_list,
-                    ville_ref_list
-                )
-
-                if parsed_events and not args.dry_run:
-                    for parsed in parsed_events:
-                        # Convertir date en string ISO si nécessaire
-                        date_evt = parsed.get('date_evenement')
-                        if hasattr(date_evt, 'isoformat'):
-                            date_evt = date_evt.isoformat()
-                        # Convertir artistes/spectacles en JSON si nécessaire
-                        artistes = parsed.get('artistes')
-                        if artistes is not None and not isinstance(artistes, str):
-                            artistes = json.dumps(artistes, ensure_ascii=False)
-                        spectacles = parsed.get('spectacles')
-                        if spectacles is not None and not isinstance(spectacles, str):
-                            spectacles = json.dumps(spectacles, ensure_ascii=False)
-                        db.insert_evenement_from_dict({
-                            'bidul_numero': numero,
-                            'raw_text': parsed.get('raw_text'),
-                            'nom': parsed.get('nom'),
-                            'date_evenement': date_evt,
-                            'heure': parsed.get('heure'),
-                            'lieu_raw': parsed.get('lieu_raw'),
-                            'ville_raw': parsed.get('ville_raw'),
-                            'tarif_raw': parsed.get('tarif_raw'),
-                            'prix_min': parsed.get('prix_min'),
-                            'prix_max': parsed.get('prix_max'),
-                            'gratuit': parsed.get('gratuit', False),
-                            'artistes': artistes,
-                            'spectacles': spectacles
-                        })
-                        reparsed_count += 1
-
-            print(f"[{numero}] Re-parsé: {len(unique_raw_texts)} raw_text -> {reparsed_count} événements")
+            print(f"[{numero}] Re-parsé: {existing_count} -> {reparsed_count} événements")
             total_reparsed += reparsed_count
             reparsed_biduls += 1
             continue
