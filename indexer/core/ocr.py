@@ -629,13 +629,22 @@ class ScanExtractor:
         try:
             # Convertir PDF en images
             images = convert_from_path(str(pdf_path), dpi=self.dpi)
+            num_pages = len(images)
+
+            # Pour les PDFs à 3 pages, seule la page 3 contient l'agenda résumé
+            # Pages 1-2 sont des articles, pas des événements
+            if num_pages == 3:
+                pages_to_process = [3]
+                logger.info(f"PDF 3 pages détecté - extraction page 3 uniquement (agenda résumé)")
+            else:
+                pages_to_process = list(range(1, num_pages + 1))
 
             result = OCRResult(
                 pdf_path=pdf_path,
                 bidul_numero=numero,
                 mois=mois,
                 annee=annee,
-                num_pages=len(images),
+                num_pages=num_pages,
                 metadata={
                     'dpi': self.dpi,
                     'ocr_engine': self.ocr.engine_name,
@@ -643,10 +652,12 @@ class ScanExtractor:
                     'date_format': config.date_format if config else 'inline',
                     'page1_sections': config.page1_sections if config else '',
                     'page2_sections': config.page2_sections if config else '',
+                    'pages_processed': pages_to_process,
                 }
             )
 
-            for page_num, pil_image in enumerate(images, start=1):
+            for page_num in pages_to_process:
+                pil_image = images[page_num - 1]  # images est 0-indexed
                 page_config = self._get_page_config(config, page_num)
 
                 # Convertir PIL → numpy BGR

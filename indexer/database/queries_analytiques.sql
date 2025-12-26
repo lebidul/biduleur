@@ -19,23 +19,28 @@
 -- Liste des événements d'un Bidul avec artistes et spectacles (normalisés)
 SELECT
     e.id,
+	e.bidul_numero,
     e.raw_text,
     e.nom,
     e.date_evenement,
     e.heure,
-    COALESCE(lr.nom, e.lieu_raw) AS lieu,
-    COALESCE(vr.nom, e.ville_raw, 'Le Mans') AS ville,
+	e.lieu_raw,
+	lr.nom,
+	e.ville_raw,
+	vr.nom,
     e.tarif_raw,
     c.nom_spectacle,
-    COALESCE(ar.nom, c.artiste) AS artiste,
+	c.artiste,
+	ar.nom,
     c.style
 FROM evenement e
 LEFT JOIN lieu_ref lr ON e.lieu_ref_id = lr.id
 LEFT JOIN ville_ref vr ON e.ville_ref_id = vr.id
 LEFT JOIN contenu_evenement c ON e.id = c.evenement_id
 LEFT JOIN artiste_ref ar ON c.artiste_ref_id = ar.id
-WHERE e.bidul_numero = 184
-ORDER BY e.date_evenement, e.heure, c.ordre;
+WHERE e.bidul_numero = 204
+ORDER BY e.raw_text, e.heure, c.ordre;
+-- ORDER BY e.date_evenement, e.heure, c.ordre;
 
 -- Événements d'une date précise avec détails complets (normalisés)
 SELECT
