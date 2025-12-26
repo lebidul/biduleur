@@ -600,7 +600,103 @@ def cmd_populate(args):
     skipped = 0
     already_exists = 0
 
+    # Stats pour reparse
+    total_reparsed = 0
+    reparsed_biduls = 0
+
     for numero in numeros:
+        # Mode --reparse: re-parser les événements existants depuis raw_text
+        if getattr(args, 'reparse', False):
+            existing_events = db.get_evenements_for_bidul(numero)
+            if not existing_events:
+                if args.verbose:
+                    print(f"[{numero}] Aucun événement en base - ignoré")
+                skipped += 1
+                continue
+
+            # Récupérer mois/année depuis le premier événement ou le PDF
+            pdf_path = find_pdf(numero)
+            if pdf_path:
+                n, mois, annee = extract_bidul_info(pdf_path.name)
+            else:
+                # Fallback: extraire depuis la date_evenement du premier événement
+                first_event = existing_events[0]
+                if first_event.get('date_evenement'):
+                    from datetime import datetime
+                    dt = datetime.strptime(first_event['date_evenement'], '%Y-%m-%d')
+                    mois, annee = dt.month, dt.year
+                else:
+                    print(f"[{numero}] Impossible de déterminer mois/année - ignoré")
+                    skipped += 1
+                    continue
+
+            # Collecter les raw_text uniques (pour éviter les doublons après split)
+            unique_raw_texts = []
+            seen_raw_texts = set()
+            for event in existing_events:
+                raw_text = event.get('raw_text')
+                if raw_text and raw_text not in seen_raw_texts:
+                    unique_raw_texts.append(raw_text)
+                    seen_raw_texts.add(raw_text)
+
+            if not unique_raw_texts:
+                if args.verbose:
+                    print(f"[{numero}] Aucun raw_text à re-parser - ignoré")
+                skipped += 1
+                continue
+
+            # Supprimer TOUS les événements du bidul avant de re-parser
+            if not args.dry_run:
+                db.delete_evenements(numero)
+
+            # Re-parser chaque raw_text unique
+            from indexer.core.parser import parse_event_line_v2
+            reparsed_count = 0
+
+            for raw_text in unique_raw_texts:
+                parsed_events = parse_event_line_v2(
+                    raw_text,
+                    mois,
+                    annee,
+                    lieu_ref_list,
+                    ville_ref_list
+                )
+
+                if parsed_events and not args.dry_run:
+                    for parsed in parsed_events:
+                        # Convertir date en string ISO si nécessaire
+                        date_evt = parsed.get('date_evenement')
+                        if hasattr(date_evt, 'isoformat'):
+                            date_evt = date_evt.isoformat()
+                        # Convertir artistes/spectacles en JSON si nécessaire
+                        artistes = parsed.get('artistes')
+                        if artistes is not None and not isinstance(artistes, str):
+                            artistes = json.dumps(artistes, ensure_ascii=False)
+                        spectacles = parsed.get('spectacles')
+                        if spectacles is not None and not isinstance(spectacles, str):
+                            spectacles = json.dumps(spectacles, ensure_ascii=False)
+                        db.insert_evenement_from_dict({
+                            'bidul_numero': numero,
+                            'raw_text': parsed.get('raw_text'),
+                            'nom': parsed.get('nom'),
+                            'date_evenement': date_evt,
+                            'heure': parsed.get('heure'),
+                            'lieu_raw': parsed.get('lieu_raw'),
+                            'ville_raw': parsed.get('ville_raw'),
+                            'tarif_raw': parsed.get('tarif_raw'),
+                            'prix_min': parsed.get('prix_min'),
+                            'prix_max': parsed.get('prix_max'),
+                            'gratuit': parsed.get('gratuit', False),
+                            'artistes': artistes,
+                            'spectacles': spectacles
+                        })
+                        reparsed_count += 1
+
+            print(f"[{numero}] Re-parsé: {len(unique_raw_texts)} raw_text -> {reparsed_count} événements")
+            total_reparsed += reparsed_count
+            reparsed_biduls += 1
+            continue
+
         # Vérifier si déjà en base (sauf si --replace)
         existing_count = db.count_evenements(numero)
         if existing_count > 0 and not args.replace:
@@ -767,11 +863,15 @@ def cmd_populate(args):
     print(f"\n{'='*50}")
     print("RÉSUMÉ POPULATE")
     print(f"{'='*50}")
-    print(f"Biduls depuis CSV: {csv_biduls} ({total_from_csv} événements)")
-    print(f"Biduls depuis PDF: {pdf_biduls} ({total_from_pdf} événements)")
+    if getattr(args, 'reparse', False):
+        print(f"Biduls re-parsés:  {reparsed_biduls} ({total_reparsed} événements)")
+    else:
+        print(f"Biduls depuis CSV: {csv_biduls} ({total_from_csv} événements)")
+        print(f"Biduls depuis PDF: {pdf_biduls} ({total_from_pdf} événements)")
     print(f"Biduls déjà en base: {already_exists}")
     print(f"Biduls ignorés:    {skipped}")
-    print(f"Total événements:  {total_events}")
+    if not getattr(args, 'reparse', False):
+        print(f"Total événements:  {total_events}")
 
     return 0
 
@@ -1813,6 +1913,7 @@ Matching ref_id (lieu/artiste):
     p_populate.add_argument('--pdf-only', action='store_true', help='Ignorer les CSV (forcer extraction PDF)')
     p_populate.add_argument('--dry-run', action='store_true', help='Affiche sans sauvegarder')
     p_populate.add_argument('--replace', action='store_true', help='Remplacer les événements existants')
+    p_populate.add_argument('--reparse', action='store_true', help='Re-parser les événements existants depuis raw_text (sans OCR)')
     p_populate.add_argument('--no-ocr', action='store_true', help='Désactiver l\'OCR pour les scans')
     p_populate.add_argument('--engine', '-e', default='google', choices=['paddleocr', 'easyocr', 'google'],
                            help='Moteur OCR (défaut: google)')

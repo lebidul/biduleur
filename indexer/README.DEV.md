@@ -54,15 +54,18 @@ Classe `EventParser` avec deux stratégies de parsing:
 2. **Stratégie "lieu d'abord"** (`parse_with_referentiel()`) - utilise les référentiels
 
 **Stratégie "lieu d'abord" (recommandée):**
-1. Trouve le lieu dans le texte via le référentiel `lieu_ref`
+1. Trouve le lieu dans le texte via le référentiel `lieu_ref` (incluant les alias)
 2. Extrait le contenu AVANT le lieu (artistes, spectacles)
 3. Extrait le contenu APRÈS le lieu (ville, heure, tarif)
+4. Si le lieu n'est pas trouvé, utilise une extraction heuristique
 
 **Extraction basée sur le formatage:**
 - Artistes: texte en **gras** suivi optionnellement de (style) en *italique*
 - Spectacles: texte en **gras** entre guillemets « »
 - Styles/genres: texte en *italique* entre parenthèses
 - Artistes multiples: séparés par `+` (ex: `<b>ARTISTE1 + ARTISTE2</b>`)
+- Artistes avec préfixe numérique: `0' BROTHERS`, `2 Many DJs`
+- Heures individuelles par artiste: `ARTISTE1 16h + ARTISTE2 17h` → prend l'heure la plus tôt
 
 ```python
 parser = EventParser(bidul_mois=5, bidul_annee=2023)
@@ -221,13 +224,30 @@ INLINE_DATE_PATTERN = r'^(Lu|Ma|Me|Je|Ve|Sa|Di)\s+(\d{1,2})(?:\s*[-–]\s*(\d{1,
 
 # Format bloc: "Samedi 2", "Samedi 2 & Dimanche 3", "Du 6 au 10 juin"
 DATE_PATTERN = r'^(?:({JOURS})\s+(\d{1,2})(?:ER|er)?(?:\s*[&,]\s*({JOURS})\s+(\d{1,2}))?|[Dd]u\s+(\d{1,2})\s*[aà]u?\s+(\d{1,2}))'
+
+# Dates multiples avec séparateurs: "Lu 12/Ma 13/Me 14:" ou "Lu 12 & Ma 13:"
+MULTI_DATE_PATTERN = r'^([DLMJVS][a-z]\s*\d{1,2}(?:\s*[&,/]\s*[A-Za-z]{2}\s*\d{1,2})*)\s*:\s*'
+
+# Plages de dates: "Je 23 au Sa 25:" ou "Du Je 23 au Sa 25:"
+DATE_RANGE_PATTERN = r'^(?:Du\s+)?([DLMJVS][a-z])\s*(\d{1,2})\s+(?:au|à)\s+([DLMJVS][a-z])\s*(\d{1,2})\s*:'
 ```
+
+**Comportement du split sur dates:**
+- Ne split PAS après un prix décimal (`7€50`)
+- Ne split PAS sur une date faisant partie d'une plage (`Je 23 au Sa 25`)
+- Génère toutes les dates de la plage (23, 24, 25 → 3 événements)
 
 ### Artistes (en gras)
 ```python
 # <b>NOM ARTISTE</b> optionnel: <i>(style)</i>
 # Sépare automatiquement sur "+" : <b>ARTISTE1 + ARTISTE2</b>
 ARTISTE_PATTERN = r'<b>([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][^<]+)</b>(?:\s*<i>\s*\(([^)]+)\)\s*</i>)?'
+
+# Artistes avec préfixe numérique: "0' BROTHERS", "2 Many DJs"
+ARTISTE_NUMERIC_PREFIX = r'^((?:\d+'?\s*)?[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇa-z...]+)'
+
+# Artistes avec heure individuelle: "ARTISTE1 (style) 16h + ARTISTE2 (style) 17h"
+# L'heure de l'événement = heure la plus tôt
 ```
 
 ### Noms d'événements

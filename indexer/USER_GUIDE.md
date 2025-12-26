@@ -168,7 +168,33 @@ python cli.py extract --numero 280 --dry-run
 
 # Forcer extraction d'un scan
 python cli.py extract --numero 150 --force
+
+# Re-parser les evenements existants (conserve raw_text)
+python cli.py extract --numero 280 --reparse
 ```
+
+### `--reparse` - Re-parser les evenements existants
+
+L'option `--reparse` permet de re-parser les evenements deja en base sans re-extraire le PDF. Utile apres correction des patterns de parsing.
+
+**Fonctionnement:**
+1. Collecte tous les `raw_text` uniques des evenements du Bidul
+2. Supprime TOUS les evenements et contenus associes du Bidul
+3. Re-parse chaque `raw_text` avec l'algorithme actuel
+4. Insere les nouveaux evenements
+
+```bash
+# Re-parser un Bidul
+python cli.py extract --numero 102 --reparse
+
+# Re-parser en mode simulation
+python cli.py extract --numero 102 --reparse --dry-run
+
+# Re-parser une plage
+python cli.py extract --range 100-110 --reparse
+```
+
+**Note:** Le reparse peut generer plus ou moins d'evenements que l'original si les patterns de split ont change (ex: dates multiples `Lu 12/Ma 13/Me 14:` → 3 evenements).
 
 ---
 
@@ -852,3 +878,75 @@ Si vous modifiez les CSV et que les changements ne sont pas pris en compte:
 python cli.py sync-corpus-to-db  # Re-importe et vide les caches
 python cli.py ref-backfill       # Re-matche avec les nouvelles donnees
 ```
+
+---
+
+## Algorithme de parsing
+
+### Vue d'ensemble
+
+L'algorithme de parsing extrait les evenements depuis le texte brut en suivant une strategie "lieu d'abord":
+
+1. **Split sur les dates** - Decoupe le texte en blocs par date
+2. **Detection du lieu** - Trouve le lieu via le referentiel
+3. **Extraction avant/apres lieu** - Parse les artistes/spectacles avant, heure/tarif apres
+4. **Normalisation** - Normalise les villes et lieux
+
+### Formats de dates supportes
+
+| Format | Exemple | Resultat |
+|--------|---------|----------|
+| Date simple | `Ve 3 :` | 1 evenement (jour 3) |
+| Dates multiples | `Lu 12/Ma 13/Me 14 :` | 3 evenements (jours 12, 13, 14) |
+| Dates multiples (autres separateurs) | `Lu 12 & Ma 13 :` ou `Lu 12, Ma 13 :` | 2 evenements |
+| Plage de dates | `Je 23 au Sa 25 :` | 3 evenements (jours 23, 24, 25) |
+| Plage avec prefixe | `Du Je 23 au Sa 25 :` | 3 evenements |
+
+### Extraction des artistes
+
+**Format standard:**
+```
+<b>NOM ARTISTE</b> <i>(style)</i>
+```
+
+**Artistes multiples (separes par `+`):**
+```
+<b>ARTISTE1 + ARTISTE2</b> → 2 artistes
+```
+
+**Artistes avec prefixe numerique:**
+```
+<b>0' BROTHERS</b>   → artiste "0' BROTHERS"
+<b>2 MANY DJs</b>    → artiste "2 MANY DJs"
+```
+
+**Artistes avec heures individuelles:**
+```
+ARTISTE1 (style) 16h + ARTISTE2 (style) 17h
+→ 2 artistes, heure de l'evenement = 16h (la plus tot)
+```
+
+### Extraction des spectacles
+
+Les spectacles sont identifies par des guillemets en gras:
+```
+<b>„Titre du spectacle"</b>
+<b>«Titre»</b>
+```
+
+### Evenements nommes
+
+Les evenements avec un nom (festivals, soirees thematiques) sont detectes:
+```
+Festival Soirs au Village avec <b>ARTISTE1 + ARTISTE2</b>
+→ nom_evenement = "Festival Soirs au Village"
+```
+
+Mots-cles detectes: Festival, Fete, Soiree, Nuit, Journee, Apero, etc.
+
+### Normalisation des villes
+
+Certaines variantes sont automatiquement normalisees:
+- `Saint Calais` → `Saint-Calais`
+- `La Ferte Bernard` → `La Ferté-Bernard`
+- `Chateau du Loir` → `Château-du-Loir`
