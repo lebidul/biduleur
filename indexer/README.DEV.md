@@ -223,7 +223,10 @@ python -m pytest tests/
 INLINE_DATE_PATTERN = r'^(Lu|Ma|Me|Je|Ve|Sa|Di)\s+(\d{1,2})(?:\s*[-–]\s*(\d{1,2}))?'
 
 # Format bloc: "Samedi 2", "Samedi 2 & Dimanche 3", "Du 6 au 10 juin"
-DATE_PATTERN = r'^(?:({JOURS})\s+(\d{1,2})(?:ER|er)?(?:\s*[&,]\s*({JOURS})\s+(\d{1,2}))?|[Dd]u\s+(\d{1,2})\s*[aà]u?\s+(\d{1,2}))'
+# Supporte aussi:
+# - Dates composées avec "et": "Samedi 04 et Dimanche 05"
+# - Plages avec jours complets: "Du Mercredi 01 au Samedi 07"
+DATE_PATTERN = r'^(?:({JOURS})\s+(\d{1,2})(?:ER|er)?(?:\s*(?:[&,]|et)\s*({JOURS})\s+(\d{1,2}))?|[Dd]u\s+(?:{JOURS}\s+)?(\d{1,2})\s*[aà]u?\s+(?:{JOURS}\s+)?(\d{1,2}))'
 
 # Dates multiples avec séparateurs: "Lu 12/Ma 13/Me 14:" ou "Lu 12 & Ma 13:"
 MULTI_DATE_PATTERN = r'^([DLMJVS][a-z]\s*\d{1,2}(?:\s*[&,/]\s*[A-Za-z]{2}\s*\d{1,2})*)\s*:\s*'
@@ -382,6 +385,13 @@ Le parser utilise automatiquement le bon format via `date_format` :
 ```python
 parser = EventParser(bidul_mois=7, bidul_annee=2011, date_format='inline')
 ```
+
+**Patterns de dates bloc supportés (v1.3):**
+- Dates simples: `Jeudi 02`, `Lundi 06`
+- Dates composées avec "et": `Samedi 04 et Dimanche 05`
+- Dates composées avec "&" ou ",": `Ve 10 & Sa 11`
+- Plages numériques: `Du 6 au 10`
+- Plages avec jours complets: `Du Mercredi 01 au Samedi 07`
 
 ## Limitations connues
 

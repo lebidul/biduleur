@@ -641,48 +641,73 @@ def cmd_populate(args):
             if not args.dry_run:
                 db.delete_evenements(numero)
 
-            # Re-parser le texte brut complet du bidul
-            from indexer.core.parser import parse_event_line_v2
-            parsed_events = parse_event_line_v2(
+            # Charger la config du Bidul pour obtenir date_format
+            config = load_bidul_config(numero)
+            date_format = config.date_format if config else None
+
+            # Re-parser le texte brut complet avec EventParser (supporte format bloc)
+            parser = EventParser(bidul_mois=mois, bidul_annee=annee, date_format=date_format)
+            parsed_events = parser.parse_with_referentiel(
                 bidul_raw_text,
-                mois,
-                annee,
                 lieu_ref_list,
                 ville_ref_list
             )
 
-            reparsed_count = 0
-            if parsed_events and not args.dry_run:
-                for parsed in parsed_events:
-                    # Convertir date en string ISO si nécessaire
-                    date_evt = parsed.get('date_evenement')
+            reparsed_count = len(parsed_events)
+
+            if not args.dry_run:
+                for event in parsed_events:
+                    # Convertir ParsedEvent en dict pour insertion
+                    date_evt = event.date_evenement
                     if hasattr(date_evt, 'isoformat'):
                         date_evt = date_evt.isoformat()
-                    # Convertir artistes/spectacles en JSON si nécessaire
-                    artistes = parsed.get('artistes')
-                    if artistes is not None and not isinstance(artistes, str):
-                        artistes = json.dumps(artistes, ensure_ascii=False)
-                    spectacles = parsed.get('spectacles')
-                    if spectacles is not None and not isinstance(spectacles, str):
-                        spectacles = json.dumps(spectacles, ensure_ascii=False)
+                    # Convertir artistes/spectacles en JSON
+                    # Les artistes peuvent être des ArtisteInfo (dataclass) ou des dicts
+                    artistes = event.artistes
+                    if artistes:
+                        artistes_list = []
+                        for a in artistes:
+                            if hasattr(a, 'to_dict'):
+                                artistes_list.append(a.to_dict())
+                            elif isinstance(a, dict):
+                                artistes_list.append(a)
+                            else:
+                                artistes_list.append({'nom': str(a)})
+                        artistes = json.dumps(artistes_list, ensure_ascii=False)
+                    else:
+                        artistes = None
+                    # Les spectacles sont généralement des dicts
+                    spectacles = event.spectacles
+                    if spectacles:
+                        spectacles_list = []
+                        for s in spectacles:
+                            if hasattr(s, 'to_dict'):
+                                spectacles_list.append(s.to_dict())
+                            elif isinstance(s, dict):
+                                spectacles_list.append(s)
+                            else:
+                                spectacles_list.append({'nom': str(s)})
+                        spectacles = json.dumps(spectacles_list, ensure_ascii=False)
+                    else:
+                        spectacles = None
                     db.insert_evenement_from_dict({
                         'bidul_numero': numero,
-                        'raw_text': parsed.get('raw_text'),
-                        'nom': parsed.get('nom'),
+                        'raw_text': event.raw_text,
+                        'nom': event.nom,
                         'date_evenement': date_evt,
-                        'heure': parsed.get('heure'),
-                        'lieu_raw': parsed.get('lieu_raw'),
-                        'ville_raw': parsed.get('ville_raw'),
-                        'tarif_raw': parsed.get('tarif_raw'),
-                        'prix_min': parsed.get('prix_min'),
-                        'prix_max': parsed.get('prix_max'),
-                        'gratuit': parsed.get('gratuit', False),
+                        'heure': event.heure,
+                        'lieu_raw': event.lieu_raw,
+                        'ville_raw': event.ville_raw,
+                        'tarif_raw': event.tarif_raw,
+                        'prix_min': event.prix_min,
+                        'prix_max': event.prix_max,
+                        'gratuit': event.gratuit,
                         'artistes': artistes,
                         'spectacles': spectacles
                     })
-                    reparsed_count += 1
 
-            print(f"[{numero}] Re-parsé: {existing_count} -> {reparsed_count} événements")
+            dry_run_suffix = " (dry-run)" if args.dry_run else ""
+            print(f"[{numero}] Re-parsé: {existing_count} -> {reparsed_count} événements (format={date_format or 'auto'}){dry_run_suffix}")
             total_reparsed += reparsed_count
             reparsed_biduls += 1
             continue

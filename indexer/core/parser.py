@@ -1914,15 +1914,20 @@ class EventParser:
     MOIS = r"(?:[Jj]anvier|[Ff][ée]vrier|[Mm]ars|[Aa]vril|[Mm]ai|[Jj]uin|[Jj]uillet|[Aa]o[uû]t|[Ss]eptembre|[Oo]ctobre|[Nn]ovembre|[Dd][ée]cembre)"
     # Pattern pour dates simples: "Samedi 20", "Mardi 2", "Vendredi 1er"
     DATE_SIMPLE_PATTERN = re.compile(rf"^({JOURS})\s+(\d{{1,2}})(?:ER|er|ème|eme)?\s*:?\s*$", re.MULTILINE)
-    # Pattern pour dates composées: "Samedi 2 & Dimanche 3", "Ve 10 & Sa 11"
-    DATE_COMPOSE_PATTERN = re.compile(rf"^({JOURS})\s+(\d{{1,2}})(?:ER|er|ème|eme)?\s*[&,]\s*({JOURS})\s+(\d{{1,2}})(?:ER|er|ème|eme)?\s*:?\s*$", re.MULTILINE | re.IGNORECASE)
-    # Pattern pour plages: "Du 6 au 10 juin", "Du 26 juin au 1er juillet"
-    DATE_RANGE_PATTERN = re.compile(rf"^[Dd]u\s+(\d{{1,2}})(?:ER|er|ème|eme)?\s*(?:{MOIS})?\s*[aà]u?\s+(\d{{1,2}})(?:ER|er|ème|eme)?\s*(?:{MOIS})?\s*$", re.MULTILINE | re.IGNORECASE)
+    # Pattern pour dates composées: "Samedi 2 & Dimanche 3", "Ve 10 & Sa 11", "Samedi 04 et Dimanche 05"
+    DATE_COMPOSE_PATTERN = re.compile(rf"^({JOURS})\s+(\d{{1,2}})(?:ER|er|ème|eme)?\s*(?:[&,]|et)\s*({JOURS})\s+(\d{{1,2}})(?:ER|er|ème|eme)?\s*:?\s*$", re.MULTILINE | re.IGNORECASE)
+    # Pattern pour plages: "Du 6 au 10 juin", "Du 26 juin au 1er juillet", "Du Mercredi 01 au Samedi 07"
+    DATE_RANGE_PATTERN = re.compile(rf"^[Dd]u\s+(?:{JOURS}\s+)?(\d{{1,2}})(?:ER|er|ème|eme)?\s*(?:{MOIS})?\s*[aà]u?\s+(?:{JOURS}\s+)?(\d{{1,2}})(?:ER|er|ème|eme)?\s*(?:{MOIS})?\s*$", re.MULTILINE | re.IGNORECASE)
     # Pattern combiné pour matcher n'importe quel format de date (utilisé par _split_by_dates)
+    # Supporte:
+    # - Dates simples: "Jeudi 02", "Lundi 06"
+    # - Dates composées avec &, , ou et: "Samedi 04 et Dimanche 05", "Ve 10 & Sa 11"
+    # - Plages numériques: "Du 6 au 10"
+    # - Plages avec jours complets: "Du Mercredi 01 au Samedi 07", "Du Vendredi 03 au Dimanche 05"
     DATE_PATTERN = re.compile(
         rf"^(?:"
-        rf"({JOURS})\s+(\d{{1,2}})(?:ER|er|ème|eme)?(?:\s*[&,]\s*({JOURS})\s+(\d{{1,2}})(?:ER|er|ème|eme)?)?"  # Simple ou composée
-        rf"|[Dd]u\s+(\d{{1,2}})(?:ER|er|ème|eme)?\s*(?:{MOIS})?\s*[aà]u?\s+(\d{{1,2}})(?:ER|er|ème|eme)?\s*(?:{MOIS})?"  # Plage
+        rf"({JOURS})\s+(\d{{1,2}})(?:ER|er|ème|eme)?(?:\s*(?:[&,]|et)\s*({JOURS})\s+(\d{{1,2}})(?:ER|er|ème|eme)?)?"  # Simple ou composée (avec &, , ou et)
+        rf"|[Dd]u\s+(?:{JOURS}\s+)?(\d{{1,2}})(?:ER|er|ème|eme)?\s*(?:{MOIS})?\s*[aà]u?\s+(?:{JOURS}\s+)?(\d{{1,2}})(?:ER|er|ème|eme)?\s*(?:{MOIS})?"  # Plage (avec ou sans jours complets)
         rf")\s*:?\s*$",
         re.MULTILINE | re.IGNORECASE
     )

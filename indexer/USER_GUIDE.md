@@ -179,9 +179,12 @@ L'option `--reparse` permet de re-parser les evenements depuis le texte brut com
 
 **Fonctionnement:**
 1. Recupere le texte brut complet du Bidul (`bidul.raw_text`)
-2. Supprime TOUS les evenements et contenus associes du Bidul
-3. Re-parse le texte complet avec l'algorithme actuel (split sur dates inclus)
-4. Insere les nouveaux evenements
+2. Charge la configuration du Bidul depuis `biduls.description.csv` (notamment `date_format`)
+3. Supprime TOUS les evenements et contenus associes du Bidul
+4. Re-parse le texte complet avec `EventParser.parse_with_referentiel()` qui:
+   - Utilise le format de date specifie (`inline` ou `par bloc`)
+   - Applique la strategie "lieu d'abord" avec les referentiels
+5. Insere les nouveaux evenements
 
 ```bash
 # Re-parser un Bidul
@@ -195,6 +198,12 @@ python cli.py populate --range 100-110 --reparse
 ```
 
 **Note:** Le reparse utilise `bidul.raw_text` (texte complet) et non `evenement.raw_text` (deja splitte). Cela permet de beneficier des nouvelles regles de split (ex: dates multiples `Lu 12/Ma 13/Me 14:` → 3 evenements).
+
+**Formats de dates supportes (v1.3):**
+- Format inline: `Je 02 : CONCERT, Lieu, 21h`
+- Format bloc avec dates simples: `Jeudi 02`
+- Format bloc avec "et": `Samedi 04 et Dimanche 05`
+- Format bloc avec plages: `Du Mercredi 01 au Samedi 07`
 
 ---
 
@@ -894,6 +903,8 @@ L'algorithme de parsing extrait les evenements depuis le texte brut en suivant u
 
 ### Formats de dates supportes
 
+**Format inline (Biduls anciens):**
+
 | Format | Exemple | Resultat |
 |--------|---------|----------|
 | Date simple | `Ve 3 :` | 1 evenement (jour 3) |
@@ -901,6 +912,16 @@ L'algorithme de parsing extrait les evenements depuis le texte brut en suivant u
 | Dates multiples (autres separateurs) | `Lu 12 & Ma 13 :` ou `Lu 12, Ma 13 :` | 2 evenements |
 | Plage de dates | `Je 23 au Sa 25 :` | 3 evenements (jours 23, 24, 25) |
 | Plage avec prefixe | `Du Je 23 au Sa 25 :` | 3 evenements |
+
+**Format bloc (Biduls recents, v1.3):**
+
+| Format | Exemple | Resultat |
+|--------|---------|----------|
+| Date simple | `Jeudi 02` | En-tete pour les evenements suivants |
+| Dates composees (et) | `Samedi 04 et Dimanche 05` | 2 dates appliquees aux evenements |
+| Dates composees (&) | `Ve 10 & Sa 11` | 2 dates appliquees aux evenements |
+| Plage numerique | `Du 6 au 10` | 5 dates generees |
+| Plage avec jours | `Du Mercredi 01 au Samedi 07` | Toutes les dates de la plage |
 
 ### Extraction des artistes
 
