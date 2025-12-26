@@ -37,10 +37,30 @@ def extract_formatted_spectacles(text: str) -> list[dict]:
     - Ouvrants: « " " „ <<
     - Fermants: » " " >>
 
+    IMPORTANT: Ne pas extraire comme spectacle les textes qui sont des noms d'événements
+    (Festival X, EscExp#N, La Souterraine #N, etc.)
+
     Returns:
         Liste de dicts {'nom': str, 'style': str|None}
     """
     spectacles = []
+
+    # Patterns de noms d'événements à exclure des spectacles
+    event_name_patterns = [
+        r'^Esc\s*Exp\s*#?\d+',
+        r'^La\s+Souterraine\s*#\d+',
+        r'^LES\s+\d+\s+ANS\s+',
+        r'^Festival\s+',
+        r'^Alpa\s+On\s+The\s+Rock',
+        r'^Les\s+Rdv\s+',
+    ]
+
+    def is_event_name(nom: str) -> bool:
+        """Vérifie si le nom est un nom d'événement."""
+        for pattern in event_name_patterns:
+            if re.match(pattern, nom, re.IGNORECASE):
+                return True
+        return False
 
     # D'abord fusionner les <i> consécutifs (styles coupés par saut de ligne)
     text = _merge_consecutive_italic_tags(text)
@@ -59,7 +79,7 @@ def extract_formatted_spectacles(text: str) -> list[dict]:
     for match in matches:
         nom = match.group(1).strip()
         style = _clean_style(match.group(2)) if match.group(2) else None
-        if nom and len(nom) > 1:
+        if nom and len(nom) > 1 and not is_event_name(nom):
             spectacles.append({'nom': nom, 'style': style})
 
     # Pattern 2: "Spectacle" (sans gras) suivi de <i>(style)</i>
@@ -71,7 +91,7 @@ def extract_formatted_spectacles(text: str) -> list[dict]:
     for match in matches2:
         nom = match.group(1).strip()
         style = _clean_style(match.group(2)) if match.group(2) else None
-        if nom and len(nom) > 1:
+        if nom and len(nom) > 1 and not is_event_name(nom):
             # Vérifier que ce n'est pas déjà dans la liste
             if not any(s['nom'] == nom for s in spectacles):
                 spectacles.append({'nom': nom, 'style': style})
@@ -85,10 +105,37 @@ def extract_formatted_spectacles(text: str) -> list[dict]:
     for match in matches3:
         nom = match.group(1).strip()
         style = _clean_style(match.group(2)) if match.group(2) else None
-        if nom and len(nom) > 2:
+        if nom and len(nom) > 2 and not is_event_name(nom):
             # Vérifier que ce n'est pas déjà dans la liste
             if not any(s['nom'] == nom for s in spectacles):
                 spectacles.append({'nom': nom, 'style': style})
+
+    # Pattern 4: "Spectacle (style) - guillemet non fermé (erreur OCR)
+    # Cas: "Les Rdv Conservatoire (musique classique), Médiathèque...
+    # Le guillemet ouvrant n'a pas de fermant, le style est juste après
+    pattern4 = rf'(?:{open_quotes})\s*([A-Za-zÀ-ÿ][^(»""<>]+?)\s*\(([^)]+)\)[,\s]'
+    matches4 = re.finditer(pattern4, text, re.IGNORECASE)
+
+    for match in matches4:
+        nom = match.group(1).strip()
+        style = _clean_style(match.group(2)) if match.group(2) else None
+        if nom and len(nom) > 2 and not is_event_name(nom):
+            # Vérifier que ce n'est pas déjà dans la liste
+            if not any(s['nom'] == nom for s in spectacles):
+                spectacles.append({'nom': nom, 'style': style})
+
+    # Pattern 5: "Spectacle" - Artiste (style)
+    # Cas: "45° sans eau" - Cie KL (jonglage)
+    # Le spectacle est entre guillemets, suivi de " - " puis l'artiste
+    pattern5 = rf'(?:{open_quotes})\s*([^»""<>]+?)\s*(?:{close_quotes})\s*[-–—]\s*'
+    matches5 = re.finditer(pattern5, text, re.IGNORECASE)
+
+    for match in matches5:
+        nom = match.group(1).strip()
+        if nom and len(nom) > 2 and not is_event_name(nom):
+            # Vérifier que ce n'est pas déjà dans la liste
+            if not any(s['nom'] == nom for s in spectacles):
+                spectacles.append({'nom': nom, 'style': None})
 
     return spectacles
 
@@ -300,26 +347,39 @@ def is_named_event(text: str) -> bool:
     # Patterns d'événements nommés
     # Note: ^[«""„]? permet de matcher avec ou sans guillemets au début
     # Note: (?:\d+[°e]?\s+)? permet de matcher les numéros d'édition (8°, 3e, etc.)
+    # Les guillemets incluent << pour l'OCR
+    open_q = r'[«""„]|<<'
     named_event_patterns = [
-        r'^[«""„]?Alpa\s+On\s+The\s+Rock\s+#?\d+',
-        r'^[«""„]?Esc\s+Exp\s+#?\d+',
-        r'^[«""„]?Melting\s+Rock',
-        r'^[«""„]?Les\s+Spectaculaires',
-        r'^[«""„]?Soirée\s+[\w\s]+',  # Soirée Solidaire, Soirée Mix Généraliste, Soirée OULALA Xmas
-        r'^[«""„]?Labo\s+d.Impro',
-        r'^[«""„]?[Cc]arte\s+[Bb]lanche\s+[àa]',
-        r'^[«""„]?(?:\d+[°e]?\s+)?[Ff]estival\s+',  # Festival, 8° festival, 3e Festival
-        r'^[«""„]?Nuit\s+\w+',  # Nuit Blanche, etc.
-        r'^[«""„]?Scène\s+ouverte',  # Scène ouverte musicale, etc.
-        r'^[«""„]?Open\s+mic',
-        r'^[«""„]?Jam\s+session',
-        r'^[«""„]?(?:\d+[°e]?\s+)?[Ff]ête\s+',  # Fête interculturelle, 2° Fête de la musique
-        r'^[«""„]?Répét\.\s+publique',  # Répétition publique
-        r'^[«""„]?Bellevue\s+en\s+balade',  # Événement spécifique
-        r'^[«""„]?Apéro\s+concert',  # Apéro concert avec ARTISTE
+        rf'^(?:{open_q})?Alpa\s+On\s+The\s+Rock\s+#?\d+',
+        rf'^(?:{open_q})?Esc\s*Exp\s*#?\d+',  # EscExp#28 ou Esc Exp #28
+        rf'^(?:{open_q})?Melting\s+Rock',
+        rf'^(?:{open_q})?Les\s+Spectaculaires',
+        rf'^(?:{open_q})?Soirée\s+[\w\s]+',  # Soirée Solidaire, Soirée Mix Généraliste
+        rf'^(?:{open_q})?Labo\s+d.Impro',
+        rf'^(?:{open_q})?[Cc]arte\s+[Bb]lanche\s+[àa]',
+        rf'^(?:{open_q})?(?:\d+[°e]?\s+)?[Ff]estival\s+',  # Festival, 8° festival
+        rf'^(?:{open_q})?Nuit\s+\w+',  # Nuit Blanche, etc.
+        rf'^(?:{open_q})?Scène\s+ouverte',  # Scène ouverte musicale, etc.
+        rf'^(?:{open_q})?Open\s+mic',
+        rf'^(?:{open_q})?Jam\s+session',
+        rf'^(?:{open_q})?(?:\d+[°e]?\s+)?[Ff]ête\s+',  # Fête interculturelle
+        rf'^(?:{open_q})?Répét\.\s+publique',  # Répétition publique
+        rf'^(?:{open_q})?Bellevue\s+en\s+balade',  # Événement spécifique
+        rf'^(?:{open_q})?Apéro\s+concert',  # Apéro concert avec ARTISTE
+        # "La Souterraine #N" - série d'événements
+        rf'^(?:{open_q})?La\s+Souterraine\s*#\d+',
+        # "LES X ANS DE..." - anniversaires d'associations
+        rf'^(?:{open_q})?LES\s+\d+\s+ANS\s+',
+        # "X présente" - organisateur présente (avec ou sans accent)
+        r'^(\w+)\s+pr[ée]sente\s+',
+        # "Les Rdv X" - séries de rendez-vous
+        rf'^(?:{open_q})?Les\s+Rdv\s+',
         # Nom d'événement en MAJUSCULES suivi de ":" puis artistes en gras
         # Ex: "SPRINGROCK : <b>AS YOU WANT</b>"
         r'^[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s\-]+\s*:\s*<b>',
+        # "TITRE" suivi de ":" puis artistes (sans gras)
+        # Ex: "La Souterraine #4": LA PESTE...
+        rf'^(?:{open_q})([^»""]+)(?:[»""]|>>)\s*:\s*[A-Z]',
     ]
 
     for pattern in named_event_patterns:
@@ -342,14 +402,15 @@ def extract_event_name(text: str) -> Optional[str]:
 
     # Retirer les guillemets de début et fin pour simplifier l'extraction
     clean_text = text.strip()
-    clean_text = re.sub(r'^[«""„]', '', clean_text)
-    clean_text = re.sub(r'[»""]$', '', clean_text)
+    clean_text = re.sub(r'^(?:[«""„]|<<)', '', clean_text)
+    clean_text = re.sub(r'(?:[»""]|>>)$', '', clean_text)
     clean_text = clean_text.strip()
 
     # Extraire le nom jusqu'au premier ":" ou "avec" ou artiste
     patterns = [
         r'^(Alpa\s+On\s+The\s+Rock\s+#?\d+)',
-        r'^(Esc\s+Exp\s+#?\d+\s+\w+)',
+        # EscExp#28 Teriaki → "EscExp#28 Teriaki"
+        r'^(Esc\s*Exp\s*#?\d+(?:\s+\w+)?)',
         r'^(Melting\s+Rock)',
         r'^(Les\s+Spectaculaires)',
         # "Soirée X" entre guillemets → extraire Soirée X sans guillemets
@@ -373,9 +434,17 @@ def extract_event_name(text: str) -> Optional[str]:
         r'^(Répét\.\s+publique\s*)',  # Répétition publique
         r'^(Bellevue\s+en\s+balade\s*)',  # Événement spécifique
         r'^(Apéro\s+concert)(?:\s+avec\s+|\s*,|$)',  # Apéro concert
+        # "La Souterraine #N" - série d'événements
+        r'^(La\s+Souterraine\s*#\d+)',
+        # "LES X ANS DE..." → "LES X ANS DE..."
+        r'^(LES\s+\d+\s+ANS\s+[^"»]+?)(?:\s+avec\s+|[»""]|$)',
+        # "X présente" → "X" (l'organisateur) - avec ou sans accent
+        r'^(\w+)\s+pr[ée]sente\s+',
+        # "Les Rdv X" - séries de rendez-vous
+        r'^(Les\s+Rdv\s+[\w\s]+?)(?:\s*\(|$)',
         # Nom d'événement en MAJUSCULES suivi de ":" puis artistes
         # Ex: "SPRINGROCK : <b>AS YOU WANT</b>" → "SPRINGROCK"
-        r'^([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s\-]+?)\s*:\s*<b>',
+        r'^([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s\-]+?)\s*:\s*(?:<b>|[A-Z])',
     ]
 
     for pattern in patterns:
@@ -959,6 +1028,7 @@ def parse_date_prefix_v2(text: str, base_month: int, base_year: int) -> tuple[li
     Ex: "Di 01 : Événement..." → [(2013-12-01)], "Événement..."
     Ex: "Me 1er : Événement..." → [(2013-05-01)], "Événement..."
     Ex: "Je 23 au Sa 25 : Festival..." → [(date 23), (date 24), (date 25)], "Festival..."
+    Ex: "Du Mercredi 01 au Samedi 07" → [(date 1), ..., (date 7)], ""
     Ex: "Événement..." → [], "Événement..."
 
     Returns:
@@ -966,14 +1036,19 @@ def parse_date_prefix_v2(text: str, base_month: int, base_year: int) -> tuple[li
     """
     text_stripped = text.strip()
 
-    # Pattern 1: Plage de dates avec "au" ou "à" (ex: "Je 23 au Sa 25 :" ou "Du Je 23 au Sa 25 :")
-    range_pattern = r'^(?:Du\s+)?([DLMJVS][a-z])\s*(\d{1,2})(?:er|e|ème)?\s+(?:au|à)\s+([DLMJVS][a-z])\s*(\d{1,2})(?:er|e|ème)?\s*:\s*(.+)$'
-    range_match = re.match(range_pattern, text_stripped, re.IGNORECASE | re.DOTALL)
+    # Jours complets pour les patterns
+    jours_complets = r'(?:Lundi|Mardi|Mercredi|Jeudi|Vendredi|Samedi|Dimanche)'
+    jours_abreges = r'[DLMJVS][a-z]'
 
-    if range_match:
-        start_day = int(range_match.group(2))
-        end_day = int(range_match.group(4))
-        event_text = range_match.group(5)
+    # Pattern 0: Plage avec noms de jours COMPLETS (ex: "Du Mercredi 01 au Samedi 07")
+    # Ce pattern peut ne pas avoir de ":" car c'est un bloc de dates
+    range_full_pattern = rf'^Du\s+{jours_complets}\s+(\d{{1,2}})(?:er|e|ème)?\s+au\s+{jours_complets}\s+(\d{{1,2}})(?:er|e|ème)?(?:\s*:?\s*(.*))?$'
+    range_full_match = re.match(range_full_pattern, text_stripped, re.IGNORECASE | re.DOTALL)
+
+    if range_full_match:
+        start_day = int(range_full_match.group(1))
+        end_day = int(range_full_match.group(2))
+        event_text = range_full_match.group(3) or ''
 
         # Générer toutes les dates de la plage
         dates = []
@@ -982,7 +1057,25 @@ def parse_date_prefix_v2(text: str, base_month: int, base_year: int) -> tuple[li
                 dates.append(date(base_year, base_month, day))
             except ValueError:
                 pass
-        return dates, event_text
+        return dates, event_text.strip()
+
+    # Pattern 1: Plage de dates avec "au" ou "à" (ex: "Je 23 au Sa 25 :" ou "Du Je 23 au Sa 25 :")
+    range_pattern = rf'^(?:Du\s+)?({jours_abreges})\s*(\d{{1,2}})(?:er|e|ème)?\s+(?:au|à)\s+({jours_abreges})\s*(\d{{1,2}})(?:er|e|ème)?\s*:?\s*(.*)$'
+    range_match = re.match(range_pattern, text_stripped, re.IGNORECASE | re.DOTALL)
+
+    if range_match:
+        start_day = int(range_match.group(2))
+        end_day = int(range_match.group(4))
+        event_text = range_match.group(5) or ''
+
+        # Générer toutes les dates de la plage
+        dates = []
+        for day in range(start_day, end_day + 1):
+            try:
+                dates.append(date(base_year, base_month, day))
+            except ValueError:
+                pass
+        return dates, event_text.strip()
 
     # Pattern 2: Dates multiples avec séparateurs (ex: "Lu 02 & Ma 03 :")
     # Gère les suffixes ordinaux: 1er, 2e, 3ème, etc.
@@ -1643,6 +1736,11 @@ def extract_ville_from_text_v2(text: str, ville_ref_list: list) -> tuple[Optiona
         (r'(?:St[\.\s]+|Saint\s+)Calais', 'Saint-Calais'),
         (r'Fill[ée]\s*s/?Sarthe', 'Fillé-sur-Sarthe'),
         (r'Ch[âa]teau\s+du\s+Loir', 'Château-du-Loir'),
+        # La Chapelle-Saint-Aubin
+        (r'La\s+Chapelle\s+(?:St[\.\s]*|Saint\s*)Aubin', 'La Chapelle-Saint-Aubin'),
+        # La Chartre-sur-le-Loir
+        (r'La\s+Chartre\s+[Ss]/?(?:ur\s+)?[Ll]e\s+Loir', 'La Chartre-sur-le-Loir'),
+        (r'La\s+Chartre\s+S/Le\s+Loir', 'La Chartre-sur-le-Loir'),
     ]
 
     text_normalized = text
