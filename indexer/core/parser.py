@@ -2223,6 +2223,7 @@ class EventParser:
     # - Avec horaires: "Je 01/Ve 02 à 20h30 et Di 04 à 17h :"
     # - Avec tiret: "Je 29 -"
     # - Plage avec "au": "Ma 06 au Ve 09 :"
+    # - Sans séparateur: "Sa 11 Afro-latino Party" (suivi d'un mot Title Case)
     # Group 1: Date complète (tout avant le séparateur)
     # Group 2: Contenu de l'événement (après le séparateur)
     INLINE_DATE_PATTERN = re.compile(
@@ -2236,7 +2237,8 @@ class EventParser:
         r'(?:\s+et\s+[MLJVSD][aeiou]?\s*\d{1,2}(?:er|ère|ème|eme)?(?:\s+(?:à|a)\s+\d{1,2}h\d{0,2})?)*'  # "et Di 04 à 17h"
         r')?'
         r')'  # Fin groupe 1
-        r'\s*[:–-]\s*(.+)$',  # Séparateur : ou - ou – suivi du contenu (groupe 2)
+        r'(?:\s*[:–-]\s*|\s+(?=[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][a-zàâäéèêëïîôùûüç]))'  # Séparateur OU espace + mot Title Case
+        r'(.+)$',  # Contenu (groupe 2)
         re.MULTILINE | re.IGNORECASE
     )
 
