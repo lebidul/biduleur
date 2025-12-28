@@ -1184,6 +1184,35 @@ def extract_before_lieu(text: str, lieu_start: int) -> dict:
         if before.startswith(','):
             before = before[1:].strip()
 
+    # Pattern "NomEvent avec ARTISTES" - NomEvent est en Title Case, ARTISTES en MAJUSCULES
+    # Ex: "Snamshit Troopers part. 1 avec MARTI + KOR + NOTORIOUS NEST (électro)"
+    # Le nom d'événement doit:
+    # - Commencer par une majuscule suivie de minuscules (Title Case)
+    # - Ne pas être tout en MAJUSCULES (sinon c'est un artiste)
+    # - Être suivi de "avec" puis d'artistes en MAJUSCULES
+    if not result['nom_evenement']:
+        avec_artistes_match = re.match(
+            r'^([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][a-zàâäéèêëïîôùûüç]+(?:[\s\-][A-Za-zÀ-ÿ]+)*(?:\s+(?:part|vol|n°|#)\.?\s*\d+)?)\s+avec\s+([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s\+\&\-]+)',
+            before
+        )
+        if avec_artistes_match:
+            event_name = avec_artistes_match.group(1).strip()
+            # Vérifier que le nom n'est pas tout en majuscules (sinon c'est un artiste)
+            if not event_name.isupper() and len(event_name) > 3:
+                result['nom_evenement'] = event_name
+
+    # Pattern "NomEvent animée par ARTISTE" - NomEvent est en Title Case
+    # Ex: "Afro-latino Party animée par BAILA SUAVE"
+    if not result['nom_evenement']:
+        animee_par_match = re.match(
+            r'^([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][a-zàâäéèêëïîôùûüç\-]+(?:[\s\-][A-Za-zÀ-ÿ\-]+)*)\s+anim[ée]+\s+par\s+([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s\-]+)',
+            before, re.IGNORECASE
+        )
+        if animee_par_match:
+            event_name = animee_par_match.group(1).strip()
+            if not event_name.isupper() and len(event_name) > 3:
+                result['nom_evenement'] = event_name
+
     # Utiliser l'extraction basée sur le formatage si disponible
     if has_formatting_tags(before):
         # Extraction basée sur le formatage (plus précise)
