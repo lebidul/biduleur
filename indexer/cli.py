@@ -707,7 +707,19 @@ def cmd_populate(args):
                     })
 
             dry_run_suffix = " (dry-run)" if args.dry_run else ""
-            print(f"[{numero}] Re-parsé: {existing_count} -> {reparsed_count} événements (format={date_format or 'auto'}){dry_run_suffix}")
+            # Calculer le pourcentage d'amélioration
+            if existing_count > 0:
+                pct_change = ((reparsed_count - existing_count) / existing_count) * 100
+                if pct_change > 0:
+                    pct_str = f" (+{pct_change:.0f}%)"
+                elif pct_change < 0:
+                    pct_str = f" ({pct_change:.0f}%)"
+                else:
+                    pct_str = " (=)"
+            else:
+                pct_str = " (nouveau)"
+            timestamp = datetime.now().strftime("%H:%M:%S")
+            print(f"[{timestamp}] [{numero}] Re-parsé: {existing_count} -> {reparsed_count} événements{pct_str} (format={date_format or 'auto'}){dry_run_suffix}")
             total_reparsed += reparsed_count
             reparsed_biduls += 1
             continue
