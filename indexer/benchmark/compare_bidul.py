@@ -74,7 +74,16 @@ def load_expected(csv_path: Path) -> list[dict]:
     with open(csv_path, 'r', encoding='utf-8') as f:
         reader = csv.DictReader(f)
         for row in reader:
-            expected.append(row)
+            # Normaliser les clés - retirer les préfixes "evenement." et "contenu_evenement."
+            normalized = {}
+            for key, value in row.items():
+                if key.startswith('evenement.'):
+                    normalized[key.replace('evenement.', '')] = value
+                elif key.startswith('contenu_evenement.'):
+                    normalized[key.replace('contenu_evenement.', '')] = value
+                else:
+                    normalized[key] = value
+            expected.append(normalized)
     return expected
 
 
@@ -146,9 +155,10 @@ def compare_field(expected: str | None, actual: str | None, field_name: str) -> 
 
 
 def find_matching_actual(expected_row: dict, actual_rows: list[dict]) -> dict | None:
-    """Trouve la ligne actuelle correspondante basée sur raw_text + artiste."""
+    """Trouve la ligne actuelle correspondante basée sur raw_text + artiste + date."""
     exp_raw = normalize_text(expected_row.get('raw_text', ''))
     exp_artiste = normalize_text(expected_row.get('artiste', ''))
+    exp_date = normalize_date(expected_row.get('date_evenement', ''))
 
     best_match = None
     best_score = 0
@@ -156,11 +166,14 @@ def find_matching_actual(expected_row: dict, actual_rows: list[dict]) -> dict | 
     for actual in actual_rows:
         act_raw = normalize_text(actual.get('raw_text', ''))
         act_artiste = normalize_text(actual.get('artiste', ''))
+        act_date = normalize_date(actual.get('date_evenement', ''))
 
         raw_sim = similarity(exp_raw, act_raw)
         art_sim = similarity(exp_artiste, act_artiste) if exp_artiste else 1.0
+        # Bonus si les dates correspondent exactement
+        date_bonus = 0.2 if exp_date and act_date and exp_date == act_date else 0.0
 
-        score = raw_sim * 0.7 + art_sim * 0.3
+        score = raw_sim * 0.6 + art_sim * 0.2 + date_bonus
 
         if score > best_score and score > 0.5:
             best_score = score

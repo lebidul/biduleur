@@ -335,6 +335,10 @@ def is_named_event(text: str) -> bool:
         # Nom d'événement en MAJUSCULES suivi de ":" puis artistes en gras
         # Ex: "SPRINGROCK : <b>AS YOU WANT</b>"
         r'^[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s\-]+\s*:\s*<b>',
+        # Pattern "XXX présente YYY" - XXX est le nom de l'événement
+        r'^[\w\s]+\s+présente\s+',
+        # DAMADA FESTIVAL # 11 avec ... - Festival avec numéro et "avec"
+        r'^[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s]+\s+#\s*\d+\s+avec\s+',
     ]
 
     for pattern in named_event_patterns:
@@ -357,8 +361,8 @@ def extract_event_name(text: str) -> Optional[str]:
 
     # Retirer les guillemets de début et fin pour simplifier l'extraction
     clean_text = text.strip()
-    clean_text = re.sub(r'^[«""„]', '', clean_text)
-    clean_text = re.sub(r'[»""]$', '', clean_text)
+    clean_text = re.sub(r'^[«""„"\']', '', clean_text)
+    clean_text = re.sub(r'[»"""\']$', '', clean_text)
     clean_text = clean_text.strip()
 
     # Extraire le nom jusqu'au premier ":" ou "avec" ou artiste
@@ -375,8 +379,8 @@ def extract_event_name(text: str) -> Optional[str]:
         r'^(Soirée\s+[\w\s]+?)(?:\s*,|$)',
         r'^(Labo\s+d.Impro\s*:\s*"[^"]+")' ,
         # Festival avec numéro d'édition: "8° festival Soirs au Village"
-        r'^(\d+[°e]?\s+[Ff]estival\s+[\w\s]+?)(?:\s+avec\s+|\s*,|$)',
-        r'^([Ff]estival\s+[^:,]+?)(?:\s+avec\s+|\s*,|$)',
+        r'^(\d+[°e]?\s+[Ff]estival\s+[\w\s]+?)(?:[»"""\']?\s+avec\s+|\s*,|$)',
+        r'^([Ff]estival\s+[^:,»"""\'\s]+(?:\s+[^:,»"""\'\s]+)*)(?:[»"""\']?\s+avec\s+|\s*,|$)',
         r'^(Nuit\s+\w+)',
         r'^([Cc]arte\s+[Bb]lanche\s+[àa]\s+[^:,]+)',
         r'^(Scène\s+ouverte\s*\w*)',
@@ -391,6 +395,12 @@ def extract_event_name(text: str) -> Optional[str]:
         # Nom d'événement en MAJUSCULES suivi de ":" puis artistes
         # Ex: "SPRINGROCK : <b>AS YOU WANT</b>" → "SPRINGROCK"
         r'^([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s\-]+?)\s*:\s*<b>',
+        # Pattern "XXX présente YYY" - XXX est le nom de l'événement
+        # Ex: "Window on a Mix présente BLAST #2" → "Window on a Mix"
+        r'^([\w\s]+?)\s+présente\s+',
+        # FESTIVAL # XX avec ... - Festival en MAJUSCULES avec numéro
+        # Ex: "DAMADA FESTIVAL # 11 avec ..." → "DAMADA FESTIVAL # 11"
+        r'^([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s]+\s+#\s*\d+)\s+avec\s+',
     ]
 
     for pattern in patterns:
@@ -973,6 +983,23 @@ def split_on_dates_v2(raw_text: str) -> list[str]:
 
     parts = re.split(split_pattern, raw_text, flags=re.IGNORECASE)
 
+    # Si pas de split avec séparateur, essayer sans séparateur
+    # Pattern: "...0€ Sa 11 EventName..." où EventName commence par une majuscule
+    # Utilisé pour les cas OCR où le ":" est omis
+    if len(parts) <= 1:
+        # Pattern alternatif sans séparateur obligatoire
+        # Date suivie d'un espace puis d'un mot commençant par majuscule (nom d'événement)
+        # NE PAS matcher "Du XX" car c'est le début d'une plage "Du XX au YY"
+        alt_pattern = (
+            r'(?<![0-9]€)(?<!au )(?<!et )(?<=[\s€,.])\s*'
+            r'((?<!Du\s)'  # NE PAS matcher après "Du " (début de plage)
+            r'[DLMJVS][aeiou]?\s*\d{1,2}'  # Jour simple: Sa 11
+            r')\s+'  # Juste un espace (pas de séparateur)
+            r'(?=[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][a-zA-ZÀ-ÿ\-]+)'  # Suivi d'un mot majuscule (lookahead)
+            r'(?!au\s)'  # NE PAS être suivi de "au " (fin de plage)
+        )
+        parts = re.split(alt_pattern, raw_text, flags=re.IGNORECASE)
+
     if len(parts) <= 1:
         return [raw_text]
 
@@ -1107,14 +1134,55 @@ def extract_before_lieu(text: str, lieu_start: int) -> dict:
     """
     before = text[:lieu_start].strip().rstrip(',').strip()
 
-    # Nettoyer les symboles décoratifs au début (✪, •, ★, ⚫, →, etc.)
-    before = re.sub(r'^[✪★☆●○◆◇■□▲△▼▽♦♠♣♥•·⚫⚪→➔➜➤\-–—\s]+', '', before).strip()
+    # Détecter si le texte commence par >> ou > (artiste direct sans guillemets)
+    # Ex: ">> BONOME TETARD (chanson à texte)" ou "> OCT IBOR.K (rock)"
+    starts_with_arrow = re.match(r'^>+\s*', before)
+
+    # Nettoyer les symboles décoratifs au début (✪, •, ★, ⚫, →, >, etc.)
+    before = re.sub(r'^[✪★☆●○◆◇■□▲△▼▽♦♠♣♥•·⚫⚪→➔➜➤>\-–—\s]+', '', before).strip()
 
     result = {
         'spectacles': [],
         'artistes': [],
         'nom_evenement': None
     }
+
+    # Si le texte commençait par >> ou >, c'est un artiste direct (pas un spectacle)
+    # Ex: ">> BONOME TETARD (chanson à texte)" → artiste = "BONOME TETARD", style = "chanson à texte"
+    if starts_with_arrow:
+        # Pattern: ARTISTE (style) - artiste en majuscules suivi optionnellement d'un style
+        arrow_artiste_match = re.match(
+            r'^([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s\.\-\&\']+?)(?:\s*\(([^)]+)\))?\s*(?:,|$)',
+            before
+        )
+        if arrow_artiste_match:
+            artiste_nom = arrow_artiste_match.group(1).strip()
+            artiste_style = arrow_artiste_match.group(2).strip() if arrow_artiste_match.group(2) else None
+            if artiste_nom and len(artiste_nom) > 2:
+                result['artistes'].append({'nom': artiste_nom, 'style': artiste_style})
+            # Retirer l'artiste du before pour ne pas le re-parser
+            before = before[arrow_artiste_match.end():].strip()
+            if before.startswith(','):
+                before = before[1:].strip()
+
+    # Pattern "XXX présente YYY (style)" - XXX est le nom de l'événement, YYY est l'artiste
+    # Ex: "Window on a Mix présente BLAST #2 featuring MLC aka Lucien Moullec (House)"
+    presente_match = re.search(
+        r'^(.+?)\s+présente\s+([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-Za-zÀ-ÿ\s\.\-\&\'#\d]+?)(?:\s*\(([^)]+)\))?\s*(?:,|$)',
+        before, re.IGNORECASE
+    )
+    if presente_match:
+        event_name = presente_match.group(1).strip()
+        artiste_nom = presente_match.group(2).strip()
+        artiste_style = presente_match.group(3).strip() if presente_match.group(3) else None
+        if event_name:
+            result['nom_evenement'] = event_name
+        if artiste_nom and len(artiste_nom) > 2:
+            result['artistes'].append({'nom': artiste_nom, 'style': artiste_style})
+        # Retirer du before pour ne pas re-parser
+        before = before[presente_match.end():].strip()
+        if before.startswith(','):
+            before = before[1:].strip()
 
     # Utiliser l'extraction basée sur le formatage si disponible
     if has_formatting_tags(before):
@@ -1235,7 +1303,14 @@ def extract_before_lieu(text: str, lieu_start: int) -> dict:
     for match in spectacle_matches:
         nom = match.group(1).strip()
         style = match.group(2).strip() if match.group(2) else None
-        # Éviter les doublons
+        # Éviter les doublons et exclure les événements nommés (festivals, soirées)
+        # qui ne sont pas des spectacles mais des noms d'événements
+        is_event_name = is_named_event(nom) or nom.lower().startswith('festival')
+        if is_event_name:
+            # C'est un nom d'événement, pas un spectacle
+            if not result['nom_evenement']:
+                result['nom_evenement'] = nom
+            continue
         if not any(s['nom'].lower() == nom.lower() for s in result['spectacles']):
             result['spectacles'].append({'nom': nom, 'style': style})
 
