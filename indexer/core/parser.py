@@ -1296,6 +1296,45 @@ def extract_before_lieu(text: str, lieu_start: int) -> dict:
                 # On garde seulement la partie artistes (après "avec ")
                 avant_avec_len = len(event_name) + len(' avec ')
                 before = before[avant_avec_len:].strip()
+                # Parser les artistes restants (format: ARTISTE (style) + ARTISTE2 (style2)...)
+                # Le texte commence maintenant directement par les artistes
+                artiste_avec_style = re.match(
+                    r'^([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s\-\'\&0-9]+?)\s*\(([^)]+)\)',
+                    before
+                )
+                if artiste_avec_style:
+                    nom = artiste_avec_style.group(1).strip()
+                    style = artiste_avec_style.group(2).strip()
+                    if nom and len(nom) > 1:
+                        result['artistes'].append({'nom': nom, 'style': style})
+                        # Retirer ce qu'on a parsé pour continuer avec d'éventuels autres artistes
+                        before = before[artiste_avec_style.end():].strip()
+                        # Continuer à parser les artistes suivants séparés par +
+                        while before.startswith('+'):
+                            before = before[1:].strip()
+                            next_artiste = re.match(
+                                r'^([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s\-\'\&0-9]+?)\s*\(([^)]+)\)',
+                                before
+                            )
+                            if next_artiste:
+                                nom = next_artiste.group(1).strip()
+                                style = next_artiste.group(2).strip()
+                                if nom and len(nom) > 1:
+                                    result['artistes'].append({'nom': nom, 'style': style})
+                                before = before[next_artiste.end():].strip()
+                            else:
+                                # Artiste sans style
+                                next_artiste_no_style = re.match(
+                                    r'^([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s\-\'\&0-9]+?)(?:\s*[\+,]|\s*$|\s+de\s|\s+\d{1,2}h)',
+                                    before
+                                )
+                                if next_artiste_no_style:
+                                    nom = next_artiste_no_style.group(1).strip()
+                                    if nom and len(nom) > 1:
+                                        result['artistes'].append({'nom': nom, 'style': None})
+                                    before = before[next_artiste_no_style.end():].strip()
+                                else:
+                                    break
 
     # Pattern "NomEvent animée par ARTISTE" - NomEvent est en Title Case
     # Ex: "Afro-latino Party animée par BAILA SUAVE"
