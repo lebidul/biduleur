@@ -2284,6 +2284,34 @@ class ParsedEvent:
     # Qualité
     confidence: float = 0.5
 
+    def is_valid(self) -> bool:
+        """
+        Vérifie si l'événement est valide (contenu minimal requis).
+
+        Un événement est considéré valide s'il a au moins:
+        - Une date OU
+        - Un artiste/spectacle/nom d'événement OU
+        - Un lieu
+
+        Les événements avec seulement du texte non structuré (ex: "(réservations au ...)")
+        sont rejetés.
+        """
+        has_date = self.date_evenement is not None or self.date_str is not None
+        has_content = bool(self.artistes) or bool(self.spectacles) or bool(self.nom)
+        has_lieu = self.lieu_raw is not None
+
+        # Au moins un des critères doit être rempli
+        if not (has_date or has_content or has_lieu):
+            return False
+
+        # Rejeter les événements qui ne sont que du texte entre parenthèses
+        # Ex: "(réservations au 06 10 53 38 40)"
+        if self.raw_text.strip().startswith('(') and self.raw_text.strip().endswith(')'):
+            if not has_content and not has_lieu:
+                return False
+
+        return True
+
     def to_dict(self) -> dict:
         """Convertit en dict pour JSON/DB."""
         d = asdict(self)
@@ -3460,13 +3488,15 @@ class EventParser:
             # Fallback sur l'autre format si rien trouvé
             if not events:
                 events = self._parse_bloc_with_referentiel(text, lieu_ref_list, ville_ref_list)
-            return events
+            # Filtrer les événements invalides
+            return [e for e in events if e.is_valid()]
         elif self.date_format == 'par bloc':
             events = self._parse_bloc_with_referentiel(text, lieu_ref_list, ville_ref_list)
             # Fallback sur l'autre format si rien trouvé
             if not events:
                 events = self._parse_inline_with_referentiel(text, lieu_ref_list, ville_ref_list)
-            return events
+            # Filtrer les événements invalides
+            return [e for e in events if e.is_valid()]
 
         # Auto-détection: essayer d'abord le format par bloc
         events = self._parse_bloc_with_referentiel(text, lieu_ref_list, ville_ref_list)
@@ -3475,7 +3505,8 @@ class EventParser:
         if not events:
             events = self._parse_inline_with_referentiel(text, lieu_ref_list, ville_ref_list)
 
-        return events
+        # Filtrer les événements invalides
+        return [e for e in events if e.is_valid()]
 
     def _parse_bloc_with_referentiel(
         self,

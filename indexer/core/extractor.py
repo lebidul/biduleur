@@ -436,6 +436,11 @@ class TextExtractor:
 
         # Vérifier si c'est un scan
         if config and config.type_source == 'scan':
+            # Pour les scans à 3 pages, seule la page 3 contient l'agenda résumé
+            # Les pages 1-2 sont des articles, pas des événements
+            if num_pages == 3:
+                logger.debug(f"Bidul {numero}: type=scan, 3 pages -> OCR page 3 uniquement")
+                return [3], True
             logger.debug(f"Bidul {numero}: type=scan -> OCR nécessaire")
             return list(range(1, num_pages + 1)), True
 
