@@ -1851,6 +1851,98 @@ def cmd_ref_stats(args):
 
 
 # =============================================================================
+# Maintenance Commands
+# =============================================================================
+
+def cmd_clean_database(args):
+    """Nettoie les faux événements et artistes invalides."""
+    import subprocess
+    script_path = Path(__file__).parent / 'scripts' / 'clean_database.py'
+    cmd = [sys.executable, str(script_path)]
+    if args.dry_run:
+        cmd.append('--dry-run')
+    result = subprocess.run(cmd, cwd=str(Path(__file__).parent))
+    return result.returncode
+
+
+def cmd_deduplicate(args):
+    """Supprime les événements en double."""
+    import subprocess
+    script_path = Path(__file__).parent / 'scripts' / 'deduplicate_events.py'
+    cmd = [sys.executable, str(script_path)]
+    if args.dry_run:
+        cmd.append('--dry-run')
+    if args.exact:
+        cmd.append('--exact')
+    result = subprocess.run(cmd, cwd=str(Path(__file__).parent))
+    return result.returncode
+
+
+def cmd_renormalize(args):
+    """Re-normalise les lieux, artistes et villes."""
+    import subprocess
+    script_path = Path(__file__).parent / 'scripts' / 'renormalize.py'
+    cmd = [sys.executable, str(script_path)]
+    if args.dry_run:
+        cmd.append('--dry-run')
+    if args.lieux_only:
+        cmd.append('--lieux-only')
+    if args.artistes_only:
+        cmd.append('--artistes-only')
+    if args.villes_only:
+        cmd.append('--villes-only')
+    result = subprocess.run(cmd, cwd=str(Path(__file__).parent))
+    return result.returncode
+
+
+def cmd_maintenance(args):
+    """Exécute toutes les tâches de maintenance (clean + dedupe + renormalize)."""
+    import subprocess
+    scripts_dir = Path(__file__).parent / 'scripts'
+
+    print("=" * 60)
+    print("MAINTENANCE COMPLÈTE DE LA BASE")
+    print("=" * 60)
+
+    dry_run_flag = ['--dry-run'] if args.dry_run else []
+
+    # 1. Nettoyage
+    print("\n[1/3] Nettoyage de la base...")
+    result = subprocess.run(
+        [sys.executable, str(scripts_dir / 'clean_database.py')] + dry_run_flag,
+        cwd=str(Path(__file__).parent)
+    )
+    if result.returncode != 0:
+        print("Erreur lors du nettoyage")
+        return result.returncode
+
+    # 2. Déduplication
+    print("\n[2/3] Déduplication...")
+    result = subprocess.run(
+        [sys.executable, str(scripts_dir / 'deduplicate_events.py')] + dry_run_flag,
+        cwd=str(Path(__file__).parent)
+    )
+    if result.returncode != 0:
+        print("Erreur lors de la déduplication")
+        return result.returncode
+
+    # 3. Renormalisation
+    print("\n[3/3] Re-normalisation...")
+    result = subprocess.run(
+        [sys.executable, str(scripts_dir / 'renormalize.py')] + dry_run_flag,
+        cwd=str(Path(__file__).parent)
+    )
+    if result.returncode != 0:
+        print("Erreur lors de la renormalisation")
+        return result.returncode
+
+    print("\n" + "=" * 60)
+    print("✓ Maintenance terminée")
+    print("=" * 60)
+    return 0
+
+
+# =============================================================================
 # Main
 # =============================================================================
 
@@ -1913,6 +2005,16 @@ Matching ref_id (lieu/artiste):
   python cli.py ref-migrate                     # Migration: ajoute artiste_ref_id
   python cli.py ref-backfill                    # Back-populate lieu_ref_id et artiste_ref_id
   python cli.py ref-stats                       # Stats de matching
+
+Maintenance (normalisation v2):
+  python cli.py clean-database                  # Nettoie faux evenements et artistes invalides
+  python cli.py clean-database --dry-run       # Simule sans modifier
+  python cli.py deduplicate                     # Supprime les evenements en double
+  python cli.py deduplicate --exact             # Doublons exacts uniquement
+  python cli.py renormalize                     # Re-normalise lieux, artistes, villes
+  python cli.py renormalize --lieux-only        # Re-normalise uniquement les lieux
+  python cli.py maintenance                     # Execute clean + dedupe + renormalize
+  python cli.py maintenance --dry-run          # Simule la maintenance complete
         """
     )
 
@@ -2103,6 +2205,30 @@ Matching ref_id (lieu/artiste):
     # ref-stats - Stats de matching
     p_ref_stats = subparsers.add_parser('ref-stats', help='Statistiques de matching ref_id')
 
+    # ==========================================================================
+    # Maintenance Commands
+    # ==========================================================================
+
+    # clean-database - Nettoie les faux événements
+    p_clean_db = subparsers.add_parser('clean-database', help='Nettoie les faux événements et artistes invalides')
+    p_clean_db.add_argument('--dry-run', '-n', action='store_true', help='Simule sans modifier')
+
+    # deduplicate - Supprime les doublons
+    p_dedupe = subparsers.add_parser('deduplicate', help='Supprime les événements en double')
+    p_dedupe.add_argument('--dry-run', '-n', action='store_true', help='Simule sans modifier')
+    p_dedupe.add_argument('--exact', '-e', action='store_true', help='Recherche doublons exacts uniquement')
+
+    # renormalize - Re-normalise les données
+    p_renorm = subparsers.add_parser('renormalize', help='Re-normalise lieux, artistes et villes')
+    p_renorm.add_argument('--dry-run', '-n', action='store_true', help='Simule sans modifier')
+    p_renorm.add_argument('--lieux-only', action='store_true', help='Re-normaliser uniquement les lieux')
+    p_renorm.add_argument('--artistes-only', action='store_true', help='Re-normaliser uniquement les artistes')
+    p_renorm.add_argument('--villes-only', action='store_true', help='Re-normaliser uniquement les villes')
+
+    # maintenance - Exécute toutes les tâches de maintenance
+    p_maint = subparsers.add_parser('maintenance', help='Exécute clean + dedupe + renormalize')
+    p_maint.add_argument('--dry-run', '-n', action='store_true', help='Simule sans modifier')
+
     args = parser.parse_args()
 
     # Configuration logging
@@ -2154,6 +2280,11 @@ Matching ref_id (lieu/artiste):
         'ref-migrate': cmd_ref_migrate,
         'ref-backfill': cmd_ref_backfill,
         'ref-stats': cmd_ref_stats,
+        # Maintenance commands
+        'clean-database': cmd_clean_database,
+        'deduplicate': cmd_deduplicate,
+        'renormalize': cmd_renormalize,
+        'maintenance': cmd_maintenance,
     }
 
     return commands[args.command](args)

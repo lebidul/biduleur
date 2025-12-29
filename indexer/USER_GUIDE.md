@@ -977,9 +977,50 @@ Festival Soirs au Village avec <b>ARTISTE1 + ARTISTE2</b>
 
 Mots-cles detectes: Festival, Fete, Soiree, Nuit, Journee, Apero, etc.
 
+**Evenements avec numero d'edition (v1.5):**
+
+Les evenements en Title Case avec un numero d'edition (#N) sont reconnus:
+```
+"Syncope fait de la resistance #2" avec ROTTERDAMES + LOLA BAI...
+→ evenement.nom = "Syncope fait de la resistance #2"
+→ artistes = [ROTTERDAMES, LOLA BAI, ...]
+```
+
 ### Normalisation des villes
 
 Certaines variantes sont automatiquement normalisees:
 - `Saint Calais` → `Saint-Calais`
 - `La Ferte Bernard` → `La Ferté-Bernard`
 - `Chateau du Loir` → `Château-du-Loir`
+
+---
+
+## Normalisation automatique (v1.5)
+
+Le systeme de normalisation applique automatiquement des regles de matching intelligent:
+
+| Regle | Description | Exemple |
+|-------|-------------|---------|
+| Case-insensitive | Ignore la casse | `bar le lezard` → `Bar le Lezard` |
+| Accent-insensitive | Ignore les accents | `theatre` → `Theatre` |
+| Separateurs | `-` et ` ` interchangeables | `pop-rock` ↔ `pop rock` |
+| Prefixes | `le`, `la`, `l'` optionnels | `le barouf` → `Bar Le Barouf` |
+| Abbreviations | Expansion automatique | `th.` → `Theatre`, `st` → `Saint` |
+
+**Commandes de maintenance:**
+
+```bash
+# Re-normaliser tous les evenements
+python cli.py renormalize
+
+# Mode simulation
+python cli.py renormalize --dry-run
+
+# Nettoyer la base (donnees orphelines, invalides)
+python cli.py clean-database
+
+# Detecter et fusionner les doublons
+python cli.py deduplicate
+```
+
+**Note:** Les caches sont automatiquement vides lors du `renormalize` pour garantir l'utilisation des dernieres regles.

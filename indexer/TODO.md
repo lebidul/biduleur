@@ -16,14 +16,16 @@
   * #260
     * juillet-août
     * festivals non reconnus
+  * #204
+    * ZIG ZAG (power pop), Bistrot de la Guinguette, Fillé s/Sarthe, 20h, au chapeau - artiste non reconnu
+    * `````"Syncope fait de la résistance #2" avec ROTTERDAMES (pop rock) + LOLA BAÏ (chanson pop) + UNLEASHING THE BEAST (metal hardcore) + PUPPA NADEM (raggamuffin fast style rap), Salle Jean Carmet 20h30, 5/7/9€```
+      Syncope fait de la résistance #2 comme evenement.nom
   * raw_text	nom_spectacle
 <b>"A</b><b>Hfa de Yambolé"</b> <i>(conte dès 12 ans)</i>, S.Signoret, Mulsanne, 15h, 3.5/9.5 €	A</b><b>Hfa de Yambolé
 
-* normalisation. automatique sans alias pour th. esp., case, /s, -, saint  ...
 * enlever evenement.artistes et evenement.styles
 * refactor pour simplifier la logique et l'ajout de patterns
-* éliminer doublons
-* enlever artifacts (evenements qui 'en sont pas plus texte non utile (inclure gestion rubriques))
+* enlever tout ce qui vient après: "Et un peu plus loin..."
 * ajouter html ou csv tapages manquants
 * colonne description dans table bidul (ex. bidul covid)
 * revoir avec grouping tous les lieux n'ayant pas de ref

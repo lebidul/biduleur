@@ -398,6 +398,9 @@ def is_named_event(text: str) -> bool:
         r'^[\w\s]+\s+présente\s*:?\s+',
         # DAMADA FESTIVAL # 11 avec ... - Festival avec numéro et "avec"
         r'^[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s]+\s+#\s*\d+\s+avec\s+',
+        # Événement nommé avec numéro d'édition: "Syncope fait de la résistance #2"
+        # Pattern: Nom en Title Case avec #N
+        r'^[«""„]?[A-ZÀ-Ÿ][a-zà-ÿ]+(?:\s+[a-zà-ÿ]+)*\s+#\d+',
     ]
 
     for pattern in named_event_patterns:
@@ -1293,6 +1296,45 @@ def extract_before_lieu(text: str, lieu_start: int) -> dict:
                 # On garde seulement la partie artistes (après "avec ")
                 avant_avec_len = len(event_name) + len(' avec ')
                 before = before[avant_avec_len:].strip()
+                # Parser les artistes restants (format: ARTISTE (style) + ARTISTE2 (style2)...)
+                # Le texte commence maintenant directement par les artistes
+                artiste_avec_style = re.match(
+                    r'^([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s\-\'\&0-9]+?)\s*\(([^)]+)\)',
+                    before
+                )
+                if artiste_avec_style:
+                    nom = artiste_avec_style.group(1).strip()
+                    style = artiste_avec_style.group(2).strip()
+                    if nom and len(nom) > 1:
+                        result['artistes'].append({'nom': nom, 'style': style})
+                        # Retirer ce qu'on a parsé pour continuer avec d'éventuels autres artistes
+                        before = before[artiste_avec_style.end():].strip()
+                        # Continuer à parser les artistes suivants séparés par +
+                        while before.startswith('+'):
+                            before = before[1:].strip()
+                            next_artiste = re.match(
+                                r'^([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s\-\'\&0-9]+?)\s*\(([^)]+)\)',
+                                before
+                            )
+                            if next_artiste:
+                                nom = next_artiste.group(1).strip()
+                                style = next_artiste.group(2).strip()
+                                if nom and len(nom) > 1:
+                                    result['artistes'].append({'nom': nom, 'style': style})
+                                before = before[next_artiste.end():].strip()
+                            else:
+                                # Artiste sans style
+                                next_artiste_no_style = re.match(
+                                    r'^([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s\-\'\&0-9]+?)(?:\s*[\+,]|\s*$|\s+de\s|\s+\d{1,2}h)',
+                                    before
+                                )
+                                if next_artiste_no_style:
+                                    nom = next_artiste_no_style.group(1).strip()
+                                    if nom and len(nom) > 1:
+                                        result['artistes'].append({'nom': nom, 'style': None})
+                                    before = before[next_artiste_no_style.end():].strip()
+                                else:
+                                    break
 
     # Pattern "NomEvent animée par ARTISTE" - NomEvent est en Title Case
     # Ex: "Afro-latino Party animée par BAILA SUAVE"
@@ -2089,9 +2131,13 @@ def parse_event_line_v2(
 
             # Si le lieu trouvé correspond aussi à une ville, c'est probablement une erreur
             # du référentiel. Dans ce cas, on utilise l'extraction heuristique.
-            from core.normalizer import normalize_ville
-            ville_id_check, _ = normalize_ville(lieu_nom)
-            if ville_id_check is not None:
+            # Note: normalize_ville retourne toujours un ID (Le Mans par défaut),
+            # donc on compare le nom normalisé retourné avec le nom du lieu.
+            from core.normalizer import normalize_ville, normalize_for_matching
+            _, ville_nom_check = normalize_ville(lieu_nom)
+            # Seul invalider si le nom retourné correspond vraiment au nom du lieu
+            # (pas juste "Le Mans" par défaut)
+            if normalize_for_matching(ville_nom_check) == normalize_for_matching(lieu_nom):
                 # Le "lieu" est en fait une ville - invalider le match
                 lieu_match = None
 
@@ -2241,6 +2287,39 @@ class ParsedEvent:
 
     # Qualité
     confidence: float = 0.5
+
+    def is_valid(self) -> bool:
+        """
+        Vérifie si l'événement est valide (contenu minimal requis).
+
+        Un événement exploitable dans un agenda doit avoir:
+        - Une date ET un lieu, OU
+        - Une date ET un contenu (artiste/spectacle/nom), OU
+        - Un lieu ET un contenu
+
+        Les événements avec seulement artiste+heure+prix (sans date ni lieu)
+        ne sont pas exploitables car on ne sait pas où ni quand ils ont lieu.
+
+        Exemples rejetés:
+        - "MAGMA 20h30" (artiste + heure, mais pas de date ni lieu)
+        - "(réservations au 06 10 53 38 40)" (texte non structuré)
+        """
+        has_date = self.date_evenement is not None or self.date_str is not None
+        has_content = bool(self.artistes) or bool(self.spectacles) or bool(self.nom)
+        has_lieu = self.lieu_raw is not None
+
+        # Un événement doit avoir au moins 2 des 3 critères pour être exploitable
+        criteria_count = sum([has_date, has_content, has_lieu])
+        if criteria_count < 2:
+            return False
+
+        # Rejeter les événements qui ne sont que du texte entre parenthèses
+        # Ex: "(réservations au 06 10 53 38 40)"
+        if self.raw_text.strip().startswith('(') and self.raw_text.strip().endswith(')'):
+            if not has_content and not has_lieu:
+                return False
+
+        return True
 
     def to_dict(self) -> dict:
         """Convertit en dict pour JSON/DB."""
@@ -3418,13 +3497,15 @@ class EventParser:
             # Fallback sur l'autre format si rien trouvé
             if not events:
                 events = self._parse_bloc_with_referentiel(text, lieu_ref_list, ville_ref_list)
-            return events
+            # Filtrer les événements invalides
+            return [e for e in events if e.is_valid()]
         elif self.date_format == 'par bloc':
             events = self._parse_bloc_with_referentiel(text, lieu_ref_list, ville_ref_list)
             # Fallback sur l'autre format si rien trouvé
             if not events:
                 events = self._parse_inline_with_referentiel(text, lieu_ref_list, ville_ref_list)
-            return events
+            # Filtrer les événements invalides
+            return [e for e in events if e.is_valid()]
 
         # Auto-détection: essayer d'abord le format par bloc
         events = self._parse_bloc_with_referentiel(text, lieu_ref_list, ville_ref_list)
@@ -3433,7 +3514,8 @@ class EventParser:
         if not events:
             events = self._parse_inline_with_referentiel(text, lieu_ref_list, ville_ref_list)
 
-        return events
+        # Filtrer les événements invalides
+        return [e for e in events if e.is_valid()]
 
     def _parse_bloc_with_referentiel(
         self,
