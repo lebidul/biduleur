@@ -335,8 +335,8 @@ def is_named_event(text: str) -> bool:
         # Nom d'événement en MAJUSCULES suivi de ":" puis artistes en gras
         # Ex: "SPRINGROCK : <b>AS YOU WANT</b>"
         r'^[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s\-]+\s*:\s*<b>',
-        # Pattern "XXX présente YYY" - XXX est le nom de l'événement
-        r'^[\w\s]+\s+présente\s+',
+        # Pattern "XXX présente YYY" ou "XXX présente: YYY" - XXX est le nom de l'événement
+        r'^[\w\s]+\s+présente\s*:?\s+',
         # DAMADA FESTIVAL # 11 avec ... - Festival avec numéro et "avec"
         r'^[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s]+\s+#\s*\d+\s+avec\s+',
     ]
@@ -395,9 +395,10 @@ def extract_event_name(text: str) -> Optional[str]:
         # Nom d'événement en MAJUSCULES suivi de ":" puis artistes
         # Ex: "SPRINGROCK : <b>AS YOU WANT</b>" → "SPRINGROCK"
         r'^([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s\-]+?)\s*:\s*<b>',
-        # Pattern "XXX présente YYY" - XXX est le nom de l'événement
+        # Pattern "XXX présente YYY" ou "XXX présente: YYY" - XXX est le nom de l'événement
         # Ex: "Window on a Mix présente BLAST #2" → "Window on a Mix"
-        r'^([\w\s]+?)\s+présente\s+',
+        # Ex: "Cortex présente: CHEWBACCA ALL STARS" → "Cortex"
+        r'^([\w\s]+?)\s+présente\s*:?\s+',
         # FESTIVAL # XX avec ... - Festival en MAJUSCULES avec numéro
         # Ex: "DAMADA FESTIVAL # 11 avec ..." → "DAMADA FESTIVAL # 11"
         r'^([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s]+\s+#\s*\d+)\s+avec\s+',
@@ -971,12 +972,12 @@ def split_on_dates_v2(raw_text: str) -> list[str]:
     # Support des plages "Du Je 23 au Sa 25:"
     # Support des horaires par date "Je 01/Ve 02 à 20h30 et Di 04 à 17h:"
     split_pattern = (
-        r'(?<![0-9]€)(?<!au )(?<!et )(?<=[\s€,.])\s*'  # Précédé de espace/€/,/. mais pas de prix décimal, "au " ou "et "
+        r'(?<![0-9]€)(?<!au )(?<!et )(?<!Du )(?<=[\s€,.])\s*'  # Précédé de espace/€/,/. mais pas après prix décimal, "au ", "et " ou "Du "
         r'((?:Du\s+)?'  # Optionnel "Du "
         r'[DLMJVS][aeiou]?\s*\d{1,2}'  # Premier jour: Lu 02
         r'(?:\s+(?:au|à)\s+[DLMJVS][aeiou]?\s*\d{1,2})?'  # Plage optionnelle: au Sa 05
-        r'(?:\s*[&,/]\s*[A-Za-z]{2,3}\s*\d{1,2})*'  # Jours additionnels: /Ma 03/Me 04
-        r'(?:\s+(?:à|a)\s+\d{1,2}h\d{0,2})?'  # Horaire optionnel: à 20h30
+        r'(?:\s+(?:à|a)\s+\d{1,2}h\d{0,2})?'  # Horaire optionnel après premier jour: à 20h30
+        r'(?:\s*[&,/]\s*[A-Za-z]{2,3}\s*\d{1,2}(?:\s+(?:à|a)\s+\d{1,2}h\d{0,2})?)*'  # Jours additionnels avec horaire: /Ve 30 à 20h
         r'(?:\s+et\s+[A-Za-z]{2,3}\s*\d{1,2}(?:\s+(?:à|a)\s+\d{1,2}h\d{0,2})?)*'  # "et Di 04 à 17h" optionnel
         r')\s*[:–-]\s*'  # Séparateur : ou - ou –
     )
@@ -989,13 +990,14 @@ def split_on_dates_v2(raw_text: str) -> list[str]:
     if len(parts) <= 1:
         # Pattern alternatif sans séparateur obligatoire
         # Date suivie d'un espace puis d'un mot commençant par majuscule (nom d'événement)
+        # ou d'un guillemet ouvrant (<< ou " ou «)
         # NE PAS matcher "Du XX" car c'est le début d'une plage "Du XX au YY"
         alt_pattern = (
             r'(?<![0-9]€)(?<!au )(?<!et )(?<=[\s€,.])\s*'
             r'((?<!Du\s)'  # NE PAS matcher après "Du " (début de plage)
             r'[DLMJVS][aeiou]?\s*\d{1,2}'  # Jour simple: Sa 11
             r')\s+'  # Juste un espace (pas de séparateur)
-            r'(?=[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][a-zA-ZÀ-ÿ\-]+)'  # Suivi d'un mot majuscule (lookahead)
+            r'(?=[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ«""<][a-zA-ZÀ-ÿ\-<"]+)'  # Suivi d'un mot majuscule ou guillemet ouvrant
             r'(?!au\s)'  # NE PAS être suivi de "au " (fin de plage)
         )
         parts = re.split(alt_pattern, raw_text, flags=re.IGNORECASE)
@@ -1061,13 +1063,14 @@ def parse_date_prefix_v2(text: str, base_month: int, base_year: int) -> tuple[li
         return dates, event_text
 
     # Pattern 2: Dates complexes avec horaires (ex: "Je 01/Ve 02 à 20h30 et Di 04 à 17h :")
+    # Supporte aussi: "Ma 27 à 19h/Ve 30 à 20h :" (horaire après chaque jour)
     # Ce pattern capture toute la partie date complexe avant le séparateur
     complex_date_pattern = (
         r'^('
         r'[DLMJVS][a-z]\s*\d{1,2}(?:er|ère|e|ème)?'  # Premier jour
-        r'(?:\s*[&,/]\s*[A-Za-z]{2,3}\s*\d{1,2}(?:er|ère|e|ème)?)*'  # Jours additionnels / ou &
+        r'(?:\s+(?:à|a)\s+\d{1,2}h\d{0,2})?'  # Horaire optionnel après premier jour
+        r'(?:\s*[&,/]\s*[A-Za-z]{2,3}\s*\d{1,2}(?:er|ère|e|ème)?(?:\s+(?:à|a)\s+\d{1,2}h\d{0,2})?)*'  # Jours additionnels avec horaire
         r'(?:\s+(?:au|à)\s+[A-Za-z]{2,3}\s*\d{1,2}(?:er|ère|e|ème)?)?'  # Plage "au Ve 09"
-        r'(?:\s+(?:à|a)\s+\d{1,2}h\d{0,2})?'  # Horaire optionnel
         r'(?:\s+et\s+[A-Za-z]{2,3}\s*\d{1,2}(?:er|ère|e|ème)?(?:\s+(?:à|a)\s+\d{1,2}h\d{0,2})?)*'  # "et Di 04 à 17h"
         r')'
         r'\s*[:–-]\s*(.+)$'  # Séparateur et contenu
@@ -1144,8 +1147,30 @@ def extract_before_lieu(text: str, lieu_start: int) -> dict:
     result = {
         'spectacles': [],
         'artistes': [],
-        'nom_evenement': None
+        'nom_evenement': None,
+        'style_evenement': None
     }
+
+    # Pattern "//" pour les festivals: "Festival X #N (style) // ARTISTES"
+    # Le nom d'événement est AVANT le //, les artistes sont APRÈS
+    # Ex: "Festival Les DéciBeilles #1 // <b>LES BONS TUYAUX</b>..."
+    # Ex: "Plein Champ #3 (festival d'arts urbains) // <b>JULIEN LEBRUN</b>..."
+    double_slash_match = re.search(r'^(.+?)\s*//\s*(.+)$', before)
+    if double_slash_match:
+        event_part = double_slash_match.group(1).strip()
+        artistes_part = double_slash_match.group(2).strip()
+
+        # Extraire le style s'il est entre parenthèses à la fin du nom
+        # Ex: "Plein Champ #3 (festival d'arts urbains)" → nom="Plein Champ #3", style="festival d'arts urbains"
+        style_match = re.match(r'^(.+?)\s*\(([^)]+)\)\s*$', event_part)
+        if style_match:
+            result['nom_evenement'] = style_match.group(1).strip()
+            result['style_evenement'] = style_match.group(2).strip()
+        else:
+            result['nom_evenement'] = event_part
+
+        # Continuer le parsing avec seulement la partie artistes
+        before = artistes_part
 
     # Si le texte commençait par >> ou >, c'est un artiste direct (pas un spectacle)
     # Ex: ">> BONOME TETARD (chanson à texte)" → artiste = "BONOME TETARD", style = "chanson à texte"
@@ -1165,10 +1190,11 @@ def extract_before_lieu(text: str, lieu_start: int) -> dict:
             if before.startswith(','):
                 before = before[1:].strip()
 
-    # Pattern "XXX présente YYY (style)" - XXX est le nom de l'événement, YYY est l'artiste
+    # Pattern "XXX présente YYY (style)" ou "XXX présente: YYY (style)" - XXX est le nom de l'événement, YYY est l'artiste
     # Ex: "Window on a Mix présente BLAST #2 featuring MLC aka Lucien Moullec (House)"
+    # Ex: "Cortex présente: CHEWBACCA ALL STARS (soul-garage)"
     presente_match = re.search(
-        r'^(.+?)\s+présente\s+([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-Za-zÀ-ÿ\s\.\-\&\'#\d]+?)(?:\s*\(([^)]+)\))?\s*(?:,|$)',
+        r'^(.+?)\s+présente\s*:?\s+([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-Za-zÀ-ÿ\s\.\-\&\'#\d]+?)(?:\s*\(([^)]+)\))?\s*(?:,|\+|$)',
         before, re.IGNORECASE
     )
     if presente_match:
@@ -1878,15 +1904,19 @@ def extract_ville_from_text_v2(text: str, ville_ref_list: list) -> tuple[Optiona
         text_normalized = re.sub(pattern, replacement, text_normalized, flags=re.IGNORECASE)
 
     text_lower = text_normalized.lower()
+    # Normaliser tirets en espaces pour le matching (ex: "Brette Les Pins" == "Brette-les-Pins")
+    text_lower_normalized = text_lower.replace('-', ' ')
 
     found = []
     for ville_tuple in ville_ref_list:
         ville_id = ville_tuple[0]
         ville_nom = ville_tuple[1]
         ville_lower = ville_nom.lower()
+        # Normaliser aussi les tirets de la ville de référence
+        ville_lower_normalized = ville_lower.replace('-', ' ')
 
-        pattern = r'\b' + re.escape(ville_lower) + r'\b'
-        if re.search(pattern, text_lower):
+        pattern = r'\b' + re.escape(ville_lower_normalized) + r'\b'
+        if re.search(pattern, text_lower_normalized):
             found.append((ville_id, ville_nom))
 
     if not found:
@@ -2032,6 +2062,7 @@ def parse_event_line_v2(
                 # Utiliser event_text (sans préfixe de date) pour raw_text
                 'raw_text': event_text.strip(),
                 'nom': before_data.get('nom_evenement'),
+                'style': before_data.get('style_evenement'),
                 'date_str': date_str,
                 'date_evenement': event_date,
                 'heure': after_data.get('heure'),
@@ -2228,6 +2259,7 @@ class EventParser:
     # Group 2: Contenu de l'événement (après le séparateur)
     INLINE_DATE_PATTERN = re.compile(
         r'^('  # Groupe 1: Date complète
+        r'(?:Du\s+)?'  # Optionnel "Du " pour les plages de dates
         r'(?:[MLJVSD][aeiou]|[Ll]undi|[Mm]ardi|[Mm]ercredi|[Jj]eudi|[Vv]endredi|[Ss]amedi|[Dd]imanche)\s+'
         r'\d{1,2}(?:er|ère|ème|eme)?'
         r'(?:'

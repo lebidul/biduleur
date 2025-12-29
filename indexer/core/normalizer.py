@@ -131,14 +131,16 @@ def normalize_name(name: str) -> str:
 
 
 def normalize_text(text: str) -> str:
-    """Normalise le texte pour comparaison (minuscules, sans accents)."""
+    """Normalise le texte pour comparaison (minuscules, sans accents, tirets→espaces)."""
     if not text:
         return ''
     text = text.lower().strip()
     # Retirer accents
     text = unicodedata.normalize('NFD', text)
     text = ''.join(c for c in text if unicodedata.category(c) != 'Mn')
-    # Normaliser espaces
+    # Normaliser tirets en espaces (pour matcher "Brette-les-Pins" avec "Brette Les Pins")
+    text = text.replace('-', ' ')
+    # Normaliser espaces multiples
     text = re.sub(r'\s+', ' ', text)
     return text
 
