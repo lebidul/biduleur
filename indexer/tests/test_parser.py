@@ -461,15 +461,14 @@ class TestLoadLieuPatterns:
             (3, "Zoo", "Le Mans"),
         ]
         patterns = load_lieu_patterns(lieu_ref)
-        # Le plus long (Théâtre de l'Éphémère) doit être en premier
+        # Les patterns doivent être triés par longueur décroissante
         assert len(patterns) > 0
-        # Les patterns sont des dicts avec 'nom' et 'length'
-        names = [p['nom'] for p in patterns]
-        # Vérifier que le plus long est en premier
-        assert names[0] == "Théâtre de l'Éphémère"
         # Les lengths doivent être décroissantes
         lengths = [p['length'] for p in patterns]
         assert lengths == sorted(lengths, reverse=True)
+        # Vérifier que "Théâtre de l'Éphémère" est dans les patterns (peut ne pas être le premier à cause des alias)
+        names = [p['nom'] for p in patterns]
+        assert "Théâtre de l'Éphémère" in names
 
 
 class TestFindLieuV2:

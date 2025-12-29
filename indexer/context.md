@@ -180,6 +180,21 @@ Fichier de credentials : `gcp_creds_biduleur.json` à la racine du projet.
 
 Le format est spécifié dans `biduls.description.csv` (colonne `date`). Si non spécifié, le parser tente le format standard, puis inline.
 
+## Extraction des spectacles formatés (v1.4)
+
+Le parser supporte plusieurs patterns de spectacles avec guillemets et balises :
+
+| Pattern | Format | Exemple |
+|---------|--------|---------|
+| Standard | `<b>"Spectacle"</b>` | Guillemets à l'intérieur du gras |
+| Pattern 1b | `"<b>Spectacle</b>" (<i>style</i>)` | Guillemets autour du gras + style |
+| Pattern 1c | `"<b>Spectacle</b>" Cie XXX (<i>style</i>)` | Spectacle + Cie artiste + style |
+
+**Caractères unicode supportés :**
+- Guillemets typographiques : `"` (U+201C), `"` (U+201D), `«`, `»`, `„`
+- Apostrophe curly : `'` (U+2019) dans les noms de Cie
+- Patterns OCR : `<<...>`, `<...">` pour guillemets mal reconnus
+
 ## Limitations actuelles
 
 1. **OCR** : Qualité variable selon l'état des scans (anciens numéros)

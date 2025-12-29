@@ -600,7 +600,146 @@ def cmd_populate(args):
     skipped = 0
     already_exists = 0
 
+    # Stats pour reparse
+    total_reparsed = 0
+    reparsed_biduls = 0
+
     for numero in numeros:
+        # Mode --reparse: re-parser depuis bidul.raw_text (texte complet)
+        if getattr(args, 'reparse', False):
+            # Récupérer le bidul avec son raw_text complet
+            bidul = db.get_bidul(numero)
+            if not bidul:
+                if args.verbose:
+                    print(f"[{numero}] Bidul non trouvé en base - ignoré")
+                skipped += 1
+                continue
+
+            bidul_raw_text = bidul.get('raw_text')
+            if not bidul_raw_text:
+                if args.verbose:
+                    print(f"[{numero}] Pas de raw_text dans bidul - ignoré")
+                skipped += 1
+                continue
+
+            # Récupérer mois/année depuis le bidul ou le PDF
+            mois = bidul.get('mois')
+            annee = bidul.get('annee')
+            if not mois or not annee:
+                pdf_path = find_pdf(numero)
+                if pdf_path:
+                    n, mois, annee = extract_bidul_info(pdf_path.name)
+                else:
+                    print(f"[{numero}] Impossible de déterminer mois/année - ignoré")
+                    skipped += 1
+                    continue
+
+            # Compter les événements existants avant suppression
+            existing_count = db.count_evenements(numero)
+            existing_contenu = db.count_contenu_evenement(numero)
+
+            # Supprimer TOUS les événements du bidul avant de re-parser
+            if not args.dry_run:
+                db.delete_evenements(numero)
+
+            # Charger la config du Bidul pour obtenir date_format
+            config = load_bidul_config(numero)
+            date_format = config.date_format if config else None
+
+            # Re-parser le texte brut complet avec EventParser (supporte format bloc)
+            parser = EventParser(bidul_mois=mois, bidul_annee=annee, date_format=date_format)
+            parsed_events = parser.parse_with_referentiel(
+                bidul_raw_text,
+                lieu_ref_list,
+                ville_ref_list
+            )
+
+            reparsed_count = len(parsed_events)
+
+            if not args.dry_run:
+                for event in parsed_events:
+                    # Convertir ParsedEvent en dict pour insertion
+                    date_evt = event.date_evenement
+                    if hasattr(date_evt, 'isoformat'):
+                        date_evt = date_evt.isoformat()
+                    # Convertir artistes/spectacles en JSON
+                    # Les artistes peuvent être des ArtisteInfo (dataclass) ou des dicts
+                    artistes = event.artistes
+                    if artistes:
+                        artistes_list = []
+                        for a in artistes:
+                            if hasattr(a, 'to_dict'):
+                                artistes_list.append(a.to_dict())
+                            elif isinstance(a, dict):
+                                artistes_list.append(a)
+                            else:
+                                artistes_list.append({'nom': str(a)})
+                        artistes = json.dumps(artistes_list, ensure_ascii=False)
+                    else:
+                        artistes = None
+                    # Les spectacles sont généralement des dicts
+                    spectacles = event.spectacles
+                    if spectacles:
+                        spectacles_list = []
+                        for s in spectacles:
+                            if hasattr(s, 'to_dict'):
+                                spectacles_list.append(s.to_dict())
+                            elif isinstance(s, dict):
+                                spectacles_list.append(s)
+                            else:
+                                spectacles_list.append({'nom': str(s)})
+                        spectacles = json.dumps(spectacles_list, ensure_ascii=False)
+                    else:
+                        spectacles = None
+                    db.insert_evenement_from_dict({
+                        'bidul_numero': numero,
+                        'raw_text': event.raw_text,
+                        'nom': event.nom,
+                        'date_evenement': date_evt,
+                        'heure': event.heure,
+                        'lieu_raw': event.lieu_raw,
+                        'ville_raw': event.ville_raw,
+                        'tarif_raw': event.tarif_raw,
+                        'prix_min': event.prix_min,
+                        'prix_max': event.prix_max,
+                        'gratuit': event.gratuit,
+                        'artistes': artistes,
+                        'spectacles': spectacles
+                    })
+
+            dry_run_suffix = " (dry-run)" if args.dry_run else ""
+
+            # Compter les contenu_evenement après reparsing
+            if not args.dry_run:
+                new_contenu = db.count_contenu_evenement(numero)
+            else:
+                new_contenu = {'artistes': 0, 'spectacles': 0}
+
+            # Calculer le pourcentage d'amélioration pour les événements
+            if existing_count > 0:
+                pct_change = ((reparsed_count - existing_count) / existing_count) * 100
+                if pct_change > 0:
+                    pct_str = f" (+{pct_change:.0f}%)"
+                elif pct_change < 0:
+                    pct_str = f" ({pct_change:.0f}%)"
+                else:
+                    pct_str = " (=)"
+            else:
+                pct_str = " (nouveau)"
+
+            # Formater les stats contenu_evenement
+            old_art = existing_contenu.get('artistes', 0)
+            new_art = new_contenu.get('artistes', 0)
+            old_spec = existing_contenu.get('spectacles', 0)
+            new_spec = new_contenu.get('spectacles', 0)
+            contenu_str = f"art: {old_art}->{new_art}, spec: {old_spec}->{new_spec}"
+
+            timestamp = datetime.now().strftime("%H:%M:%S")
+            print(f"[{timestamp}] [{numero}] Re-parsé: {existing_count} -> {reparsed_count} événements{pct_str} | {contenu_str} (format={date_format or 'auto'}){dry_run_suffix}")
+            total_reparsed += reparsed_count
+            reparsed_biduls += 1
+            continue
+
         # Vérifier si déjà en base (sauf si --replace)
         existing_count = db.count_evenements(numero)
         if existing_count > 0 and not args.replace:
@@ -767,11 +906,15 @@ def cmd_populate(args):
     print(f"\n{'='*50}")
     print("RÉSUMÉ POPULATE")
     print(f"{'='*50}")
-    print(f"Biduls depuis CSV: {csv_biduls} ({total_from_csv} événements)")
-    print(f"Biduls depuis PDF: {pdf_biduls} ({total_from_pdf} événements)")
+    if getattr(args, 'reparse', False):
+        print(f"Biduls re-parsés:  {reparsed_biduls} ({total_reparsed} événements)")
+    else:
+        print(f"Biduls depuis CSV: {csv_biduls} ({total_from_csv} événements)")
+        print(f"Biduls depuis PDF: {pdf_biduls} ({total_from_pdf} événements)")
     print(f"Biduls déjà en base: {already_exists}")
     print(f"Biduls ignorés:    {skipped}")
-    print(f"Total événements:  {total_events}")
+    if not getattr(args, 'reparse', False):
+        print(f"Total événements:  {total_events}")
 
     return 0
 
@@ -1399,6 +1542,315 @@ def cmd_ocr_extract(args):
 
 
 # =============================================================================
+# Corpus Commands
+# =============================================================================
+
+def cmd_corpus_generate(args):
+    """Genere les fichiers CSV de corpus depuis la base."""
+    import subprocess
+    import sys
+
+    script_path = Path(__file__).parent / 'scripts' / 'generate_corpus_csv.py'
+    result = subprocess.run([sys.executable, str(script_path)], cwd=str(Path(__file__).parent))
+    return result.returncode
+
+
+def cmd_corpus_stats(args):
+    """Affiche les statistiques des corpus CSV."""
+    import csv
+    from pathlib import Path
+
+    corpus_dir = Path(__file__).parent / 'corpus'
+
+    files = [
+        ('lieu.csv', 'Lieux'),
+        ('lieu_alias.csv', 'Aliases lieux'),
+        ('artiste.csv', 'Artistes'),
+        ('artiste_alias.csv', 'Aliases artistes'),
+        ('ville.csv', 'Villes'),
+    ]
+
+    print("=" * 40)
+    print("STATISTIQUES DES CORPUS")
+    print("=" * 40)
+
+    for filename, label in files:
+        path = corpus_dir / filename
+        if path.exists():
+            with open(path, 'r', encoding='utf-8') as f:
+                count = sum(1 for _ in csv.reader(f)) - 1
+            print(f"  {label:20} {count:5} entrees")
+        else:
+            print(f"  {label:20} [fichier manquant]")
+
+    return 0
+
+
+def cmd_corpus_test(args):
+    """Teste la normalisation d'un lieu ou artiste."""
+    from core.normalizer import normalize_name, get_lieu_normalizer, get_artiste_normalizer
+
+    text = args.text
+    norm = normalize_name(text)
+    print(f"Entree:     '{text}'")
+    print(f"Normalise:  '{norm}'")
+
+    if args.type == 'lieu':
+        normalizer = get_lieu_normalizer()
+        result = normalizer.find_lieu(text)
+        if result:
+            print(f"Match:      '{result[0]}' (ville: {result[1]})")
+        else:
+            print("Aucun match trouve")
+    else:
+        normalizer = get_artiste_normalizer()
+        result = normalizer.find_artiste(text)
+        if result:
+            print(f"Match:      '{result[0]}' (style: {result[1] or '-'})")
+        else:
+            print("Aucun match trouve")
+
+    return 0
+
+
+def cmd_corpus_add_lieu_alias(args):
+    """Ajoute un alias de lieu."""
+    import csv
+    from pathlib import Path
+    from core.normalizer import get_lieu_normalizer, reload_normalizers
+
+    variante = args.variante
+    lieu_nom = args.lieu_nom
+
+    # Verifier que le lieu canonique existe
+    normalizer = get_lieu_normalizer()
+    result = normalizer.find_lieu(lieu_nom)
+
+    if not result:
+        print(f"! Lieu '{lieu_nom}' non trouve dans lieu.csv")
+        return 1
+
+    lieu_canonique = result[0]
+
+    # Ajouter au CSV
+    alias_path = Path(__file__).parent / 'corpus' / 'lieu_alias.csv'
+    with open(alias_path, 'a', encoding='utf-8', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow([variante, lieu_canonique])
+
+    print(f"+ Alias ajoute: '{variante}' -> '{lieu_canonique}'")
+
+    # Recharger
+    reload_normalizers()
+
+    return 0
+
+
+def cmd_corpus_add_artiste_alias(args):
+    """Ajoute un alias d'artiste."""
+    import csv
+    from pathlib import Path
+    from core.normalizer import get_artiste_normalizer, normalize_name, reload_normalizers
+
+    variante = args.variante
+    artiste_nom = args.artiste_nom
+
+    normalizer = get_artiste_normalizer()
+    result = normalizer.find_artiste(artiste_nom)
+
+    artiste_canonique = artiste_nom
+
+    if not result:
+        print(f"! Artiste '{artiste_nom}' non trouve")
+        # L'ajouter d'abord dans artiste.csv
+        artiste_path = Path(__file__).parent / 'corpus' / 'artiste.csv'
+        with open(artiste_path, 'a', encoding='utf-8', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow([artiste_nom, normalize_name(artiste_nom), ''])
+        print(f"+ Artiste ajoute: '{artiste_nom}'")
+    else:
+        artiste_canonique = result[0]
+
+    # Ajouter l'alias
+    alias_path = Path(__file__).parent / 'corpus' / 'artiste_alias.csv'
+    with open(alias_path, 'a', encoding='utf-8', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow([variante, artiste_canonique])
+
+    print(f"+ Alias ajoute: '{variante}' -> '{artiste_canonique}'")
+    reload_normalizers()
+
+    return 0
+
+
+# =============================================================================
+# Clean Commands
+# =============================================================================
+
+def cmd_clean_all(args):
+    """Execute tous les nettoyages."""
+    import subprocess
+    import sys
+
+    script_path = Path(__file__).parent / 'scripts' / 'clean_data.py'
+    result = subprocess.run([sys.executable, str(script_path)], cwd=str(Path(__file__).parent))
+    return result.returncode
+
+
+def cmd_clean_prix(args):
+    """Nettoie uniquement les prix aberrants."""
+    import sqlite3
+    import sys
+    # Import dynamique du module
+    sys.path.insert(0, str(Path(__file__).parent))
+    from scripts.clean_data import clean_prix_aberrants
+
+    db_path = Path(__file__).parent / 'database' / 'bidul_archives.db'
+    conn = sqlite3.connect(str(db_path))
+    count = clean_prix_aberrants(conn)
+    conn.close()
+    print(f"Nettoye {count} prix aberrants")
+
+    return 0
+
+
+def cmd_clean_lieux_dups(args):
+    """Deduplique lieu_ref (fusionne variantes de casse)."""
+    import sqlite3
+    import sys
+    # Import dynamique du module
+    sys.path.insert(0, str(Path(__file__).parent))
+    from scripts.clean_data import deduplicate_lieu_ref
+
+    db_path = Path(__file__).parent / 'database' / 'bidul_archives.db'
+    conn = sqlite3.connect(str(db_path))
+    aliases = deduplicate_lieu_ref(conn)
+    conn.close()
+
+    if aliases:
+        print("\nAliases a ajouter dans lieu_alias.csv:")
+        for v, c in aliases:
+            print(f"  '{v}' -> '{c}'")
+
+    return 0
+
+
+def cmd_corpus_dedupe_lieux(args):
+    """Detecte et deduplique les lieux dans lieu.csv."""
+    import subprocess
+    import sys
+
+    script_path = Path(__file__).parent / 'scripts' / 'dedupe_lieux.py'
+    cmd = [sys.executable, str(script_path)]
+
+    if args.apply:
+        cmd.append('--apply')
+    if args.report:
+        cmd.append('--report')
+    if args.interactive:
+        cmd.append('--interactive')
+    if args.keyword:
+        cmd.extend(['--keyword', args.keyword])
+
+    result = subprocess.run(cmd, cwd=str(Path(__file__).parent))
+    return result.returncode
+
+
+def cmd_corpus_dedupe_artistes(args):
+    """Detecte et deduplique les artistes dans artiste.csv."""
+    import subprocess
+    import sys
+
+    script_path = Path(__file__).parent / 'scripts' / 'dedupe_artistes.py'
+    cmd = [sys.executable, str(script_path)]
+
+    if args.apply:
+        cmd.append('--apply')
+    if args.report:
+        cmd.append('--report')
+    if args.interactive:
+        cmd.append('--interactive')
+    if args.keyword:
+        cmd.extend(['--keyword', args.keyword])
+
+    result = subprocess.run(cmd, cwd=str(Path(__file__).parent))
+    return result.returncode
+
+
+# =============================================================================
+# Sync DB <-> Corpus commands
+# =============================================================================
+
+def cmd_sync_corpus_to_db(args):
+    """Importe les CSV corpus dans la DB."""
+    import subprocess
+    script_path = Path(__file__).parent / 'scripts' / 'sync_corpus_db.py'
+    cmd = [sys.executable, str(script_path), 'corpus-to-db']
+    result = subprocess.run(cmd, cwd=str(Path(__file__).parent))
+    return result.returncode
+
+
+def cmd_sync_db_to_corpus(args):
+    """Exporte les tables DB vers CSV corpus."""
+    import subprocess
+    script_path = Path(__file__).parent / 'scripts' / 'sync_corpus_db.py'
+    cmd = [sys.executable, str(script_path), 'db-to-corpus']
+    result = subprocess.run(cmd, cwd=str(Path(__file__).parent))
+    return result.returncode
+
+
+def cmd_sync_dedupe_db(args):
+    """Deduplique lieu_ref et artiste_ref en DB."""
+    import subprocess
+    script_path = Path(__file__).parent / 'scripts' / 'sync_corpus_db.py'
+    cmd = [sys.executable, str(script_path), 'dedupe-db']
+    if args.apply:
+        cmd.append('--apply')
+    result = subprocess.run(cmd, cwd=str(Path(__file__).parent))
+    return result.returncode
+
+
+def cmd_sync_stats(args):
+    """Statistiques des tables de reference en DB."""
+    import subprocess
+    script_path = Path(__file__).parent / 'scripts' / 'sync_corpus_db.py'
+    cmd = [sys.executable, str(script_path), 'stats']
+    result = subprocess.run(cmd, cwd=str(Path(__file__).parent))
+    return result.returncode
+
+
+# =============================================================================
+# Ref Matching commands
+# =============================================================================
+
+def cmd_ref_migrate(args):
+    """Migration: ajoute artiste_ref_id a contenu_evenement."""
+    import subprocess
+    script_path = Path(__file__).parent / 'scripts' / 'migrate_ref_matching.py'
+    cmd = [sys.executable, str(script_path), 'migrate']
+    result = subprocess.run(cmd, cwd=str(Path(__file__).parent))
+    return result.returncode
+
+
+def cmd_ref_backfill(args):
+    """Back-populate lieu_ref_id et artiste_ref_id."""
+    import subprocess
+    script_path = Path(__file__).parent / 'scripts' / 'migrate_ref_matching.py'
+    cmd = [sys.executable, str(script_path), 'backfill']
+    result = subprocess.run(cmd, cwd=str(Path(__file__).parent))
+    return result.returncode
+
+
+def cmd_ref_stats(args):
+    """Statistiques de matching ref_id."""
+    import subprocess
+    script_path = Path(__file__).parent / 'scripts' / 'migrate_ref_matching.py'
+    cmd = [sys.executable, str(script_path), 'stats']
+    result = subprocess.run(cmd, cwd=str(Path(__file__).parent))
+    return result.returncode
+
+
+# =============================================================================
 # Main
 # =============================================================================
 
@@ -1421,12 +1873,46 @@ Exemples:
   python cli.py quality-report          # Rapport de qualité
   python cli.py analyze-corrections     # Analyse des corrections
 
-OCR (PDFs scannés):
+OCR (PDFs scannes):
   python cli.py ocr archives/1997-03_Bidul_002.pdf  # OCR d'un PDF
   python cli.py ocr archives/1997-03_Bidul_002.pdf -o output.txt  # Sauvegarde
   python cli.py ocr-test --samples 5    # Teste l'OCR sur 5 PDFs
-  python cli.py ocr-extract --numero 35 # Extrait les événements du Bidul 35
-  python cli.py ocr-extract --range 1-50 --dry-run  # Prévisualise l'extraction
+  python cli.py ocr-extract --numero 35 # Extrait les evenements du Bidul 35
+  python cli.py ocr-extract --range 1-50 --dry-run  # Previsualise l'extraction
+
+Corpus (referentiels CSV):
+  python cli.py corpus-generate         # Genere les CSV depuis la base
+  python cli.py corpus-stats            # Statistiques des corpus
+  python cli.py corpus-test "Th. Paul Scarron"  # Teste la normalisation
+  python cli.py corpus-test "Dj SUPER LUCIEN" -t artiste  # Teste un artiste
+  python cli.py corpus-add-lieu-alias "Th. Municipal" "Theatre Municipal"
+  python cli.py corpus-add-artiste-alias "SMAK FLY" "SMAC FLY"
+
+Nettoyage (base de donnees):
+  python cli.py clean-all               # Execute tous les nettoyages
+  python cli.py clean-prix              # Nettoie les prix aberrants
+  python cli.py clean-lieux-dups        # Fusionne les doublons de lieux
+
+Deduplication corpus:
+  python cli.py corpus-dedupe-lieux             # Analyse les doublons lieu.csv
+  python cli.py corpus-dedupe-lieux --apply     # Applique la deduplication
+  python cli.py corpus-dedupe-lieux --report    # Exporte un rapport CSV
+  python cli.py corpus-dedupe-lieux -k abbaye   # Review par mot-cle (interactif)
+  python cli.py corpus-dedupe-artistes          # Analyse les doublons artiste.csv
+  python cli.py corpus-dedupe-artistes --apply  # Applique la deduplication
+  python cli.py corpus-dedupe-artistes -k jazz  # Review par mot-cle (interactif)
+
+Synchronisation DB <-> Corpus:
+  python cli.py sync-corpus-to-db               # Importe CSV corpus -> DB
+  python cli.py sync-db-to-corpus               # Exporte DB -> CSV corpus
+  python cli.py sync-dedupe-db                  # Deduplique en DB
+  python cli.py sync-dedupe-db --apply          # Applique la deduplication
+  python cli.py sync-stats                      # Stats des tables DB
+
+Matching ref_id (lieu/artiste):
+  python cli.py ref-migrate                     # Migration: ajoute artiste_ref_id
+  python cli.py ref-backfill                    # Back-populate lieu_ref_id et artiste_ref_id
+  python cli.py ref-stats                       # Stats de matching
         """
     )
 
@@ -1470,6 +1956,7 @@ OCR (PDFs scannés):
     p_populate.add_argument('--pdf-only', action='store_true', help='Ignorer les CSV (forcer extraction PDF)')
     p_populate.add_argument('--dry-run', action='store_true', help='Affiche sans sauvegarder')
     p_populate.add_argument('--replace', action='store_true', help='Remplacer les événements existants')
+    p_populate.add_argument('--reparse', action='store_true', help='Re-parser les événements existants depuis raw_text (sans OCR)')
     p_populate.add_argument('--no-ocr', action='store_true', help='Désactiver l\'OCR pour les scans')
     p_populate.add_argument('--engine', '-e', default='google', choices=['paddleocr', 'easyocr', 'google'],
                            help='Moteur OCR (défaut: google)')
@@ -1533,6 +2020,89 @@ OCR (PDFs scannés):
     p_ocr_extract.add_argument('--dpi', '-d', type=int, default=200, help='Résolution pour conversion PDF (défaut: 200)')
     p_ocr_extract.add_argument('--dry-run', action='store_true', help='Ne pas sauvegarder en base')
 
+    # ==========================================================================
+    # Corpus Commands
+    # ==========================================================================
+
+    # corpus-generate - Genere les CSV de corpus depuis la base
+    p_corpus_gen = subparsers.add_parser('corpus-generate', help='Genere les fichiers CSV de corpus depuis la base')
+
+    # corpus-stats - Statistiques des corpus
+    p_corpus_stats = subparsers.add_parser('corpus-stats', help='Affiche les statistiques des corpus CSV')
+
+    # corpus-test - Teste la normalisation
+    p_corpus_test = subparsers.add_parser('corpus-test', help='Teste la normalisation d\'un lieu ou artiste')
+    p_corpus_test.add_argument('text', help='Texte a normaliser')
+    p_corpus_test.add_argument('--type', '-t', choices=['lieu', 'artiste'], default='lieu',
+                               help='Type de normalisation (defaut: lieu)')
+
+    # corpus-add-lieu-alias - Ajoute un alias de lieu
+    p_corpus_lieu = subparsers.add_parser('corpus-add-lieu-alias', help='Ajoute un alias de lieu')
+    p_corpus_lieu.add_argument('variante', help='Variante a ajouter')
+    p_corpus_lieu.add_argument('lieu_nom', help='Nom du lieu canonique')
+
+    # corpus-add-artiste-alias - Ajoute un alias d'artiste
+    p_corpus_artiste = subparsers.add_parser('corpus-add-artiste-alias', help='Ajoute un alias d\'artiste')
+    p_corpus_artiste.add_argument('variante', help='Variante a ajouter')
+    p_corpus_artiste.add_argument('artiste_nom', help='Nom de l\'artiste canonique')
+
+    # corpus-dedupe-lieux - Deduplique les lieux dans lieu.csv
+    p_corpus_dedupe = subparsers.add_parser('corpus-dedupe-lieux', help='Detecte et deduplique les lieux dans lieu.csv')
+    p_corpus_dedupe.add_argument('--apply', '-a', action='store_true', help='Appliquer les changements')
+    p_corpus_dedupe.add_argument('--report', '-r', action='store_true', help='Exporter un rapport CSV')
+    p_corpus_dedupe.add_argument('--interactive', '-i', action='store_true', help='Mode interactif')
+    p_corpus_dedupe.add_argument('--keyword', '-k', type=str, help='Mot-cle pour filtrer les lieux')
+
+    # corpus-dedupe-artistes - Deduplique les artistes dans artiste.csv
+    p_corpus_dedupe_art = subparsers.add_parser('corpus-dedupe-artistes', help='Detecte et deduplique les artistes dans artiste.csv')
+    p_corpus_dedupe_art.add_argument('--apply', '-a', action='store_true', help='Appliquer les changements')
+    p_corpus_dedupe_art.add_argument('--report', '-r', action='store_true', help='Exporter un rapport CSV')
+    p_corpus_dedupe_art.add_argument('--interactive', '-i', action='store_true', help='Mode interactif')
+    p_corpus_dedupe_art.add_argument('--keyword', '-k', type=str, help='Mot-cle pour filtrer les artistes')
+
+    # ==========================================================================
+    # Clean Commands
+    # ==========================================================================
+
+    # clean-all - Execute tous les nettoyages
+    p_clean_all = subparsers.add_parser('clean-all', help='Execute tous les nettoyages de la base')
+
+    # clean-prix - Nettoie les prix aberrants
+    p_clean_prix = subparsers.add_parser('clean-prix', help='Nettoie les prix aberrants')
+
+    # clean-lieux-dups - Deduplique lieu_ref
+    p_clean_lieux = subparsers.add_parser('clean-lieux-dups', help='Deduplique lieu_ref (fusionne variantes de casse)')
+
+    # ==========================================================================
+    # Sync Commands (DB <-> Corpus)
+    # ==========================================================================
+
+    # sync-corpus-to-db - Importe CSV corpus dans DB
+    p_sync_to_db = subparsers.add_parser('sync-corpus-to-db', help='Importe les CSV corpus dans la DB')
+
+    # sync-db-to-corpus - Exporte DB vers CSV corpus
+    p_sync_to_csv = subparsers.add_parser('sync-db-to-corpus', help='Exporte les tables DB vers CSV corpus')
+
+    # sync-dedupe-db - Deduplique en DB
+    p_sync_dedupe = subparsers.add_parser('sync-dedupe-db', help='Deduplique lieu_ref et artiste_ref en DB')
+    p_sync_dedupe.add_argument('--apply', '-a', action='store_true', help='Appliquer les changements')
+
+    # sync-stats - Stats des tables DB
+    p_sync_stats = subparsers.add_parser('sync-stats', help='Statistiques des tables de reference en DB')
+
+    # ==========================================================================
+    # Ref Matching Commands
+    # ==========================================================================
+
+    # ref-migrate - Migration pour ajouter artiste_ref_id
+    p_ref_migrate = subparsers.add_parser('ref-migrate', help='Migration: ajoute artiste_ref_id a contenu_evenement')
+
+    # ref-backfill - Back-populate les ref_id
+    p_ref_backfill = subparsers.add_parser('ref-backfill', help='Back-populate lieu_ref_id et artiste_ref_id')
+
+    # ref-stats - Stats de matching
+    p_ref_stats = subparsers.add_parser('ref-stats', help='Statistiques de matching ref_id')
+
     args = parser.parse_args()
 
     # Configuration logging
@@ -1563,6 +2133,27 @@ OCR (PDFs scannés):
         'ocr': cmd_ocr,
         'ocr-test': cmd_ocr_test,
         'ocr-extract': cmd_ocr_extract,
+        # Corpus commands
+        'corpus-generate': cmd_corpus_generate,
+        'corpus-stats': cmd_corpus_stats,
+        'corpus-test': cmd_corpus_test,
+        'corpus-add-lieu-alias': cmd_corpus_add_lieu_alias,
+        'corpus-add-artiste-alias': cmd_corpus_add_artiste_alias,
+        'corpus-dedupe-lieux': cmd_corpus_dedupe_lieux,
+        'corpus-dedupe-artistes': cmd_corpus_dedupe_artistes,
+        # Clean commands
+        'clean-all': cmd_clean_all,
+        'clean-prix': cmd_clean_prix,
+        'clean-lieux-dups': cmd_clean_lieux_dups,
+        # Sync DB <-> Corpus commands
+        'sync-corpus-to-db': cmd_sync_corpus_to_db,
+        'sync-db-to-corpus': cmd_sync_db_to_corpus,
+        'sync-dedupe-db': cmd_sync_dedupe_db,
+        'sync-stats': cmd_sync_stats,
+        # Ref Matching commands
+        'ref-migrate': cmd_ref_migrate,
+        'ref-backfill': cmd_ref_backfill,
+        'ref-stats': cmd_ref_stats,
     }
 
     return commands[args.command](args)

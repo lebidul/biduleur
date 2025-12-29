@@ -1,10 +1,74 @@
+# Release Notes - Indexer v1.4
+
+## Vue d'ensemble
+
+Version avec amélioration majeure de l'extraction des spectacles formatés et support des caractères unicode.
+
+**Résultat** : ~14 500 événements indexés depuis 122 numéros (178-308)
+
+## Nouveautés v1.4
+
+### Extraction améliorée des spectacles formatés
+
+Support complet des spectacles avec guillemets autour des balises `<b>` :
+
+| Pattern | Exemple | Extraction |
+|---------|---------|------------|
+| Pattern 1b | `"<b>Concert à table</b>" (<i>concert >7 ans</i>)` | spectacle + style ✓ |
+| Pattern 1c | `"<b>Concerto pour camionneuse</b>" Cie XXX (<i>funambule</i>)` | spectacle + Cie artiste + style ✓ |
+
+### Support des caractères unicode
+
+- **Guillemets typographiques** : `"..."` (U+201C, U+201D) maintenant reconnus
+- **Apostrophe curly** : `'` (U+2019) supportée dans les noms de Cie (ex: "Cie Ordinaire d'exception")
+- **Patterns OCR** : Support de `<<...>`, `<...">` pour les guillemets mal reconnus
+
+### Corrections de bugs
+
+- **Position lieu heuristique** : Correction du calcul de position dans le texte original (vs texte nettoyé)
+- **Double extraction spectacle/artiste** : Les spectacles entre guillemets ne sont plus extraits comme artistes
+- **Cie après spectacle** : Pattern "Cie XXX" directement après un spectacle maintenant extrait comme artiste
+
+---
+
+# Release Notes - Indexer v1.3
+
+## Vue d'ensemble
+
+Version avec support complet du format "par bloc" pour les dates et amélioration du reparse.
+
+## Nouveautés v1.3
+
+### Support complet du format "par bloc"
+
+Le parser reconnaît maintenant tous les formats de dates utilisés dans les Biduls récents :
+
+| Format | Exemple | Support |
+|--------|---------|---------|
+| Date simple | `Jeudi 02` | ✓ |
+| Dates composées (et) | `Samedi 04 et Dimanche 05` | ✓ **nouveau** |
+| Dates composées (&) | `Ve 10 & Sa 11` | ✓ |
+| Plages numériques | `Du 6 au 10` | ✓ |
+| Plages avec jours complets | `Du Mercredi 01 au Samedi 07` | ✓ **nouveau** |
+
+### Amélioration du reparse
+
+- **`--reparse` utilise maintenant `EventParser.parse_with_referentiel()`** : Le reparse charge automatiquement le `date_format` depuis `biduls.description.csv` et utilise la stratégie "lieu d'abord" avec les référentiels.
+- **Affichage du format** : Le message de reparse indique maintenant le format utilisé (inline/par bloc).
+- **Mode dry-run corrigé** : Le compteur d'événements s'affiche correctement en mode simulation.
+
+### Corrections de bugs
+
+- **Import `EventParser`** : Correction d'un `UnboundLocalError` lors de l'utilisation du chemin OCR sans `--reparse`.
+- **Sérialisation JSON des artistes** : Les objets `ArtisteInfo` sont maintenant correctement convertis en dicts avant sérialisation.
+
+---
+
 # Release Notes - Indexer v1.2
 
 ## Vue d'ensemble
 
 Version avec extraction configurable et support des formats anciens (pré-2015).
-
-**Résultat** : ~14 500 événements indexés depuis 122 numéros (178-308)
 
 ## Nouveautés v1.2
 
