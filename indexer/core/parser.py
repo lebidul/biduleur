@@ -47,8 +47,9 @@ def extract_formatted_spectacles(text: str) -> list[dict]:
 
     # Classes de guillemets (ouvrants et fermants)
     # Inclut << et >> pour l'OCR qui peut confondre les guillemets
-    open_quotes = r'[«""„]|<<'
-    close_quotes = r'[»""]|>>'
+    # U+00AB «, U+00BB », U+201C ", U+201D ", U+201E „, U+0022 "
+    open_quotes = r'[«""„\u201c\u201d]|<<'
+    close_quotes = r'[»""\u201c\u201d]|>>'
 
     # Pattern 1: <b>"Spectacle"</b> suivi optionnellement de <i>(style),</i>
     # Note: la virgule peut être dans ou après les parenthèses
@@ -61,6 +62,37 @@ def extract_formatted_spectacles(text: str) -> list[dict]:
         style = _clean_style(match.group(2)) if match.group(2) else None
         if nom and len(nom) > 1:
             spectacles.append({'nom': nom, 'style': style})
+
+    # Pattern 1b: "<b>Spectacle</b>" (<i>style</i>) - guillemets AUTOUR des balises <b>
+    # Cas: "<b>Concert à table</b>" (<i>concert >7 ans</i>)
+    # Les guillemets encadrent les balises <b>, et le style est en <i> après
+    pattern1b = rf'(?:{open_quotes})\s*<b>([^<>]+)</b>\s*(?:{close_quotes})\s*(?:\(?\s*<i>\s*\(?([^)<]+?)\)?\s*</i>\s*\)?)?'
+    matches1b = re.finditer(pattern1b, text, re.IGNORECASE)
+
+    for match in matches1b:
+        nom = match.group(1).strip()
+        style = _clean_style(match.group(2)) if match.group(2) else None
+        if nom and len(nom) > 1:
+            if not any(s['nom'] == nom for s in spectacles):
+                spectacles.append({'nom': nom, 'style': style})
+
+    # Pattern 1c: "<b>Spectacle</b>" Cie XXX (<i>style</i>) - avec Cie entre spectacle et style
+    # Cas: "<b>Concerto pour camionneuse</b>" Cie Ordinaire d'exception (<i>funambule</i>)
+    # Le style vient APRÈS la Cie, pas directement après le spectacle
+    pattern1c = rf'(?:{open_quotes})\s*<b>([^<>]+)</b>\s*(?:{close_quotes})\s+[Cc]ie\s+[^<(]+\s*(?:\(?\s*<i>\s*\(?([^)<]+?)\)?\s*</i>\s*\)?)?'
+    matches1c = re.finditer(pattern1c, text, re.IGNORECASE)
+
+    for match in matches1c:
+        nom = match.group(1).strip()
+        style = _clean_style(match.group(2)) if match.group(2) else None
+        if nom and len(nom) > 1:
+            # Mettre à jour le style si le spectacle existe déjà sans style
+            existing = next((s for s in spectacles if s['nom'] == nom), None)
+            if existing:
+                if not existing.get('style') and style:
+                    existing['style'] = style
+            else:
+                spectacles.append({'nom': nom, 'style': style})
 
     # Pattern 2: "Spectacle" (sans gras) suivi de <i>(style)</i>
     # Cas spécial: "Ma tata, mon pingouin..." <i>(concert jeune public)</i>
@@ -205,7 +237,9 @@ def extract_formatted_artistes_musicaux(text: str) -> list[dict]:
     # Pattern: <b>ARTISTE</b> suivi optionnellement de <i>(style),</i>
     # Note: la virgule peut être dans ou après les parenthèses
     # Exclure les spectacles (guillemets) et les textes courts
-    pattern = r'<b>([^<"»"„«]+)</b>(?:\s*<i>\s*\(([^)]+)\)[,;]?\s*</i>)?'
+    # Utilise un lookbehind négatif pour exclure les <b> précédés de guillemets (spectacles)
+    # U+00AB «, U+00BB », U+201C ", U+201D ", U+201E „, U+0022 "
+    pattern = r'(?<![«»\u201c\u201d„"\'])<b>([^<"»\u201c\u201d„«]+)</b>(?:\s*<i>\s*\(([^)]+)\)[,;]?\s*</i>)?'
     matches = re.finditer(pattern, text, re.IGNORECASE)
 
     for match in matches:
@@ -1343,6 +1377,21 @@ def extract_before_lieu(text: str, lieu_start: int) -> dict:
                         result['artistes'].append({'nom': full_nom, 'style': None, 'is_musical': False})
                 break
 
+        # Pattern "Cie XXX" directement après spectacle (sans "par" ni "avec")
+        # Ex: "<b>Spectacle</b>" Cie Ordinaire d'exception (<i>style</i>)
+        # Supporte apostrophe droite (') et curly (\u2019)
+        if not result['artistes']:
+            cie_direct_match = re.search(
+                r'[Cc]ie\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s\'\u2019\-/&]+?)(?:\s*,|\s*\d{1,2}h|\s*\(|\s*<|\s*$)',
+                before_stripped
+            )
+            if cie_direct_match:
+                nom = cie_direct_match.group(1).strip().rstrip(',')
+                if nom and len(nom) > 2:
+                    full_nom = f"Cie {nom}"
+                    if not any(a['nom'].lower() == full_nom.lower() for a in result['artistes']):
+                        result['artistes'].append({'nom': full_nom, 'style': None, 'is_musical': False})
+
         return result
 
     # === Fallback: extraction classique sans formatage ===
@@ -1389,8 +1438,10 @@ def extract_before_lieu(text: str, lieu_start: int) -> dict:
     spectacle_matches = list(re.finditer(spectacle_pattern, before))
 
     for match in spectacle_matches:
-        nom = match.group(1).strip()
+        nom_raw = match.group(1).strip()
         style = match.group(2).strip() if match.group(2) else None
+        # Nettoyer les balises HTML du nom (ex: "<b>Concert</b>" -> "Concert")
+        nom = re.sub(r'</?[bi]>', '', nom_raw).strip()
         # Éviter les doublons et exclure les événements nommés (festivals, soirées)
         # qui ne sont pas des spectacles mais des noms d'événements
         is_event_name = is_named_event(nom) or nom.lower().startswith('festival')
@@ -1399,7 +1450,14 @@ def extract_before_lieu(text: str, lieu_start: int) -> dict:
             if not result['nom_evenement']:
                 result['nom_evenement'] = nom
             continue
-        if not any(s['nom'].lower() == nom.lower() for s in result['spectacles']):
+        # Vérifier si ce spectacle existe déjà (peut-être avec un style)
+        existing = next((s for s in result['spectacles'] if s['nom'].lower() == nom.lower()), None)
+        if existing:
+            # Si le spectacle existe déjà avec un style, ne pas écraser
+            # Si le spectacle existe sans style et on a un style, mettre à jour
+            if not existing.get('style') and style:
+                existing['style'] = style
+        else:
             result['spectacles'].append({'nom': nom, 'style': style})
 
     # Retirer les spectacles du texte pour parser le reste
@@ -1426,8 +1484,9 @@ def extract_before_lieu(text: str, lieu_start: int) -> dict:
 
     # Ensuite: Pattern ", Cie XXX" ou "Cie XXX" - résultat: "Cie XXX"
     # Supporte les noms avec "/" pour duo/groupe: "Cie Robin/Juteau"
+    # Supporte aussi "Cie XXX (<i>style</i>)" où le style vient après
     if not cie_suffix_match:
-        cie_prefix_match = re.search(r'(?:,\s*|^|\s)[Cc]ie\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s\'\-/&]+?)(?:\s*,|\s*\d{1,2}h|\s*$)', remaining)
+        cie_prefix_match = re.search(r'(?:,\s*|^|\s)[Cc]ie\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s\'\-/&]+?)(?:\s*,|\s*\d{1,2}h|\s*\(|\s*<|\s*$)', remaining)
         if cie_prefix_match:
             nom = cie_prefix_match.group(1).strip().rstrip(',')
             if nom and len(nom) > 2:
@@ -1731,6 +1790,12 @@ def find_lieu_position_heuristic(text: str) -> Optional[int]:
             re.match(r'^[A-Za-zÀ-ÿ°][A-Za-zÀ-ÿ°\s\'\-]*\s+[Cc]ie\b', after_comma_stripped)  # "XXX Cie"
         )
         if not is_artiste_context:
+            # Trouver la position correspondante dans le texte original
+            # en cherchant le texte qui suit la virgule
+            original_match = re.search(re.escape(after_comma_stripped[:15]), text)
+            if original_match:
+                return original_match.start()
+            # Fallback: retourner la position dans le texte nettoyé
             return style_then_comma.end()
 
     # Chercher les patterns de lieu explicites
