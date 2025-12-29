@@ -22,6 +22,7 @@
 * normalisation. automatique sans alias pour th. esp., case, /s, -, saint  ...
 * enlever evenement.artistes et evenement.styles
 * refactor pour simplifier la logique et l'ajout de patterns
+* éliminer doublons
 * enlever artifacts (evenements qui 'en sont pas plus texte non utile (inclure gestion rubriques))
 * ajouter html ou csv tapages manquants
 * colonne description dans table bidul (ex. bidul covid)
