@@ -105,6 +105,31 @@ def extract_formatted_spectacles(text: str) -> list[dict]:
             if not any(s['nom'] == nom for s in spectacles):
                 spectacles.append({'nom': nom, 'style': style})
 
+    # Pattern 5: <<Spectacle> (style) - OCR avec << ouvrant et > fermant (mal lu)
+    # Cas spécial: <<Marrons gagnants> (contes), <<Guth Després> (contes)
+    # Le < final est un guillemet fermant mal reconnu
+    pattern5 = r'<<\s*([^<>]+?)\s*>\s*\(([^)]+)\)'
+    matches5 = re.finditer(pattern5, text, re.IGNORECASE)
+
+    for match in matches5:
+        nom = match.group(1).strip()
+        style = _clean_style(match.group(2)) if match.group(2) else None
+        if nom and len(nom) > 2:
+            if not any(s['nom'] == nom for s in spectacles):
+                spectacles.append({'nom': nom, 'style': style})
+
+    # Pattern 6: <Spectacle" (style) - OCR avec < ouvrant et " fermant
+    # Cas spécial: <Ferouër" (danse contemporaine)
+    pattern6 = r'<([^<>"]+?)\s*"\s*\(([^)]+)\)'
+    matches6 = re.finditer(pattern6, text, re.IGNORECASE)
+
+    for match in matches6:
+        nom = match.group(1).strip()
+        style = _clean_style(match.group(2)) if match.group(2) else None
+        if nom and len(nom) > 2:
+            if not any(s['nom'] == nom for s in spectacles):
+                spectacles.append({'nom': nom, 'style': style})
+
     return spectacles
 
 
@@ -1212,20 +1237,28 @@ def extract_before_lieu(text: str, lieu_start: int) -> dict:
 
     # Pattern "NomEvent avec ARTISTES" - NomEvent est en Title Case, ARTISTES en MAJUSCULES
     # Ex: "Snamshit Troopers part. 1 avec MARTI + KOR + NOTORIOUS NEST (électro)"
+    # Ex: "L'instant Eclectik avec ERNESTINE (rock/fusion) + BABEL"
+    # Ex: "Drum'n'Breaks Party avec K-POERA + GOLGOTT 14"
     # Le nom d'événement doit:
-    # - Commencer par une majuscule suivie de minuscules (Title Case)
-    # - Ne pas être tout en MAJUSCULES (sinon c'est un artiste)
+    # - Commencer par une majuscule (ou apostrophe suivie de majuscule pour L'instant, etc.)
+    # - Contenir au moins une minuscule (pas tout MAJUSCULES)
     # - Être suivi de "avec" puis d'artistes en MAJUSCULES
     if not result['nom_evenement']:
         avec_artistes_match = re.match(
-            r'^([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][a-zàâäéèêëïîôùûüç]+(?:[\s\-][A-Za-zÀ-ÿ]+)*(?:\s+(?:part|vol|n°|#)\.?\s*\d+)?)\s+avec\s+([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s\+\&\-]+)',
+            r"^([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇL'][A-Za-zÀ-ÿ']+(?:[\s\-'&][A-Za-zÀ-ÿ']+)*(?:\s+(?:part|vol|n°|#)\.?\s*\d+)?)\s+avec\s+([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s\+\&\-]+)",
             before
         )
         if avec_artistes_match:
             event_name = avec_artistes_match.group(1).strip()
             # Vérifier que le nom n'est pas tout en majuscules (sinon c'est un artiste)
-            if not event_name.isupper() and len(event_name) > 3:
+            # et qu'il contient au moins une minuscule
+            has_lowercase = any(c.islower() for c in event_name)
+            if has_lowercase and len(event_name) > 3:
                 result['nom_evenement'] = event_name
+                # Retirer le nom d'événement et "avec" du texte pour ne pas re-parser
+                # On garde seulement la partie artistes (après "avec ")
+                avant_avec_len = len(event_name) + len(' avec ')
+                before = before[avant_avec_len:].strip()
 
     # Pattern "NomEvent animée par ARTISTE" - NomEvent est en Title Case
     # Ex: "Afro-latino Party animée par BAILA SUAVE"
