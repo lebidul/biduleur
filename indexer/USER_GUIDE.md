@@ -955,6 +955,18 @@ Les spectacles sont identifies par des guillemets en gras:
 <b>«Titre»</b>
 ```
 
+**Nouveaux patterns v1.4:**
+
+| Format | Exemple | Extraction |
+|--------|---------|------------|
+| Standard | `<b>"Spectacle"</b>` | spectacle |
+| Pattern 1b | `"<b>Spectacle</b>" (<i>style</i>)` | spectacle + style |
+| Pattern 1c | `"<b>Spectacle</b>" Cie XXX (<i>style</i>)` | spectacle + Cie artiste + style |
+
+**Caracteres unicode supportes:**
+- Guillemets typographiques: `"` (U+201C), `"` (U+201D)
+- Apostrophe curly: `'` (U+2019) dans les noms de Cie
+
 ### Evenements nommes
 
 Les evenements avec un nom (festivals, soirees thematiques) sont detectes:

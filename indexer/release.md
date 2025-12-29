@@ -1,10 +1,41 @@
+# Release Notes - Indexer v1.4
+
+## Vue d'ensemble
+
+Version avec amélioration majeure de l'extraction des spectacles formatés et support des caractères unicode.
+
+**Résultat** : ~14 500 événements indexés depuis 122 numéros (178-308)
+
+## Nouveautés v1.4
+
+### Extraction améliorée des spectacles formatés
+
+Support complet des spectacles avec guillemets autour des balises `<b>` :
+
+| Pattern | Exemple | Extraction |
+|---------|---------|------------|
+| Pattern 1b | `"<b>Concert à table</b>" (<i>concert >7 ans</i>)` | spectacle + style ✓ |
+| Pattern 1c | `"<b>Concerto pour camionneuse</b>" Cie XXX (<i>funambule</i>)` | spectacle + Cie artiste + style ✓ |
+
+### Support des caractères unicode
+
+- **Guillemets typographiques** : `"..."` (U+201C, U+201D) maintenant reconnus
+- **Apostrophe curly** : `'` (U+2019) supportée dans les noms de Cie (ex: "Cie Ordinaire d'exception")
+- **Patterns OCR** : Support de `<<...>`, `<...">` pour les guillemets mal reconnus
+
+### Corrections de bugs
+
+- **Position lieu heuristique** : Correction du calcul de position dans le texte original (vs texte nettoyé)
+- **Double extraction spectacle/artiste** : Les spectacles entre guillemets ne sont plus extraits comme artistes
+- **Cie après spectacle** : Pattern "Cie XXX" directement après un spectacle maintenant extrait comme artiste
+
+---
+
 # Release Notes - Indexer v1.3
 
 ## Vue d'ensemble
 
 Version avec support complet du format "par bloc" pour les dates et amélioration du reparse.
-
-**Résultat** : ~14 500 événements indexés depuis 122 numéros (178-308)
 
 ## Nouveautés v1.3
 

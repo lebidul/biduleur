@@ -74,11 +74,12 @@ events = parser.parse_with_referentiel(text, lieu_ref_list, ville_ref_list)
 
 **Fonctions utilitaires importantes:**
 - `extract_formatted_artistes_musicaux()` - Extrait artistes depuis balises `<b>`, sépare sur `+`
-- `extract_formatted_spectacles()` - Extrait spectacles entre guillemets gras
+- `extract_formatted_spectacles()` - Extrait spectacles entre guillemets gras (v1.4 : supporte patterns 1b/1c)
 - `extract_event_name()` - Extrait le nom d'événement (festivals, soirées thématiques)
 - `is_named_event()` - Détecte si un texte représente un événement nommé
 - `extract_lieu_fallback()` - Extraction heuristique quand le lieu n'est pas dans le référentiel
 - `strip_formatting_tags()` - Retire les balises pour comparaison
+- `find_lieu_position_heuristic()` - Trouve la position du lieu dans le texte (v1.4 : corrige position texte original)
 
 ### `core/db.py` - Base de données
 
@@ -262,8 +263,20 @@ extract_event_name()  # Extrait le nom (ex: "SPRINGROCK", "Fête interculturelle
 
 ### Spectacles (guillemets + gras)
 ```python
-# <b>„Titre du spectacle"</b> ou <b>«Titre»</b>
+# Pattern standard: <b>„Titre du spectacle"</b> ou <b>«Titre»</b>
 SPECTACLE_PATTERN = r'<b>\s*[«""„]([^»""]+)[»""]\s*</b>'
+
+# Pattern 1b (v1.4): guillemets AUTOUR du gras + style
+# "<b>Spectacle</b>" (<i>style</i>)
+PATTERN_1B = rf'(?:{open_quotes})\s*<b>([^<>]+)</b>\s*(?:{close_quotes})\s*(?:\(?\s*<i>\s*\(?([^)<]+?)\)?\s*</i>\s*\)?)?'
+
+# Pattern 1c (v1.4): spectacle + Cie + style
+# "<b>Spectacle</b>" Cie XXX (<i>style</i>)
+PATTERN_1C = rf'(?:{open_quotes})\s*<b>([^<>]+)</b>\s*(?:{close_quotes})\s+[Cc]ie\s+[^<(]+\s*(?:\(?\s*<i>\s*\(?([^)<]+?)\)?\s*</i>\s*\)?)?'
+
+# Classes de guillemets (v1.4) - inclut unicode et OCR
+open_quotes = r'[«""„\u201c\u201d]|<<'
+close_quotes = r'[»""\u201c\u201d]|>>'
 ```
 
 ### Heures
@@ -399,6 +412,14 @@ parser = EventParser(bidul_mois=7, bidul_annee=2011, date_format='inline')
 2. **Lieux non référencés** - Extraction heuristique moins fiable
 3. **Formatage incohérent** - Certains vieux numéros ont un formatage variable
 4. **OCR des très anciens Biduls** - Qualité variable selon l'état du scan
+
+## Changelog v1.4
+
+- **Pattern 1b** : Support `"<b>Spectacle</b>" (<i>style</i>)` avec guillemets autour du gras
+- **Pattern 1c** : Support `"<b>Spectacle</b>" Cie XXX (<i>style</i>)` pour Cie après spectacle
+- **Unicode** : Guillemets typographiques (U+201C, U+201D) et apostrophe curly (U+2019)
+- **Lookbehind artiste** : Évite double extraction spectacle/artiste pour texte entre guillemets
+- **Position heuristique** : Correction du mapping position stripped → original text
 
 ## Contribution
 
