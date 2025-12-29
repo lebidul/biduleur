@@ -1425,8 +1425,9 @@ def extract_before_lieu(text: str, lieu_start: int) -> dict:
                 result['artistes'].append({'nom': full_nom, 'style': None})
 
     # Ensuite: Pattern ", Cie XXX" ou "Cie XXX" - résultat: "Cie XXX"
+    # Supporte les noms avec "/" pour duo/groupe: "Cie Robin/Juteau"
     if not cie_suffix_match:
-        cie_prefix_match = re.search(r'(?:,\s*|^|\s)[Cc]ie\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s\'\-]+?)(?:\s*,|\s*\d{1,2}h|\s*$)', remaining)
+        cie_prefix_match = re.search(r'(?:,\s*|^|\s)[Cc]ie\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s\'\-/&]+?)(?:\s*,|\s*\d{1,2}h|\s*$)', remaining)
         if cie_prefix_match:
             nom = cie_prefix_match.group(1).strip().rstrip(',')
             if nom and len(nom) > 2:
@@ -1582,8 +1583,9 @@ def extract_before_lieu(text: str, lieu_start: int) -> dict:
             # Supporte aussi les heures après le style: "GERMAINE (ch.) 16h" ou "SEREIN (jazz) à 15h30"
             # Supporte aussi les fins en "..." ou "etc..." : "FUMUJ...Saint Calais" -> "FUMUJ"
             # Supporte les noms commençant par un chiffre: "0' BROTHERS", "2 Many DJs"
+            # Supporte les initiales avec point: "L. MARTEAU", "O. BACOU"
             artist_match = re.match(
-                r"^((?:\d+'?\s*)?[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇa-zàâäéèêëïîôùûüç\s'\u2019\-&]+?(?:['\u2019]s)?)\s*(?:\(([^)]+)\))?\s*(?:(?:etc)?\.{2,}|(?:à\s*)?\d{1,2}h\d{0,2}|,|$)",
+                r"^((?:\d+'?\s*)?(?:[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ]\.\s*)?[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇa-zàâäéèêëïîôùûüç\s'\u2019\-&\.]+?(?:['\u2019]s)?)\s*(?:\(([^)]+)\))?\s*(?:(?:etc)?\.{2,}|(?:à\s*)?\d{1,2}h\d{0,2}|,|$)",
                 part.strip()
             )
             if artist_match:
@@ -1806,6 +1808,8 @@ def extract_lieu_fallback(text: str, ville_ref_list: list) -> tuple[Optional[str
     # Artistes en MAJUSCULES (avec ou sans genre entre parenthèses)
     # Inclut les artistes séparés par + (ARTISTE1 + ARTISTE2)
     artiste_pattern = re.compile(r'^[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s\'\-\&\.0-9]+(?:\s*\([^)]+\))?(?:\s*\+\s*[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s\'\-\&\.0-9]+(?:\s*\([^)]+\))?)*$')
+    # Compagnies de théâtre: "Cie XXX", "Compagnie XXX", "Cie XXX/YYY"
+    cie_pattern = re.compile(r'^[Cc](?:ie|ompagnie)\s+[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s\'\-/&]+$')
     # Texte avec genre entre parenthèses (probablement artiste ou spectacle)
     with_genre_pattern = re.compile(r'.+\s*\([^)]+\)\s*$')
     # Texte contenant "+" suivi de texte (probablement artistes/guests)
@@ -1842,6 +1846,10 @@ def extract_lieu_fallback(text: str, ville_ref_list: list) -> tuple[Optional[str
 
         # Ignorer les artistes en MAJUSCULES
         if artiste_pattern.match(part):
+            continue
+
+        # Ignorer les compagnies de théâtre (Cie XXX)
+        if cie_pattern.match(part):
             continue
 
         # Ignorer les segments contenant "+" suivi d'artistes (multi-artistes)
