@@ -2131,9 +2131,13 @@ def parse_event_line_v2(
 
             # Si le lieu trouvé correspond aussi à une ville, c'est probablement une erreur
             # du référentiel. Dans ce cas, on utilise l'extraction heuristique.
-            from core.normalizer import normalize_ville
-            ville_id_check, _ = normalize_ville(lieu_nom)
-            if ville_id_check is not None:
+            # Note: normalize_ville retourne toujours un ID (Le Mans par défaut),
+            # donc on compare le nom normalisé retourné avec le nom du lieu.
+            from core.normalizer import normalize_ville, normalize_for_matching
+            _, ville_nom_check = normalize_ville(lieu_nom)
+            # Seul invalider si le nom retourné correspond vraiment au nom du lieu
+            # (pas juste "Le Mans" par défaut)
+            if normalize_for_matching(ville_nom_check) == normalize_for_matching(lieu_nom):
                 # Le "lieu" est en fait une ville - invalider le match
                 lieu_match = None
 
