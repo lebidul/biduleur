@@ -14,7 +14,7 @@ from pathlib import Path
 # Ajouter le parent au path pour les imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.normalizer import find_lieu_ref_id, find_artiste_ref_id, normalize_ville
+from core.normalizer import find_lieu_ref_id, find_artiste_ref_id, normalize_ville, clear_caches
 
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 logger = logging.getLogger(__name__)
@@ -267,6 +267,10 @@ def main(dry_run: bool = False, lieux: bool = True, artistes: bool = True, ville
     if dry_run:
         logger.info(">>> MODE DRY RUN <<<")
     logger.info("="*60)
+
+    # Vider les caches pour utiliser les dernières règles de normalisation
+    clear_caches()
+    logger.info("Caches de normalisation vidés")
 
     conn = sqlite3.connect(DB_PATH)
 
