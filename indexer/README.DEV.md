@@ -101,13 +101,43 @@ bidul (1) ──► (N) evenement (1) ──► (N) contenu_evenement
 
 ### `core/normalizer.py` - Normalisation
 
-Fonctions de normalisation pour les lieux et villes.
+Module central de normalisation avec système de règles automatiques (v1.5).
 
+**Normalisation automatique:**
 ```python
-from core.normalizer import normalize_lieu, normalize_ville
+from core.normalizer import normalize_for_matching
 
-lieu_id, lieu_nom = normalize_lieu("bar le lézard")  # → (42, "Bar le Lézard")
-ville_id, ville_nom = normalize_ville("le mans")     # → (1, "Le Mans")
+# Normalisation pour comparaison (case, accents, séparateurs)
+normalize_for_matching("Théâtre")  # → "theatre"
+normalize_for_matching("pop-rock") # → "pop rock"
+normalize_for_matching("L'Oasis")  # → "oasis"
+```
+
+**Matching avec référentiels:**
+```python
+from core.normalizer import find_lieu_ref_id, find_artiste_ref_id, normalize_ville
+
+lieu_id = find_lieu_ref_id("bar le lézard")     # → 42 (matching automatique)
+artiste_id = find_artiste_ref_id("ZIG ZAG")     # → 15625
+ville_id, ville_nom = normalize_ville("le mans") # → (1, "Le Mans")
+```
+
+**Règles de normalisation automatique (v1.5):**
+
+| Règle | Fonction | Exemple |
+|-------|----------|---------|
+| Case-insensitive | `lower()` | `BAR` → `bar` |
+| Accent-insensitive | NFD decomposition | `théâtre` → `theatre` |
+| Séparateurs | `-` → ` ` | `pop-rock` → `pop rock` |
+| Préfixes strippés | `le`, `la`, `l'`, etc. | `le barouf` → `barouf` |
+| Abbreviations | `th.` → `theatre` | `th. municipal` → `theatre municipal` |
+
+**Cache management:**
+```python
+from core.normalizer import clear_caches
+
+# Vider les caches après modification des CSV
+clear_caches()
 ```
 
 ### `core/text_cleaner.py` - Nettoyage du texte
@@ -259,6 +289,9 @@ ARTISTE_NUMERIC_PREFIX = r'^((?:\d+'?\s*)?[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-Z�
 # Événements nommés: Soirée X, Festival Y, SPRINGROCK : <b>artistes</b>
 is_named_event()  # Détecte si c'est un événement nommé
 extract_event_name()  # Extrait le nom (ex: "SPRINGROCK", "Fête interculturelle")
+
+# v1.5: Support des événements avec numéro d'édition en Title Case
+# "Syncope fait de la résistance #2" → evenement.nom (pas nom_spectacle)
 ```
 
 ### Spectacles (guillemets + gras)
@@ -412,6 +445,14 @@ parser = EventParser(bidul_mois=7, bidul_annee=2011, date_format='inline')
 2. **Lieux non référencés** - Extraction heuristique moins fiable
 3. **Formatage incohérent** - Certains vieux numéros ont un formatage variable
 4. **OCR des très anciens Biduls** - Qualité variable selon l'état du scan
+
+## Changelog v1.5
+
+- **Normalisation automatique** : Système de règles pour matching case/accent/separator insensitive
+- **Événements nommés #N** : Reconnaissance des événements Title Case avec numéro d'édition
+- **Cleanup aliases** : 593 aliases redondants supprimés (couverts par normalisation auto)
+- **Cache clearing** : `clear_caches()` automatique dans `renormalize`
+- **Commandes maintenance** : `renormalize`, `clean-database`, `deduplicate`
 
 ## Changelog v1.4
 

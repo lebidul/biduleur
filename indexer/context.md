@@ -102,7 +102,7 @@ python cli.py list --type scan       # Lister PDFs scannés
 | `core/ocr_postprocess.py` | Post-traitement texte OCR (corrections, normalisation) |
 | `core/parser.py` | Parsing événements (regex, formats standard, inline, par bloc) |
 | `core/csv_importer.py` | Import depuis CSV tapages |
-| `core/normalizer.py` | Normalisation lieux/villes |
+| `core/normalizer.py` | Normalisation automatique lieux/villes/artistes (v1.5) |
 | `core/db.py` | Accès base SQLite |
 | `database/schema_v2.sql` | Schéma de la base |
 | `database/queries_analytiques.sql` | Requêtes SQL d'analyse |
@@ -195,9 +195,22 @@ Le parser supporte plusieurs patterns de spectacles avec guillemets et balises :
 - Apostrophe curly : `'` (U+2019) dans les noms de Cie
 - Patterns OCR : `<<...>`, `<...">` pour guillemets mal reconnus
 
+## Normalisation automatique (v1.5)
+
+Le système de normalisation applique automatiquement des règles de matching :
+
+| Règle | Description | Exemple |
+|-------|-------------|---------|
+| Case-insensitive | Ignore la casse | `bar le lézard` → `Bar le Lézard` |
+| Accent-insensitive | Ignore les accents | `theatre` → `Théâtre` |
+| Séparateurs | `-` et ` ` interchangeables | `pop-rock` ↔ `pop rock` |
+| Préfixes | `le`, `la`, `l'` optionnels | `le barouf` → `Bar Le Barouf` |
+| Abbreviations | Expansion automatique | `th.` → `Théâtre`, `st` → `Saint` |
+
+**Impact** : Réduction de 593 aliases manuels dans les CSV.
+
 ## Limitations actuelles
 
 1. **OCR** : Qualité variable selon l'état des scans (anciens numéros)
 2. **Parsing** : Certains formats d'événements non reconnus (confidence < 0.6)
-3. **Normalisation** : Lieux/villes non systématiquement liés aux référentiels
-4. **Événements multi-dates** : Support partiel ("Ve 3-4" → 2 événements)
+3. **Événements multi-dates** : Support partiel ("Ve 3-4" → 2 événements)

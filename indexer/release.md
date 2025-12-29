@@ -1,3 +1,53 @@
+# Release Notes - Indexer v1.5
+
+## Vue d'ensemble
+
+Version avec normalisation automatique des référentiels et amélioration de la détection des événements nommés.
+
+## Nouveautés v1.5
+
+### Normalisation automatique
+
+Système de normalisation intelligent qui réduit drastiquement le besoin d'aliases manuels :
+
+| Règle | Exemple | Matching automatique |
+|-------|---------|---------------------|
+| Case-insensitive | `bar le lézard` | → `Bar le Lézard` ✓ |
+| Accent-insensitive | `theatre` | → `Théâtre` ✓ |
+| Séparateurs interchangeables | `pop-rock` | → `pop rock` ✓ |
+| Préfixes optionnels | `le barouf` | → `Bar Le Barouf` ✓ |
+| Abbreviations | `th.` / `st` | → `Théâtre` / `Saint` ✓ |
+
+**Impact** : 593 aliases redondants supprimés des fichiers CSV (couverts par la normalisation automatique).
+
+### Événements nommés avec numéro d'édition
+
+Reconnaissance des événements avec numéro d'édition (#N) en Title Case :
+
+```
+"Syncope fait de la résistance #2" avec ROTTERDAMES + LOLA BAÏ...
+→ evenement.nom = "Syncope fait de la résistance #2"
+→ artistes = [ROTTERDAMES, LOLA BAÏ, ...]
+```
+
+Auparavant, ce type d'événement était incorrectement placé dans `nom_spectacle`.
+
+### Commandes de maintenance
+
+Nouvelles commandes CLI pour la gestion de la base :
+
+| Commande | Description |
+|----------|-------------|
+| `renormalize` | Re-normalise tous les événements avec les dernières règles |
+| `clean-database` | Nettoie les données orphelines et invalides |
+| `deduplicate` | Détecte et fusionne les événements en double |
+
+### Cache clearing automatique
+
+Les caches LRU sont automatiquement vidés lors du `renormalize` pour garantir l'utilisation des dernières règles de normalisation.
+
+---
+
 # Release Notes - Indexer v1.4
 
 ## Vue d'ensemble
