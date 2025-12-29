@@ -398,6 +398,9 @@ def is_named_event(text: str) -> bool:
         r'^[\w\s]+\s+présente\s*:?\s+',
         # DAMADA FESTIVAL # 11 avec ... - Festival avec numéro et "avec"
         r'^[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s]+\s+#\s*\d+\s+avec\s+',
+        # Événement nommé avec numéro d'édition: "Syncope fait de la résistance #2"
+        # Pattern: Nom en Title Case avec #N
+        r'^[«""„]?[A-ZÀ-Ÿ][a-zà-ÿ]+(?:\s+[a-zà-ÿ]+)*\s+#\d+',
     ]
 
     for pattern in named_event_patterns:
