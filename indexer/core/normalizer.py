@@ -1,20 +1,21 @@
 """
-Module de normalisation des lieux et artistes.
+Module de normalisation des lieux, villes, artistes et styles.
 
-Source de verite : fichiers CSV dans corpus/
-Les CSV sont charges en memoire au demarrage et utilises pour le matching.
+Normalisation automatique (sans CSV):
+- Case insensitive
+- Tirets/espaces interchangeables
+- Accents insensitifs
+- Apostrophes normalisées
+- Abréviations expandées (th., esp., st., ste., s/)
 
-Strategie de matching (par ordre de priorite):
+Les fichiers CSV d'aliases sont utilisés uniquement pour les cas spéciaux
+non couverts par les règles automatiques.
+
+Stratégie de matching (par ordre de priorité):
 1. Match exact (case-sensitive)
 2. Match case-insensitive
-3. Match par alias exact (case-insensitive)
-4. Match par nom normalise (apres transformation)
-5. Match par alias normalise
-
-Ce module fournit:
-- LieuNormalizer: Normalisation et matching des lieux depuis CSV
-- ArtisteNormalizer: Normalisation et matching des artistes depuis CSV
-- Fonctions legacy pour compatibilite avec l'existant (normalize_lieu, normalize_ville)
+3. Match normalisé automatique (sans accents, tirets=espaces, abréviations)
+4. Match par alias CSV (cas spéciaux)
 """
 
 import csv
@@ -22,7 +23,7 @@ import re
 import unicodedata
 from functools import lru_cache
 from pathlib import Path
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Tuple
 import logging
 
 logger = logging.getLogger(__name__)
@@ -31,139 +32,191 @@ logger = logging.getLogger(__name__)
 CORPUS_DIR = Path(__file__).parent.parent / 'corpus'
 DEFAULT_DB_PATH = Path(__file__).parent.parent / 'database' / 'bidul_archives.db'
 
+
+# =============================================================================
+# Abréviations et règles de transformation
+# =============================================================================
+
+# Abréviations à expander AVANT normalisation
+# IMPORTANT: Ordre du plus spécifique au moins spécifique
+ABBREVIATIONS = {
+    # Théâtre
+    'thé. ': 'théâtre ',
+    'théat. ': 'théâtre ',
+    'th. ': 'théâtre ',
+    'th ': 'théâtre ',
+    # Espace
+    'esp. ': 'espace ',
+    'esp ': 'espace ',
+    # Saints
+    'ste. ': 'sainte ',
+    'ste ': 'sainte ',
+    'ste-': 'sainte-',
+    'st. ': 'saint ',
+    'st ': 'saint ',
+    'st-': 'saint-',
+    # Sur (géographie)
+    ' s/ ': '-sur-',
+    's/': '-sur-',
+    # Compagnies
+    'cie. ': 'compagnie ',
+    'cie ': 'compagnie ',
+    # Lieux
+    'mpt ': 'maison pour tous ',
+    'mjc ': 'mjc ',  # Garder tel quel
+    'cc ': 'centre culturel ',
+    'méd. ': 'médiathèque ',
+    'med. ': 'médiathèque ',
+    'sal. ': 'salle ',
+    's. ': 'salle ',
+    'pl. ': 'place ',
+    'bd ': 'boulevard ',
+    'av. ': 'avenue ',
+    'ab. ': 'abbaye ',
+    'coll. ': 'collégiale ',
+    'chap. ': 'chapiteau ',
+    'égl. ': 'église ',
+    'egl. ': 'église ',
+    # Musique/Styles
+    'ch. fr.': 'chanson française',
+    'ch.fr.': 'chanson française',
+    'ch. ': 'chanson ',
+    'mus. ': 'musique ',
+    'feat. ': 'feat ',
+    'ft. ': 'feat ',
+    # Ponctuation
+    '&': ' et ',
+    ' / ': ' ',
+}
+
+# Préfixes à ignorer pour le matching
+PREFIXES_TO_STRIP = ['bar ', 'le ', 'la ', "l'", "l'", 'les ', 'au ', 'a ', 'chez ', 'du ', 'de la ', 'des ', "d'", "d'"]
+
+
 # =============================================================================
 # Fonctions de normalisation de texte
 # =============================================================================
 
-# Abreviations courantes pour les lieux
-# IMPORTANT: Les abreviations doivent etre dans l'ordre du plus specifique au moins specifique
-# et doivent avoir des espaces/points pour eviter les faux positifs (ex: 'cie ' pas 'cie')
-LIEU_ABBREVIATIONS = {
-    # Lieux
-    'th.': 'theatre',
-    'the.': 'theatre',
-    'theat.': 'theatre',
-    'mpt ': 'maison pour tous ',
-    'mais.': 'maison ',
-    'mjc ': 'mjc ',  # Garder mjc tel quel, c'est connu
-    'cc ': 'centre culturel ',
-    'esp.': 'espace',
-    'esp ': 'espace ',
-    'med.': 'mediatheque',
-    'med ': 'mediatheque ',
-    'sal.': 'salle',
-    'sal ': 'salle ',
-    's.': 'salle ',
-    'ab.': 'abbaye',
-    'coll.': 'collegiale',
-    'chap.': 'chapiteau',
-    'egl.': 'eglise',
-    'pl.': 'place',
-    'bd ': 'boulevard ',
-    'av.': 'avenue',
-    # Geographie
-    'st ': 'saint ',
-    'st-': 'saint-',
-    'ste ': 'sainte ',
-    'ste-': 'sainte-',
-    # Compagnies - AVEC espace pour eviter faux positifs
-    'cie ': 'compagnie ',
-    'cie.': 'compagnie ',
-    # Musique
-    'ch.': 'chanson',
-    'ch. fr.': 'chanson francaise',
-    'ch.fr.': 'chanson francaise',
-    'mus.': 'musique',
-    'feat.': 'feat',
-    'ft.': 'feat',
-    # Ponctuation
-    '&': 'et',
-    ' / ': ' ',
-}
+def remove_accents(text: str) -> str:
+    """
+    Supprime les accents d'un texte.
 
-# Prefixes a ignorer pour le matching
-LIEU_PREFIXES = ['bar ', 'le ', 'la ', 'l\'', 'les ', 'au ', 'a ', 'chez ', 'du ', 'de la ', 'des ', 'd\'']
+    Exemple: "Chemiré-le-Gaudin" -> "Chemire-le-Gaudin"
+    """
+    if not text:
+        return ""
+    # NFD décompose les caractères accentués (é → e + accent)
+    # On filtre ensuite les "combining characters" (les accents)
+    normalized = unicodedata.normalize('NFD', text)
+    return ''.join(c for c in normalized if not unicodedata.combining(c))
+
+
+def normalize_separators(text: str) -> str:
+    """
+    Normalise les séparateurs (tirets, espaces, apostrophes).
+    Tous deviennent des espaces pour comparaison.
+
+    Exemple: "Saint-Mars-la-Brière" -> "Saint Mars la Brière"
+    """
+    if not text:
+        return ""
+    # Remplacer tirets et apostrophes par des espaces
+    s = re.sub(r"[-–—''`'']", ' ', text)
+    # Normaliser les espaces multiples
+    s = ' '.join(s.split())
+    return s
+
+
+def expand_abbreviations(text: str) -> str:
+    """
+    Expande les abréviations courantes.
+
+    Exemple: "Th. Paul Scarron" -> "théâtre Paul Scarron"
+    """
+    if not text:
+        return ""
+    s = text.lower()
+
+    # Appliquer les abréviations (ordre du dict préservé en Python 3.7+)
+    for abbr, full in ABBREVIATIONS.items():
+        s = s.replace(abbr, full)
+
+    return s
+
+
+def strip_prefixes(text: str) -> str:
+    """
+    Retire les préfixes courants (articles, etc.) pour le matching.
+
+    Exemple: "Le Barouf" -> "Barouf"
+    """
+    if not text:
+        return ""
+    s = text.lower().strip()
+    for prefix in PREFIXES_TO_STRIP:
+        if s.startswith(prefix):
+            s = s[len(prefix):]
+            break
+    return s.strip()
+
+
+def normalize_for_matching(text: str) -> str:
+    """
+    Normalise un texte pour le matching automatique.
+
+    Applique dans l'ordre:
+    1. Lowercase
+    2. Expansion des abréviations
+    3. Suppression des accents
+    4. Normalisation des séparateurs (tirets/espaces/apostrophes → espaces)
+    5. Normalisation des espaces multiples
+
+    Exemples:
+        "Th. Paul Scarron" → "theatre paul scarron"
+        "AZURYTE" → "azuryte"
+        "Auvers le-Hamon" → "auvers le hamon"
+        "Chemiré-le-Gaudin" → "chemire le gaudin"
+        "L'Écluse" → "l ecluse"
+        "St Pavace" → "saint pavace"
+        "Moncé s/Loir" → "monce sur loir"
+    """
+    if not text:
+        return ""
+
+    # 1. Lowercase
+    s = text.lower().strip()
+
+    # 2. Expansion des abréviations
+    s = expand_abbreviations(s)
+
+    # 3. Suppression des accents
+    s = remove_accents(s)
+
+    # 4. Normalisation des séparateurs
+    s = normalize_separators(s)
+
+    # 5. Normalisation des espaces
+    s = ' '.join(s.split())
+
+    return s
 
 
 def normalize_name(name: str) -> str:
     """
-    Normalise un nom pour le matching.
-
-    Transformations appliquees:
-    - Lowercase
-    - Expansion des abreviations (Th. -> theatre, Cie -> compagnie, etc.)
-    - Suppression des accents
-    - Normalisation de la ponctuation
-    - Suppression des articles en debut
-    - Normalisation des espaces
-
-    Exemples:
-        "Th. de la Halle au Ble" -> "theatre halle au ble"
-        "L'Oasis" -> "oasis"
-        "DJ SUPER LUCIEN" -> "dj super lucien"
-        "Cie Pieces & Main d'Oeuvre" -> "compagnie pieces et main oeuvre"
+    Alias pour normalize_for_matching (compatibilité).
     """
-    if not name:
-        return ""
-
-    s = name.lower()
-
-    # Expand abreviations AVANT de supprimer la ponctuation
-    for abbr, full in LIEU_ABBREVIATIONS.items():
-        s = s.replace(abbr, full)
-
-    # Supprimer accents
-    s = unicodedata.normalize('NFKD', s)
-    s = ''.join(c for c in s if not unicodedata.combining(c))
-
-    # Normaliser ponctuation (remplacer par espaces)
-    # Le tiret doit etre en fin de classe pour eviter d'etre interprete comme range
-    s = re.sub(r"[''\"«»„"",./:;!?(){}—–-]", ' ', s)
-    s = s.replace('[', ' ').replace(']', ' ')
-
-    # Supprimer articles en debut
-    s = re.sub(r'^(le |la |l |les |un |une |des )', '', s)
-
-    # Normaliser espaces multiples
-    s = ' '.join(s.split())
-
-    return s.strip()
+    return normalize_for_matching(name)
 
 
 def normalize_text(text: str) -> str:
-    """Normalise le texte pour comparaison (minuscules, sans accents, tirets→espaces)."""
-    if not text:
-        return ''
-    text = text.lower().strip()
-    # Retirer accents
-    text = unicodedata.normalize('NFD', text)
-    text = ''.join(c for c in text if unicodedata.category(c) != 'Mn')
-    # Normaliser tirets en espaces (pour matcher "Brette-les-Pins" avec "Brette Les Pins")
-    text = text.replace('-', ' ')
-    # Normaliser espaces multiples
-    text = re.sub(r'\s+', ' ', text)
-    return text
-
-
-def expand_abbreviations(text: str) -> str:
-    """Expand les abreviations courantes."""
-    text_lower = text.lower()
-    for abbrev, full in LIEU_ABBREVIATIONS.items():
-        text_lower = text_lower.replace(abbrev, full)
-    return text_lower
-
-
-def strip_prefixes(text: str) -> str:
-    """Retire les prefixes pour matching."""
-    text_lower = text.lower().strip()
-    for prefix in LIEU_PREFIXES:
-        if text_lower.startswith(prefix):
-            text_lower = text_lower[len(prefix):]
-    return text_lower.strip()
+    """
+    Normalise le texte pour comparaison (compatibilité legacy).
+    """
+    return normalize_for_matching(text)
 
 
 # =============================================================================
-# Classes de normalisation basees sur CSV
+# Classes de normalisation basées sur CSV
 # =============================================================================
 
 class LieuNormalizer:
@@ -172,69 +225,78 @@ class LieuNormalizer:
 
     Source: corpus/lieu.csv et corpus/lieu_alias.csv
 
-    Usage:
-        normalizer = LieuNormalizer()
-        result = normalizer.find_lieu("Th. Paul Scarron")
-        # -> ("Theatre Paul Scarron", "Le Mans")
+    Stratégie de matching (par ordre de priorité):
+    1. Match exact case-insensitive dans les lieux
+    2. Match normalisé automatique (accents, tirets, abréviations)
+    3. Match par alias CSV exact
+    4. Match par alias CSV normalisé
+    5. Match sans préfixes (le, la, l', etc.)
     """
 
     def __init__(self, corpus_dir: Path = CORPUS_DIR):
         self.corpus_dir = corpus_dir
-        self._cache: Dict[str, Optional[tuple[str, str]]] = {}
+        self._cache: Dict[str, Optional[Tuple[str, str]]] = {}
         self._load_from_csv()
 
     def _load_from_csv(self):
-        """Charge les referentiels depuis les CSV."""
+        """Charge les référentiels depuis les CSV."""
 
-        # Index principal : nom_lower -> {nom, ville, nom_normalise}
+        # Index principal: nom_lower -> {nom, ville}
         self.lieux: Dict[str, Dict] = {}
-        # Index par nom normalise : nom_normalise -> nom
-        self.lieux_by_normalise: Dict[str, str] = {}
+
+        # Index par nom normalisé: nom_normalise -> nom_original
+        self.lieux_by_normalized: Dict[str, str] = {}
+
+        # Index sans préfixes: nom_sans_prefix -> nom_original
+        self.lieux_by_stripped: Dict[str, str] = {}
 
         lieu_path = self.corpus_dir / 'lieu.csv'
         if lieu_path.exists():
             with open(lieu_path, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    nom = row['nom']
-                    ville = row.get('ville', 'Le Mans')
-                    nom_norm = row.get('nom_normalise') or normalize_name(nom)
+                    nom = row['nom'].strip()
+                    ville = row.get('ville', 'Le Mans').strip()
 
-                    self.lieux[nom.lower()] = {
-                        'nom': nom,
-                        'ville': ville,
-                        'nom_normalise': nom_norm
-                    }
-                    if nom_norm:
-                        self.lieux_by_normalise[nom_norm] = nom
+                    # Stocker avec clé lowercase
+                    self.lieux[nom.lower()] = {'nom': nom, 'ville': ville}
 
-            logger.debug(f"Charge {len(self.lieux)} lieux depuis lieu.csv")
+                    # Index normalisé pour matching automatique
+                    nom_norm = normalize_for_matching(nom)
+                    if nom_norm and nom_norm not in self.lieux_by_normalized:
+                        self.lieux_by_normalized[nom_norm] = nom
+
+                    # Index sans préfixes
+                    nom_stripped = strip_prefixes(nom)
+                    nom_stripped_norm = normalize_for_matching(nom_stripped)
+                    if nom_stripped_norm and nom_stripped_norm not in self.lieux_by_stripped:
+                        self.lieux_by_stripped[nom_stripped_norm] = nom
+
+            logger.debug(f"Chargé {len(self.lieux)} lieux depuis lieu.csv")
         else:
-            logger.warning(f"Fichier non trouve: {lieu_path}")
+            logger.warning(f"Fichier non trouvé: {lieu_path}")
 
-        # Aliases : variante_lower -> nom_canonique
-        self.aliases: Dict[str, str] = {}
-        # Aliases normalises : variante_normalise -> nom_canonique
-        self.aliases_normalise: Dict[str, str] = {}
+        # Aliases CSV (cas spéciaux uniquement)
+        self.aliases: Dict[str, str] = {}  # variante_lower -> nom_canonique
+        self.aliases_normalized: Dict[str, str] = {}  # variante_norm -> nom_canonique
 
         alias_path = self.corpus_dir / 'lieu_alias.csv'
         if alias_path.exists():
             with open(alias_path, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    variante = row['variante']
-                    lieu_nom = row['lieu_nom']
+                    variante = row['variante'].strip()
+                    lieu_nom = row['lieu_nom'].strip()
 
                     self.aliases[variante.lower()] = lieu_nom
-                    norm = normalize_name(variante)
-                    if norm:
-                        self.aliases_normalise[norm] = lieu_nom
 
-            logger.debug(f"Charge {len(self.aliases)} aliases depuis lieu_alias.csv")
-        else:
-            logger.debug(f"Fichier non trouve (optionnel): {alias_path}")
+                    variante_norm = normalize_for_matching(variante)
+                    if variante_norm:
+                        self.aliases_normalized[variante_norm] = lieu_nom
 
-    def find_lieu(self, lieu_raw: str) -> Optional[tuple[str, str]]:
+            logger.debug(f"Chargé {len(self.aliases)} aliases depuis lieu_alias.csv")
+
+    def find_lieu(self, lieu_raw: str) -> Optional[Tuple[str, str]]:
         """
         Trouve le lieu correspondant.
 
@@ -242,12 +304,11 @@ class LieuNormalizer:
             lieu_raw: Nom du lieu tel qu'extrait
 
         Returns:
-            (nom_canonique, ville) ou None si non trouve
+            (nom_canonique, ville) ou None si non trouvé
         """
         if not lieu_raw or not lieu_raw.strip():
             return None
 
-        # Verifier le cache
         cache_key = lieu_raw.lower().strip()
         if cache_key in self._cache:
             return self._cache[cache_key]
@@ -256,46 +317,133 @@ class LieuNormalizer:
         self._cache[cache_key] = result
         return result
 
-    def _match_lieu(self, lieu_raw: str) -> Optional[tuple[str, str]]:
-        """Logique de matching par ordre de priorite."""
+    def _match_lieu(self, lieu_raw: str) -> Optional[Tuple[str, str]]:
+        """Logique de matching multi-niveaux."""
 
         lieu_lower = lieu_raw.lower()
-        lieu_norm = normalize_name(lieu_raw)
+        lieu_norm = normalize_for_matching(lieu_raw)
+        lieu_stripped = normalize_for_matching(strip_prefixes(lieu_raw))
 
-        # 1. Match exact (case-insensitive) dans lieux
+        # 1. Match exact case-insensitive dans les lieux
         if lieu_lower in self.lieux:
-            data = self.lieux[lieu_lower]
-            return (data['nom'], data['ville'])
+            d = self.lieux[lieu_lower]
+            return (d['nom'], d['ville'])
 
-        # 2. Match par alias exact (case-insensitive)
+        # 2. Match normalisé automatique (accents, tirets, abréviations)
+        if lieu_norm and lieu_norm in self.lieux_by_normalized:
+            nom = self.lieux_by_normalized[lieu_norm]
+            d = self.lieux[nom.lower()]
+            return (d['nom'], d['ville'])
+
+        # 3. Match par alias exact (cas spéciaux CSV)
         if lieu_lower in self.aliases:
-            nom_canonique = self.aliases[lieu_lower]
-            if nom_canonique.lower() in self.lieux:
-                data = self.lieux[nom_canonique.lower()]
-                return (data['nom'], data['ville'])
+            nom = self.aliases[lieu_lower]
+            if nom.lower() in self.lieux:
+                d = self.lieux[nom.lower()]
+                return (d['nom'], d['ville'])
 
-        # 3. Match par nom normalise dans lieux
-        if lieu_norm and lieu_norm in self.lieux_by_normalise:
-            nom_canonique = self.lieux_by_normalise[lieu_norm]
-            if nom_canonique.lower() in self.lieux:
-                data = self.lieux[nom_canonique.lower()]
-                return (data['nom'], data['ville'])
+        # 4. Match par alias normalisé
+        if lieu_norm and lieu_norm in self.aliases_normalized:
+            nom = self.aliases_normalized[lieu_norm]
+            if nom.lower() in self.lieux:
+                d = self.lieux[nom.lower()]
+                return (d['nom'], d['ville'])
 
-        # 4. Match par alias normalise
-        if lieu_norm and lieu_norm in self.aliases_normalise:
-            nom_canonique = self.aliases_normalise[lieu_norm]
-            if nom_canonique.lower() in self.lieux:
-                data = self.lieux[nom_canonique.lower()]
-                return (data['nom'], data['ville'])
+        # 5. Match sans préfixes (le, la, l', etc.)
+        if lieu_stripped and lieu_stripped in self.lieux_by_stripped:
+            nom = self.lieux_by_stripped[lieu_stripped]
+            d = self.lieux[nom.lower()]
+            return (d['nom'], d['ville'])
 
         return None
 
     def get_all_lieux(self) -> List[Dict]:
         """Retourne tous les lieux sous forme de liste."""
-        return list(self.lieux.values())
+        return [{'nom': d['nom'], 'ville': d['ville']} for d in self.lieux.values()]
 
     def reload(self):
-        """Recharge les donnees depuis les CSV."""
+        """Recharge les données depuis les CSV."""
+        self._cache = {}
+        self._load_from_csv()
+
+
+class VilleNormalizer:
+    """
+    Normalisation des villes.
+
+    Mêmes règles automatiques que LieuNormalizer.
+    Par défaut, retourne "Le Mans" si ville non trouvée ou vide.
+    """
+
+    def __init__(self, corpus_dir: Path = CORPUS_DIR):
+        self.corpus_dir = corpus_dir
+        self._cache: Dict[str, Tuple[str, bool]] = {}
+        self._load_from_csv()
+
+    def _load_from_csv(self):
+        """Charge les villes depuis le CSV."""
+        self.villes: Dict[str, str] = {}  # nom_lower -> nom_canonique
+        self.villes_by_normalized: Dict[str, str] = {}  # nom_norm -> nom_canonique
+        self.le_mans = 'Le Mans'
+
+        ville_path = self.corpus_dir / 'ville.csv'
+        if ville_path.exists():
+            with open(ville_path, 'r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    nom = row['nom'].strip()
+                    self.villes[nom.lower()] = nom
+
+                    nom_norm = normalize_for_matching(nom)
+                    if nom_norm and nom_norm not in self.villes_by_normalized:
+                        self.villes_by_normalized[nom_norm] = nom
+
+                    if nom.lower() == 'le mans':
+                        self.le_mans = nom
+
+            logger.debug(f"Chargé {len(self.villes)} villes depuis ville.csv")
+
+    def find_ville(self, ville_raw: str) -> Tuple[str, bool]:
+        """
+        Trouve la ville correspondante.
+
+        Args:
+            ville_raw: Nom de la ville tel qu'extrait
+
+        Returns:
+            (nom_canonique, found) - Si non trouvé, retourne ("Le Mans", False)
+        """
+        # Défaut: Le Mans
+        if not ville_raw or not ville_raw.strip():
+            return (self.le_mans, False)
+
+        cache_key = ville_raw.lower().strip()
+        if cache_key in self._cache:
+            return self._cache[cache_key]
+
+        result = self._match_ville(ville_raw.strip())
+        self._cache[cache_key] = result
+        return result
+
+    def _match_ville(self, ville_raw: str) -> Tuple[str, bool]:
+        """Logique de matching."""
+
+        ville_lower = ville_raw.lower()
+        ville_norm = normalize_for_matching(ville_raw)
+
+        # 1. Match exact case-insensitive
+        if ville_lower in self.villes:
+            return (self.villes[ville_lower], True)
+
+        # 2. Match normalisé (accents, tirets, etc.)
+        if ville_norm and ville_norm in self.villes_by_normalized:
+            return (self.villes_by_normalized[ville_norm], True)
+
+        # Non trouvé - retourner Le Mans par défaut
+        return (self.le_mans, False)
+
+    def reload(self):
+        """Recharge les données depuis les CSV."""
         self._cache = {}
         self._load_from_csv()
 
@@ -306,71 +454,64 @@ class ArtisteNormalizer:
 
     Source: corpus/artiste.csv et corpus/artiste_alias.csv
 
-    Usage:
-        normalizer = ArtisteNormalizer()
-        result = normalizer.find_artiste("Dj SUPER LUCIEN")
-        # -> ("DJ SUPER LUCIEN", "dj")
+    Stratégie de matching:
+    1. Match exact case-insensitive
+    2. Match normalisé automatique
+    3. Match par alias CSV
     """
 
     def __init__(self, corpus_dir: Path = CORPUS_DIR):
         self.corpus_dir = corpus_dir
-        self._cache: Dict[str, Optional[tuple[str, str]]] = {}
+        self._cache: Dict[str, Optional[Tuple[str, str]]] = {}
         self._load_from_csv()
 
     def _load_from_csv(self):
-        """Charge les referentiels depuis les CSV."""
+        """Charge les référentiels depuis les CSV."""
 
-        self.artistes: Dict[str, Dict] = {}
-        self.artistes_by_normalise: Dict[str, str] = {}
+        self.artistes: Dict[str, Dict] = {}  # nom_lower -> {nom, style}
+        self.artistes_by_normalized: Dict[str, str] = {}  # nom_norm -> nom
 
         artiste_path = self.corpus_dir / 'artiste.csv'
         if artiste_path.exists():
             with open(artiste_path, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    nom = row['nom_canonique']
-                    nom_norm = row.get('nom_normalise') or normalize_name(nom)
-                    style = row.get('style', '')
+                    nom = row['nom_canonique'].strip()
+                    style = row.get('style', '').strip()
 
-                    self.artistes[nom.lower()] = {
-                        'nom': nom,
-                        'nom_normalise': nom_norm,
-                        'style': style
-                    }
-                    if nom_norm:
-                        self.artistes_by_normalise[nom_norm] = nom
+                    self.artistes[nom.lower()] = {'nom': nom, 'style': style}
 
-            logger.debug(f"Charge {len(self.artistes)} artistes depuis artiste.csv")
-        else:
-            logger.debug(f"Fichier non trouve (optionnel): {artiste_path}")
+                    nom_norm = normalize_for_matching(nom)
+                    if nom_norm and nom_norm not in self.artistes_by_normalized:
+                        self.artistes_by_normalized[nom_norm] = nom
 
-        self.aliases: Dict[str, str] = {}
-        self.aliases_normalise: Dict[str, str] = {}
+            logger.debug(f"Chargé {len(self.artistes)} artistes depuis artiste.csv")
+
+        self.aliases: Dict[str, str] = {}  # variante_lower -> nom_canonique
+        self.aliases_normalized: Dict[str, str] = {}
 
         alias_path = self.corpus_dir / 'artiste_alias.csv'
         if alias_path.exists():
             with open(alias_path, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    variante = row['variante']
-                    artiste_nom = row['artiste_nom']
+                    variante = row['variante'].strip()
+                    artiste_nom = row['artiste_nom'].strip()
 
                     self.aliases[variante.lower()] = artiste_nom
-                    norm = normalize_name(variante)
-                    if norm:
-                        self.aliases_normalise[norm] = artiste_nom
 
-            logger.debug(f"Charge {len(self.aliases)} aliases depuis artiste_alias.csv")
+                    variante_norm = normalize_for_matching(variante)
+                    if variante_norm:
+                        self.aliases_normalized[variante_norm] = artiste_nom
 
-    def find_artiste(self, artiste_raw: str) -> Optional[tuple[str, str]]:
+            logger.debug(f"Chargé {len(self.aliases)} aliases depuis artiste_alias.csv")
+
+    def find_artiste(self, artiste_raw: str) -> Optional[Tuple[str, str]]:
         """
         Trouve l'artiste correspondant.
 
-        Args:
-            artiste_raw: Nom de l'artiste tel qu'extrait
-
         Returns:
-            (nom_canonique, style) ou None si non trouve
+            (nom_canonique, style) ou None si non trouvé
         """
         if not artiste_raw or not artiste_raw.strip():
             return None
@@ -383,37 +524,36 @@ class ArtisteNormalizer:
         self._cache[cache_key] = result
         return result
 
-    def _match_artiste(self, artiste_raw: str) -> Optional[tuple[str, str]]:
-        """Logique de matching par ordre de priorite."""
+    def _match_artiste(self, artiste_raw: str) -> Optional[Tuple[str, str]]:
+        """Logique de matching."""
 
         artiste_lower = artiste_raw.lower()
-        artiste_norm = normalize_name(artiste_raw)
+        artiste_norm = normalize_for_matching(artiste_raw)
 
-        # 1. Match exact (case-insensitive)
+        # 1. Match exact case-insensitive
         if artiste_lower in self.artistes:
-            data = self.artistes[artiste_lower]
-            return (data['nom'], data['style'])
+            d = self.artistes[artiste_lower]
+            return (d['nom'], d['style'])
 
-        # 2. Match par alias exact
+        # 2. Match normalisé automatique
+        if artiste_norm and artiste_norm in self.artistes_by_normalized:
+            nom = self.artistes_by_normalized[artiste_norm]
+            d = self.artistes[nom.lower()]
+            return (d['nom'], d['style'])
+
+        # 3. Match par alias exact
         if artiste_lower in self.aliases:
-            nom_canonique = self.aliases[artiste_lower]
-            if nom_canonique.lower() in self.artistes:
-                data = self.artistes[nom_canonique.lower()]
-                return (data['nom'], data['style'])
+            nom = self.aliases[artiste_lower]
+            if nom.lower() in self.artistes:
+                d = self.artistes[nom.lower()]
+                return (d['nom'], d['style'])
 
-        # 3. Match par nom normalise
-        if artiste_norm and artiste_norm in self.artistes_by_normalise:
-            nom_canonique = self.artistes_by_normalise[artiste_norm]
-            if nom_canonique.lower() in self.artistes:
-                data = self.artistes[nom_canonique.lower()]
-                return (data['nom'], data['style'])
-
-        # 4. Match par alias normalise
-        if artiste_norm and artiste_norm in self.aliases_normalise:
-            nom_canonique = self.aliases_normalise[artiste_norm]
-            if nom_canonique.lower() in self.artistes:
-                data = self.artistes[nom_canonique.lower()]
-                return (data['nom'], data['style'])
+        # 4. Match par alias normalisé
+        if artiste_norm and artiste_norm in self.aliases_normalized:
+            nom = self.aliases_normalized[artiste_norm]
+            if nom.lower() in self.artistes:
+                d = self.artistes[nom.lower()]
+                return (d['nom'], d['style'])
 
         return None
 
@@ -422,9 +562,80 @@ class ArtisteNormalizer:
         return list(self.artistes.values())
 
     def reload(self):
-        """Recharge les donnees depuis les CSV."""
+        """Recharge les données depuis les CSV."""
         self._cache = {}
         self._load_from_csv()
+
+
+class StyleNormalizer:
+    """
+    Normalisation des styles/genres.
+
+    Règles automatiques + aliases CSV.
+    """
+
+    # Styles canoniques et leurs variations automatiques
+    STYLE_EXPANSIONS = {
+        'th.': 'théâtre',
+        'th': 'théâtre',
+        'theatre': 'théâtre',
+        'chanson fr.': 'chanson française',
+        'chanson fr': 'chanson française',
+        'ch. fr.': 'chanson française',
+        'ch.fr.': 'chanson française',
+        'ch fr': 'chanson française',
+    }
+
+    def __init__(self, corpus_dir: Path = CORPUS_DIR):
+        self.corpus_dir = corpus_dir
+        self._load_data()
+
+    def _load_data(self):
+        """Charge les aliases depuis le CSV."""
+        self.aliases: Dict[str, str] = {}
+
+        # Charger les expansions automatiques
+        for variante, canonique in self.STYLE_EXPANSIONS.items():
+            self.aliases[variante.lower()] = canonique
+
+        # Charger les aliases CSV (prioritaires)
+        style_alias_path = self.corpus_dir / 'style_alias.csv'
+        if style_alias_path.exists():
+            with open(style_alias_path, 'r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    variante = row['variante'].strip().lower()
+                    canonique = row['style_canonique'].strip()
+                    self.aliases[variante] = canonique
+
+            logger.debug(f"Chargé {len(self.aliases)} aliases de styles")
+
+    def normalize(self, style_raw: str) -> str:
+        """
+        Normalise un style.
+
+        Returns:
+            Style canonique ou l'original si non trouvé
+        """
+        if not style_raw:
+            return style_raw
+
+        style_lower = style_raw.lower().strip()
+
+        # Lookup direct
+        if style_lower in self.aliases:
+            return self.aliases[style_lower]
+
+        # Lookup sans accents
+        style_no_accent = remove_accents(style_lower)
+        if style_no_accent in self.aliases:
+            return self.aliases[style_no_accent]
+
+        return style_raw
+
+    def reload(self):
+        """Recharge les données."""
+        self._load_data()
 
 
 # =============================================================================
@@ -432,7 +643,9 @@ class ArtisteNormalizer:
 # =============================================================================
 
 _lieu_normalizer: Optional[LieuNormalizer] = None
+_ville_normalizer: Optional[VilleNormalizer] = None
 _artiste_normalizer: Optional[ArtisteNormalizer] = None
+_style_normalizer: Optional[StyleNormalizer] = None
 
 
 def get_lieu_normalizer() -> LieuNormalizer:
@@ -443,6 +656,14 @@ def get_lieu_normalizer() -> LieuNormalizer:
     return _lieu_normalizer
 
 
+def get_ville_normalizer() -> VilleNormalizer:
+    """Retourne l'instance singleton du normaliseur de villes."""
+    global _ville_normalizer
+    if _ville_normalizer is None:
+        _ville_normalizer = VilleNormalizer()
+    return _ville_normalizer
+
+
 def get_artiste_normalizer() -> ArtisteNormalizer:
     """Retourne l'instance singleton du normaliseur d'artistes."""
     global _artiste_normalizer
@@ -451,13 +672,20 @@ def get_artiste_normalizer() -> ArtisteNormalizer:
     return _artiste_normalizer
 
 
+def get_style_normalizer() -> StyleNormalizer:
+    """Retourne l'instance singleton du normaliseur de styles."""
+    global _style_normalizer
+    if _style_normalizer is None:
+        _style_normalizer = StyleNormalizer()
+    return _style_normalizer
+
+
 def reload_normalizers():
     """Recharge tous les normaliseurs depuis les CSV."""
-    global _lieu_normalizer, _artiste_normalizer
-    if _lieu_normalizer:
-        _lieu_normalizer.reload()
-    if _artiste_normalizer:
-        _artiste_normalizer.reload()
+    global _lieu_normalizer, _ville_normalizer, _artiste_normalizer, _style_normalizer
+    for norm in [_lieu_normalizer, _ville_normalizer, _artiste_normalizer, _style_normalizer]:
+        if norm:
+            norm.reload()
 
 
 # =============================================================================
@@ -468,7 +696,7 @@ def reload_normalizers():
 def load_lieu_index_with_aliases(db_path: str = None) -> dict[str, tuple[int, str]]:
     """
     Charge un index de matching pour les lieux (incluant les alias).
-    Retourne dict: {nom_lower: (lieu_id, nom_canonique)}
+    Retourne dict: {nom_lower_or_norm: (lieu_id, nom_canonique)}
     """
     import sqlite3
     path = db_path or str(DEFAULT_DB_PATH)
@@ -480,11 +708,16 @@ def load_lieu_index_with_aliases(db_path: str = None) -> dict[str, tuple[int, st
     # Charger lieu_ref (actifs uniquement)
     cur.execute('SELECT id, nom FROM lieu_ref WHERE actif = 1')
     for lieu_id, nom in cur.fetchall():
+        # Forme lowercase
         index[nom.lower()] = (lieu_id, nom)
-        # Ajouter forme normalisee
-        norm = normalize_name(nom)
+        # Forme normalisée automatique
+        norm = normalize_for_matching(nom)
         if norm:
             index[norm] = (lieu_id, nom)
+        # Forme sans préfixes
+        stripped = normalize_for_matching(strip_prefixes(nom))
+        if stripped and stripped != norm:
+            index[stripped] = (lieu_id, nom)
 
     # Charger lieu_alias -> pointer vers lieu_ref
     cur.execute('''
@@ -494,7 +727,7 @@ def load_lieu_index_with_aliases(db_path: str = None) -> dict[str, tuple[int, st
     ''')
     for variante, lieu_id, nom_canonique in cur.fetchall():
         index[variante.lower()] = (lieu_id, nom_canonique)
-        norm = normalize_name(variante)
+        norm = normalize_for_matching(variante)
         if norm:
             index[norm] = (lieu_id, nom_canonique)
 
@@ -506,7 +739,7 @@ def load_lieu_index_with_aliases(db_path: str = None) -> dict[str, tuple[int, st
 def load_artiste_index_with_aliases(db_path: str = None) -> dict[str, tuple[int, str]]:
     """
     Charge un index de matching pour les artistes (incluant les alias).
-    Retourne dict: {nom_lower: (artiste_id, nom_canonique)}
+    Retourne dict: {nom_lower_or_norm: (artiste_id, nom_canonique)}
     """
     import sqlite3
     path = db_path or str(DEFAULT_DB_PATH)
@@ -519,7 +752,7 @@ def load_artiste_index_with_aliases(db_path: str = None) -> dict[str, tuple[int,
     cur.execute('SELECT id, nom FROM artiste_ref WHERE actif = 1')
     for artiste_id, nom in cur.fetchall():
         index[nom.lower()] = (artiste_id, nom)
-        norm = normalize_name(nom)
+        norm = normalize_for_matching(nom)
         if norm:
             index[norm] = (artiste_id, nom)
 
@@ -531,7 +764,7 @@ def load_artiste_index_with_aliases(db_path: str = None) -> dict[str, tuple[int,
     ''')
     for variante, artiste_id, nom_canonique in cur.fetchall():
         index[variante.lower()] = (artiste_id, nom_canonique)
-        norm = normalize_name(variante)
+        norm = normalize_for_matching(variante)
         if norm:
             index[norm] = (artiste_id, nom_canonique)
 
@@ -542,8 +775,7 @@ def load_artiste_index_with_aliases(db_path: str = None) -> dict[str, tuple[int,
 def find_lieu_ref_id(lieu_raw: str, db_path: str = None) -> tuple[Optional[int], Optional[str]]:
     """
     Trouve l'ID de lieu_ref pour un lieu brut (via matching avec aliases).
-
-    Retourne (lieu_ref_id, nom_canonique) ou (None, None) si non trouve.
+    Retourne (lieu_ref_id, nom_canonique) ou (None, None) si non trouvé.
     """
     if not lieu_raw or not lieu_raw.strip():
         return None, None
@@ -555,19 +787,15 @@ def find_lieu_ref_id(lieu_raw: str, db_path: str = None) -> tuple[Optional[int],
     if key in index:
         return index[key]
 
-    # Match par nom normalise
-    norm = normalize_name(lieu_raw)
+    # Match par nom normalisé
+    norm = normalize_for_matching(lieu_raw)
     if norm and norm in index:
         return index[norm]
 
-    # Match partiel (le lieu brut contient le nom de reference ou vice-versa)
-    if norm and len(norm) > 4:
-        for ref_key, (lieu_id, nom_canonique) in index.items():
-            if len(ref_key) > 4:
-                if ref_key in norm or norm in ref_key:
-                    ratio = min(len(ref_key), len(norm)) / max(len(ref_key), len(norm))
-                    if ratio > 0.5:
-                        return (lieu_id, nom_canonique)
+    # Match sans préfixes
+    stripped = normalize_for_matching(strip_prefixes(lieu_raw))
+    if stripped and stripped in index:
+        return index[stripped]
 
     return None, None
 
@@ -575,8 +803,7 @@ def find_lieu_ref_id(lieu_raw: str, db_path: str = None) -> tuple[Optional[int],
 def find_artiste_ref_id(artiste_raw: str, db_path: str = None) -> tuple[Optional[int], Optional[str]]:
     """
     Trouve l'ID de artiste_ref pour un artiste brut (via matching avec aliases).
-
-    Retourne (artiste_ref_id, nom_canonique) ou (None, None) si non trouve.
+    Retourne (artiste_ref_id, nom_canonique) ou (None, None) si non trouvé.
     """
     if not artiste_raw or not artiste_raw.strip():
         return None, None
@@ -588,30 +815,21 @@ def find_artiste_ref_id(artiste_raw: str, db_path: str = None) -> tuple[Optional
     if key in index:
         return index[key]
 
-    # Match par nom normalise
-    norm = normalize_name(artiste_raw)
+    # Match par nom normalisé
+    norm = normalize_for_matching(artiste_raw)
     if norm and norm in index:
         return index[norm]
-
-    # Match partiel plus strict pour artistes
-    if norm and len(norm) > 5:
-        for ref_key, (artiste_id, nom_canonique) in index.items():
-            if len(ref_key) > 5:
-                if ref_key in norm or norm in ref_key:
-                    ratio = min(len(ref_key), len(norm)) / max(len(ref_key), len(norm))
-                    if ratio > 0.7:  # Plus strict
-                        return (artiste_id, nom_canonique)
 
     return None, None
 
 
 # =============================================================================
-# Fonctions legacy (compatibilite avec l'existant)
+# Fonctions legacy (compatibilité avec l'existant)
 # =============================================================================
 
 @lru_cache(maxsize=1)
 def load_lieu_ref(db_path: str = None) -> dict[int, str]:
-    """Charge le referentiel des lieux depuis la DB."""
+    """Charge le référentiel des lieux depuis la DB."""
     import sqlite3
     path = db_path or str(DEFAULT_DB_PATH)
     conn = sqlite3.connect(path)
@@ -624,7 +842,7 @@ def load_lieu_ref(db_path: str = None) -> dict[int, str]:
 
 @lru_cache(maxsize=1)
 def load_ville_ref(db_path: str = None) -> dict[int, str]:
-    """Charge le referentiel des villes depuis la DB."""
+    """Charge le référentiel des villes depuis la DB."""
     import sqlite3
     path = db_path or str(DEFAULT_DB_PATH)
     conn = sqlite3.connect(path)
@@ -635,112 +853,59 @@ def load_ville_ref(db_path: str = None) -> dict[int, str]:
     return villes
 
 
-def build_lieu_index(lieux_ref: dict[int, str]) -> dict[str, tuple[int, str]]:
-    """
-    Construit un index de matching pour les lieux.
-    Retourne dict: {normalized_variant: (lieu_id, lieu_nom_officiel)}
-    """
-    index = {}
-
-    for lieu_id, nom in lieux_ref.items():
-        # Forme originale normalisee
-        norm = normalize_text(nom)
-        index[norm] = (lieu_id, nom)
-
-        # Sans prefixes
-        stripped = strip_prefixes(nom)
-        index[normalize_text(stripped)] = (lieu_id, nom)
-
-        # Avec expansion abreviations
-        expanded = expand_abbreviations(nom)
-        index[normalize_text(expanded)] = (lieu_id, nom)
-
-    return index
-
-
 def normalize_lieu(lieu_raw: str, db_path: str = None) -> tuple[Optional[int], Optional[str]]:
     """
-    Normalise un nom de lieu extrait vers le referentiel.
-
-    Retourne (lieu_ref_id, lieu_nom_normalise) ou (None, lieu_raw) si non trouve.
-
-    Exemples:
-    - "Th. Paul Scarron" -> (173, "Theatre Paul Scarron")
-    - "bar le Lezard" -> (252, "Le Lezard")
-    - "L'oasis" -> (68, "L'Oasis")
+    Normalise un nom de lieu extrait vers le référentiel.
+    Retourne (lieu_ref_id, lieu_nom_normalise) ou (None, lieu_raw) si non trouvé.
     """
     if not lieu_raw:
         return None, None
 
-    path = db_path or str(DEFAULT_DB_PATH)
-    lieux_ref = load_lieu_ref(path)
-    index = build_lieu_index(lieux_ref)
+    # Utiliser la fonction avec index
+    lieu_id, nom = find_lieu_ref_id(lieu_raw, db_path)
+    if lieu_id:
+        return lieu_id, nom
 
-    # Essayer differentes normalisations
-    candidates = [
-        normalize_text(lieu_raw),
-        normalize_text(strip_prefixes(lieu_raw)),
-        normalize_text(expand_abbreviations(lieu_raw)),
-        normalize_text(strip_prefixes(expand_abbreviations(lieu_raw))),
-    ]
-
-    for candidate in candidates:
-        if candidate in index:
-            return index[candidate]
-
-    # Matching partiel (le lieu extrait contient le nom de reference ou vice-versa)
-    lieu_norm = normalize_text(lieu_raw)
-    if not lieu_norm:
-        return None, lieu_raw
-
-    for ref_norm, (lieu_id, lieu_nom) in index.items():
-        if ref_norm in lieu_norm or lieu_norm in ref_norm:
-            # Verifier que c'est un match significatif (>50% de longueur)
-            if len(ref_norm) > 3 and (len(ref_norm) / len(lieu_norm) > 0.5 or len(lieu_norm) / len(ref_norm) > 0.5):
-                return (lieu_id, lieu_nom)
-
-    # Non trouve
     return None, lieu_raw
 
 
 def normalize_ville(ville_raw: str, db_path: str = None) -> tuple[Optional[int], str]:
     """
-    Normalise un nom de ville extrait vers le referentiel.
-
+    Normalise un nom de ville extrait vers le référentiel.
     Retourne (ville_ref_id, ville_nom_normalise).
     Si ville_raw est vide/None -> retourne l'id du Mans.
     """
     path = db_path or str(DEFAULT_DB_PATH)
     villes_ref = load_ville_ref(path)
 
-    # Regle : si ville nulle -> Le Mans
+    # Règle : si ville nulle -> Le Mans
     if not ville_raw or not ville_raw.strip():
-        # Chercher l'id du Mans
         for ville_id, nom in villes_ref.items():
             if nom.lower() == 'le mans':
                 return ville_id, 'Le Mans'
         return None, 'Le Mans'
 
-    # Matching exact normalise
-    ville_norm = normalize_text(ville_raw)
+    # Matching avec normalisation
+    ville_norm = normalize_for_matching(ville_raw)
 
     for ville_id, nom in villes_ref.items():
-        if normalize_text(nom) == ville_norm:
+        # Match exact lowercase
+        if nom.lower() == ville_raw.lower().strip():
+            return ville_id, nom
+        # Match normalisé
+        if normalize_for_matching(nom) == ville_norm:
             return ville_id, nom
 
-    # Matching partiel
+    # Non trouvé -> Le Mans par défaut
     for ville_id, nom in villes_ref.items():
-        ref_norm = normalize_text(nom)
-        if ref_norm in ville_norm or ville_norm in ref_norm:
-            if len(ref_norm) > 3:
-                return ville_id, nom
+        if nom.lower() == 'le mans':
+            return ville_id, 'Le Mans'
 
-    # Non trouve mais pas vide -> garder le raw
     return None, ville_raw
 
 
 def clear_caches():
-    """Vide les caches (utile apres rechargement de la base)."""
+    """Vide les caches (utile après rechargement de la base)."""
     load_lieu_ref.cache_clear()
     load_ville_ref.cache_clear()
     load_lieu_index_with_aliases.cache_clear()
@@ -753,75 +918,109 @@ def clear_caches():
 # =============================================================================
 
 if __name__ == '__main__':
-    print("=== TEST NORMALISATION ===\n")
+    logging.basicConfig(level=logging.DEBUG)
 
-    # Test nouveau systeme CSV
-    print("--- LieuNormalizer (CSV) ---")
+    print("=" * 60)
+    print("TEST NORMALISATION AUTOMATIQUE")
+    print("=" * 60)
+
+    # Test fonction normalize_for_matching
+    print("\n--- normalize_for_matching() ---")
+    tests = [
+        ("AZURYTE", "azuryte"),
+        ("Th. Paul Scarron", "theatre paul scarron"),
+        ("Auvers le-Hamon", "auvers le hamon"),
+        ("Chemiré-le-Gaudin", "chemire le gaudin"),
+        ("L'Écluse", "l ecluse"),
+        ("L Écluse", "l ecluse"),
+        ("St Pavace", "saint pavace"),
+        ("St. Pavace", "saint pavace"),
+        ("Moncé s/Loir", "monce sur loir"),
+        ("Esp. Culturel", "espace culturel"),
+        ("La Flèche", "la fleche"),
+        ("Ste-Jamme-sur-Sarthe", "sainte jamme sur sarthe"),
+        ("DJ SUPER LUCIEN", "dj super lucien"),
+    ]
+
+    all_pass = True
+    for input_str, expected in tests:
+        result = normalize_for_matching(input_str)
+        status = "✓" if result == expected else "✗"
+        if result != expected:
+            all_pass = False
+        print(f"  {status} '{input_str}' → '{result}' (attendu: '{expected}')")
+
+    print(f"\nRésultat: {'TOUS OK' if all_pass else 'ÉCHECS DÉTECTÉS'}")
+
+    # Test LieuNormalizer
+    print("\n--- LieuNormalizer ---")
     lieu_norm = get_lieu_normalizer()
-    print(f"Lieux charges: {len(lieu_norm.lieux)}")
-    print(f"Aliases charges: {len(lieu_norm.aliases)}")
+    print(f"Lieux chargés: {len(lieu_norm.lieux)}")
+    print(f"Aliases chargés: {len(lieu_norm.aliases)}")
 
-    tests_lieux = [
-        'Th. Paul Scarron',
-        'bar le Lezard',
-        "L'oasis",
-        'le barouf',
-        'Blue Zinc',
-        'MJC Ronceray',
-        "L'Alambik",
-        'Le Mans Bowling',
-        'S.Jean Carmet',
-        'La Peniche Excelsior',
+    lieu_tests = [
+        "Th. Paul Scarron",
+        "th paul scarron",
+        "THEATRE PAUL SCARRON",
+        "L'Oasis",
+        "l oasis",
+        "L OASIS",
+        "Le Barouf",
+        "le barouf",
+        "BAROUF",
+        "Le Mackeson",
+        "le mackeson",
     ]
 
-    for lieu in tests_lieux:
+    for lieu in lieu_tests:
         result = lieu_norm.find_lieu(lieu)
-        status = '[OK]' if result else '[--]'
+        status = "✓" if result else "✗"
         if result:
-            print(f'{status} {lieu:25} -> {result[0]} ({result[1]})')
+            print(f"  {status} '{lieu}' → '{result[0]}' ({result[1]})")
         else:
-            print(f'{status} {lieu:25} -> non trouve')
+            print(f"  {status} '{lieu}' → non trouvé")
 
-    # Test artistes
-    print("\n--- ArtisteNormalizer (CSV) ---")
-    artiste_norm = get_artiste_normalizer()
-    print(f"Artistes charges: {len(artiste_norm.artistes)}")
-    print(f"Aliases charges: {len(artiste_norm.aliases)}")
+    # Test VilleNormalizer
+    print("\n--- VilleNormalizer ---")
+    ville_norm = get_ville_normalizer()
+    print(f"Villes chargées: {len(ville_norm.villes)}")
 
-    tests_artistes = [
-        'DJ SUPER LUCIEN',
-        'Dj Super Lucien',
-        'AZURYTE',
-        'azuryte',
+    ville_tests = [
+        "Le Mans",
+        "le mans",
+        "LE MANS",
+        "La Flèche",
+        "La Fleche",
+        "la fleche",
+        "Chemiré-le-Gaudin",
+        "Chemire le Gaudin",
+        "Saint-Pavace",
+        "St Pavace",
+        "Auvers-le-Hamon",
+        "Auvers le-Hamon",
+        "",
     ]
 
-    for artiste in tests_artistes:
-        result = artiste_norm.find_artiste(artiste)
-        status = '[OK]' if result else '[--]'
-        if result:
-            print(f'{status} {artiste:25} -> {result[0]} (style: {result[1] or "-"})')
-        else:
-            print(f'{status} {artiste:25} -> non trouve')
+    for ville in ville_tests:
+        result, found = ville_norm.find_ville(ville)
+        status = "✓" if found else "→"
+        print(f"  {status} '{ville}' → '{result}' (found={found})")
 
-    # Test legacy (DB)
-    print("\n--- Legacy (DB) ---")
-    for lieu in tests_lieux[:5]:
-        ref_id, normalized = normalize_lieu(lieu)
-        status = '[OK]' if ref_id else '[--]'
-        print(f'{status} {lieu:25} -> id={ref_id}, nom={normalized}')
+    # Test StyleNormalizer
+    print("\n--- StyleNormalizer ---")
+    style_norm = get_style_normalizer()
 
-    tests_villes = [
-        'Le Mans',
-        'le mans',
-        '',
-        None,
-        'Allonnes',
-        'Saint-Pavace',
-        'Arnage',
+    style_tests = [
+        ("th.", "théâtre"),
+        ("Th.", "théâtre"),
+        ("th", "théâtre"),
+        ("théâtre", "théâtre"),
+        ("chanson fr.", "chanson française"),
+        ("ch. fr.", "chanson française"),
+        ("rock", "rock"),
     ]
 
-    print('\n--- Villes (legacy) ---')
-    for ville in tests_villes:
-        ref_id, normalized = normalize_ville(ville)
-        status = '[OK]' if ref_id else '[--]'
-        print(f'{status} {str(ville):20} -> id={ref_id}, nom={normalized}')
+    for style_in, expected in style_tests:
+        result = style_norm.normalize(style_in)
+        status = "✓" if result == expected else "✗"
+        print(f"  {status} '{style_in}' → '{result}' (attendu: '{expected}')")
