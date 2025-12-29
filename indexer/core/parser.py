@@ -2288,20 +2288,25 @@ class ParsedEvent:
         """
         Vérifie si l'événement est valide (contenu minimal requis).
 
-        Un événement est considéré valide s'il a au moins:
-        - Une date OU
-        - Un artiste/spectacle/nom d'événement OU
-        - Un lieu
+        Un événement exploitable dans un agenda doit avoir:
+        - Une date ET un lieu, OU
+        - Une date ET un contenu (artiste/spectacle/nom), OU
+        - Un lieu ET un contenu
 
-        Les événements avec seulement du texte non structuré (ex: "(réservations au ...)")
-        sont rejetés.
+        Les événements avec seulement artiste+heure+prix (sans date ni lieu)
+        ne sont pas exploitables car on ne sait pas où ni quand ils ont lieu.
+
+        Exemples rejetés:
+        - "MAGMA 20h30" (artiste + heure, mais pas de date ni lieu)
+        - "(réservations au 06 10 53 38 40)" (texte non structuré)
         """
         has_date = self.date_evenement is not None or self.date_str is not None
         has_content = bool(self.artistes) or bool(self.spectacles) or bool(self.nom)
         has_lieu = self.lieu_raw is not None
 
-        # Au moins un des critères doit être rempli
-        if not (has_date or has_content or has_lieu):
+        # Un événement doit avoir au moins 2 des 3 critères pour être exploitable
+        criteria_count = sum([has_date, has_content, has_lieu])
+        if criteria_count < 2:
             return False
 
         # Rejeter les événements qui ne sont que du texte entre parenthèses
