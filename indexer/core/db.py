@@ -335,6 +335,22 @@ class BidulDB:
             ).fetchone()[0]
         return conn.execute("SELECT COUNT(*) FROM evenement").fetchone()[0]
 
+    def count_contenu_evenement(self, bidul_numero: int) -> dict:
+        """Compte les artistes et spectacles pour un bidul."""
+        conn = self.connect()
+        result = conn.execute("""
+            SELECT
+                COUNT(DISTINCT ce.artiste) as artistes,
+                COUNT(DISTINCT ce.nom_spectacle) as spectacles
+            FROM contenu_evenement ce
+            JOIN evenement e ON ce.evenement_id = e.id
+            WHERE e.bidul_numero = ?
+        """, (bidul_numero,)).fetchone()
+        return {
+            'artistes': result[0] if result else 0,
+            'spectacles': result[1] if result else 0
+        }
+
     def get_evenements_for_bidul(self, bidul_numero: int) -> list[dict]:
         """Récupère tous les événements d'un Bidul sous forme de dictionnaires."""
         conn = self.connect()

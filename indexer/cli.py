@@ -636,6 +636,7 @@ def cmd_populate(args):
 
             # Compter les événements existants avant suppression
             existing_count = db.count_evenements(numero)
+            existing_contenu = db.count_contenu_evenement(numero)
 
             # Supprimer TOUS les événements du bidul avant de re-parser
             if not args.dry_run:
@@ -707,7 +708,14 @@ def cmd_populate(args):
                     })
 
             dry_run_suffix = " (dry-run)" if args.dry_run else ""
-            # Calculer le pourcentage d'amélioration
+
+            # Compter les contenu_evenement après reparsing
+            if not args.dry_run:
+                new_contenu = db.count_contenu_evenement(numero)
+            else:
+                new_contenu = {'artistes': 0, 'spectacles': 0}
+
+            # Calculer le pourcentage d'amélioration pour les événements
             if existing_count > 0:
                 pct_change = ((reparsed_count - existing_count) / existing_count) * 100
                 if pct_change > 0:
@@ -718,8 +726,16 @@ def cmd_populate(args):
                     pct_str = " (=)"
             else:
                 pct_str = " (nouveau)"
+
+            # Formater les stats contenu_evenement
+            old_art = existing_contenu.get('artistes', 0)
+            new_art = new_contenu.get('artistes', 0)
+            old_spec = existing_contenu.get('spectacles', 0)
+            new_spec = new_contenu.get('spectacles', 0)
+            contenu_str = f"art: {old_art}->{new_art}, spec: {old_spec}->{new_spec}"
+
             timestamp = datetime.now().strftime("%H:%M:%S")
-            print(f"[{timestamp}] [{numero}] Re-parsé: {existing_count} -> {reparsed_count} événements{pct_str} (format={date_format or 'auto'}){dry_run_suffix}")
+            print(f"[{timestamp}] [{numero}] Re-parsé: {existing_count} -> {reparsed_count} événements{pct_str} | {contenu_str} (format={date_format or 'auto'}){dry_run_suffix}")
             total_reparsed += reparsed_count
             reparsed_biduls += 1
             continue

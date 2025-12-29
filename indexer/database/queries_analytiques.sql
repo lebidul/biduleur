@@ -39,7 +39,7 @@ LEFT JOIN ville_ref vr ON e.ville_ref_id = vr.id
 LEFT JOIN contenu_evenement c ON e.id = c.evenement_id
 LEFT JOIN artiste_ref ar ON c.artiste_ref_id = ar.id
 WHERE e.bidul_numero = 204
-ORDER BY e.raw_text, e.heure, c.ordre;
+ORDER BY e.date_evenement,e.raw_text,e.heure;
 -- ORDER BY e.date_evenement, e.heure, c.ordre;
 
 -- Événements d'une date précise avec détails complets (normalisés)
