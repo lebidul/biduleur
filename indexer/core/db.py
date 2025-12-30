@@ -185,13 +185,16 @@ class BidulDB:
         # Générer raw_text_clean (sans balises de formatage)
         raw_text_clean = strip_formatting_tags(event.raw_text) if event.raw_text else None
 
+        # Récupérer is_regional depuis event (défaut: False)
+        is_regional = getattr(event, 'is_regional', False)
+
         cursor = conn.execute("""
             INSERT INTO evenement (
                 bidul_numero, raw_text, raw_text_clean, nom, date_evenement, heure,
                 lieu_raw, lieu_ref_id, ville_raw, ville_ref_id,
                 tarif_raw, prix_min, prix_max, gratuit,
-                type_evenement, confidence
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                type_evenement, confidence, is_regional
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             bidul_numero,
             event.raw_text,
@@ -208,7 +211,8 @@ class BidulDB:
             event.prix_max,
             event.gratuit,
             event.type_evenement,
-            event.confidence
+            event.confidence,
+            is_regional
         ))
         evenement_id = cursor.lastrowid
 
@@ -234,14 +238,17 @@ class BidulDB:
         # Cela préserve les villes non connues du référentiel (ex: Ancinnes, Coulongé)
         ville_to_store = event.get('ville_raw') or ville_normalized
 
+        # Récupérer is_regional depuis le dict (défaut: False)
+        is_regional = event.get('is_regional', False)
+
         cursor = conn.execute("""
             INSERT INTO evenement (
                 bidul_numero, raw_text, raw_text_clean, nom, date_evenement, heure,
                 lieu_raw, lieu_ref_id, ville_raw, ville_ref_id,
                 genre_evenement,
                 tarif_raw, prix_min, prix_max, gratuit,
-                type_evenement, confidence
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                type_evenement, confidence, is_regional
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             event['bidul_numero'],
             raw_text,
@@ -259,7 +266,8 @@ class BidulDB:
             event.get('prix_max'),
             event.get('gratuit', False),
             event.get('type_evenement'),
-            event.get('confidence', 0.5)
+            event.get('confidence', 0.5),
+            is_regional
         ))
         evenement_id = cursor.lastrowid
 

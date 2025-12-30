@@ -106,6 +106,9 @@ CREATE TABLE IF NOT EXISTS evenement (
     -- Source
     source TEXT DEFAULT 'pdf',
 
+    -- Événement hors département (région)
+    is_regional BOOLEAN DEFAULT FALSE,
+
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -115,6 +118,7 @@ CREATE INDEX IF NOT EXISTS idx_evt_lieu ON evenement(lieu_ref_id);
 CREATE INDEX IF NOT EXISTS idx_evt_ville ON evenement(ville_ref_id);
 CREATE INDEX IF NOT EXISTS idx_evenement_review_status ON evenement(review_status);
 CREATE INDEX IF NOT EXISTS idx_evenement_verified ON evenement(verified);
+CREATE INDEX IF NOT EXISTS idx_evenement_is_regional ON evenement(is_regional);
 
 -- -----------------------------------------------------------------------------
 -- Table: contenu_evenement

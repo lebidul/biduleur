@@ -42,6 +42,8 @@ from indexer.core.db import BidulDB
 from indexer.core.csv_importer import find_csv_for_bidul as find_csv_files, import_bidul_from_csv
 from indexer.core.ocr import ScanExtractor, load_bidul_config, is_scan_from_csv
 from indexer.core.ocr_postprocess import OCRPostProcessor
+from indexer.core.regional_filter import detect_regional
+from indexer.core.artifact_filter import detect_artifact
 
 # Configuration
 ARCHIVES_DIR = Path(__file__).parent / "archives"
@@ -492,6 +494,30 @@ def cmd_stats(args):
     """Affiche les statistiques globales."""
     db = BidulDB()
 
+    # Si --html, générer le dashboard HTML
+    if getattr(args, 'html', None):
+        from core.stats_generator import get_stats_data, generate_html
+
+        print("Generation du dashboard HTML...")
+        data = get_stats_data(str(db.db_path))
+
+        # Stats résumées
+        existing = [d for d in data if not d['missing']]
+        total_events = sum(d['events'] for d in existing)
+        total_content = sum(d['content'] for d in existing)
+        missing_count = len([d for d in data if d['missing']])
+        empty_count = len([d for d in data if d['events'] == 0 and not d['missing']])
+
+        print(f"  - {len(existing)} Biduls indexes")
+        print(f"  - {total_events:,} evenements")
+        print(f"  - {total_content:,} artistes/spectacles")
+        print(f"  - {missing_count} PDFs manquants")
+        print(f"  - {empty_count} Biduls vides")
+
+        output_path = generate_html(data, args.html)
+        print(f"\nDashboard genere : {output_path}")
+        return 0
+
     stats = db.get_stats()
 
     print(f"{'='*50}")
@@ -604,6 +630,16 @@ def cmd_populate(args):
     total_reparsed = 0
     reparsed_biduls = 0
 
+    # Stats pour filtrage régional
+    regional_excluded = 0
+    regional_included = 0
+    include_regional = getattr(args, 'include_regional', False)
+
+    # Stats pour filtrage artifacts
+    artifacts_excluded = 0
+    artifacts_included = 0
+    include_artifacts = getattr(args, 'include_artifacts', False)
+
     for numero in numeros:
         # Mode --reparse: re-parser depuis bidul.raw_text (texte complet)
         if getattr(args, 'reparse', False):
@@ -654,10 +690,49 @@ def cmd_populate(args):
                 ville_ref_list
             )
 
-            reparsed_count = len(parsed_events)
+            # Filtrer les événements régionaux et artifacts
+            events_to_insert = []
+            for event in parsed_events:
+                # Détecter si artifact (faux événement)
+                artifact_detection = detect_artifact(
+                    event.raw_text,
+                    lieu_raw=event.lieu_raw,
+                    artistes=event.artistes,
+                    spectacles=event.spectacles
+                )
+
+                if artifact_detection.is_artifact:
+                    if not include_artifacts:
+                        artifacts_excluded += 1
+                        if args.verbose:
+                            logging.debug(f"[{numero}] Exclus (artifact): {event.raw_text[:50]}... [{artifact_detection.reason}]")
+                        continue
+                    else:
+                        artifacts_included += 1
+                        if args.verbose:
+                            logging.debug(f"[{numero}] Inclus (artifact): {event.raw_text[:50]}... [{artifact_detection.reason}]")
+
+                # Détecter si régional
+                detection = detect_regional(event.raw_text, event.lieu_raw, event.ville_raw)
+                event.is_regional = detection.is_regional
+
+                if event.is_regional:
+                    if not include_regional:
+                        regional_excluded += 1
+                        if args.verbose:
+                            logging.debug(f"[{numero}] Exclus (régional): {event.raw_text[:50]}... [{detection.reason}]")
+                        continue
+                    else:
+                        regional_included += 1
+                        if args.verbose:
+                            logging.debug(f"[{numero}] Inclus (régional): {event.raw_text[:50]}... [{detection.reason}]")
+
+                events_to_insert.append(event)
+
+            reparsed_count = len(events_to_insert)
 
             if not args.dry_run:
-                for event in parsed_events:
+                for event in events_to_insert:
                     # Convertir ParsedEvent en dict pour insertion
                     date_evt = event.date_evenement
                     if hasattr(date_evt, 'isoformat'):
@@ -704,7 +779,8 @@ def cmd_populate(args):
                         'prix_max': event.prix_max,
                         'gratuit': event.gratuit,
                         'artistes': artistes,
-                        'spectacles': spectacles
+                        'spectacles': spectacles,
+                        'is_regional': event.is_regional
                     })
 
             dry_run_suffix = " (dry-run)" if args.dry_run else ""
@@ -849,6 +925,40 @@ def cmd_populate(args):
             source = 'scan' if is_scan else 'pdf'
             events = []
             for e in parsed_events:
+                # Détecter si artifact (faux événement)
+                artifact_detection = detect_artifact(
+                    e.raw_text,
+                    lieu_raw=e.lieu_raw,
+                    artistes=e.artistes,
+                    spectacles=e.spectacles
+                )
+
+                if artifact_detection.is_artifact:
+                    if not include_artifacts:
+                        artifacts_excluded += 1
+                        if args.verbose:
+                            logging.debug(f"[{numero}] Exclus (artifact): {e.raw_text[:50]}... [{artifact_detection.reason}]")
+                        continue
+                    else:
+                        artifacts_included += 1
+                        if args.verbose:
+                            logging.debug(f"[{numero}] Inclus (artifact): {e.raw_text[:50]}... [{artifact_detection.reason}]")
+
+                # Détecter si régional
+                detection = detect_regional(e.raw_text, e.lieu_raw, e.ville_raw)
+                is_regional_event = detection.is_regional
+
+                if is_regional_event:
+                    if not include_regional:
+                        regional_excluded += 1
+                        if args.verbose:
+                            logging.debug(f"[{numero}] Exclus (régional): {e.raw_text[:50]}... [{detection.reason}]")
+                        continue
+                    else:
+                        regional_included += 1
+                        if args.verbose:
+                            logging.debug(f"[{numero}] Inclus (régional): {e.raw_text[:50]}... [{detection.reason}]")
+
                 events.append({
                     'bidul_numero': numero,
                     'raw_text': e.raw_text,
@@ -866,7 +976,8 @@ def cmd_populate(args):
                     'prix_max': e.prix_max,
                     'gratuit': e.gratuit,
                     'type_evenement': e.type_evenement,
-                    'confidence': e.confidence
+                    'confidence': e.confidence,
+                    'is_regional': is_regional_event
                 })
             pdf_biduls += 1
             total_from_pdf += len(events)
@@ -915,6 +1026,18 @@ def cmd_populate(args):
     print(f"Biduls ignorés:    {skipped}")
     if not getattr(args, 'reparse', False):
         print(f"Total événements:  {total_events}")
+
+    # Stats artifacts
+    if artifacts_excluded > 0:
+        print(f"Artifacts exclus: {artifacts_excluded}")
+    if artifacts_included > 0:
+        print(f"Artifacts inclus: {artifacts_included}")
+
+    # Stats régionales
+    if regional_excluded > 0:
+        print(f"Événements régionaux exclus: {regional_excluded}")
+    if regional_included > 0:
+        print(f"Événements régionaux inclus: {regional_included}")
 
     return 0
 
@@ -2045,6 +2168,8 @@ Maintenance (normalisation v2):
 
     # stats
     p_stats = subparsers.add_parser('stats', help='Statistiques globales')
+    p_stats.add_argument('--html', nargs='?', const='stats/bidul_stats.html', metavar='PATH',
+                         help='Genere un dashboard HTML (defaut: stats/bidul_stats.html)')
 
     # list
     p_list = subparsers.add_parser('list', help='Liste les PDFs disponibles')
@@ -2063,6 +2188,10 @@ Maintenance (normalisation v2):
     p_populate.add_argument('--engine', '-e', default='google', choices=['paddleocr', 'easyocr', 'google'],
                            help='Moteur OCR (défaut: google)')
     p_populate.add_argument('--dpi', type=int, default=200, help='Résolution OCR (défaut: 200)')
+    p_populate.add_argument('--include-regional', action='store_true',
+                           help='Inclure les événements hors département (marqués is_regional=True)')
+    p_populate.add_argument('--include-artifacts', action='store_true',
+                           help='Inclure les faux événements (texte court, infos/annonces, sans contenu)')
 
     # purge
     p_purge = subparsers.add_parser('purge', help='Supprime les événements de la base')

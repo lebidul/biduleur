@@ -1,3 +1,74 @@
+# Release Notes - Indexer v1.7
+
+## Vue d'ensemble
+
+Version avec filtrage automatique des événements régionaux et artifacts, plus génération de dashboard HTML pour les statistiques.
+
+## Nouveautés v1.7
+
+### Filtrage des événements régionaux
+
+Nouveau module `core/regional_filter.py` pour détecter et filtrer les événements hors département 72 (Sarthe) :
+
+| Critère | Exemple | Résultat |
+|---------|---------|----------|
+| Code département (72) | `Concert, Le Mans (72)` | LOCAL |
+| Ville sarthoise | `Allonnes`, `La Flèche` | LOCAL |
+| Lieu au Mans | `Palais des Congrès, Le Mans` | LOCAL |
+| Code département hors 72 | `Chabada, Angers (49)` | RÉGIONAL |
+| Lieu connu hors Sarthe | `Le Chabada`, `L'Ubu` | RÉGIONAL |
+| Ville hors Sarthe | `Laval`, `Nantes`, `Rennes` | RÉGIONAL |
+
+**Utilisation :**
+```bash
+python cli.py populate --reparse                    # Exclut les régionaux (défaut)
+python cli.py populate --reparse --include-regional # Inclut les régionaux (is_regional=True)
+```
+
+### Filtrage des artifacts (faux événements)
+
+Nouveau module `core/artifact_filter.py` pour exclure automatiquement les blocs qui ne sont pas de vrais événements :
+
+| Critère | Exemple | Action |
+|---------|---------|--------|
+| Texte < 15 chars | `21h30` | Exclu |
+| Info/annonce | `Plus d'infos sur www...` | Exclu |
+| Pattern réservation | `Rens. 02 43...` | Exclu |
+| Sans contenu | Pas de lieu, artiste ni spectacle | Exclu |
+
+**Utilisation :**
+```bash
+python cli.py populate --reparse                     # Exclut les artifacts (défaut)
+python cli.py populate --reparse --include-artifacts # Inclut les artifacts
+```
+
+### Dashboard HTML pour les statistiques
+
+Nouvelle option `--html` pour la commande `stats` :
+
+```bash
+python cli.py stats                    # Stats terminal (comportement actuel)
+python cli.py stats --html             # Génère stats/bidul_stats.html
+python cli.py stats --html report.html # Chemin personnalisé
+```
+
+Le dashboard inclut :
+- Graphique interactif des événements/contenus par Bidul (Chart.js)
+- Statistiques globales (événements, artistes/spectacles, ratio)
+- Liste des PDFs manquants et Biduls vides
+- Détection des ratios anormaux
+- Top 10 des Biduls les plus riches
+
+### Colonne `is_regional` dans la base
+
+Nouvelle colonne booléenne dans la table `evenement` :
+```sql
+ALTER TABLE evenement ADD COLUMN is_regional BOOLEAN DEFAULT FALSE;
+CREATE INDEX idx_evenement_is_regional ON evenement(is_regional);
+```
+
+---
+
 # Release Notes - Indexer v1.6
 
 ## Vue d'ensemble

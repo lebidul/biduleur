@@ -2590,6 +2590,9 @@ class ParsedEvent:
     # Qualité
     confidence: float = 0.5
 
+    # Événement hors département (régional)
+    is_regional: bool = False
+
     def is_valid(self) -> bool:
         """
         Vérifie si l'événement est valide (contenu minimal requis).
