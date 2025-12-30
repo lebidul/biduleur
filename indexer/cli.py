@@ -860,7 +860,7 @@ def cmd_populate(args):
                     'artistes': json.dumps([a.to_dict() if hasattr(a, 'to_dict') else a for a in e.artistes], ensure_ascii=False) if e.artistes else None,
                     'spectacles': json.dumps(e.spectacles, ensure_ascii=False) if e.spectacles else None,
                     'genres_raw': json.dumps(e.genres_raw, ensure_ascii=False) if e.genres_raw else None,
-                    'genre_evenement': None,
+                    'genre_evenement': e.genre_evenement,
                     'tarif_raw': e.tarif_raw,
                     'prix_min': e.prix_min,
                     'prix_max': e.prix_max,

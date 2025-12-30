@@ -6,24 +6,30 @@
   * [215] Erreur extraction PDF: None
   * 2010-09 Bidul 147 bis.pdf
   * 2019-03 Bidul 242 Marion.pdf, 2019-03 Bidul 242 Stef@n.pdf
+  * #92 seulement 14 evenements (juillet aout)
   * pas d'événement Bidul 255 (covid)
   * bidul #233 page 3 pas bonne (vérifier si pas d'autres comme ça)
-  * #117 
-    * spectacle "13 à la douzaine"
-    * "Brette Les Pins" -> "Brette-les-Pins"
-    * "Confidences trop intimes" (th.), Caveau 105, Le Mans, Je au Sa: 21h, Di 17h, 9€ à 13€ -> ville + split
-    * "Marrons gagnants> (contes), Centre La Longère Coulaines sur Gée, 20h30, 3.5 à 9€ Ma 27 à 19h/Ve 30 à 20h: "Ricercar" (théâtre), par le Théâtre du Radeau, au lieu-dit Robin des Bois, chemin de la Foresterie, Le Mans, 5-10€
+  * #40
+    * ```<<DUO D'AMOUR" (théâtre), Salle André Voisin, Fresnay-sur-Sarthe (72), 20h30, 50 et 70F``` lieu non capturé
+  * #73
+    * ```STRASAX (jazz), ITEMM, Le Mans, 18h30``` lieu non capturé
+    * ````Scène ouverte jazz, L'Inventaire, MJC Prévert Le Mans, 21h, gratuit```` lieu non capturé
+  * #117
+    * Ancinnes Thorigné sur Dué Coulongé normalisés avec Le Mans
   * #260
     * juillet-août
     * festivals non reconnus
-  * #204
-    * ZIG ZAG (power pop), Bistrot de la Guinguette, Fillé s/Sarthe, 20h, au chapeau - artiste non reconnu
-    * `````"Syncope fait de la résistance #2" avec ROTTERDAMES (pop rock) + LOLA BAÏ (chanson pop) + UNLEASHING THE BEAST (metal hardcore) + PUPPA NADEM (raggamuffin fast style rap), Salle Jean Carmet 20h30, 5/7/9€```
-      Syncope fait de la résistance #2 comme evenement.nom
+  * #237
+    * ```<b>PALATINE </b>(<i>chanson folk pop rock</i>), La Péniche Excelsior, Allonnes, 20h30, 5/11€``` style non reconnu
+    * ```Festival Folkiri // <b>MES SOULIERS SONT ROUGES </b><i>(ch. folk</i>) <bi>+</bi><b> JEAN-CHARLES GUICHEN </b>(<i>musique bretonne</i>), Les Saulnières, 20h30, 11/17€``` styles non reconnus
+    * ```“<b>Nous ne viendrons pas manger dimanche</b>” (<i>théâtre</i>) collectif Grand Maximum, L’Envol, La Bazoge, 20h30, t.n.c COMPLET !``` artiste non reconnu`
   * raw_text	nom_spectacle
 <b>"A</b><b>Hfa de Yambolé"</b> <i>(conte dès 12 ans)</i>, S.Signoret, Mulsanne, 15h, 3.5/9.5 €	A</b><b>Hfa de Yambolé
 
-* enlever evenement.artistes et evenement.styles
+* alias:
+  * "Le Narais" lieu alias
+  * Sablé
+  * Sargé
 * refactor pour simplifier la logique et l'ajout de patterns
 * enlever tout ce qui vient après: "Et un peu plus loin..."
 * ajouter html ou csv tapages manquants
@@ -31,4 +37,4 @@
 * revoir avec grouping tous les lieux n'ayant pas de ref
 * stocker texte extrait dans table bidul pour csv
 * faire fichiers benchmark
-* consolidation pdf à continuer
+* consolidation parsing à continuer

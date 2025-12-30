@@ -87,17 +87,19 @@ Classe `BidulDB` pour la gestion SQLite.
 
 **Tables principales:**
 - `bidul` - Métadonnées des numéros (n°, mois, année, statut)
-- `evenement` - Événements avec raw_text, date, lieu, tarif, confidence
-- `contenu_evenement` - Artistes/spectacles normalisés (relation 1-N)
+- `evenement` - Événements avec raw_text, date, lieu, tarif, confidence (v1.6: sans colonnes JSON)
+- `contenu_evenement` - Artistes/spectacles normalisés (relation 1-N) - **source de vérité v1.6**
 - `lieu_ref` / `ville_ref` - Référentiels pour normalisation
 
-**Schéma relationnel:**
+**Schéma relationnel (v1.6):**
 ```
 bidul (1) ──► (N) evenement (1) ──► (N) contenu_evenement
-                     │
+                     │                      (artiste, nom_spectacle, style)
                      ▼
                lieu_ref / ville_ref
 ```
+
+**Note v1.6:** Les colonnes `artistes`, `spectacles`, `genres_raw`, `style` ont été supprimées de `evenement`. Utiliser `contenu_evenement` ou la vue `v_evenements_complets`.
 
 ### `core/normalizer.py` - Normalisation
 
@@ -445,6 +447,15 @@ parser = EventParser(bidul_mois=7, bidul_annee=2011, date_format='inline')
 2. **Lieux non référencés** - Extraction heuristique moins fiable
 3. **Formatage incohérent** - Certains vieux numéros ont un formatage variable
 4. **OCR des très anciens Biduls** - Qualité variable selon l'état du scan
+
+## Changelog v1.6
+
+- **Schema v3** : Suppression des colonnes JSON redondantes (`artistes`, `spectacles`, `genres_raw`, `style`) de la table `evenement`
+- **Source de vérité** : `contenu_evenement` devient la seule source pour artistes/spectacles
+- **Vue `v_evenements_complets`** : Agrégation automatique avec `GROUP_CONCAT`
+- **Villes inconnues** : Préservation des villes non référencées (ex: `Thorigné sur Dué`)
+- **Événements avec chiffres** : Support de `Born 2 Moonwalk Party` dans `evenement.nom`
+- **Parser `smart_split`** : Refactoring avec dictionnaire de guillemets, apostrophe exclue
 
 ## Changelog v1.5
 

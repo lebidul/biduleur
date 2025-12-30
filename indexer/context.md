@@ -20,7 +20,7 @@ Extraction et indexation des événements culturels depuis les archives PDF du f
 
 Les CSV sont prioritaires : si un CSV existe pour un mois donné, il remplace l'extraction PDF.
 
-## Structure de la base
+## Structure de la base (Schema V3)
 
 ```
 bidul (122 entrées)
@@ -33,14 +33,21 @@ evenement (~14500 entrées)
 ├── bidul_numero (FK)
 ├── date_evenement, heure
 ├── lieu_raw, ville_raw
-├── artistes (JSON array)
-├── spectacles (JSON array)
-├── genres_raw (JSON array)
 ├── tarif_raw, prix_min, prix_max, gratuit
 ├── type_evenement (concert, spectacle vivant, etc.)
+├── genre_evenement
 ├── source (csv/pdf)
 └── confidence (0.0-1.0)
+
+contenu_evenement (source de vérité pour artistes/spectacles)
+├── evenement_id (FK)
+├── artiste
+├── nom_spectacle
+├── style
+└── ordre
 ```
+
+**Note v1.6** : Les colonnes JSON redondantes (`artistes`, `spectacles`, `genres_raw`, `style`) ont été supprimées de la table `evenement`. Les données sont maintenant stockées uniquement dans `contenu_evenement`.
 
 ## Mapping Bidul <-> Date
 

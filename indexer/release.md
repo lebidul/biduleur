@@ -1,3 +1,63 @@
+# Release Notes - Indexer v1.6
+
+## Vue d'ensemble
+
+Version avec migration vers le schema v3, simplification de la structure de données et amélioration de l'extraction des villes inconnues.
+
+## Nouveautés v1.6
+
+### Schema v3 - Suppression des colonnes JSON redondantes
+
+La table `evenement` ne contient plus les colonnes JSON redondantes :
+- `artistes` (JSON array)
+- `spectacles` (JSON array)
+- `genres_raw` (JSON array)
+- `style`
+
+Ces données sont maintenant stockées **uniquement** dans `contenu_evenement` (source de vérité).
+
+**Migration:**
+```bash
+python scripts/migrate_schema_v3.py --dry-run  # Simulation
+python scripts/migrate_schema_v3.py            # Migration effective
+```
+
+### Nouvelle vue `v_evenements_complets`
+
+Vue avec agrégation automatique des artistes/spectacles/styles depuis `contenu_evenement` :
+
+```sql
+SELECT * FROM v_evenements_complets WHERE bidul_numero = 212;
+-- Colonnes: artistes, spectacles, styles (GROUP_CONCAT)
+```
+
+### Extraction améliorée des villes inconnues
+
+Les villes non présentes dans le référentiel sont maintenant préservées dans `ville_raw` :
+
+| Avant | Après |
+|-------|-------|
+| `Thorigné sur Dué` → `Le Mans` | `Thorigné sur Dué` → `Thorigné sur Dué` ✓ |
+| `Coulongé` → `Le Mans` | `Coulongé` → `Coulongé` ✓ |
+| `Ancinnes` → `Le Mans` | `Ancinnes` → `Ancinnes` ✓ |
+
+Heuristique ajoutée pour détecter les villes après le lieu.
+
+### Événements nommés avec chiffres
+
+Support des noms d'événements contenant des chiffres :
+
+```
+"Born 2 Moonwalk Party avec..." → evenement.nom = "Born 2 Moonwalk Party"
+```
+
+### Amélioration du parser `smart_split`
+
+- Refactoring pour éviter les erreurs d'index sur les paires de guillemets
+- Apostrophe `'` exclue des caractères de guillemets (préserve `Val'Rhonne`, `L'Oasis`)
+
+---
+
 # Release Notes - Indexer v1.5
 
 ## Vue d'ensemble

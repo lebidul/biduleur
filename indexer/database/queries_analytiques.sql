@@ -22,6 +22,7 @@ SELECT
 	e.bidul_numero,
     e.raw_text,
     e.nom,
+	e.genre_evenement,
     e.date_evenement,
     e.heure,
 	e.lieu_raw,
