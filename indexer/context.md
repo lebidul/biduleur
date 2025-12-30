@@ -49,6 +49,8 @@ contenu_evenement (source de vérité pour artistes/spectacles)
 
 **Note v1.6** : Les colonnes JSON redondantes (`artistes`, `spectacles`, `genres_raw`, `style`) ont été supprimées de la table `evenement`. Les données sont maintenant stockées uniquement dans `contenu_evenement`.
 
+**Note v1.7** : Nouvelle colonne `is_regional` pour marquer les événements hors département 72 (Sarthe).
+
 ## Mapping Bidul <-> Date
 
 Référence : **Bidul 280 = Mai 2023**
@@ -79,6 +81,8 @@ python cli.py populate --pdf-only    # Forcer extraction PDF
 python cli.py populate --replace     # Remplacer les événements existants
 python cli.py populate --no-ocr      # Désactiver OCR pour les scans
 python cli.py populate --engine google  # Moteur OCR (google, paddleocr, easyocr)
+python cli.py populate --include-regional  # Inclure événements hors Sarthe (v1.7)
+python cli.py populate --include-artifacts # Inclure faux événements (v1.7)
 
 # OCR (PDFs scannés)
 python cli.py ocr "archives/bidul_158.pdf" --engine google -o output.txt
@@ -96,6 +100,7 @@ python cli.py compare --numero 280 --details
 
 # Statistiques
 python cli.py stats                  # Stats étendues (sources, types, top lieux/villes)
+python cli.py stats --html           # Génère dashboard HTML (stats/bidul_stats.html)
 python cli.py list --type texte
 python cli.py list --type scan       # Lister PDFs scannés
 ```
@@ -110,6 +115,9 @@ python cli.py list --type scan       # Lister PDFs scannés
 | `core/parser.py` | Parsing événements (regex, formats standard, inline, par bloc) |
 | `core/csv_importer.py` | Import depuis CSV tapages |
 | `core/normalizer.py` | Normalisation automatique lieux/villes/artistes (v1.5) |
+| `core/regional_filter.py` | Détection événements hors Sarthe (v1.7) |
+| `core/artifact_filter.py` | Filtrage faux événements (v1.7) |
+| `core/stats_generator.py` | Dashboard HTML avec Chart.js (v1.7) |
 | `core/db.py` | Accès base SQLite |
 | `database/schema_v2.sql` | Schéma de la base |
 | `database/queries_analytiques.sql` | Requêtes SQL d'analyse |
@@ -215,6 +223,30 @@ Le système de normalisation applique automatiquement des règles de matching :
 | Abbreviations | Expansion automatique | `th.` → `Théâtre`, `st` → `Saint` |
 
 **Impact** : Réduction de 593 aliases manuels dans les CSV.
+
+## Filtrage v1.7
+
+### Filtrage régional
+
+Les événements de la section "Et un peu plus loin..." (hors département 72) sont exclus par défaut :
+
+| Critère | Exemple | Résultat |
+|---------|---------|----------|
+| Code département (72) | `Concert, Le Mans (72)` | LOCAL |
+| Ville sarthoise | `Allonnes`, `La Flèche` | LOCAL |
+| Code département hors 72 | `Chabada, Angers (49)` | RÉGIONAL (exclu) |
+| Lieu connu hors Sarthe | `Le Chabada`, `L'Ubu` | RÉGIONAL (exclu) |
+
+Option `--include-regional` pour les inclure (marqués `is_regional=True`).
+
+### Filtrage des artifacts
+
+Les faux événements sont exclus par défaut :
+- Texte < 15 caractères
+- Info/annonces (www., contact:, inscription)
+- Sans lieu ni artiste ni spectacle
+
+Option `--include-artifacts` pour les inclure.
 
 ## Limitations actuelles
 

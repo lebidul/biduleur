@@ -78,10 +78,22 @@ PDFs disponibles: 131
 ### `stats` - Statistiques globales
 
 ```bash
+# Stats en mode terminal
 python cli.py stats
+
+# Générer un dashboard HTML interactif (v1.7)
+python cli.py stats --html                    # stats/bidul_stats.html
+python cli.py stats --html mon_rapport.html   # Chemin personnalisé
 ```
 
-Sortie:
+Le dashboard HTML inclut :
+- Graphique interactif des événements/contenus par Bidul (Chart.js)
+- Statistiques globales (événements, artistes/spectacles, ratio)
+- Liste des PDFs manquants et Biduls vides
+- Détection des ratios anormaux
+- Top 10 des Biduls les plus riches
+
+Sortie terminal:
 ```
 ==================================================
 STATISTIQUES BASE DE DONNEES
@@ -151,6 +163,8 @@ Options:
 | `--no-ocr` | Desactiver l'OCR pour les scans |
 | `--engine` | Moteur OCR: `google` (defaut), `paddleocr`, `easyocr` |
 | `--dpi` | Resolution OCR (defaut: 200) |
+| `--include-regional` | Inclure les evenements hors Sarthe (v1.7) |
+| `--include-artifacts` | Inclure les faux evenements (v1.7) |
 
 ### `extract` - Extraire un PDF
 
@@ -819,7 +833,7 @@ indexer/
 
 ---
 
-## Schema de la base de donnees (v1.6)
+## Schema de la base de donnees (v1.7)
 
 ### Tables principales
 
@@ -847,6 +861,7 @@ indexer/
 |---------|-------|-------------|
 | `lieu_ref_id` | evenement | FK vers lieu_ref.id |
 | `ville_ref_id` | evenement | FK vers ville_ref.id |
+| `is_regional` | evenement | Evenement hors Sarthe (v1.7) |
 | `artiste_ref_id` | contenu_evenement | FK vers artiste_ref.id |
 
 ---
@@ -1055,3 +1070,49 @@ python cli.py deduplicate
 ```
 
 **Note:** Les caches sont automatiquement vides lors du `renormalize` pour garantir l'utilisation des dernieres regles.
+
+---
+
+## Filtrage automatique (v1.7)
+
+### Filtrage des evenements regionaux
+
+Par defaut, les evenements hors departement 72 (Sarthe) sont exclus lors du `populate`. Ces evenements proviennent de la section "Et un peu plus loin..." du Bidul.
+
+```bash
+# Comportement par defaut: exclut les evenements regionaux
+python cli.py populate --numero 280
+
+# Inclure les evenements regionaux (marques is_regional=True en base)
+python cli.py populate --numero 280 --include-regional
+```
+
+Criteres de detection:
+| Critere | Exemple | Resultat |
+|---------|---------|----------|
+| Code departement (72) | `Concert, Le Mans (72)` | LOCAL |
+| Ville sarthoise | `Allonnes`, `La Fleche` | LOCAL |
+| Lieu au Mans | `Palais des Congres, Le Mans` | LOCAL |
+| Code departement hors 72 | `Chabada, Angers (49)` | REGIONAL (exclu) |
+| Lieu connu hors Sarthe | `Le Chabada`, `L'Ubu` | REGIONAL (exclu) |
+| Ville hors Sarthe | `Laval`, `Nantes`, `Rennes` | REGIONAL (exclu) |
+
+### Filtrage des artifacts (faux evenements)
+
+Par defaut, les blocs de texte qui ne sont pas de vrais evenements sont exclus:
+
+```bash
+# Comportement par defaut: exclut les artifacts
+python cli.py populate --numero 280
+
+# Inclure les artifacts
+python cli.py populate --numero 280 --include-artifacts
+```
+
+Criteres d'exclusion:
+| Critere | Exemple | Action |
+|---------|---------|--------|
+| Texte < 15 chars | `21h30` | Exclu |
+| Info/annonce | `Plus d'infos sur www...` | Exclu |
+| Pattern reservation | `Rens. 02 43...` | Exclu |
+| Sans contenu | Pas de lieu, artiste ni spectacle | Exclu |

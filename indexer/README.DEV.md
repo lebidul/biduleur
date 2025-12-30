@@ -448,6 +448,16 @@ parser = EventParser(bidul_mois=7, bidul_annee=2011, date_format='inline')
 3. **Formatage incohérent** - Certains vieux numéros ont un formatage variable
 4. **OCR des très anciens Biduls** - Qualité variable selon l'état du scan
 
+## Changelog v1.7
+
+- **Filtrage régional** : Nouveau module `core/regional_filter.py` pour exclure les événements hors Sarthe (dept 72)
+- **Filtrage artifacts** : Nouveau module `core/artifact_filter.py` pour exclure les faux événements
+- **Dashboard HTML** : Nouveau module `core/stats_generator.py` avec Chart.js interactif
+- **Option `--include-regional`** : Inclut les événements régionaux (marqués `is_regional=True`)
+- **Option `--include-artifacts`** : Inclut les faux événements
+- **Option `--html`** : Génère un dashboard HTML pour `stats` (défaut: `stats/bidul_stats.html`)
+- **Colonne `is_regional`** : Nouvelle colonne dans `evenement` pour marquer les événements hors département
+
 ## Changelog v1.6
 
 - **Schema v3** : Suppression des colonnes JSON redondantes (`artistes`, `spectacles`, `genres_raw`, `style`) de la table `evenement`
