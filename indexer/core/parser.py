@@ -16,6 +16,12 @@ from typing import Optional
 from datetime import date
 
 from core.text_cleaner import clean_pdf_text, expand_abbreviations, normalize_lieu_name
+from core.month_detector import (
+    detect_month_sections,
+    get_month_for_line,
+    is_summer_bidul,
+    MonthSection
+)
 
 logger = logging.getLogger(__name__)
 
@@ -2735,6 +2741,9 @@ class EventParser:
         self.bidul_mois = bidul_mois
         self.bidul_annee = bidul_annee
         self.date_format = date_format
+        # Support juillet/août: sections de mois détectées et lignes du texte
+        self._month_sections: list[MonthSection] = []
+        self._lines: list[str] = []
 
     # Pattern pour détecter le début d'un événement inline
     # Supporte:
@@ -2780,6 +2789,15 @@ class EventParser:
         Returns:
             Liste d'événements parsés (dédoublonnés)
         """
+        # Détecter les sections de mois pour les Biduls d'été (juillet couvrant juillet+août)
+        if is_summer_bidul(self.bidul_mois):
+            self._month_sections = detect_month_sections(text)
+            self._lines = text.split('\n')
+            if self._month_sections:
+                logger.info(f"Bidul juillet: {len(self._month_sections)} section(s) de mois détectée(s)")
+                for section in self._month_sections:
+                    logger.debug(f"  - Ligne {section.line_number}: mois={section.month} ({section.header_text})")
+
         # Si le format est spécifié, l'utiliser directement
         if self.date_format == 'inline':
             events = self._parse_inline_format(text)
@@ -2815,11 +2833,14 @@ class EventParser:
             # Découper par événements (bullets)
             event_texts = self._split_by_bullets(block_text)
 
+            # Calculer le line_number pour cette date (support juillet/août)
+            line_number = self._get_line_number_for_text(date_str) if date_str else None
+
             # Parser toutes les dates de la plage (ex: "Du 3 au 5" → [3, 4, 5])
-            all_dates = self._parse_all_dates(date_str) if date_str else []
+            all_dates = self._parse_all_dates(date_str, line_number) if date_str else []
             if not all_dates:
                 # Fallback sur une seule date si pas de plage
-                single_date = self._parse_date(date_str) if date_str else None
+                single_date = self._parse_date(date_str, line_number) if date_str else None
                 all_dates = [single_date] if single_date else [None]
 
             for event_text in event_texts:
@@ -2851,8 +2872,9 @@ class EventParser:
         lines = text.split('\n')
         current_event_lines = []
         current_date = None
+        current_line_number = None  # Support juillet/août
 
-        for line in lines:
+        for line_idx, line in enumerate(lines):
             line = line.strip()
             if not line:
                 continue
@@ -2863,7 +2885,7 @@ class EventParser:
                 # Traiter l'événement précédent
                 if current_event_lines and current_date:
                     event_text = ' '.join(current_event_lines)
-                    event = self._parse_event(event_text, current_date)
+                    event = self._parse_event(event_text, current_date, current_line_number)
                     if event:
                         signature = self._event_signature(event)
                         if signature not in seen_signatures:
@@ -2874,6 +2896,7 @@ class EventParser:
                 # Group 1: date complète, Group 2: contenu
                 current_date = match.group(1).strip()
                 current_event_lines = [match.group(2).strip()]
+                current_line_number = line_idx  # Mémoriser le numéro de ligne
             else:
                 # Continuation de l'événement précédent
                 if current_event_lines:
@@ -2882,7 +2905,7 @@ class EventParser:
         # Traiter le dernier événement
         if current_event_lines and current_date:
             event_text = ' '.join(current_event_lines)
-            event = self._parse_event(event_text, current_date)
+            event = self._parse_event(event_text, current_date, current_line_number)
             if event:
                 signature = self._event_signature(event)
                 if signature not in seen_signatures:
@@ -3171,7 +3194,8 @@ class EventParser:
             event.date_evenement = event_date
         return event
 
-    def _parse_event(self, text: str, date_str: Optional[str]) -> Optional[ParsedEvent]:
+    def _parse_event(self, text: str, date_str: Optional[str],
+                     line_number: Optional[int] = None) -> Optional[ParsedEvent]:
         if not text:
             return None
 
@@ -3184,7 +3208,7 @@ class EventParser:
 
         if date_str:
             event.date_str = date_str
-            event.date_evenement = self._parse_date(date_str)
+            event.date_evenement = self._parse_date(date_str, line_number)
 
         # 0a. Extraire le pattern // (Titre événement // ARTISTES)
         event_name_from_slash, text = self._extract_double_slash_pattern(text)
@@ -3236,21 +3260,59 @@ class EventParser:
 
         return event
 
-    def _parse_date(self, date_str: str) -> Optional[date]:
-        """Convertit une date relative en date absolue."""
+    def _get_line_number_for_text(self, text_fragment: str) -> int:
+        """
+        Trouve le numéro de ligne approximatif pour un fragment de texte.
+
+        Utilisé pour déterminer le mois contextuel lors du parsing
+        des Biduls d'été (juillet couvrant juillet+août).
+
+        Args:
+            text_fragment: Fragment de texte à localiser
+
+        Returns:
+            Numéro de ligne (0-indexed), ou 0 si non trouvé
+        """
+        if not self._lines:
+            return 0
+
+        text_clean = text_fragment.strip()[:50]  # Premiers 50 chars
+
+        for i, line in enumerate(self._lines):
+            if text_clean in line:
+                return i
+
+        return 0
+
+    def _parse_date(self, date_str: str, line_number: Optional[int] = None) -> Optional[date]:
+        """
+        Convertit une date relative en date absolue.
+
+        Args:
+            date_str: Chaîne de date (ex: "Samedi 3")
+            line_number: Numéro de ligne pour déterminer le mois contextuel (Biduls d'été)
+
+        Returns:
+            Date absolue ou None
+        """
         if not self.bidul_mois or not self.bidul_annee:
             return None
+
+        # Déterminer le mois contextuel pour les Biduls d'été
+        mois = self.bidul_mois
+        if self._month_sections and line_number is not None:
+            mois = get_month_for_line(self._month_sections, line_number, self.bidul_mois)
 
         match = re.search(r"(\d{1,2})", date_str)
         if match:
             jour = int(match.group(1))
             try:
-                return date(self.bidul_annee, self.bidul_mois, jour)
+                return date(self.bidul_annee, mois, jour)
             except ValueError:
                 return None
         return None
 
-    def _parse_all_dates(self, date_str: str) -> list[date]:
+    def _parse_all_dates(self, date_str: str, line_number: Optional[int] = None) -> list[date]:
         """
         Parse toutes les dates d'une chaîne de date (simple, composée, ou plage).
 
@@ -3260,11 +3322,20 @@ class EventParser:
         - "Du 6 au 10 juin" → [date_6, date_7, ..., date_10]
         - "Du Vendredi 03 au Dimanche 05" → [date_3, date_4, date_5]
 
+        Args:
+            date_str: Chaîne de date
+            line_number: Numéro de ligne pour déterminer le mois contextuel (Biduls d'été)
+
         Returns:
             Liste de dates
         """
         if not self.bidul_mois or not self.bidul_annee:
             return []
+
+        # Déterminer le mois contextuel pour les Biduls d'été
+        mois = self.bidul_mois
+        if self._month_sections and line_number is not None:
+            mois = get_month_for_line(self._month_sections, line_number, self.bidul_mois)
 
         dates = []
 
@@ -3280,7 +3351,7 @@ class EventParser:
             # Générer toutes les dates de la plage
             for day in range(start_day, end_day + 1):
                 try:
-                    dates.append(date(self.bidul_annee, self.bidul_mois, day))
+                    dates.append(date(self.bidul_annee, mois, day))
                 except ValueError:
                     pass
             return dates
@@ -3292,7 +3363,7 @@ class EventParser:
         for jour_str in jour_matches:
             jour = int(jour_str)
             try:
-                dates.append(date(self.bidul_annee, self.bidul_mois, jour))
+                dates.append(date(self.bidul_annee, mois, jour))
             except ValueError:
                 # Jour invalide pour ce mois (ex: 31 février)
                 pass
@@ -3839,6 +3910,15 @@ class EventParser:
         Returns:
             Liste d'événements parsés (dédoublonnés)
         """
+        # Détecter les sections de mois pour les Biduls d'été (juillet couvrant juillet+août)
+        if is_summer_bidul(self.bidul_mois):
+            self._month_sections = detect_month_sections(text)
+            self._lines = text.split('\n')
+            if self._month_sections:
+                logger.info(f"Bidul juillet: {len(self._month_sections)} section(s) de mois détectée(s)")
+                for section in self._month_sections:
+                    logger.debug(f"  - Ligne {section.line_number}: mois={section.month} ({section.header_text})")
+
         # Si le format est spécifié, l'utiliser directement
         if self.date_format == 'inline':
             events = self._parse_inline_with_referentiel(text, lieu_ref_list, ville_ref_list)
@@ -3882,14 +3962,23 @@ class EventParser:
             # Découper par événements (bullets)
             event_texts = self._split_by_bullets(block_text)
 
+            # Calculer le line_number pour cette date (support juillet/août)
+            line_number = self._get_line_number_for_text(date_str) if date_str else None
+
+            # Déterminer le mois contextuel pour les Biduls d'été
+            mois = self.bidul_mois or 1
+            if self._month_sections and line_number is not None:
+                mois = get_month_for_line(self._month_sections, line_number, self.bidul_mois or 7)
+
             for event_text in event_texts:
                 if len(event_text.strip()) < 10:
                     continue
 
                 # Utiliser parse_event_line_v2 pour chaque ligne
+                # Passer le mois contextuel au lieu du mois du Bidul
                 parsed_events = parse_event_line_v2(
                     event_text.strip(),
-                    self.bidul_mois or 1,
+                    mois,
                     self.bidul_annee or 2023,
                     lieu_ref_list,
                     ville_ref_list
@@ -3898,7 +3987,7 @@ class EventParser:
                 for parsed in parsed_events:
                     # Convertir le dict en ParsedEvent
                     # Pour les dates composées, créer un événement par date
-                    event_dates = self._parse_all_dates(date_str)
+                    event_dates = self._parse_all_dates(date_str, line_number)
 
                     if not event_dates:
                         # Pas de date spécifique (plage ou date invalide)
@@ -3939,26 +4028,35 @@ class EventParser:
         events = []
         seen_signatures = set()
 
-        def process_event(event_text: str, date_str: str):
+        # Référence aux attributs pour la closure
+        month_sections = self._month_sections
+        bidul_mois = self.bidul_mois
+
+        def process_event(event_text: str, date_str: str, line_number: int = None):
             """Traite un événement avec une date (potentiellement composée)."""
             nonlocal events, seen_signatures
+
+            # Déterminer le mois contextuel pour les Biduls d'été
+            mois = bidul_mois or 1
+            if month_sections and line_number is not None:
+                mois = get_month_for_line(month_sections, line_number, bidul_mois or 7)
 
             # Parser les dates composées
             date_list, _ = parse_date_prefix_v2(
                 f"{date_str}: dummy",  # Simuler le format attendu
-                self.bidul_mois or 1,
+                mois,
                 self.bidul_annee or 2023
             )
 
             if not date_list:
                 # Fallback: utiliser _parse_date pour une date simple
-                single_date = self._parse_date(date_str)
+                single_date = self._parse_date(date_str, line_number)
                 date_list = [single_date] if single_date else [None]
 
             # Parser le contenu de l'événement
             parsed_events = parse_event_line_v2(
                 event_text,
-                self.bidul_mois or 1,
+                mois,
                 self.bidul_annee or 2023,
                 lieu_ref_list,
                 ville_ref_list
@@ -3996,8 +4094,9 @@ class EventParser:
         lines = text.split('\n')
         current_event_lines = []
         current_date = None
+        current_line_number = None  # Support juillet/août
 
-        for line in lines:
+        for line_idx, line in enumerate(lines):
             line = line.strip()
             if not line:
                 continue
@@ -4007,11 +4106,12 @@ class EventParser:
                 # Traiter l'événement précédent
                 if current_event_lines and current_date:
                     event_text = ' '.join(current_event_lines)
-                    process_event(event_text, current_date)
+                    process_event(event_text, current_date, current_line_number)
 
                 # Group 1: date complète, Group 2: contenu
                 current_date = match.group(1).strip()
                 current_event_lines = [match.group(2).strip()]
+                current_line_number = line_idx  # Mémoriser le numéro de ligne
             else:
                 if current_event_lines:
                     current_event_lines.append(line)
@@ -4019,7 +4119,7 @@ class EventParser:
         # Traiter le dernier événement
         if current_event_lines and current_date:
             event_text = ' '.join(current_event_lines)
-            process_event(event_text, current_date)
+            process_event(event_text, current_date, current_line_number)
 
         return events
 
