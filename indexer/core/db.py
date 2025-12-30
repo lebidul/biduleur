@@ -230,6 +230,10 @@ class BidulDB:
         raw_text = event.get('raw_text', '')
         raw_text_clean = strip_formatting_tags(raw_text) if raw_text else None
 
+        # Utiliser la ville originale si elle existe, sinon la version normalisée
+        # Cela préserve les villes non connues du référentiel (ex: Ancinnes, Coulongé)
+        ville_to_store = event.get('ville_raw') or ville_normalized
+
         cursor = conn.execute("""
             INSERT INTO evenement (
                 bidul_numero, raw_text, raw_text_clean, nom, date_evenement, heure,
@@ -247,7 +251,7 @@ class BidulDB:
             event.get('heure'),
             event.get('lieu_raw'),
             lieu_ref_id,
-            ville_normalized,  # Normalisé (Le Mans si vide)
+            ville_to_store,  # Ville originale ou normalisée si vide
             ville_ref_id,
             event.get('genre_evenement'),
             event.get('tarif_raw'),
@@ -557,11 +561,12 @@ class BidulDB:
             if isinstance(art, dict):
                 norm_artistes.append({
                     'nom': art.get('nom'),
-                    'style': art.get('genre') or art.get('style')
+                    'style': art.get('genre') or art.get('style'),
+                    'spectacle': art.get('spectacle')  # Préserver le spectacle associé
                 })
             else:
                 style = genres[i] if i < len(genres) else None
-                norm_artistes.append({'nom': art, 'style': style})
+                norm_artistes.append({'nom': art, 'style': style, 'spectacle': None})
 
         # Cas 1: Spectacles + Artistes → combiner intelligemment
         if norm_spectacles and norm_artistes:
@@ -573,9 +578,9 @@ class BidulDB:
             self._insert_contenu_row(conn, evenement_id, first_art.get('nom'), first_spec.get('nom'), style, ordre)
             ordre += 1
 
-            # Artistes supplémentaires (sans spectacle, juste l'artiste)
+            # Artistes supplémentaires (avec leur spectacle associé si présent)
             for art in norm_artistes[1:]:
-                self._insert_contenu_row(conn, evenement_id, art.get('nom'), None, art.get('style'), ordre)
+                self._insert_contenu_row(conn, evenement_id, art.get('nom'), art.get('spectacle'), art.get('style'), ordre)
                 ordre += 1
 
             # Spectacles supplémentaires (sans artiste)
@@ -589,10 +594,10 @@ class BidulDB:
                 self._insert_contenu_row(conn, evenement_id, None, spec.get('nom'), spec.get('style'), ordre)
                 ordre += 1
 
-        # Cas 3: Artistes seuls
+        # Cas 3: Artistes seuls (avec leur spectacle associé si présent)
         elif norm_artistes:
             for art in norm_artistes:
-                self._insert_contenu_row(conn, evenement_id, art.get('nom'), None, art.get('style'), ordre)
+                self._insert_contenu_row(conn, evenement_id, art.get('nom'), art.get('spectacle'), art.get('style'), ordre)
                 ordre += 1
 
     # -------------------------------------------------------------------------

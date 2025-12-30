@@ -819,15 +819,17 @@ indexer/
 
 ---
 
-## Schema de la base de donnees
+## Schema de la base de donnees (v1.6)
 
 ### Tables principales
 
 | Table | Description |
 |-------|-------------|
 | `bidul` | Metadonnees des numeros du Bidul |
-| `evenement` | Evenements extraits |
-| `contenu_evenement` | Artistes/spectacles (relation 1-N avec evenement) |
+| `evenement` | Evenements extraits (sans colonnes JSON depuis v1.6) |
+| `contenu_evenement` | Artistes/spectacles (source de verite v1.6) |
+
+**Note v1.6:** Les colonnes `artistes`, `spectacles`, `genres_raw`, `style` ont ete supprimees de `evenement`. Utiliser `contenu_evenement` ou la vue `v_evenements_complets`.
 
 ### Tables de referentiels
 
@@ -992,6 +994,35 @@ Certaines variantes sont automatiquement normalisees:
 - `Saint Calais` → `Saint-Calais`
 - `La Ferte Bernard` → `La Ferté-Bernard`
 - `Chateau du Loir` → `Château-du-Loir`
+
+---
+
+## Nouveautes v1.6
+
+### Migration schema v3
+
+Pour migrer vers le schema v3 (suppression des colonnes JSON redondantes):
+
+```bash
+# Simulation
+python scripts/migrate_schema_v3.py --dry-run
+
+# Migration effective (avec backup automatique)
+python scripts/migrate_schema_v3.py
+```
+
+### Vue v_evenements_complets
+
+Nouvelle vue avec agregation automatique des artistes/spectacles:
+
+```bash
+# Requete SQL
+SELECT * FROM v_evenements_complets WHERE bidul_numero = 212;
+```
+
+### Preservation des villes inconnues
+
+Les villes non presentes dans le referentiel sont maintenant preservees dans `ville_raw` au lieu d'etre remplacees par "Le Mans".
 
 ---
 
