@@ -1,7 +1,7 @@
 """
 Module de gestion de la base de données SQLite.
 
-Utilise le schéma simplifié v2.
+Utilise le schéma v3 (artistes/spectacles dans contenu_evenement uniquement).
 """
 
 import csv
@@ -17,7 +17,7 @@ from .parser import ParsedEvent, strip_formatting_tags
 logger = logging.getLogger(__name__)
 
 # Chemins par défaut
-SCHEMA_PATH = Path(__file__).parent.parent / "database" / "schema_v2.sql"
+SCHEMA_PATH = Path(__file__).parent.parent / "database" / "schema_v3.sql"
 DEFAULT_DB_PATH = Path(__file__).parent.parent / "database" / "bidul_archives.db"
 CORPUS_DIR = Path(__file__).parent.parent / "corpus"
 
@@ -26,10 +26,11 @@ class BidulDB:
     """
     Gestionnaire de la base de données des archives du Bidul.
 
-    Utilise le schéma v2 simplifié avec:
+    Utilise le schéma v3 avec:
     - bidul: métadonnées des exemplaires
     - evenement: événements extraits avec raw_text
-    - lieu_ref / ville_ref: référentiels pour normalisation
+    - contenu_evenement: artistes/spectacles/styles (source de vérité)
+    - lieu_ref / ville_ref / artiste_ref: référentiels pour normalisation
     """
 
     def __init__(self, db_path: Optional[Path] = None):
@@ -188,10 +189,9 @@ class BidulDB:
             INSERT INTO evenement (
                 bidul_numero, raw_text, raw_text_clean, nom, date_evenement, heure,
                 lieu_raw, lieu_ref_id, ville_raw, ville_ref_id,
-                artistes, spectacles, genres_raw,
                 tarif_raw, prix_min, prix_max, gratuit,
                 type_evenement, confidence
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             bidul_numero,
             event.raw_text,
@@ -203,9 +203,6 @@ class BidulDB:
             lieu_ref_id,
             ville_normalized,  # Normalisé (Le Mans si vide)
             ville_ref_id,
-            json.dumps([a.to_dict() if hasattr(a, 'to_dict') else a for a in event.artistes], ensure_ascii=False) if event.artistes else None,
-            json.dumps(event.spectacles, ensure_ascii=False),
-            json.dumps(event.genres_raw, ensure_ascii=False),
             event.tarif_raw,
             event.prix_min,
             event.prix_max,
@@ -215,14 +212,14 @@ class BidulDB:
         ))
         evenement_id = cursor.lastrowid
 
-        # Insérer dans contenu_evenement
+        # Insérer dans contenu_evenement (source de vérité pour artistes/spectacles)
         self._insert_contenu_evenement(conn, evenement_id, event.artistes, event.spectacles)
 
         conn.commit()
         return evenement_id
 
     def insert_evenement_from_dict(self, event: dict) -> int:
-        """Insère un événement depuis un dictionnaire (import CSV)."""
+        """Insère un événement depuis un dictionnaire (import CSV legacy)."""
         conn = self.connect()
 
         # Chercher les IDs de référence pour lieu et ville (matching fuzzy)
@@ -237,10 +234,10 @@ class BidulDB:
             INSERT INTO evenement (
                 bidul_numero, raw_text, raw_text_clean, nom, date_evenement, heure,
                 lieu_raw, lieu_ref_id, ville_raw, ville_ref_id,
-                artistes, spectacles, genres_raw, genre_evenement,
+                genre_evenement,
                 tarif_raw, prix_min, prix_max, gratuit,
                 type_evenement, confidence
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             event['bidul_numero'],
             raw_text,
@@ -252,9 +249,6 @@ class BidulDB:
             lieu_ref_id,
             ville_normalized,  # Normalisé (Le Mans si vide)
             ville_ref_id,
-            event.get('artistes'),
-            event.get('spectacles'),
-            event.get('genres_raw'),
             event.get('genre_evenement'),
             event.get('tarif_raw'),
             event.get('prix_min'),
@@ -265,7 +259,7 @@ class BidulDB:
         ))
         evenement_id = cursor.lastrowid
 
-        # Insérer dans contenu_evenement (parser le JSON artistes/spectacles)
+        # Insérer dans contenu_evenement (parser le JSON artistes/spectacles si présent dans dict)
         artistes_json = event.get('artistes')
         spectacles_json = event.get('spectacles')
         genres_json = event.get('genres_raw')
@@ -276,19 +270,19 @@ class BidulDB:
 
         if artistes_json:
             try:
-                artistes = json.loads(artistes_json)
+                artistes = json.loads(artistes_json) if isinstance(artistes_json, str) else artistes_json
             except (json.JSONDecodeError, TypeError):
                 pass
 
         if spectacles_json:
             try:
-                spectacles = json.loads(spectacles_json)
+                spectacles = json.loads(spectacles_json) if isinstance(spectacles_json, str) else spectacles_json
             except (json.JSONDecodeError, TypeError):
                 pass
 
         if genres_json:
             try:
-                genres = json.loads(genres_json)
+                genres = json.loads(genres_json) if isinstance(genres_json, str) else genres_json
             except (json.JSONDecodeError, TypeError):
                 pass
 
@@ -357,7 +351,7 @@ class BidulDB:
         cursor = conn.execute("""
             SELECT id, bidul_numero, raw_text, nom, date_evenement, heure,
                    lieu_raw, lieu_ref_id, ville_raw, ville_ref_id,
-                   artistes, spectacles, tarif_raw, prix_min, prix_max, gratuit
+                   tarif_raw, prix_min, prix_max, gratuit
             FROM evenement
             WHERE bidul_numero = ?
         """, (bidul_numero,))
@@ -375,12 +369,10 @@ class BidulDB:
                 'lieu_ref_id': row[7],
                 'ville_raw': row[8],
                 'ville_ref_id': row[9],
-                'artistes': row[10],
-                'spectacles': row[11],
-                'tarif_raw': row[12],
-                'prix_min': row[13],
-                'prix_max': row[14],
-                'gratuit': row[15],
+                'tarif_raw': row[10],
+                'prix_min': row[11],
+                'prix_max': row[12],
+                'gratuit': row[13],
             })
         return events
 
@@ -389,6 +381,7 @@ class BidulDB:
         Met à jour les champs parsés d'un événement existant.
 
         Utilisé par --reparse pour mettre à jour les événements sans re-faire l'OCR.
+        Note: artistes/spectacles sont stockés dans contenu_evenement (schema v3).
         """
         conn = self.connect()
 
@@ -396,11 +389,8 @@ class BidulDB:
         fields = []
         values = []
 
-        # Mapper les kwargs aux colonnes de la table
-        # Note: date_str n'existe pas dans le schéma actuel
+        # Mapper les kwargs aux colonnes de la table (schema v3 - sans artistes/spectacles)
         field_mapping = {
-            'artistes': 'artistes',
-            'spectacles': 'spectacles',
             'lieu_raw': 'lieu_raw',
             'lieu_ref_id': 'lieu_ref_id',
             'ville_raw': 'ville_raw',
@@ -417,18 +407,13 @@ class BidulDB:
         for key, column in field_mapping.items():
             if key in kwargs:
                 value = kwargs[key]
-                # Sérialiser les listes/dicts en JSON
-                if isinstance(value, (list, dict)):
-                    value = json.dumps(value, ensure_ascii=False)
                 fields.append(f"{column} = ?")
                 values.append(value)
 
-        if not fields:
-            return
-
-        values.append(evenement_id)
-        sql = f"UPDATE evenement SET {', '.join(fields)} WHERE id = ?"
-        conn.execute(sql, values)
+        if fields:
+            values.append(evenement_id)
+            sql = f"UPDATE evenement SET {', '.join(fields)} WHERE id = ?"
+            conn.execute(sql, values)
 
         # Mettre à jour contenu_evenement si artistes présents
         if 'artistes' in kwargs and kwargs['artistes']:
