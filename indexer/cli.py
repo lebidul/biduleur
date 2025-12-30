@@ -608,7 +608,7 @@ def cmd_populate(args):
 
     # Déterminer les numéros à traiter
     if args.numero:
-        numeros = [args.numero]
+        numeros = args.numero  # Déjà une liste grâce à nargs='+'
     elif args.range:
         start, end = map(int, args.range.split('-'))
         numeros = list(range(start, end + 1))
@@ -2177,7 +2177,7 @@ Maintenance (normalisation v2):
 
     # populate
     p_populate = subparsers.add_parser('populate', help='Peuple avec CSV prioritaire ou PDF')
-    p_populate.add_argument('--numero', '-n', type=int, help='Numéro du Bidul')
+    p_populate.add_argument('--numero', '-n', type=int, nargs='+', help='Numéro(s) du Bidul (ex: -n 102 117 260)')
     p_populate.add_argument('--range', '-r', help='Plage de numéros (ex: 178-308)')
     p_populate.add_argument('--csv-only', action='store_true', help='Uniquement les Biduls avec CSV')
     p_populate.add_argument('--pdf-only', action='store_true', help='Ignorer les CSV (forcer extraction PDF)')
