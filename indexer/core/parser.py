@@ -1675,6 +1675,17 @@ def extract_before_lieu(text: str, lieu_start: int) -> dict:
                 if not any(a['nom'].lower() == full_nom.lower() for a in result['artistes']):
                     result['artistes'].append({'nom': full_nom, 'style': None})
 
+    # 1c. Pattern "collectif XXX" après un spectacle (sans "par")
+    # Ex: '"Nous ne viendrons pas manger dimanche" (théâtre) collectif Grand Maximum'
+    # Note: peut être au début du remaining (après suppression du spectacle), donc on autorise ^
+    collectif_match = re.search(r'(?:^|,\s*|\s)[Cc]ollectif\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s\'\-/&]+?)(?:\s*,|\s*\d{1,2}h|\s*\(|\s*<|\s*$)', remaining)
+    if collectif_match:
+        nom = collectif_match.group(1).strip().rstrip(',')
+        if nom and len(nom) > 2:
+            full_nom = f"Collectif {nom}"
+            if not any(a['nom'].lower() == full_nom.lower() for a in result['artistes']):
+                result['artistes'].append({'nom': full_nom, 'style': None})
+
     # 2. Pattern "par ARTISTE (style)" - avec style optionnel
     # Ex: "par GREGORY QUESTEL et DAVID MORA", "par YOLAINE (contes)"
     # Ex: "par O. Py" (initiales avec point)
@@ -3599,6 +3610,21 @@ class EventParser:
             # avec LES MOYENS DU BORD (majuscules = artiste)
             (r'avec\s+([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s\-\']+?)(?:\s*\(|\s*et\s|\s*,|$)', ''),
         ]
+
+        # Pattern "collectif XXX" sans "par" (ex: '"spectacle" (théâtre) collectif Grand Maximum')
+        collectif_match = re.search(r'(?:^|,\s*|\s)[Cc]ollectif\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s\'\-/&]+?)(?:\s*,|\s*\d{1,2}h|\s*\(|\s*<|\s*$)', text)
+        if collectif_match:
+            nom = collectif_match.group(1).strip().rstrip(',')
+            if nom and len(nom) > 2:
+                full_nom = f"Collectif {nom}"
+                normalized_nom = _normalize_artist_name(full_nom)
+                if normalized_nom.lower() not in seen_noms:
+                    seen_noms.add(normalized_nom.lower())
+                    artistes.append(ArtisteInfo(
+                        nom=normalized_nom,
+                        genre=None,
+                        spectacle=None
+                    ))
 
         for pattern, prefix in avec_patterns:
             matches = re.findall(pattern, text)

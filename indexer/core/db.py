@@ -459,6 +459,9 @@ class BidulDB:
         Insère une ligne dans contenu_evenement avec matching artiste_ref_id.
         """
         artiste_ref_id = self._find_artiste_ref(artiste) if artiste else None
+        # Nettoyer le style des balises HTML résiduelles
+        if style:
+            style = strip_formatting_tags(style)
         conn.execute('''
             INSERT INTO contenu_evenement (evenement_id, artiste, artiste_ref_id, nom_spectacle, style, ordre)
             VALUES (?, ?, ?, ?, ?, ?)
