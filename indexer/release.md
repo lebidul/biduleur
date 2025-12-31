@@ -98,6 +98,34 @@ Les balises HTML résiduelles dans les styles sont maintenant nettoyées :
 rock</i> → rock
 ```
 
+### Dashboard qualité (KPIs)
+
+Le dashboard HTML (`python cli.py stats --html`) inclut maintenant des métriques de qualité :
+
+**Score global** : Pourcentage d'événements complets (avec lieu, heure, tarif et contenu normalisés).
+
+**Complétude par champ** :
+- Lieu normalisé / Lieu raw
+- Heure / Tarif
+- Artiste normalisé / Style
+
+**Visualisations** :
+- Barres de progression colorées (vert ≥80%, orange ≥50%, rouge <50%)
+- Graphique d'évolution par période (1997-1999, 2000-2004, etc.)
+- Overlay du score qualité sur le graphique principal
+
+**Détails** :
+- Top 10 lieux à normaliser
+- Top 10 artistes à normaliser
+- Distribution des styles (top 15)
+
+Bouton "Qualité" pour afficher/masquer les sections qualité.
+
+```bash
+python cli.py stats --html
+# → stats/bidul_stats.html avec score qualité 48.1%
+```
+
 ### Benchmarks
 
 | Bidul | Score v1.7 | Score v1.8 |

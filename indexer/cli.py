@@ -496,10 +496,11 @@ def cmd_stats(args):
 
     # Si --html, générer le dashboard HTML
     if getattr(args, 'html', None):
-        from core.stats_generator import get_stats_data, generate_html
+        from core.stats_generator import get_stats_data, get_quality_data, generate_html
 
         print("Generation du dashboard HTML...")
         data = get_stats_data(str(db.db_path))
+        quality_data = get_quality_data(str(db.db_path))
 
         # Stats résumées
         existing = [d for d in data if not d['missing']]
@@ -513,8 +514,9 @@ def cmd_stats(args):
         print(f"  - {total_content:,} artistes/spectacles")
         print(f"  - {missing_count} PDFs manquants")
         print(f"  - {empty_count} Biduls vides")
+        print(f"  - Score qualite: {quality_data['score_global']:.1f}%")
 
-        output_path = generate_html(data, args.html)
+        output_path = generate_html(data, args.html, quality_data)
         print(f"\nDashboard genere : {output_path}")
         return 0
 

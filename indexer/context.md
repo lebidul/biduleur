@@ -102,7 +102,7 @@ python cli.py compare --numero 280 --details
 
 # Statistiques
 python cli.py stats                  # Stats étendues (sources, types, top lieux/villes)
-python cli.py stats --html           # Génère dashboard HTML (stats/bidul_stats.html)
+python cli.py stats --html           # Dashboard HTML avec KPIs qualité (v1.8)
 python cli.py list --type texte
 python cli.py list --type scan       # Lister PDFs scannés
 ```
@@ -119,7 +119,7 @@ python cli.py list --type scan       # Lister PDFs scannés
 | `core/normalizer.py` | Normalisation automatique lieux/villes/artistes (v1.5) |
 | `core/regional_filter.py` | Détection événements hors Sarthe (v1.7) |
 | `core/artifact_filter.py` | Filtrage faux événements (v1.7) |
-| `core/stats_generator.py` | Dashboard HTML avec Chart.js (v1.7) |
+| `core/stats_generator.py` | Dashboard HTML avec Chart.js + KPIs qualité (v1.8) |
 | `core/db.py` | Accès base SQLite |
 | `database/schema_v2.sql` | Schéma de la base |
 | `database/queries_analytiques.sql` | Requêtes SQL d'analyse |
