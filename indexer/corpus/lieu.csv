@@ -2,7 +2,7 @@ nom,ville,nom_normalise
 14 hameau de verze,Le Mans,14hameauverze
 8 rue de Cyrus,Le Mans,8ruecyrus
 Abbaye,Le Mans,abbaye
-Abbaye Royale de l’Epau,Le Mans,abbayeroyaleepau
+Abbaye Royale de l'Epau,Le Mans,abbayeroyaleepau
 Archives Musicales du Mans,Le Mans,archivesmusicalesmans
 Arrêt saint Martin,Le Mans,arretsaintmartin
 Au coeur des artistes,Le Mans,coeurartistes
@@ -145,12 +145,10 @@ Kiosque du jardin des Plantes,Le Mans,kiosquejardinplantes
 l.n.c,Le Mans,nc
 L'Acthalia,Le Mans,acthalia
 L'Alambik MJC Ronceray,Le Mans,alambikmjcronceray
-L’Alambik MJC Ronceray,Le Mans,’alambikmjcronceray
 l'Athéna,Le Mans,athena
 L'Austral,Le Mans,austral
 L'Ebauche,Le Mans,ebauche
 L'Echappée,Le Mans,echappee
-L'Écluse,Le Mans,ecluse
 L'Éléphant,Le Mans,elephant
 L'Entracte,Le Mans,entracte
 L'Envol,Le Mans,envol
@@ -164,10 +162,10 @@ L'Étoile du Nord,Le Mans,etoilenord
 L'île aux Planches,Le Mans,ileplanches
 L'Îlot Co,Le Mans,ilotco
 L'Instinct,Le Mans,instinct
-L’Inventaire,Le Mans,inventaire
+L'Inventaire,Le Mans,inventaire
 L'Oasis,Le Mans,oasis
 L'Olivier,Le Mans,olivier
-L’Orée du bois,Le Mans,’oreebois
+L'Orée du bois,Le Mans,oreebois
 La bonne pioche,Le Mans,bonnepioche
 La Bulle,Le Mans,bulle
 La Capitainerie,Le Mans,capitainerie
@@ -223,7 +221,7 @@ Le Rabelais,Le Mans,rabelais
 Le salon de la rue des sonnettes,Le Mans,salonruesonnettes
 Le Val de Vray,Le Mans,valvray
 Le Val'Rhonne,Le Mans,valrhonne
-Le Vaud’,Le Mans,vaud’
+Le Vaud',Le Mans,vaud
 Le verre tige,Le Mans,verretige
 Le Zoo,Le Mans,zoo
 Les 3 mousses,Le Mans,3mousses
@@ -356,8 +354,7 @@ Salle Théophile Plé,Le Mans,salletheophileple
 salle Vauguélande,Le Mans,sallevauguelande
 Salon Arthé,Le Mans,salonarthe
 Salon de la rue des 3 Sonnettes,Le Mans,salonrue3sonnettes
-Scène J.Le Theule,Le Mans,scenejtheule
-Scène Joël Le Theule,Le Mans,scenejoeltheule
+Scène Joël Le Theule,Sablé-sur-Sarthe,scenejoeltheule
 Secours catholique,Le Mans,secourscatholique
 Site de la Salle des Fêtes,Le Mans,sitesallefetes
 Square rue Galilée,Le Mans,squareruegalilee
@@ -368,8 +365,8 @@ Terrain de jeu,Le Mans,terrainjeu
 Tertre Rouge,Le Mans,tertrerouge
 The Lodge,Le Mans,lodge
 Théâtre de Chaoué,Le Mans,theatrechaoue
-Théâtre de l’Acthalia,Le Mans,theatre’acthalia
-Théâtre de l’Écluse,Le Mans,theatre’ecluse
+Théâtre de l'Acthalia,Le Mans,theatreacthalia
+Théâtre de l'Écluse,Le Mans,theatreecluse
 Théâtre de la Bertoche,Le Mans,theatrebertoche
 Théâtre de la Halle-au-Blé,Le Mans,theatrehalleble
 Théâtre de Mamers,Le Mans,theatremamers
@@ -403,3 +400,7 @@ Chorus,Le Mans,chorus
 La Saynète,Le Mans,saynete
 Les Filo Folie's,Le Mans,filofolies
 Washington DC,Le Mans,washingtondc
+Le Café Noir,Le Mans,cafenoir
+La Maison Café,Le Mans,maisoncafe
+Le Portland Pub,Le Mans,portlandpub
+Le Bakoua,Le Mans,bakoua
