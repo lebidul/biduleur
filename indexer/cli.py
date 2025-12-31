@@ -496,10 +496,11 @@ def cmd_stats(args):
 
     # Si --html, générer le dashboard HTML
     if getattr(args, 'html', None):
-        from core.stats_generator import get_stats_data, generate_html
+        from core.stats_generator import get_stats_data, get_quality_data, generate_html
 
         print("Generation du dashboard HTML...")
         data = get_stats_data(str(db.db_path))
+        quality_data = get_quality_data(str(db.db_path))
 
         # Stats résumées
         existing = [d for d in data if not d['missing']]
@@ -513,8 +514,9 @@ def cmd_stats(args):
         print(f"  - {total_content:,} artistes/spectacles")
         print(f"  - {missing_count} PDFs manquants")
         print(f"  - {empty_count} Biduls vides")
+        print(f"  - Score qualite: {quality_data['score_global']:.1f}%")
 
-        output_path = generate_html(data, args.html)
+        output_path = generate_html(data, args.html, quality_data)
         print(f"\nDashboard genere : {output_path}")
         return 0
 
@@ -608,7 +610,7 @@ def cmd_populate(args):
 
     # Déterminer les numéros à traiter
     if args.numero:
-        numeros = [args.numero]
+        numeros = args.numero  # Déjà une liste grâce à nargs='+'
     elif args.range:
         start, end = map(int, args.range.split('-'))
         numeros = list(range(start, end + 1))
@@ -2177,7 +2179,7 @@ Maintenance (normalisation v2):
 
     # populate
     p_populate = subparsers.add_parser('populate', help='Peuple avec CSV prioritaire ou PDF')
-    p_populate.add_argument('--numero', '-n', type=int, help='Numéro du Bidul')
+    p_populate.add_argument('--numero', '-n', type=int, nargs='+', help='Numéro(s) du Bidul (ex: -n 102 117 260)')
     p_populate.add_argument('--range', '-r', help='Plage de numéros (ex: 178-308)')
     p_populate.add_argument('--csv-only', action='store_true', help='Uniquement les Biduls avec CSV')
     p_populate.add_argument('--pdf-only', action='store_true', help='Ignorer les CSV (forcer extraction PDF)')

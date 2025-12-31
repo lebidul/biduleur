@@ -1,3 +1,142 @@
+# Release Notes - Indexer v1.8
+
+## Vue d'ensemble
+
+Version avec support du Bidul d'été (juillet couvrant juillet+août), amélioration de l'extraction des lieux et villes, et corrections pour les anciens formats OCR.
+
+## Nouveautés v1.8
+
+### Support du Bidul d'été (juillet/août)
+
+Le Bidul de juillet couvre traditionnellement les mois de juillet ET août. La CLI supporte maintenant ce cas :
+
+```bash
+python cli.py populate --numero 307  # Bidul juillet 2025 → événements juillet + août
+```
+
+Le mapping date ↔ numéro gère automatiquement l'absence de Bidul en août.
+
+### Dates avec nom de mois
+
+Support des formats de date incluant le nom du mois (courant dans les Biduls d'été) :
+
+```
+Vendredi 9 juillet → 2025-07-09
+Samedi 14 août → 2025-08-14
+```
+
+### Option `--numero` avec valeurs multiples non-consécutives
+
+```bash
+python cli.py populate --numero 102,117,190  # Plusieurs numéros séparés par virgule
+```
+
+### Option `pages_override` dans biduls.description.csv
+
+Nouvelle colonne pour forcer l'extraction de pages spécifiques :
+
+| Bidul | pages_override | Effet |
+|-------|----------------|-------|
+| 228 | `1,2` | Extrait pages 1 et 2 au lieu de page 3 |
+| 188 | `2` | Extrait uniquement page 2 |
+
+### Extraction améliorée des lieux hors référentiel
+
+Correction du parsing pour les lieux non présents dans le référentiel, notamment ceux avec des patterns de guillemets atypiques issus de l'OCR :
+
+| Problème | Exemple | Correction |
+|----------|---------|------------|
+| Guillemets orphelins | `<<DUO D'AMOUR" (théâtre), Salle André Voisin...` | `smart_split` détecte maintenant les guillemets fermants après texte alphanumérique |
+| Code département | `Fresnay-sur-Sarthe (72)` | Le `(72)` est retiré avant normalisation ville |
+
+### Reconnaissance des acronymes de lieux
+
+Ajout d'une liste d'acronymes connus qui ne doivent pas être filtrés comme artistes :
+
+- `ITEMM` (Institut Technologique Européen des Métiers de la Musique)
+- `MJC` (Maison des Jeunes et de la Culture)
+- `FNAC`, `CSC`, `MPT`, `CAC`, `EMM`
+
+### Extraction des lieux avec heure intégrée
+
+Support des lieux où l'heure est directement attachée :
+
+```
+Bar Le Palais de 19h à 21h → lieu_raw = "Bar Le Palais"
+```
+
+### Normalisation des apostrophes
+
+Les apostrophes typographiques (`'` U+2019) et ASCII (`'` U+0027) sont maintenant interchangeables pour le matching des lieux comme `L'Inventaire`, `L'Oasis`.
+
+### Détection des événements "scène ouverte"
+
+Le pattern `Scène ouverte` est maintenant reconnu comme nom d'événement et n'est plus confondu avec un lieu.
+
+### Reconnaissance du pattern "collectif XXX"
+
+Les collectifs d'artistes sont maintenant extraits correctement :
+
+```
+«Spectacle» (théâtre), collectif Grand Maximum → artiste = "Collectif Grand Maximum"
+```
+
+### Support des abréviations de jours à 3 lettres
+
+Les formats de date avec abréviations à 3 lettres sont maintenant reconnus :
+
+```
+Jeu 02, Ven 03, Sam 04, Dim 05 → dates correctement parsées
+```
+
+### Nettoyage HTML des styles
+
+Les balises HTML résiduelles dans les styles sont maintenant nettoyées :
+
+```
+<i>jazz</i> → jazz
+rock</i> → rock
+```
+
+### Dashboard qualité (KPIs)
+
+Le dashboard HTML (`python cli.py stats --html`) inclut maintenant des métriques de qualité :
+
+**Score global** : Pourcentage d'événements complets (avec lieu, heure, tarif et contenu normalisés).
+
+**Complétude par champ** :
+- Lieu normalisé / Lieu raw
+- Heure / Tarif
+- Artiste normalisé / Style
+
+**Visualisations** :
+- Barres de progression colorées (vert ≥80%, orange ≥50%, rouge <50%)
+- Graphique d'évolution par période (1997-1999, 2000-2004, etc.)
+- Overlay du score qualité sur le graphique principal
+
+**Détails** :
+- Top 10 lieux à normaliser
+- Top 10 artistes à normaliser
+- Distribution des styles (top 15)
+
+Bouton "Qualité" pour afficher/masquer les sections qualité.
+
+```bash
+python cli.py stats --html
+# → stats/bidul_stats.html avec score qualité 48.1%
+```
+
+### Benchmarks
+
+| Bidul | Score v1.7 | Score v1.8 |
+|-------|------------|------------|
+| 102 | 92.4% | 92.4% |
+| 117 | 94.7% | 95.3% |
+| 184 | 95.1% | 95.1% |
+| 190 | 91.2% | 91.2% |
+
+---
+
 # Release Notes - Indexer v1.7
 
 ## Vue d'ensemble

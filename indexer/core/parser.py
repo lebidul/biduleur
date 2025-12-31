@@ -16,6 +16,12 @@ from typing import Optional
 from datetime import date
 
 from core.text_cleaner import clean_pdf_text, expand_abbreviations, normalize_lieu_name
+from core.month_detector import (
+    detect_month_sections,
+    get_month_for_line,
+    is_summer_bidul,
+    MonthSection
+)
 
 logger = logging.getLogger(__name__)
 
@@ -234,17 +240,22 @@ def extract_formatted_artistes_musicaux(text: str) -> list[dict]:
     text = _merge_consecutive_bold_tags(text)
     text = _merge_consecutive_italic_tags(text)
 
-    # Pattern: <b>ARTISTE</b> suivi optionnellement de <i>(style),</i>
+    # Pattern: <b>ARTISTE</b> suivi optionnellement d'un style
+    # Trois formats de style supportés:
+    # - <i>(style)</i> : parenthèses dans l'italique
+    # - (<i>style</i>) : italique dans les parenthèses
+    # - <i>(style</i>) : ouverture dans italique, fermeture dehors (OCR mal formé)
     # Note: la virgule peut être dans ou après les parenthèses
     # Exclure les spectacles (guillemets) et les textes courts
     # Utilise un lookbehind négatif pour exclure les <b> précédés de guillemets (spectacles)
     # U+00AB «, U+00BB », U+201C ", U+201D ", U+201E „, U+0022 "
-    pattern = r'(?<![«»\u201c\u201d„"\'])<b>([^<"»\u201c\u201d„«]+)</b>(?:\s*<i>\s*\(([^)]+)\)[,;]?\s*</i>)?'
+    pattern = r'(?<![«»\u201c\u201d„"\'])<b>([^<"»\u201c\u201d„«]+)</b>(?:\s*(?:<i>\s*\(([^)]+)\)[,;]?\s*</i>|\(\s*<i>([^<]+)</i>\s*\)[,;]?|<i>\s*\(([^<]+)</i>\s*\)[,;]?))?'
     matches = re.finditer(pattern, text, re.IGNORECASE)
 
     for match in matches:
         nom = match.group(1).strip()
-        style = _clean_style(match.group(2)) if match.group(2) else None
+        # Style peut être dans groupe 2, 3 ou 4 selon le format
+        style = _clean_style(match.group(2) or match.group(3) or match.group(4)) if (match.group(2) or match.group(3) or match.group(4)) else None
 
         # Vérifier si c'est un spectacle sans guillemets (suivi de "par")
         # Dans ce cas, on ne l'ajoute pas aux artistes
@@ -847,10 +858,12 @@ def load_lieu_patterns(lieu_ref_list: list, db_path: str = None) -> list:
         lieu_nom = lieu_tuple[1]
 
         # Pattern exact avec limites de mots
+        # Normaliser les apostrophes pour matcher les deux types (' et ')
+        lieu_nom_pattern = re.escape(lieu_nom).replace(r"\'", r"['\u2019]").replace(r"\u2019", r"['\u2019]")
         patterns.append({
             'id': lieu_id,
             'nom': lieu_nom,
-            'pattern': re.compile(r'\b' + re.escape(lieu_nom) + r'\b', re.IGNORECASE),
+            'pattern': re.compile(r'\b' + lieu_nom_pattern + r'\b', re.IGNORECASE),
             'length': len(lieu_nom)
         })
 
@@ -885,7 +898,8 @@ def load_lieu_patterns(lieu_ref_list: list, db_path: str = None) -> list:
             })
 
         # Variantes pour les lieux avec article: "L'Oasis" → "Oasis"
-        if lieu_nom_lower.startswith("l'"):
+        # Gérer les deux types d'apostrophes (droite ' et typographique ')
+        if lieu_nom_lower.startswith("l'") or lieu_nom_lower.startswith("l'"):
             short = lieu_nom[2:]  # "Oasis"
             patterns.append({
                 'id': lieu_id,
@@ -1124,8 +1138,8 @@ def parse_date_prefix_v2(text: str, base_month: int, base_year: int) -> tuple[li
     """
     text_stripped = text.strip()
 
-    # Pattern pour les noms de jours (abrégés et complets)
-    JOURS_PATTERN = r'(?:[Ll]undi|[Mm]ardi|[Mm]ercredi|[Jj]eudi|[Vv]endredi|[Ss]amedi|[Dd]imanche|[Ll]u|[Mm]a|[Mm]e|[Jj]e|[Vv]e|[Ss]a|[Dd]i)'
+    # Pattern pour les noms de jours (complets, abrégés 3 lettres, abrégés 2 lettres)
+    JOURS_PATTERN = r'(?:[Ll]undi|[Mm]ardi|[Mm]ercredi|[Jj]eudi|[Vv]endredi|[Ss]amedi|[Dd]imanche|[Ll]un|[Mm]ar|[Mm]er|[Jj]eu|[Vv]en|[Ss]am|[Dd]im|[Ll]u|[Mm]a|[Mm]e|[Jj]e|[Vv]e|[Ss]a|[Dd]i)'
 
     # Pattern 1a: Plage de dates avec "au" ou "à" (ex: "Je 23 au Sa 25 :" ou "Du Je 23 au Sa 25 :" ou "Du Vendredi 03 au Dimanche 05")
     # Supporte les noms de jours abrégés (Je, Ve, Sa) ET complets (Jeudi, Vendredi, Samedi)
@@ -1512,6 +1526,20 @@ def extract_before_lieu(text: str, lieu_start: int) -> dict:
                     if not any(a['nom'].lower() == full_nom.lower() for a in result['artistes']):
                         result['artistes'].append({'nom': full_nom, 'style': None, 'is_musical': False})
 
+        # Pattern "collectif XXX" directement après spectacle (sans "par" ni "avec")
+        # Ex: "«Spectacle» (théâtre), collectif Grand Maximum"
+        if not result['artistes']:
+            collectif_direct_match = re.search(
+                r'[Cc]ollectif\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s\'\u2019\-/&]+?)(?:\s*,|\s*\d{1,2}h|\s*\(|\s*<|\s*$)',
+                before_stripped
+            )
+            if collectif_direct_match:
+                nom = collectif_direct_match.group(1).strip().rstrip(',')
+                if nom and len(nom) > 2:
+                    full_nom = f"Collectif {nom}"
+                    if not any(a['nom'].lower() == full_nom.lower() for a in result['artistes']):
+                        result['artistes'].append({'nom': full_nom, 'style': None, 'is_musical': False})
+
         return result
 
     # === Fallback: extraction classique sans formatage ===
@@ -1668,6 +1696,17 @@ def extract_before_lieu(text: str, lieu_start: int) -> dict:
                 full_nom = f"Cie {nom}"
                 if not any(a['nom'].lower() == full_nom.lower() for a in result['artistes']):
                     result['artistes'].append({'nom': full_nom, 'style': None})
+
+    # 1c. Pattern "collectif XXX" après un spectacle (sans "par")
+    # Ex: '"Nous ne viendrons pas manger dimanche" (théâtre) collectif Grand Maximum'
+    # Note: peut être au début du remaining (après suppression du spectacle), donc on autorise ^
+    collectif_match = re.search(r'(?:^|,\s*|\s)[Cc]ollectif\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s\'\-/&]+?)(?:\s*,|\s*\d{1,2}h|\s*\(|\s*<|\s*$)', remaining)
+    if collectif_match:
+        nom = collectif_match.group(1).strip().rstrip(',')
+        if nom and len(nom) > 2:
+            full_nom = f"Collectif {nom}"
+            if not any(a['nom'].lower() == full_nom.lower() for a in result['artistes']):
+                result['artistes'].append({'nom': full_nom, 'style': None})
 
     # 2. Pattern "par ARTISTE (style)" - avec style optionnel
     # Ex: "par GREGORY QUESTEL et DAVID MORA", "par YOLAINE (contes)"
@@ -2092,11 +2131,19 @@ def extract_lieu_fallback(text: str, ville_ref_list: list) -> tuple[Optional[str
             '"': '"',    # guillemets droits ASCII
         }
 
-        for char in text:
+        for i, char in enumerate(text):
             if char in quote_pairs and not in_quotes:
-                in_quotes = True
-                quote_char = quote_pairs[char]
-                current += char
+                # Vérifier si c'est vraiment un guillemet ouvrant
+                # Un guillemet après une lettre/chiffre est probablement fermant, pas ouvrant
+                # Ex: 'AMOUR"' -> le " est fermant (ignore OCR avec << au lieu de «)
+                prev_char = text[i - 1] if i > 0 else ''
+                if prev_char.isalnum():
+                    # C'est un guillemet fermant orphelin, ignorer
+                    current += char
+                else:
+                    in_quotes = True
+                    quote_char = quote_pairs[char]
+                    current += char
             elif in_quotes and char == quote_char:
                 in_quotes = False
                 quote_char = None
@@ -2123,19 +2170,23 @@ def extract_lieu_fallback(text: str, ville_ref_list: list) -> tuple[Optional[str
     # Artistes en MAJUSCULES (avec ou sans genre entre parenthèses)
     # Inclut les artistes séparés par + (ARTISTE1 + ARTISTE2)
     artiste_pattern = re.compile(r'^[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s\'\-\&\.0-9]+(?:\s*\([^)]+\))?(?:\s*\+\s*[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s\'\-\&\.0-9]+(?:\s*\([^)]+\))?)*$')
+    # Acronymes de lieux connus (ne doivent pas être filtrés comme artistes)
+    # ITEMM = Institut Technologique Européen des Métiers de la Musique
+    # MJC = Maison des Jeunes et de la Culture
+    lieux_acronymes = {'ITEMM', 'MJC', 'FNAC', 'CSC', 'MPT', 'CAC', 'EMM'}
     # Compagnies de théâtre: "Cie XXX", "Compagnie XXX", "Cie XXX/YYY"
     cie_pattern = re.compile(r'^[Cc](?:ie|ompagnie)\s+[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s\'\-/&]+$')
     # Texte avec genre entre parenthèses (probablement artiste ou spectacle)
     # Exclut les indications de lieu comme "(extérieur)", "(intérieur)", "(jardin)", "(terrasse)"
     with_genre_pattern = re.compile(r'.+\s*\([^)]+\)\s*$')
-    # Exceptions au with_genre_pattern : ce ne sont pas des genres mais des infos lieu
-    lieu_info_pattern = re.compile(r'\((?:ext[ée]rieur|int[ée]rieur|jardin|terrasse|parking|parvis|cour|dehors|plein air)\)$', re.IGNORECASE)
+    # Exceptions au with_genre_pattern : ce ne sont pas des genres mais des infos lieu ou codes département
+    lieu_info_pattern = re.compile(r'\((?:ext[ée]rieur|int[ée]rieur|jardin|terrasse|parking|parvis|cour|dehors|plein air|\d{2,3})\)$', re.IGNORECASE)
     # Texte contenant "+" suivi de texte (probablement artistes/guests)
     multi_artiste_pattern = re.compile(r'\+\s*(?:[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ]|guests)', re.IGNORECASE)
-    # Noms d'événements: contient "avec", "invite", ":", "soirée", "concert", etc.
-    event_name_pattern = re.compile(r'\b(?:avec|featuring|feat\.?|invite)\b|^(?:soirée|concert|carte blanche)', re.IGNORECASE)
-    # Pattern pour extraire un lieu bar/espace/salle/centre/théâtre en fin de chaîne
-    lieu_in_text_pattern = re.compile(r'\b((?:bar|espace|salle|centre|théâtre|pub|médiathèque|péniche|café)\s+(?:le\s+|la\s+|l\'|du\s+|de\s+la\s+|des\s+)?[A-Za-zÀ-ÿ\s\-\']+)$', re.IGNORECASE)
+    # Noms d'événements: contient "avec", "invite", ":", "soirée", "concert", "scène ouverte", etc.
+    event_name_pattern = re.compile(r'\b(?:avec|featuring|feat\.?|invite)\b|^(?:soirée|concert|carte blanche|sc[èe]ne ouverte)', re.IGNORECASE)
+    # Pattern pour extraire un lieu bar/espace/salle/centre/théâtre en fin de chaîne ou avant "de Xh"
+    lieu_in_text_pattern = re.compile(r'\b((?:bar|espace|salle|centre|théâtre|pub|médiathèque|péniche|café)\s+(?:le\s+|la\s+|l\'|du\s+|de\s+la\s+|des\s+)?[A-Za-zÀ-ÿ\s\-\']+?)(?:\s+de\s+\d{1,2}h|$)', re.IGNORECASE)
     # Fragments de parenthèses (genre coupé) - inclut les artistes avec parenthèse non fermée
     fragment_pattern = re.compile(r'^[^(]*\)|\([^)]*$|^[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s\'\-\&\.0-9]+\s*\([^)]*$')
 
@@ -2158,8 +2209,12 @@ def extract_lieu_fallback(text: str, ville_ref_list: list) -> tuple[Optional[str
         if not part:
             continue
 
-        # Ignorer les heures et prix
+        # Ignorer les heures et prix, mais d'abord essayer d'extraire un lieu embarqué
+        # Ex: "Bar Le Palais de 19h à 21h" -> extraire "Bar Le Palais"
         if heure_pattern.search(part) or prix_pattern.search(part):
+            lieu_match = lieu_in_text_pattern.search(part)
+            if lieu_match and lieu is None:
+                lieu = lieu_match.group(1).strip()
             continue
 
         # Ignorer les genres seuls entre parenthèses
@@ -2174,8 +2229,8 @@ def extract_lieu_fallback(text: str, ville_ref_list: list) -> tuple[Optional[str
         if spectacle_pattern.match(part):
             continue
 
-        # Ignorer les artistes en MAJUSCULES
-        if artiste_pattern.match(part):
+        # Ignorer les artistes en MAJUSCULES (sauf acronymes de lieux connus)
+        if artiste_pattern.match(part) and part.upper() not in lieux_acronymes:
             continue
 
         # Ignorer les compagnies de théâtre (Cie XXX)
@@ -2220,9 +2275,11 @@ def extract_lieu_fallback(text: str, ville_ref_list: list) -> tuple[Optional[str
         # donc on compare le nom normalisé retourné avec le candidat pour
         # déterminer si c'est vraiment une ville reconnue.
         from core.normalizer import normalize_for_matching
-        ville_id, ville_norm = normalize_ville(part)
+        # Retirer le code département éventuel: "Fresnay-sur-Sarthe (72)" -> "Fresnay-sur-Sarthe"
+        part_for_ville = lieu_info_pattern.sub('', part).strip()
+        ville_id, ville_norm = normalize_ville(part_for_ville)
         # Normaliser les deux pour comparaison (tirets, accents, casse)
-        part_normalized = normalize_for_matching(part)
+        part_normalized = normalize_for_matching(part_for_ville)
         ville_normalized = normalize_for_matching(ville_norm)
 
         # C'est une ville si le nom retourné correspond au candidat
@@ -2659,23 +2716,27 @@ class EventParser:
 
     # Patterns de dates
     # Supporte: "Samedi 20", "LUNDI 1ER", "Mardi 2", "Me 1er", "Je 02", etc.
-    JOURS = r"(?:[Ll]undi|[Mm]ardi|[Mm]ercredi|[Jj]eudi|[Vv]endredi|[Ss]amedi|[Dd]imanche|LUNDI|MARDI|MERCREDI|JEUDI|VENDREDI|SAMEDI|DIMANCHE|[Ll]u|[Mm]a|[Mm]e|[Jj]e|[Vv]e|[Ss]a|[Dd]i|LU|MA|ME|JE|VE|SA|DI)"
+    # Jours de la semaine: formes complètes, abréviations 3 lettres, abréviations 2 lettres
+    # Complètes: Lundi, Mardi, Mercredi, Jeudi, Vendredi, Samedi, Dimanche
+    # 3 lettres: Lun, Mar, Mer, Jeu, Ven, Sam, Dim
+    # 2 lettres: Lu, Ma, Me, Je, Ve, Sa, Di
+    JOURS = r"(?:[Ll]undi|[Mm]ardi|[Mm]ercredi|[Jj]eudi|[Vv]endredi|[Ss]amedi|[Dd]imanche|LUNDI|MARDI|MERCREDI|JEUDI|VENDREDI|SAMEDI|DIMANCHE|[Ll]un|[Mm]ar|[Mm]er|[Jj]eu|[Vv]en|[Ss]am|[Dd]im|LUN|MAR|MER|JEU|VEN|SAM|DIM|[Ll]u|[Mm]a|[Mm]e|[Jj]e|[Vv]e|[Ss]a|[Dd]i|LU|MA|ME|JE|VE|SA|DI)"
     MOIS = r"(?:[Jj]anvier|[Ff][ée]vrier|[Mm]ars|[Aa]vril|[Mm]ai|[Jj]uin|[Jj]uillet|[Aa]o[uû]t|[Ss]eptembre|[Oo]ctobre|[Nn]ovembre|[Dd][ée]cembre)"
-    # Pattern pour dates simples: "Samedi 20", "Mardi 2", "Vendredi 1er"
-    DATE_SIMPLE_PATTERN = re.compile(rf"^({JOURS})\s+(\d{{1,2}})(?:ER|er|ème|eme)?\s*:?\s*$", re.MULTILINE)
+    # Pattern pour dates simples: "Samedi 20", "Mardi 2", "Vendredi 1er", "Vendredi 9 juillet"
+    DATE_SIMPLE_PATTERN = re.compile(rf"^({JOURS})\s+(\d{{1,2}})(?:ER|er|ème|eme)?(?:\s+{MOIS})?\s*:?\s*$", re.MULTILINE)
     # Pattern pour dates composées: "Samedi 2 & Dimanche 3", "Ve 10 & Sa 11", "Samedi 04 et Dimanche 05"
     DATE_COMPOSE_PATTERN = re.compile(rf"^({JOURS})\s+(\d{{1,2}})(?:ER|er|ème|eme)?\s*(?:[&,]|et)\s*({JOURS})\s+(\d{{1,2}})(?:ER|er|ème|eme)?\s*:?\s*$", re.MULTILINE | re.IGNORECASE)
     # Pattern pour plages: "Du 6 au 10 juin", "Du 26 juin au 1er juillet", "Du Mercredi 01 au Samedi 07"
     DATE_RANGE_PATTERN = re.compile(rf"^[Dd]u\s+(?:{JOURS}\s+)?(\d{{1,2}})(?:ER|er|ème|eme)?\s*(?:{MOIS})?\s*[aà]u?\s+(?:{JOURS}\s+)?(\d{{1,2}})(?:ER|er|ème|eme)?\s*(?:{MOIS})?\s*$", re.MULTILINE | re.IGNORECASE)
     # Pattern combiné pour matcher n'importe quel format de date (utilisé par _split_by_dates)
     # Supporte:
-    # - Dates simples: "Jeudi 02", "Lundi 06"
+    # - Dates simples: "Jeudi 02", "Lundi 06", "Vendredi 9 juillet"
     # - Dates composées avec &, , ou et: "Samedi 04 et Dimanche 05", "Ve 10 & Sa 11"
     # - Plages numériques: "Du 6 au 10"
     # - Plages avec jours complets: "Du Mercredi 01 au Samedi 07", "Du Vendredi 03 au Dimanche 05"
     DATE_PATTERN = re.compile(
         rf"^(?:"
-        rf"({JOURS})\s+(\d{{1,2}})(?:ER|er|ème|eme)?(?:\s*(?:[&,]|et)\s*({JOURS})\s+(\d{{1,2}})(?:ER|er|ème|eme)?)?"  # Simple ou composée (avec &, , ou et)
+        rf"({JOURS})\s+(\d{{1,2}})(?:ER|er|ème|eme)?(?:\s+{MOIS})?(?:\s*(?:[&,]|et)\s*({JOURS})\s+(\d{{1,2}})(?:ER|er|ème|eme)?(?:\s+{MOIS})?)?"  # Simple ou composée (avec mois optionnel)
         rf"|[Dd]u\s+(?:{JOURS}\s+)?(\d{{1,2}})(?:ER|er|ème|eme)?\s*(?:{MOIS})?\s*[aà]u?\s+(?:{JOURS}\s+)?(\d{{1,2}})(?:ER|er|ème|eme)?\s*(?:{MOIS})?"  # Plage (avec ou sans jours complets)
         rf")\s*:?\s*$",
         re.MULTILINE | re.IGNORECASE
@@ -2735,6 +2796,9 @@ class EventParser:
         self.bidul_mois = bidul_mois
         self.bidul_annee = bidul_annee
         self.date_format = date_format
+        # Support juillet/août: sections de mois détectées et lignes du texte
+        self._month_sections: list[MonthSection] = []
+        self._lines: list[str] = []
 
     # Pattern pour détecter le début d'un événement inline
     # Supporte:
@@ -2780,6 +2844,15 @@ class EventParser:
         Returns:
             Liste d'événements parsés (dédoublonnés)
         """
+        # Détecter les sections de mois pour les Biduls d'été (juillet couvrant juillet+août)
+        if is_summer_bidul(self.bidul_mois):
+            self._month_sections = detect_month_sections(text)
+            self._lines = text.split('\n')
+            if self._month_sections:
+                logger.info(f"Bidul juillet: {len(self._month_sections)} section(s) de mois détectée(s)")
+                for section in self._month_sections:
+                    logger.debug(f"  - Ligne {section.line_number}: mois={section.month} ({section.header_text})")
+
         # Si le format est spécifié, l'utiliser directement
         if self.date_format == 'inline':
             events = self._parse_inline_format(text)
@@ -2815,11 +2888,14 @@ class EventParser:
             # Découper par événements (bullets)
             event_texts = self._split_by_bullets(block_text)
 
+            # Calculer le line_number pour cette date (support juillet/août)
+            line_number = self._get_line_number_for_text(date_str) if date_str else None
+
             # Parser toutes les dates de la plage (ex: "Du 3 au 5" → [3, 4, 5])
-            all_dates = self._parse_all_dates(date_str) if date_str else []
+            all_dates = self._parse_all_dates(date_str, line_number) if date_str else []
             if not all_dates:
                 # Fallback sur une seule date si pas de plage
-                single_date = self._parse_date(date_str) if date_str else None
+                single_date = self._parse_date(date_str, line_number) if date_str else None
                 all_dates = [single_date] if single_date else [None]
 
             for event_text in event_texts:
@@ -2851,8 +2927,9 @@ class EventParser:
         lines = text.split('\n')
         current_event_lines = []
         current_date = None
+        current_line_number = None  # Support juillet/août
 
-        for line in lines:
+        for line_idx, line in enumerate(lines):
             line = line.strip()
             if not line:
                 continue
@@ -2863,7 +2940,7 @@ class EventParser:
                 # Traiter l'événement précédent
                 if current_event_lines and current_date:
                     event_text = ' '.join(current_event_lines)
-                    event = self._parse_event(event_text, current_date)
+                    event = self._parse_event(event_text, current_date, current_line_number)
                     if event:
                         signature = self._event_signature(event)
                         if signature not in seen_signatures:
@@ -2874,6 +2951,7 @@ class EventParser:
                 # Group 1: date complète, Group 2: contenu
                 current_date = match.group(1).strip()
                 current_event_lines = [match.group(2).strip()]
+                current_line_number = line_idx  # Mémoriser le numéro de ligne
             else:
                 # Continuation de l'événement précédent
                 if current_event_lines:
@@ -2882,7 +2960,7 @@ class EventParser:
         # Traiter le dernier événement
         if current_event_lines and current_date:
             event_text = ' '.join(current_event_lines)
-            event = self._parse_event(event_text, current_date)
+            event = self._parse_event(event_text, current_date, current_line_number)
             if event:
                 signature = self._event_signature(event)
                 if signature not in seen_signatures:
@@ -3171,7 +3249,8 @@ class EventParser:
             event.date_evenement = event_date
         return event
 
-    def _parse_event(self, text: str, date_str: Optional[str]) -> Optional[ParsedEvent]:
+    def _parse_event(self, text: str, date_str: Optional[str],
+                     line_number: Optional[int] = None) -> Optional[ParsedEvent]:
         if not text:
             return None
 
@@ -3184,7 +3263,7 @@ class EventParser:
 
         if date_str:
             event.date_str = date_str
-            event.date_evenement = self._parse_date(date_str)
+            event.date_evenement = self._parse_date(date_str, line_number)
 
         # 0a. Extraire le pattern // (Titre événement // ARTISTES)
         event_name_from_slash, text = self._extract_double_slash_pattern(text)
@@ -3236,21 +3315,59 @@ class EventParser:
 
         return event
 
-    def _parse_date(self, date_str: str) -> Optional[date]:
-        """Convertit une date relative en date absolue."""
+    def _get_line_number_for_text(self, text_fragment: str) -> int:
+        """
+        Trouve le numéro de ligne approximatif pour un fragment de texte.
+
+        Utilisé pour déterminer le mois contextuel lors du parsing
+        des Biduls d'été (juillet couvrant juillet+août).
+
+        Args:
+            text_fragment: Fragment de texte à localiser
+
+        Returns:
+            Numéro de ligne (0-indexed), ou 0 si non trouvé
+        """
+        if not self._lines:
+            return 0
+
+        text_clean = text_fragment.strip()[:50]  # Premiers 50 chars
+
+        for i, line in enumerate(self._lines):
+            if text_clean in line:
+                return i
+
+        return 0
+
+    def _parse_date(self, date_str: str, line_number: Optional[int] = None) -> Optional[date]:
+        """
+        Convertit une date relative en date absolue.
+
+        Args:
+            date_str: Chaîne de date (ex: "Samedi 3")
+            line_number: Numéro de ligne pour déterminer le mois contextuel (Biduls d'été)
+
+        Returns:
+            Date absolue ou None
+        """
         if not self.bidul_mois or not self.bidul_annee:
             return None
+
+        # Déterminer le mois contextuel pour les Biduls d'été
+        mois = self.bidul_mois
+        if self._month_sections and line_number is not None:
+            mois = get_month_for_line(self._month_sections, line_number, self.bidul_mois)
 
         match = re.search(r"(\d{1,2})", date_str)
         if match:
             jour = int(match.group(1))
             try:
-                return date(self.bidul_annee, self.bidul_mois, jour)
+                return date(self.bidul_annee, mois, jour)
             except ValueError:
                 return None
         return None
 
-    def _parse_all_dates(self, date_str: str) -> list[date]:
+    def _parse_all_dates(self, date_str: str, line_number: Optional[int] = None) -> list[date]:
         """
         Parse toutes les dates d'une chaîne de date (simple, composée, ou plage).
 
@@ -3260,17 +3377,26 @@ class EventParser:
         - "Du 6 au 10 juin" → [date_6, date_7, ..., date_10]
         - "Du Vendredi 03 au Dimanche 05" → [date_3, date_4, date_5]
 
+        Args:
+            date_str: Chaîne de date
+            line_number: Numéro de ligne pour déterminer le mois contextuel (Biduls d'été)
+
         Returns:
             Liste de dates
         """
         if not self.bidul_mois or not self.bidul_annee:
             return []
 
+        # Déterminer le mois contextuel pour les Biduls d'été
+        mois = self.bidul_mois
+        if self._month_sections and line_number is not None:
+            mois = get_month_for_line(self._month_sections, line_number, self.bidul_mois)
+
         dates = []
 
         # Vérifier si c'est une plage "Du X au Y" (avec jour abrégé ou complet)
         # Pattern: Du [Jour] N au [Jour] M
-        JOURS_PATTERN = r'(?:[Ll]undi|[Mm]ardi|[Mm]ercredi|[Jj]eudi|[Vv]endredi|[Ss]amedi|[Dd]imanche|[Ll]u|[Mm]a|[Mm]e|[Jj]e|[Vv]e|[Ss]a|[Dd]i)'
+        JOURS_PATTERN = r'(?:[Ll]undi|[Mm]ardi|[Mm]ercredi|[Jj]eudi|[Vv]endredi|[Ss]amedi|[Dd]imanche|[Ll]un|[Mm]ar|[Mm]er|[Jj]eu|[Vv]en|[Ss]am|[Dd]im|[Ll]u|[Mm]a|[Mm]e|[Jj]e|[Vv]e|[Ss]a|[Dd]i)'
         range_pattern = rf'^[Dd]u\s+(?:{JOURS_PATTERN}\s+)?(\d{{1,2}})(?:er|e|ème)?\s+(?:au|à)\s+(?:{JOURS_PATTERN}\s+)?(\d{{1,2}})(?:er|e|ème)?'
         range_match = re.match(range_pattern, date_str, re.IGNORECASE)
 
@@ -3280,7 +3406,7 @@ class EventParser:
             # Générer toutes les dates de la plage
             for day in range(start_day, end_day + 1):
                 try:
-                    dates.append(date(self.bidul_annee, self.bidul_mois, day))
+                    dates.append(date(self.bidul_annee, mois, day))
                 except ValueError:
                     pass
             return dates
@@ -3292,7 +3418,7 @@ class EventParser:
         for jour_str in jour_matches:
             jour = int(jour_str)
             try:
-                dates.append(date(self.bidul_annee, self.bidul_mois, jour))
+                dates.append(date(self.bidul_annee, mois, jour))
             except ValueError:
                 # Jour invalide pour ce mois (ex: 31 février)
                 pass
@@ -3524,6 +3650,21 @@ class EventParser:
             # avec LES MOYENS DU BORD (majuscules = artiste)
             (r'avec\s+([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s\-\']+?)(?:\s*\(|\s*et\s|\s*,|$)', ''),
         ]
+
+        # Pattern "collectif XXX" sans "par" (ex: '"spectacle" (théâtre) collectif Grand Maximum')
+        collectif_match = re.search(r'(?:^|,\s*|\s)[Cc]ollectif\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s\'\-/&]+?)(?:\s*,|\s*\d{1,2}h|\s*\(|\s*<|\s*$)', text)
+        if collectif_match:
+            nom = collectif_match.group(1).strip().rstrip(',')
+            if nom and len(nom) > 2:
+                full_nom = f"Collectif {nom}"
+                normalized_nom = _normalize_artist_name(full_nom)
+                if normalized_nom.lower() not in seen_noms:
+                    seen_noms.add(normalized_nom.lower())
+                    artistes.append(ArtisteInfo(
+                        nom=normalized_nom,
+                        genre=None,
+                        spectacle=None
+                    ))
 
         for pattern, prefix in avec_patterns:
             matches = re.findall(pattern, text)
@@ -3839,6 +3980,15 @@ class EventParser:
         Returns:
             Liste d'événements parsés (dédoublonnés)
         """
+        # Détecter les sections de mois pour les Biduls d'été (juillet couvrant juillet+août)
+        if is_summer_bidul(self.bidul_mois):
+            self._month_sections = detect_month_sections(text)
+            self._lines = text.split('\n')
+            if self._month_sections:
+                logger.info(f"Bidul juillet: {len(self._month_sections)} section(s) de mois détectée(s)")
+                for section in self._month_sections:
+                    logger.debug(f"  - Ligne {section.line_number}: mois={section.month} ({section.header_text})")
+
         # Si le format est spécifié, l'utiliser directement
         if self.date_format == 'inline':
             events = self._parse_inline_with_referentiel(text, lieu_ref_list, ville_ref_list)
@@ -3882,14 +4032,23 @@ class EventParser:
             # Découper par événements (bullets)
             event_texts = self._split_by_bullets(block_text)
 
+            # Calculer le line_number pour cette date (support juillet/août)
+            line_number = self._get_line_number_for_text(date_str) if date_str else None
+
+            # Déterminer le mois contextuel pour les Biduls d'été
+            mois = self.bidul_mois or 1
+            if self._month_sections and line_number is not None:
+                mois = get_month_for_line(self._month_sections, line_number, self.bidul_mois or 7)
+
             for event_text in event_texts:
                 if len(event_text.strip()) < 10:
                     continue
 
                 # Utiliser parse_event_line_v2 pour chaque ligne
+                # Passer le mois contextuel au lieu du mois du Bidul
                 parsed_events = parse_event_line_v2(
                     event_text.strip(),
-                    self.bidul_mois or 1,
+                    mois,
                     self.bidul_annee or 2023,
                     lieu_ref_list,
                     ville_ref_list
@@ -3898,7 +4057,7 @@ class EventParser:
                 for parsed in parsed_events:
                     # Convertir le dict en ParsedEvent
                     # Pour les dates composées, créer un événement par date
-                    event_dates = self._parse_all_dates(date_str)
+                    event_dates = self._parse_all_dates(date_str, line_number)
 
                     if not event_dates:
                         # Pas de date spécifique (plage ou date invalide)
@@ -3939,26 +4098,35 @@ class EventParser:
         events = []
         seen_signatures = set()
 
-        def process_event(event_text: str, date_str: str):
+        # Référence aux attributs pour la closure
+        month_sections = self._month_sections
+        bidul_mois = self.bidul_mois
+
+        def process_event(event_text: str, date_str: str, line_number: int = None):
             """Traite un événement avec une date (potentiellement composée)."""
             nonlocal events, seen_signatures
+
+            # Déterminer le mois contextuel pour les Biduls d'été
+            mois = bidul_mois or 1
+            if month_sections and line_number is not None:
+                mois = get_month_for_line(month_sections, line_number, bidul_mois or 7)
 
             # Parser les dates composées
             date_list, _ = parse_date_prefix_v2(
                 f"{date_str}: dummy",  # Simuler le format attendu
-                self.bidul_mois or 1,
+                mois,
                 self.bidul_annee or 2023
             )
 
             if not date_list:
                 # Fallback: utiliser _parse_date pour une date simple
-                single_date = self._parse_date(date_str)
+                single_date = self._parse_date(date_str, line_number)
                 date_list = [single_date] if single_date else [None]
 
             # Parser le contenu de l'événement
             parsed_events = parse_event_line_v2(
                 event_text,
-                self.bidul_mois or 1,
+                mois,
                 self.bidul_annee or 2023,
                 lieu_ref_list,
                 ville_ref_list
@@ -3996,8 +4164,9 @@ class EventParser:
         lines = text.split('\n')
         current_event_lines = []
         current_date = None
+        current_line_number = None  # Support juillet/août
 
-        for line in lines:
+        for line_idx, line in enumerate(lines):
             line = line.strip()
             if not line:
                 continue
@@ -4007,11 +4176,12 @@ class EventParser:
                 # Traiter l'événement précédent
                 if current_event_lines and current_date:
                     event_text = ' '.join(current_event_lines)
-                    process_event(event_text, current_date)
+                    process_event(event_text, current_date, current_line_number)
 
                 # Group 1: date complète, Group 2: contenu
                 current_date = match.group(1).strip()
                 current_event_lines = [match.group(2).strip()]
+                current_line_number = line_idx  # Mémoriser le numéro de ligne
             else:
                 if current_event_lines:
                     current_event_lines.append(line)
@@ -4019,7 +4189,7 @@ class EventParser:
         # Traiter le dernier événement
         if current_event_lines and current_date:
             event_text = ' '.join(current_event_lines)
-            process_event(event_text, current_date)
+            process_event(event_text, current_date, current_line_number)
 
         return events
 

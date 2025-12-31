@@ -26,6 +26,7 @@ class BidulConfig:
     numero: int
     type_source: str  # 'scan' ou 'texte'
     pages_utiles: list[int] = field(default_factory=list)  # Pages avec texte utile (1-indexed)
+    pages_override: list[int] | None = None  # Pages à extraire explicitement (surpasse la logique par défaut)
 
     @classmethod
     def from_csv_row(cls, row: dict) -> Optional['BidulConfig']:
@@ -71,7 +72,17 @@ class BidulConfig:
             if not pages_utiles and type_source == 'texte':
                 pages_utiles = [2]
 
-            return cls(numero=numero, type_source=type_source, pages_utiles=pages_utiles)
+            # Lire pages_override si spécifié (ex: "1,2" ou "1 2")
+            pages_override = None
+            pages_override_str = row.get('pages_override', '').strip()
+            if pages_override_str:
+                # Supporter formats: "1,2" ou "1 2" ou "1;2"
+                parts = pages_override_str.replace(',', ' ').replace(';', ' ').split()
+                pages_override = [int(p) for p in parts if p.isdigit()]
+                if not pages_override:
+                    pages_override = None
+
+            return cls(numero=numero, type_source=type_source, pages_utiles=pages_utiles, pages_override=pages_override)
 
         except (ValueError, KeyError) as e:
             logger.debug(f"Erreur parsing config row: {e}")
@@ -411,9 +422,10 @@ class TextExtractor:
         Détermine les pages PDF à extraire selon la configuration.
 
         Priorité:
-        1. Vérifier si c'est un scan (pas d'extraction possible)
-        2. Si page 3 existe → extraire page 3 (agenda complet consolidé)
-        3. Sinon, utiliser biduls.description.csv pour déterminer les pages
+        1. Si pages_override est défini dans le CSV → utiliser ces pages
+        2. Vérifier si c'est un scan (OCR nécessaire)
+        3. Si page 3 existe → extraire page 3 (agenda complet consolidé)
+        4. Sinon, utiliser biduls.description.csv pour déterminer les pages
 
         Args:
             numero: Numéro du Bidul
@@ -433,6 +445,15 @@ class TextExtractor:
         config = loader.get_config(numero)
         if config is None:
             config = loader.get_nearest_config(numero)
+
+        # PRIORITÉ 1: pages_override explicite dans le CSV
+        if config and config.pages_override:
+            # Filtrer les pages qui existent
+            valid_pages = [p for p in config.pages_override if 1 <= p <= num_pages]
+            if valid_pages:
+                is_scan = config.type_source == 'scan'
+                logger.debug(f"Bidul {numero}: pages_override={valid_pages} (scan={is_scan})")
+                return valid_pages, is_scan
 
         # Vérifier si c'est un scan
         if config and config.type_source == 'scan':
