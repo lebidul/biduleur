@@ -62,5 +62,6 @@ leTruc/_version.py
 # Indexer - fichiers générés
 indexer/archives/
 indexer/corpus/*.csv
+!indexer/corpus/biduls.description.csv
 indexer/corpus/*.json
 indexer/corpus/.~lock.*
