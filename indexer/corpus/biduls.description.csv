@@ -183,7 +183,7 @@ numéros,scan/texte,source,date,page1.orientation pdf,page1.orientation texte,pag
 185,texte,manuel,inline,,,,,portrait,portrait,S1 S2 S3 S4,1,,,,,
 186,texte,manuel,par bloc,,,,,portrait,portrait,S1 S2 S3 S4,1,,,,,
 187,texte,manuel,par bloc,,,,,portrait,portrait,S1 S2 S3 S4,1,,,,,
-188,texte,manuel,par bloc,,,,,portrait,portrait,S1 S2 S3 S4,1,,,,,"1,2"
+188,texte,manuel,par bloc,,,,,portrait,portrait,S1 S2 S3 S4,1,,,,,1
 189,texte,manuel,par bloc,,,,,portrait,portrait,S1 S2 S3 S4,1,,,,,
 190,texte,manuel,par bloc,,,,,portrait,portrait,S1 S2 S3 S4,1,,,,,
 191,scan,manuel,par bloc,,,,,portrait,portrait,S1 S2 S3 S4,1,,,,,

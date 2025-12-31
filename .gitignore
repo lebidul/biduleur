@@ -63,5 +63,11 @@ leTruc/_version.py
 indexer/archives/
 indexer/corpus/*.csv
 !indexer/corpus/biduls.description.csv
+!indexer/corpus/artiste.csv
+!indexer/corpus/artiste_alias.csv
+!indexer/corpus/lieu.csv
+!indexer/corpus/lieu_alias.csv
+!indexer/corpus/style_alias.csv
+!indexer/corpus/ville.csv
 indexer/corpus/*.json
 indexer/corpus/.~lock.*
