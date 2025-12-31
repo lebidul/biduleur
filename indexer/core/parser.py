@@ -1130,8 +1130,8 @@ def parse_date_prefix_v2(text: str, base_month: int, base_year: int) -> tuple[li
     """
     text_stripped = text.strip()
 
-    # Pattern pour les noms de jours (abrégés et complets)
-    JOURS_PATTERN = r'(?:[Ll]undi|[Mm]ardi|[Mm]ercredi|[Jj]eudi|[Vv]endredi|[Ss]amedi|[Dd]imanche|[Ll]u|[Mm]a|[Mm]e|[Jj]e|[Vv]e|[Ss]a|[Dd]i)'
+    # Pattern pour les noms de jours (complets, abrégés 3 lettres, abrégés 2 lettres)
+    JOURS_PATTERN = r'(?:[Ll]undi|[Mm]ardi|[Mm]ercredi|[Jj]eudi|[Vv]endredi|[Ss]amedi|[Dd]imanche|[Ll]un|[Mm]ar|[Mm]er|[Jj]eu|[Vv]en|[Ss]am|[Dd]im|[Ll]u|[Mm]a|[Mm]e|[Jj]e|[Vv]e|[Ss]a|[Dd]i)'
 
     # Pattern 1a: Plage de dates avec "au" ou "à" (ex: "Je 23 au Sa 25 :" ou "Du Je 23 au Sa 25 :" ou "Du Vendredi 03 au Dimanche 05")
     # Supporte les noms de jours abrégés (Je, Ve, Sa) ET complets (Jeudi, Vendredi, Samedi)
@@ -2665,7 +2665,11 @@ class EventParser:
 
     # Patterns de dates
     # Supporte: "Samedi 20", "LUNDI 1ER", "Mardi 2", "Me 1er", "Je 02", etc.
-    JOURS = r"(?:[Ll]undi|[Mm]ardi|[Mm]ercredi|[Jj]eudi|[Vv]endredi|[Ss]amedi|[Dd]imanche|LUNDI|MARDI|MERCREDI|JEUDI|VENDREDI|SAMEDI|DIMANCHE|[Ll]u|[Mm]a|[Mm]e|[Jj]e|[Vv]e|[Ss]a|[Dd]i|LU|MA|ME|JE|VE|SA|DI)"
+    # Jours de la semaine: formes complètes, abréviations 3 lettres, abréviations 2 lettres
+    # Complètes: Lundi, Mardi, Mercredi, Jeudi, Vendredi, Samedi, Dimanche
+    # 3 lettres: Lun, Mar, Mer, Jeu, Ven, Sam, Dim
+    # 2 lettres: Lu, Ma, Me, Je, Ve, Sa, Di
+    JOURS = r"(?:[Ll]undi|[Mm]ardi|[Mm]ercredi|[Jj]eudi|[Vv]endredi|[Ss]amedi|[Dd]imanche|LUNDI|MARDI|MERCREDI|JEUDI|VENDREDI|SAMEDI|DIMANCHE|[Ll]un|[Mm]ar|[Mm]er|[Jj]eu|[Vv]en|[Ss]am|[Dd]im|LUN|MAR|MER|JEU|VEN|SAM|DIM|[Ll]u|[Mm]a|[Mm]e|[Jj]e|[Vv]e|[Ss]a|[Dd]i|LU|MA|ME|JE|VE|SA|DI)"
     MOIS = r"(?:[Jj]anvier|[Ff][ée]vrier|[Mm]ars|[Aa]vril|[Mm]ai|[Jj]uin|[Jj]uillet|[Aa]o[uû]t|[Ss]eptembre|[Oo]ctobre|[Nn]ovembre|[Dd][ée]cembre)"
     # Pattern pour dates simples: "Samedi 20", "Mardi 2", "Vendredi 1er", "Vendredi 9 juillet"
     DATE_SIMPLE_PATTERN = re.compile(rf"^({JOURS})\s+(\d{{1,2}})(?:ER|er|ème|eme)?(?:\s+{MOIS})?\s*:?\s*$", re.MULTILINE)
@@ -3341,7 +3345,7 @@ class EventParser:
 
         # Vérifier si c'est une plage "Du X au Y" (avec jour abrégé ou complet)
         # Pattern: Du [Jour] N au [Jour] M
-        JOURS_PATTERN = r'(?:[Ll]undi|[Mm]ardi|[Mm]ercredi|[Jj]eudi|[Vv]endredi|[Ss]amedi|[Dd]imanche|[Ll]u|[Mm]a|[Mm]e|[Jj]e|[Vv]e|[Ss]a|[Dd]i)'
+        JOURS_PATTERN = r'(?:[Ll]undi|[Mm]ardi|[Mm]ercredi|[Jj]eudi|[Vv]endredi|[Ss]amedi|[Dd]imanche|[Ll]un|[Mm]ar|[Mm]er|[Jj]eu|[Vv]en|[Ss]am|[Dd]im|[Ll]u|[Mm]a|[Mm]e|[Jj]e|[Vv]e|[Ss]a|[Dd]i)'
         range_pattern = rf'^[Dd]u\s+(?:{JOURS_PATTERN}\s+)?(\d{{1,2}})(?:er|e|ème)?\s+(?:au|à)\s+(?:{JOURS_PATTERN}\s+)?(\d{{1,2}})(?:er|e|ème)?'
         range_match = re.match(range_pattern, date_str, re.IGNORECASE)
 
