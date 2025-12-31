@@ -240,17 +240,22 @@ def extract_formatted_artistes_musicaux(text: str) -> list[dict]:
     text = _merge_consecutive_bold_tags(text)
     text = _merge_consecutive_italic_tags(text)
 
-    # Pattern: <b>ARTISTE</b> suivi optionnellement de <i>(style),</i>
+    # Pattern: <b>ARTISTE</b> suivi optionnellement d'un style
+    # Trois formats de style supportés:
+    # - <i>(style)</i> : parenthèses dans l'italique
+    # - (<i>style</i>) : italique dans les parenthèses
+    # - <i>(style</i>) : ouverture dans italique, fermeture dehors (OCR mal formé)
     # Note: la virgule peut être dans ou après les parenthèses
     # Exclure les spectacles (guillemets) et les textes courts
     # Utilise un lookbehind négatif pour exclure les <b> précédés de guillemets (spectacles)
     # U+00AB «, U+00BB », U+201C ", U+201D ", U+201E „, U+0022 "
-    pattern = r'(?<![«»\u201c\u201d„"\'])<b>([^<"»\u201c\u201d„«]+)</b>(?:\s*<i>\s*\(([^)]+)\)[,;]?\s*</i>)?'
+    pattern = r'(?<![«»\u201c\u201d„"\'])<b>([^<"»\u201c\u201d„«]+)</b>(?:\s*(?:<i>\s*\(([^)]+)\)[,;]?\s*</i>|\(\s*<i>([^<]+)</i>\s*\)[,;]?|<i>\s*\(([^<]+)</i>\s*\)[,;]?))?'
     matches = re.finditer(pattern, text, re.IGNORECASE)
 
     for match in matches:
         nom = match.group(1).strip()
-        style = _clean_style(match.group(2)) if match.group(2) else None
+        # Style peut être dans groupe 2, 3 ou 4 selon le format
+        style = _clean_style(match.group(2) or match.group(3) or match.group(4)) if (match.group(2) or match.group(3) or match.group(4)) else None
 
         # Vérifier si c'est un spectacle sans guillemets (suivi de "par")
         # Dans ce cas, on ne l'ajoute pas aux artistes
@@ -853,10 +858,12 @@ def load_lieu_patterns(lieu_ref_list: list, db_path: str = None) -> list:
         lieu_nom = lieu_tuple[1]
 
         # Pattern exact avec limites de mots
+        # Normaliser les apostrophes pour matcher les deux types (' et ')
+        lieu_nom_pattern = re.escape(lieu_nom).replace(r"\'", r"['\u2019]").replace(r"\u2019", r"['\u2019]")
         patterns.append({
             'id': lieu_id,
             'nom': lieu_nom,
-            'pattern': re.compile(r'\b' + re.escape(lieu_nom) + r'\b', re.IGNORECASE),
+            'pattern': re.compile(r'\b' + lieu_nom_pattern + r'\b', re.IGNORECASE),
             'length': len(lieu_nom)
         })
 
@@ -891,7 +898,8 @@ def load_lieu_patterns(lieu_ref_list: list, db_path: str = None) -> list:
             })
 
         # Variantes pour les lieux avec article: "L'Oasis" → "Oasis"
-        if lieu_nom_lower.startswith("l'"):
+        # Gérer les deux types d'apostrophes (droite ' et typographique ')
+        if lieu_nom_lower.startswith("l'") or lieu_nom_lower.startswith("l'"):
             short = lieu_nom[2:]  # "Oasis"
             patterns.append({
                 'id': lieu_id,
@@ -1518,6 +1526,20 @@ def extract_before_lieu(text: str, lieu_start: int) -> dict:
                     if not any(a['nom'].lower() == full_nom.lower() for a in result['artistes']):
                         result['artistes'].append({'nom': full_nom, 'style': None, 'is_musical': False})
 
+        # Pattern "collectif XXX" directement après spectacle (sans "par" ni "avec")
+        # Ex: "«Spectacle» (théâtre), collectif Grand Maximum"
+        if not result['artistes']:
+            collectif_direct_match = re.search(
+                r'[Cc]ollectif\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s\'\u2019\-/&]+?)(?:\s*,|\s*\d{1,2}h|\s*\(|\s*<|\s*$)',
+                before_stripped
+            )
+            if collectif_direct_match:
+                nom = collectif_direct_match.group(1).strip().rstrip(',')
+                if nom and len(nom) > 2:
+                    full_nom = f"Collectif {nom}"
+                    if not any(a['nom'].lower() == full_nom.lower() for a in result['artistes']):
+                        result['artistes'].append({'nom': full_nom, 'style': None, 'is_musical': False})
+
         return result
 
     # === Fallback: extraction classique sans formatage ===
@@ -2109,11 +2131,19 @@ def extract_lieu_fallback(text: str, ville_ref_list: list) -> tuple[Optional[str
             '"': '"',    # guillemets droits ASCII
         }
 
-        for char in text:
+        for i, char in enumerate(text):
             if char in quote_pairs and not in_quotes:
-                in_quotes = True
-                quote_char = quote_pairs[char]
-                current += char
+                # Vérifier si c'est vraiment un guillemet ouvrant
+                # Un guillemet après une lettre/chiffre est probablement fermant, pas ouvrant
+                # Ex: 'AMOUR"' -> le " est fermant (ignore OCR avec << au lieu de «)
+                prev_char = text[i - 1] if i > 0 else ''
+                if prev_char.isalnum():
+                    # C'est un guillemet fermant orphelin, ignorer
+                    current += char
+                else:
+                    in_quotes = True
+                    quote_char = quote_pairs[char]
+                    current += char
             elif in_quotes and char == quote_char:
                 in_quotes = False
                 quote_char = None
@@ -2140,19 +2170,23 @@ def extract_lieu_fallback(text: str, ville_ref_list: list) -> tuple[Optional[str
     # Artistes en MAJUSCULES (avec ou sans genre entre parenthèses)
     # Inclut les artistes séparés par + (ARTISTE1 + ARTISTE2)
     artiste_pattern = re.compile(r'^[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s\'\-\&\.0-9]+(?:\s*\([^)]+\))?(?:\s*\+\s*[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s\'\-\&\.0-9]+(?:\s*\([^)]+\))?)*$')
+    # Acronymes de lieux connus (ne doivent pas être filtrés comme artistes)
+    # ITEMM = Institut Technologique Européen des Métiers de la Musique
+    # MJC = Maison des Jeunes et de la Culture
+    lieux_acronymes = {'ITEMM', 'MJC', 'FNAC', 'CSC', 'MPT', 'CAC', 'EMM'}
     # Compagnies de théâtre: "Cie XXX", "Compagnie XXX", "Cie XXX/YYY"
     cie_pattern = re.compile(r'^[Cc](?:ie|ompagnie)\s+[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s\'\-/&]+$')
     # Texte avec genre entre parenthèses (probablement artiste ou spectacle)
     # Exclut les indications de lieu comme "(extérieur)", "(intérieur)", "(jardin)", "(terrasse)"
     with_genre_pattern = re.compile(r'.+\s*\([^)]+\)\s*$')
-    # Exceptions au with_genre_pattern : ce ne sont pas des genres mais des infos lieu
-    lieu_info_pattern = re.compile(r'\((?:ext[ée]rieur|int[ée]rieur|jardin|terrasse|parking|parvis|cour|dehors|plein air)\)$', re.IGNORECASE)
+    # Exceptions au with_genre_pattern : ce ne sont pas des genres mais des infos lieu ou codes département
+    lieu_info_pattern = re.compile(r'\((?:ext[ée]rieur|int[ée]rieur|jardin|terrasse|parking|parvis|cour|dehors|plein air|\d{2,3})\)$', re.IGNORECASE)
     # Texte contenant "+" suivi de texte (probablement artistes/guests)
     multi_artiste_pattern = re.compile(r'\+\s*(?:[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ]|guests)', re.IGNORECASE)
-    # Noms d'événements: contient "avec", "invite", ":", "soirée", "concert", etc.
-    event_name_pattern = re.compile(r'\b(?:avec|featuring|feat\.?|invite)\b|^(?:soirée|concert|carte blanche)', re.IGNORECASE)
-    # Pattern pour extraire un lieu bar/espace/salle/centre/théâtre en fin de chaîne
-    lieu_in_text_pattern = re.compile(r'\b((?:bar|espace|salle|centre|théâtre|pub|médiathèque|péniche|café)\s+(?:le\s+|la\s+|l\'|du\s+|de\s+la\s+|des\s+)?[A-Za-zÀ-ÿ\s\-\']+)$', re.IGNORECASE)
+    # Noms d'événements: contient "avec", "invite", ":", "soirée", "concert", "scène ouverte", etc.
+    event_name_pattern = re.compile(r'\b(?:avec|featuring|feat\.?|invite)\b|^(?:soirée|concert|carte blanche|sc[èe]ne ouverte)', re.IGNORECASE)
+    # Pattern pour extraire un lieu bar/espace/salle/centre/théâtre en fin de chaîne ou avant "de Xh"
+    lieu_in_text_pattern = re.compile(r'\b((?:bar|espace|salle|centre|théâtre|pub|médiathèque|péniche|café)\s+(?:le\s+|la\s+|l\'|du\s+|de\s+la\s+|des\s+)?[A-Za-zÀ-ÿ\s\-\']+?)(?:\s+de\s+\d{1,2}h|$)', re.IGNORECASE)
     # Fragments de parenthèses (genre coupé) - inclut les artistes avec parenthèse non fermée
     fragment_pattern = re.compile(r'^[^(]*\)|\([^)]*$|^[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s\'\-\&\.0-9]+\s*\([^)]*$')
 
@@ -2175,8 +2209,12 @@ def extract_lieu_fallback(text: str, ville_ref_list: list) -> tuple[Optional[str
         if not part:
             continue
 
-        # Ignorer les heures et prix
+        # Ignorer les heures et prix, mais d'abord essayer d'extraire un lieu embarqué
+        # Ex: "Bar Le Palais de 19h à 21h" -> extraire "Bar Le Palais"
         if heure_pattern.search(part) or prix_pattern.search(part):
+            lieu_match = lieu_in_text_pattern.search(part)
+            if lieu_match and lieu is None:
+                lieu = lieu_match.group(1).strip()
             continue
 
         # Ignorer les genres seuls entre parenthèses
@@ -2191,8 +2229,8 @@ def extract_lieu_fallback(text: str, ville_ref_list: list) -> tuple[Optional[str
         if spectacle_pattern.match(part):
             continue
 
-        # Ignorer les artistes en MAJUSCULES
-        if artiste_pattern.match(part):
+        # Ignorer les artistes en MAJUSCULES (sauf acronymes de lieux connus)
+        if artiste_pattern.match(part) and part.upper() not in lieux_acronymes:
             continue
 
         # Ignorer les compagnies de théâtre (Cie XXX)
@@ -2237,9 +2275,11 @@ def extract_lieu_fallback(text: str, ville_ref_list: list) -> tuple[Optional[str
         # donc on compare le nom normalisé retourné avec le candidat pour
         # déterminer si c'est vraiment une ville reconnue.
         from core.normalizer import normalize_for_matching
-        ville_id, ville_norm = normalize_ville(part)
+        # Retirer le code département éventuel: "Fresnay-sur-Sarthe (72)" -> "Fresnay-sur-Sarthe"
+        part_for_ville = lieu_info_pattern.sub('', part).strip()
+        ville_id, ville_norm = normalize_ville(part_for_ville)
         # Normaliser les deux pour comparaison (tirets, accents, casse)
-        part_normalized = normalize_for_matching(part)
+        part_normalized = normalize_for_matching(part_for_ville)
         ville_normalized = normalize_for_matching(ville_norm)
 
         # C'est une ville si le nom retourné correspond au candidat

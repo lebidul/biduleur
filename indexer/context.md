@@ -51,6 +51,8 @@ contenu_evenement (source de vérité pour artistes/spectacles)
 
 **Note v1.7** : Nouvelle colonne `is_regional` pour marquer les événements hors département 72 (Sarthe).
 
+**Note v1.8** : Support du Bidul d'été (juillet/août), dates avec nom de mois, amélioration de l'extraction des lieux hors référentiel (guillemets orphelins OCR, acronymes de lieux, codes département).
+
 ## Mapping Bidul <-> Date
 
 Référence : **Bidul 280 = Mai 2023**
