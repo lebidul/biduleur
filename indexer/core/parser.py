@@ -5498,43 +5498,50 @@ class EventParser:
                 single_date = self._parse_date(date_str, line_number)
                 date_list = [single_date] if single_date else [None]
 
-            # Parser le contenu de l'événement
-            parsed_events = parse_event_line_v2(
-                event_text,
-                mois,
-                self.bidul_annee or 2023,
-                lieu_ref_list,
-                ville_ref_list
-            )
+            # Séparer les événements fusionnés (ex: "ARTISTE1, lieu, 5€ ARTISTE2, lieu, 3€")
+            sub_events = split_bloc_fused_events(event_text)
 
-            for parsed in parsed_events:
-                # Si parse_event_line_v2 a déjà extrait une date (via split mid-text),
-                # utiliser cette date au lieu de la date du préfixe
-                if parsed.get('date_evenement'):
-                    event = self._dict_to_parsed_event(parsed, None)
-                    if event:
-                        signature = self._event_signature(event)
-                        if signature not in seen_signatures:
-                            seen_signatures.add(signature)
-                            events.append(event)
-                else:
-                    # Créer un événement pour chaque date de la liste
-                    for event_date in date_list:
-                        # Construire date_str pour cette date
-                        if event_date:
-                            jours = ['Lu', 'Ma', 'Me', 'Je', 'Ve', 'Sa', 'Di']
-                            single_date_str = f"{jours[event_date.weekday()]} {event_date.day}"
-                        else:
-                            single_date_str = date_str
+            for sub_event_text in sub_events:
+                if len(sub_event_text.strip()) < 10:
+                    continue
 
-                        event = self._dict_to_parsed_event(parsed, single_date_str)
+                # Parser le contenu de l'événement
+                parsed_events = parse_event_line_v2(
+                    sub_event_text.strip(),
+                    mois,
+                    self.bidul_annee or 2023,
+                    lieu_ref_list,
+                    ville_ref_list
+                )
+
+                for parsed in parsed_events:
+                    # Si parse_event_line_v2 a déjà extrait une date (via split mid-text),
+                    # utiliser cette date au lieu de la date du préfixe
+                    if parsed.get('date_evenement'):
+                        event = self._dict_to_parsed_event(parsed, None)
                         if event:
-                            if event_date:
-                                event.date_evenement = event_date
                             signature = self._event_signature(event)
                             if signature not in seen_signatures:
                                 seen_signatures.add(signature)
                                 events.append(event)
+                    else:
+                        # Créer un événement pour chaque date de la liste
+                        for event_date in date_list:
+                            # Construire date_str pour cette date
+                            if event_date:
+                                jours = ['Lu', 'Ma', 'Me', 'Je', 'Ve', 'Sa', 'Di']
+                                single_date_str = f"{jours[event_date.weekday()]} {event_date.day}"
+                            else:
+                                single_date_str = date_str
+
+                            event = self._dict_to_parsed_event(parsed, single_date_str)
+                            if event:
+                                if event_date:
+                                    event.date_evenement = event_date
+                                signature = self._event_signature(event)
+                                if signature not in seen_signatures:
+                                    seen_signatures.add(signature)
+                                    events.append(event)
 
         lines = text.split('\n')
         current_event_lines = []
