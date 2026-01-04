@@ -36,6 +36,12 @@ INFO_PATTERNS = [
     r'\bdans divers lieux\b',
     r'\bplus d\'infos\b',
     r'\bréservation\b',
+    # Rubriques éditoriales des anciens Biduls (bruit OCR)
+    r'Rubrique Cucaracha',
+    r'Dicton du mois',
+    r'Blagounette',
+    r'Le Bidul est tiré à',
+    r'tiré à \d+ exemplaires',
 ]
 
 # Patterns de fragments de date/en-tête à exclure

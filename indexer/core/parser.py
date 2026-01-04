@@ -109,6 +109,16 @@ def is_noise_line(line: str) -> bool:
         r'^Surtout quand on',  # Texte éditorial
         r'recherche des groupes',  # Annonces de recherche
         r'Envoyez vos démo',  # Annonces
+        # Rubriques éditoriales des anciens Biduls
+        r'Rubrique Cucaracha',
+        r'Dicton du mois',
+        r'Blagounette',
+        r'Le Bidul est tiré à',
+        r'Ne pas jétér sur la voie publique',
+        r'Ne pas jeter sur la voie publique',
+        r'tiré à \d+ exemplaires',
+        r'Réponse sur le blog',
+        r'Réponse de la blagounette',
     ]
     for phrase in promo_phrases:
         if re.search(phrase, line_stripped, re.IGNORECASE):
