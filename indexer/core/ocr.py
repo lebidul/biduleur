@@ -56,7 +56,7 @@ class ScanConfig:
         try:
             # Le nom de colonne peut avoir des variantes d'encodage
             numero = 0
-            for key in ['numéros', 'numeros', 'num\xe9ros']:
+            for key in ['numéros', 'numeros', 'num\xe9ros', 'num\ufffdros']:
                 if key in row:
                     try:
                         numero = int(row[key])

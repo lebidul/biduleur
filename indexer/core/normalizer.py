@@ -121,7 +121,8 @@ def normalize_separators(text: str) -> str:
     if not text:
         return ""
     # Remplacer tirets et apostrophes par des espaces
-    s = re.sub(r"[-–—''`'']", ' ', text)
+    # Inclut: - – — ' ` ' ' (U+2018 LEFT, U+2019 RIGHT SINGLE QUOTATION MARK)
+    s = re.sub(r"[-–—'`\u2018\u2019]", ' ', text)
     # Normaliser les espaces multiples
     s = ' '.join(s.split())
     return s
@@ -933,6 +934,8 @@ if __name__ == '__main__':
         ("Chemiré-le-Gaudin", "chemire le gaudin"),
         ("L'Écluse", "l ecluse"),
         ("L Écluse", "l ecluse"),
+        ("L\u2019Oasis", "l oasis"),  # apostrophe typographique U+2019
+        ("L\u2018Inventaire", "l inventaire"),  # apostrophe gauche U+2018
         ("St Pavace", "saint pavace"),
         ("St. Pavace", "saint pavace"),
         ("Moncé s/Loir", "monce sur loir"),

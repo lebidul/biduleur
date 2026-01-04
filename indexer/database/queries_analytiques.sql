@@ -41,23 +41,6 @@ LEFT JOIN contenu_evenement c ON e.id = c.evenement_id
 LEFT JOIN artiste_ref ar ON c.artiste_ref_id = ar.id
 WHERE e.bidul_numero = 204
 ORDER BY e.date_evenement,e.raw_text,e.heure;
-
--- Nombre d'artistes/spectacles par bidul
-WITH RECURSIVE all_numeros(numero) AS (
-    SELECT 1
-    UNION ALL
-    SELECT numero + 1 FROM all_numeros WHERE numero < 308
-)
-SELECT
-    a.numero as bidul_numero,
-    COALESCE(COUNT(CASE WHEN ce.artiste IS NOT NULL OR ce.nom_spectacle IS NOT NULL THEN 1 END), 0) as c
-FROM all_numeros a
-LEFT JOIN evenement e ON e.bidul_numero = a.numero
-LEFT JOIN contenu_evenement ce ON ce.evenement_id = e.id
-GROUP BY a.numero
-ORDER BY a.numero;
-
-
 -- ORDER BY e.date_evenement, e.heure, c.ordre;
 
 -- Événements d'une date précise avec détails complets (normalisés)

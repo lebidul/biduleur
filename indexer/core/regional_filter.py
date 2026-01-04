@@ -3,12 +3,13 @@ Détection des événements hors département (72 - Sarthe).
 
 Stratégie de détection par ordre de priorité:
 1. Code département (72) explicite → LOCAL
-2. ville_raw est une ville sarthoise connue → LOCAL
-3. lieu_raw contient "Le Mans" → LOCAL
-4. Code département hors 72 → RÉGIONAL
-5. Lieu connu hors Sarthe (Chabada, L'Ubu, etc.) → RÉGIONAL
-6. Ville connue hors Sarthe → RÉGIONAL
-7. Sinon → LOCAL par défaut
+2. Code département hors 72 (28, 35, 44, 49, etc.) → RÉGIONAL
+3. lieu_raw EST une ville hors Sarthe (Angers, Tours, Laval) → RÉGIONAL
+4. ville_raw est une ville sarthoise connue → LOCAL
+5. lieu_raw contient "Le Mans" → LOCAL
+6. Lieu connu hors Sarthe (Chabada, L'Ubu, etc.) → RÉGIONAL
+7. Ville connue hors Sarthe (dans raw_text) → RÉGIONAL
+8. Sinon → LOCAL par défaut
 """
 
 import re
@@ -70,7 +71,8 @@ VILLES_SARTHE = {
     'st-michel-de-chavaignes', 'saint-michel-de-chavaignes',
 }
 
-DEPT_CODE_PATTERN = re.compile(r'\((\d{2})\)')
+# Pattern pour codes département: (28), [49], etc.
+DEPT_CODE_PATTERN = re.compile(r'[\(\[](\d{2})[\)\]]')
 
 # Villes hors Sarthe
 VILLES_HORS_SARTHE = {
@@ -156,8 +158,8 @@ def detect_regional(raw_text: str, lieu_raw: Optional[str] = None,
     full_text = ' '.join(filter(None, [raw_text or '', lieu_raw or '', ville_raw or '']))
     full_text_lower = full_text.lower()
 
-    # === PRIORITÉ 1: Code (72) explicite → LOCAL ===
-    if '(72)' in full_text:
+    # === PRIORITÉ 1: Code (72) ou [72] explicite → LOCAL ===
+    if '(72)' in full_text or '[72]' in full_text:
         return RegionalDetection(
             is_regional=False,
             reason="Code département (72) explicite",
@@ -165,7 +167,33 @@ def detect_regional(raw_text: str, lieu_raw: Optional[str] = None,
             dept_name='Sarthe'
         )
 
-    # === PRIORITÉ 2: ville_raw sarthoise → LOCAL ===
+    # === PRIORITÉ 2: Code département hors 72 → RÉGIONAL ===
+    # Vérifié tôt car raw_text peut contenir un code explicite même si ville_raw="Le Mans"
+    dept_matches = DEPT_CODE_PATTERN.findall(full_text)
+    for dept_code in dept_matches:
+        if dept_code != DEPT_LOCAL and dept_code in DEPTS_REGIONAUX:
+            return RegionalDetection(
+                is_regional=True,
+                reason=f"Code département ({dept_code})",
+                dept_code=dept_code,
+                dept_name=DEPTS_REGIONAUX[dept_code]
+            )
+
+    # === PRIORITÉ 3: lieu_raw EST une ville hors Sarthe → RÉGIONAL ===
+    # Cas où lieu_raw = "Angers", "à Angers", "Tours 02.47...", "Laval"
+    lieu_lower = (lieu_raw or '').lower()
+    for ville in VILLES_HORS_SARTHE:
+        pattern = r'^(à\s+)?' + re.escape(ville) + r'(\s|$)'
+        if re.search(pattern, lieu_lower):
+            dept = _get_dept_for_ville(ville)
+            return RegionalDetection(
+                is_regional=True,
+                reason=f"Lieu = ville hors Sarthe: '{ville}'",
+                dept_code=dept,
+                dept_name=DEPTS_REGIONAUX.get(dept) if dept else None
+            )
+
+    # === PRIORITÉ 4: ville_raw sarthoise → LOCAL ===
     if ville_raw:
         ville_lower = ville_raw.lower().strip()
         for ville_sarthe in VILLES_SARTHE:
@@ -177,9 +205,8 @@ def detect_regional(raw_text: str, lieu_raw: Optional[str] = None,
                     dept_name='Sarthe'
                 )
 
-    # === PRIORITÉ 3: lieu_raw contient "Le Mans" → LOCAL ===
+    # === PRIORITÉ 5: lieu_raw contient "Le Mans" → LOCAL ===
     if lieu_raw:
-        lieu_lower = lieu_raw.lower()
         if 'le mans' in lieu_lower or 'mans' in lieu_lower:
             return RegionalDetection(
                 is_regional=False,
@@ -188,19 +215,7 @@ def detect_regional(raw_text: str, lieu_raw: Optional[str] = None,
                 dept_name='Sarthe'
             )
 
-    # === PRIORITÉ 4: Code département hors 72 → RÉGIONAL ===
-    dept_matches = DEPT_CODE_PATTERN.findall(full_text)
-    for dept_code in dept_matches:
-        if dept_code != DEPT_LOCAL and dept_code in DEPTS_REGIONAUX:
-            return RegionalDetection(
-                is_regional=True,
-                reason=f"Code département ({dept_code})",
-                dept_code=dept_code,
-                dept_name=DEPTS_REGIONAUX[dept_code]
-            )
-
-    # === PRIORITÉ 5: Lieu connu hors Sarthe → RÉGIONAL ===
-    lieu_lower = (lieu_raw or '').lower()
+    # === PRIORITÉ 6: Lieu connu hors Sarthe → RÉGIONAL ===
     for lieu, dept in LIEUX_HORS_SARTHE.items():
         if lieu in lieu_lower:
             return RegionalDetection(
@@ -210,7 +225,7 @@ def detect_regional(raw_text: str, lieu_raw: Optional[str] = None,
                 dept_name=DEPTS_REGIONAUX.get(dept)
             )
 
-    # === PRIORITÉ 6: Ville hors Sarthe → RÉGIONAL ===
+    # === PRIORITÉ 7: Ville hors Sarthe → RÉGIONAL ===
     if re.search(r'\bparis\b', full_text_lower):
         if not PARIS_FALSE_POSITIVE_RE.search(full_text_lower):
             if not re.search(r'\([^)]*paris[^)]*\)', full_text_lower):

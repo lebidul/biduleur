@@ -43,7 +43,7 @@ from indexer.core.csv_importer import find_csv_for_bidul as find_csv_files, impo
 from indexer.core.ocr import ScanExtractor, load_bidul_config, is_scan_from_csv
 from indexer.core.ocr_postprocess import OCRPostProcessor
 from indexer.core.regional_filter import detect_regional
-from indexer.core.artifact_filter import detect_artifact
+from indexer.core.artifact_filter import detect_artifact, is_bidul_sans_evenements
 
 # Configuration
 ARCHIVES_DIR = Path(__file__).parent / "archives"
@@ -679,6 +679,13 @@ def cmd_populate(args):
             # Supprimer TOUS les événements du bidul avant de re-parser
             if not args.dry_run:
                 db.delete_evenements(numero)
+
+            # Vérifier si c'est un bidul sans événements (cas particulier)
+            if is_bidul_sans_evenements(numero):
+                if args.verbose:
+                    logging.info(f"[{numero}] Bidul sans événements (cas particulier)")
+                reparsed_biduls += 1
+                continue
 
             # Charger la config du Bidul pour obtenir date_format
             config = load_bidul_config(numero)
