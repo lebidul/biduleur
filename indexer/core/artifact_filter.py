@@ -11,10 +11,17 @@ Ces critères correspondent à ceux de scripts/clean_database.py.
 
 import re
 import logging
-from typing import Optional
+from typing import Optional, Set
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
+
+
+# Biduls sans événements (cas particuliers)
+# - 255: COVID confinement, contenu informatif uniquement
+BIDULS_SANS_EVENEMENTS: Set[int] = {
+    255,
+}
 
 
 # Patterns indiquant une info/annonce plutôt qu'un événement
@@ -29,6 +36,20 @@ INFO_PATTERNS = [
     r'\bdans divers lieux\b',
     r'\bplus d\'infos\b',
     r'\bréservation\b',
+]
+
+# Patterns de fragments de date/en-tête à exclure
+# Ex: "au 31 juillet 2011", "au 31 Août 2011 Les Arts SERVICES"
+DATE_FRAGMENT_PATTERNS = [
+    r'^au\s+\d{1,2}\s+(?:janvier|f[ée]vrier|mars|avril|mai|juin|juillet|ao[uû]t|septembre|octobre|novembre|d[ée]cembre)\s+\d{4}',
+]
+
+# Patterns de références lieu hors région à exclure
+# Ex: "Le Fool, Quiberon (56)", "La Grange, Nantes (44)"
+# Ces fragments ne sont pas des événements mais des références à des lieux hors Sarthe (72)
+LIEU_REFERENCE_PATTERNS = [
+    # "Lieu/Nom, Ville (code)" où code != 72
+    r'^[A-Za-zÀ-ÿ\s\-\']+,\s*[A-Za-zÀ-ÿ\s\-\']+\s*\((?!72\b)\d{2,3}\)\s*$',
 ]
 
 # Longueur minimale du raw_text_clean
@@ -83,6 +104,24 @@ def detect_artifact(raw_text: str, raw_text_clean: Optional[str] = None,
                 reason=f"Info/annonce détectée (pattern: {pattern})"
             )
 
+    # === CRITÈRE 2b: Fragment de date/en-tête ===
+    # Ex: "au 31 juillet 2011", "au 31 Août 2011 Les Arts SERVICES"
+    for pattern in DATE_FRAGMENT_PATTERNS:
+        if re.match(pattern, text_lower, re.IGNORECASE):
+            return ArtifactDetection(
+                is_artifact=True,
+                reason=f"Fragment de date/en-tête (pattern: {pattern})"
+            )
+
+    # === CRITÈRE 2c: Référence lieu hors région ===
+    # Ex: "Le Fool, Quiberon (56)" - juste un lieu + ville + code postal hors Sarthe
+    for pattern in LIEU_REFERENCE_PATTERNS:
+        if re.match(pattern, raw_text_clean, re.IGNORECASE):
+            return ArtifactDetection(
+                is_artifact=True,
+                reason=f"Référence lieu hors région (pattern: {pattern})"
+            )
+
     # === CRITÈRE 3: Sans lieu ni contenu ===
     has_lieu = bool(lieu_raw and lieu_raw.strip())
     has_artiste = bool(artistes and len(artistes) > 0)
@@ -99,6 +138,19 @@ def detect_artifact(raw_text: str, raw_text_clean: Optional[str] = None,
         is_artifact=False,
         reason="Événement valide"
     )
+
+
+def is_bidul_sans_evenements(numero: int) -> bool:
+    """
+    Vérifie si un bidul est un cas particulier sans événements.
+
+    Args:
+        numero: Numéro du bidul
+
+    Returns:
+        True si le bidul n'a pas d'événements (cas particulier)
+    """
+    return numero in BIDULS_SANS_EVENEMENTS
 
 
 def is_artifact(raw_text: str, raw_text_clean: Optional[str] = None,
