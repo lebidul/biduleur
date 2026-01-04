@@ -707,7 +707,8 @@ def cmd_populate(args):
                     event.raw_text,
                     lieu_raw=event.lieu_raw,
                     artistes=event.artistes,
-                    spectacles=event.spectacles
+                    spectacles=event.spectacles,
+                    nom_evenement=event.nom
                 )
 
                 if artifact_detection.is_artifact:
@@ -939,7 +940,8 @@ def cmd_populate(args):
                     e.raw_text,
                     lieu_raw=e.lieu_raw,
                     artistes=e.artistes,
-                    spectacles=e.spectacles
+                    spectacles=e.spectacles,
+                    nom_evenement=e.nom
                 )
 
                 if artifact_detection.is_artifact:

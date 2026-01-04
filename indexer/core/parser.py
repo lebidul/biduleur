@@ -804,7 +804,7 @@ def is_named_event(text: str) -> bool:
         r'^[«""„]?Esc\s*Exp\s*#?\d+',  # "Esc Exp #21" ou "EscExp#28"
         r'^[«""„]?Melting\s+Rock',
         r'^[«""„]?Les\s+Spectaculaires',
-        r'^[«""„]?Soir[ée]e?\s+[\w\s]+',  # Soirée/Soiree Solidaire, Soirée Mix Généraliste
+        r'^[«""„]?Soir[ée]e?\s+[""«]?[\w\s]+',  # Soirée/Soiree Solidaire, Soirée "électro festif"
         r'^[«""„]?Labo\s+d.Impro',
         r'^[«""„]?[Cc]arte\s+[Bb]lanche\s+[àa]',
         r'^[«""„]?(?:\d+[°e]?\s+)?[Ff]estival\s+',  # Festival, 8° festival, 3e Festival
@@ -830,6 +830,8 @@ def is_named_event(text: str) -> bool:
         r'^[\w\s]+\s+présente\s*:?\s+',
         # DAMADA FESTIVAL # 11 avec ... - Festival avec numéro et "avec"
         r'^[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s]+\s+#\s*\d+\s+avec\s+',
+        # NOM CLUB/NIGHT avec ... - Événement type soirée en MAJUSCULES
+        r'^[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s]+(?:CLUB|NIGHT|PARTY|SESSION|SHOW)\s+avec\s+',
         # Événement nommé avec numéro d'édition: "Syncope fait de la résistance #2"
         # Pattern: Nom en Title Case avec #N
         r'^[«""„]?[A-ZÀ-Ÿ][a-zà-ÿ]+(?:\s+[a-zà-ÿ]+)*\s+#\d+',
@@ -875,6 +877,10 @@ def extract_event_name(text: str) -> Optional[str]:
         r'^(Esc\s*Exp\s*#?\d+(?:\s+\w+)?)',  # "Esc Exp #21" ou "EscExp#28 Teriaki"
         r'^(Melting\s+Rock)',
         r'^(Les\s+Spectaculaires)',
+        # Soirée "titre" avec guillemets - avec ou sans style entre parenthèses
+        # Ex: 'Soirée "électro festif" avec Dj...' → 'Soirée "électro festif"'
+        # Ex: 'Soirée "Prosper au passeport" (rock-hip hop) Le Passeport' → 'Soirée "Prosper au passeport"'
+        r'^(Soirée\s*[""«][^""»]+[""»])(?:\s*\([^)]+\))?\s*(?:avec\s+|,|\s+[A-Z])',
         # "Soirée X" entre guillemets → extraire Soirée X sans guillemets
         r'^(Soirée\s+\w+)[»""]',
         # Soirée X avec DJ → extraire seulement "Soirée X"
@@ -922,6 +928,11 @@ def extract_event_name(text: str) -> Optional[str]:
         # FESTIVAL # XX avec ... - Festival en MAJUSCULES avec numéro
         # Ex: "DAMADA FESTIVAL # 11 avec ..." → "DAMADA FESTIVAL # 11"
         r'^([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s]+\s+#\s*\d+)\s+avec\s+',
+        # NOM CLUB/NIGHT avec ... - Événement en MAJUSCULES suivi de "avec" puis artistes
+        # Ex: "OULALA CLUB avec QUADRUPEDE (noise rock) + ..." → "OULALA CLUB"
+        # Ex: "ROCK NIGHT avec BAND1 + BAND2" → "ROCK NIGHT"
+        # Le nom doit contenir au moins 2 mots et se terminer avant "avec"
+        r'^([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s]{3,}?(?:CLUB|NIGHT|PARTY|SESSION|SHOW))\s+avec\s+',
         # Pattern: "Nom Event #N:" suivi d'artistes (ex: "No Data #2: ARTISTE...")
         # Ex: "No Data #2: EUPHORIE PAR 1024..." → "No Data #2"
         r'^([\w\s]+\s*#\s*\d+)\s*:\s*[A-Z]',
@@ -1739,14 +1750,19 @@ def split_on_dates_v2(raw_text: str) -> list[str]:
     # Le lookbehind négatif sur "et " évite de splitter sur une date additionnelle
     # Support des plages "Du Je 23 au Sa 25:"
     # Support des horaires par date "Je 01/Ve 02 à 20h30 et Di 04 à 17h:"
+    # Support des dates avec mois explicite: "Ve 01/02:" (Ve 01 février)
+    # Support des plages avec mois: "Du 31 au 03/02:" (du 31 janvier au 3 février)
+    # Pattern strict pour les abréviations de jours (évite de matcher "de 18", "le 14", etc.)
+    JOURS_ABBREV = r'(?:[Ll]u|[Mm]a|[Mm]e|[Jj]e|[Vv]e|[Ss]a|[Dd]i)'
+
     split_pattern = (
         r'(?<![0-9]€)(?<!au )(?<!et )(?<!Du )(?<=[\s€,.])\s*'  # Précédé de espace/€/,/. mais pas après prix décimal, "au ", "et " ou "Du "
-        r'((?:Du\s+)?'  # Optionnel "Du "
-        r'[DLMJVS][aeiou]?\s*\d{1,2}'  # Premier jour: Lu 02
-        r'(?:\s+(?:au|à)\s+[DLMJVS][aeiou]?\s*\d{1,2})?'  # Plage optionnelle: au Sa 05
+        rf'((?:Du\s+)?'  # Optionnel "Du "
+        rf'{JOURS_ABBREV}\s*\d{{1,2}}(?:/\d{{2}})?'  # Premier jour: Lu 02 ou Ve 01/02 (avec mois optionnel)
+        rf'(?:\s+(?:au|à)\s+(?:{JOURS_ABBREV}\s*)?\d{{1,2}}(?:/\d{{2}})?)?'  # Plage optionnelle: au Sa 05 ou au 03/02
         r'(?:\s+(?:à|a)\s+\d{1,2}h\d{0,2})?'  # Horaire optionnel après premier jour: à 20h30
-        r'(?:\s*[&,/]\s*[A-Za-z]{2,3}\s*\d{1,2}(?:\s+(?:à|a)\s+\d{1,2}h\d{0,2})?)*'  # Jours additionnels avec horaire: /Ve 30 à 20h
-        r'(?:\s+et\s+[A-Za-z]{2,3}\s*\d{1,2}(?:\s+(?:à|a)\s+\d{1,2}h\d{0,2})?)*'  # "et Di 04 à 17h" optionnel
+        rf'(?:\s*[&,/]\s*{JOURS_ABBREV}\s*\d{{1,2}}(?:/\d{{2}})?(?:\s+(?:à|a)\s+\d{{1,2}}h\d{{0,2}})?)*'  # Jours additionnels avec horaire: /Ve 30 à 20h
+        rf'(?:\s+et\s+{JOURS_ABBREV}\s*\d{{1,2}}(?:/\d{{2}})?(?:\s+(?:à|a)\s+\d{{1,2}}h\d{{0,2}})?)*'  # "et Di 04 à 17h" optionnel
         r')\s*[:–-]\s*'  # Séparateur : ou - ou –
     )
 
@@ -1760,7 +1776,7 @@ def split_on_dates_v2(raw_text: str) -> list[str]:
     alt_pattern = (
         r'(?<![0-9]€)(?<!au )(?<!et )(?<=[\s€,.\n])\s*'
         r'((?<!Du\s)'  # NE PAS matcher après "Du " (début de plage)
-        r'[DLMJVS][aeiou]?\s*\d{1,2}'  # Jour simple: Sa 11
+        rf'{JOURS_ABBREV}\s*\d{{1,2}}(?:/\d{{2}})?'  # Jour simple: Sa 11 ou Ve 01/02
         r')\s+'  # Juste un espace (pas de séparateur)
         r'(?=[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ«""<][a-zA-ZÀ-ÿ\-<"]+)'  # Suivi d'un mot majuscule ou guillemet ouvrant
         r'(?!au\s)'  # NE PAS être suivi de "au " (fin de plage)
@@ -1844,6 +1860,44 @@ def parse_date_prefix_v2(text: str, base_month: int, base_year: int) -> tuple[li
     # Pattern pour les noms de jours (complets, abrégés 3 lettres, abrégés 2 lettres)
     JOURS_PATTERN = r'(?:[Ll]undi|[Mm]ardi|[Mm]ercredi|[Jj]eudi|[Vv]endredi|[Ss]amedi|[Dd]imanche|[Ll]un|[Mm]ar|[Mm]er|[Jj]eu|[Vv]en|[Ss]am|[Dd]im|[Ll]u|[Mm]a|[Mm]e|[Jj]e|[Vv]e|[Ss]a|[Dd]i)'
 
+    # Pattern 1a0: Plage avec mois dans la date de fin (ex: "Du 31 au 03/02:" - 31 janvier au 3 février)
+    range_with_month_pattern = rf'^(?:Du\s+)(?:({JOURS_PATTERN})\s+)?(\d{{1,2}})(?:er|e|ème)?\s+(?:au|à)\s+(?:({JOURS_PATTERN})\s+)?(\d{{1,2}})/(\d{{2}})\s*:?\s*(.+)$'
+    range_month_match = re.match(range_with_month_pattern, text_stripped, re.IGNORECASE | re.DOTALL)
+
+    if range_month_match:
+        start_day = int(range_month_match.group(2))
+        end_day = int(range_month_match.group(4))
+        end_month = int(range_month_match.group(5))
+        event_text = range_month_match.group(6)
+
+        dates = []
+        # Si le jour de fin est avant le jour de début, le début est le mois précédent
+        if end_day < start_day:
+            start_month = end_month - 1 if end_month > 1 else 12
+            start_year = base_year if end_month > 1 else base_year - 1
+            # Plage qui traverse les mois: 31/01 au 03/02
+            import calendar
+            _, last_day_start = calendar.monthrange(start_year, start_month)
+            for day in range(start_day, last_day_start + 1):
+                try:
+                    dates.append(date(start_year, start_month, day))
+                except ValueError:
+                    pass
+            # Puis les jours du mois de fin
+            for day in range(1, end_day + 1):
+                try:
+                    dates.append(date(base_year, end_month, day))
+                except ValueError:
+                    pass
+        else:
+            # Même mois
+            for day in range(start_day, end_day + 1):
+                try:
+                    dates.append(date(base_year, end_month, day))
+                except ValueError:
+                    pass
+        return dates, event_text
+
     # Pattern 1a: Plage de dates avec "au" ou "à" (ex: "Je 23 au Sa 25 :" ou "Du Je 23 au Sa 25 :" ou "Du Vendredi 03 au Dimanche 05")
     # Supporte les noms de jours abrégés (Je, Ve, Sa) ET complets (Jeudi, Vendredi, Samedi)
     range_pattern = rf'^(?:Du\s+)?({JOURS_PATTERN})\s*(\d{{1,2}})(?:er|e|ème)?\s+(?:au|à)\s+({JOURS_PATTERN})\s*(\d{{1,2}})(?:er|e|ème)?\s*:?\s*(.+)$'
@@ -1914,6 +1968,22 @@ def parse_date_prefix_v2(text: str, base_month: int, base_year: int) -> tuple[li
             except ValueError:
                 pass
 
+        return dates, event_text
+
+    # Pattern 3a: Date simple avec mois explicite (ex: "Ve 01/02 :" - vendredi 1er février)
+    date_with_month_pattern = rf'^({JOURS_PATTERN})\s*(\d{{1,2}})/(\d{{2}})\s*:?\s*(.+)$'
+    date_month_match = re.match(date_with_month_pattern, text_stripped, re.IGNORECASE | re.DOTALL)
+
+    if date_month_match:
+        day_num = int(date_month_match.group(2))
+        month_num = int(date_month_match.group(3))
+        event_text = date_month_match.group(4)
+
+        dates = []
+        try:
+            dates.append(date(base_year, month_num, day_num))
+        except ValueError:
+            pass
         return dates, event_text
 
     # Pattern 3: Dates simples multiples (ex: "Lu 02 & Ma 03 :")
@@ -3790,12 +3860,13 @@ class EventParser:
         r'^('  # Groupe 1: Date complète
         r'(?:Du\s+)?'  # Optionnel "Du " pour les plages de dates
         r'(?:[MLJVSD][aeiou]|[Ll]undi|[Mm]ardi|[Mm]ercredi|[Jj]eudi|[Vv]endredi|[Ss]amedi|[Dd]imanche)\s+'
-        r'\d{1,2}(?:er|ère|ème|eme)?'
+        r'\d{1,2}(?:/\d{2})?(?:er|ère|ème|eme)?'  # Jour optionnel avec mois DD/MM
         r'(?:'
         # Jours additionnels avec / ou &, chaque jour pouvant avoir une heure
         # Ex: "Ve 1/Sa 02 à 21h/Di 03 à 15h30"
         r'(?:\s*[/&]\s*[MLJVSD][aeiou]?\s*\d{1,2}(?:er|ère|ème|eme)?(?:\s+(?:à|a)\s+\d{1,2}h\d{0,2})?)*'
-        r'(?:\s+(?:au|à)\s+[MLJVSD][aeiou]?\s*\d{1,2}(?:er|ère|ème|eme)?)?'  # Plage "au Ve 09"
+        # Plage "au Ve 09" ou "au 03/02" (avec mois explicite)
+        r'(?:\s+(?:au|à)\s+(?:[MLJVSD][aeiou]?\s*)?\d{1,2}(?:/\d{2})?(?:er|ère|ème|eme)?)?'
         r'(?:\s+(?:à|a)\s+\d{1,2}h\d{0,2})?'  # Horaire optionnel pour le premier jour
         r'(?:\s+et\s+[MLJVSD][aeiou]?\s*\d{1,2}(?:er|ère|ème|eme)?(?:\s+(?:à|a)\s+\d{1,2}h\d{0,2})?)*'  # "et Di 04 à 17h"
         r')?'
@@ -4498,7 +4569,50 @@ class EventParser:
 
         # Vérifier si c'est une plage "Du X au Y" (avec jour abrégé ou complet)
         # Pattern: Du [Jour] N au [Jour] M
+        # Support des formats avec mois: "Du 31 au 03/02" (31 janvier au 3 février)
         JOURS_PATTERN = r'(?:[Ll]undi|[Mm]ardi|[Mm]ercredi|[Jj]eudi|[Vv]endredi|[Ss]amedi|[Dd]imanche|[Ll]un|[Mm]ar|[Mm]er|[Jj]eu|[Vv]en|[Ss]am|[Dd]im|[Ll]u|[Mm]a|[Mm]e|[Jj]e|[Vv]e|[Ss]a|[Dd]i)'
+        # Pattern avec mois optionnel dans la fin de plage: "Du 31 au 03/02"
+        range_pattern_with_month = rf'^[Dd]u\s+(?:{JOURS_PATTERN}\s+)?(\d{{1,2}})(?:er|e|ème)?\s+(?:au|à)\s+(?:{JOURS_PATTERN}\s+)?(\d{{1,2}})/(\d{{2}})'
+        range_match_month = re.match(range_pattern_with_month, date_str, re.IGNORECASE)
+
+        if range_match_month:
+            start_day = int(range_match_month.group(1))
+            end_day = int(range_match_month.group(2))
+            end_month = int(range_match_month.group(3))
+            # Si le jour de fin est avant le jour de début, le début est le mois précédent
+            if end_day < start_day:
+                start_month = end_month - 1 if end_month > 1 else 12
+                start_year = annee if end_month > 1 else annee - 1
+            else:
+                start_month = end_month
+                start_year = annee
+            # Générer les dates de début de mois jusqu'à la fin
+            # D'abord les jours du mois de début
+            if start_month != end_month:
+                # Plage qui traverse les mois: 31/01 au 03/02
+                import calendar
+                _, last_day_start = calendar.monthrange(start_year, start_month)
+                for day in range(start_day, last_day_start + 1):
+                    try:
+                        dates.append(date(start_year, start_month, day))
+                    except ValueError:
+                        pass
+                # Puis les jours du mois de fin
+                for day in range(1, end_day + 1):
+                    try:
+                        dates.append(date(annee, end_month, day))
+                    except ValueError:
+                        pass
+            else:
+                # Même mois
+                for day in range(start_day, end_day + 1):
+                    try:
+                        dates.append(date(annee, end_month, day))
+                    except ValueError:
+                        pass
+            return dates
+
+        # Pattern standard sans mois
         range_pattern = rf'^[Dd]u\s+(?:{JOURS_PATTERN}\s+)?(\d{{1,2}})(?:er|e|ème)?\s+(?:au|à)\s+(?:{JOURS_PATTERN}\s+)?(\d{{1,2}})(?:er|e|ème)?'
         range_match = re.match(range_pattern, date_str, re.IGNORECASE)
 
@@ -4511,6 +4625,18 @@ class EventParser:
                     dates.append(date(annee, mois, day))
                 except ValueError:
                     pass
+            return dates
+
+        # Vérifier si c'est une date avec mois explicite: "Ve 01/02" ou "01/02"
+        date_with_month_pattern = rf'^(?:{JOURS_PATTERN}\s+)?(\d{{1,2}})/(\d{{2}})'
+        date_month_match = re.match(date_with_month_pattern, date_str, re.IGNORECASE)
+        if date_month_match:
+            jour = int(date_month_match.group(1))
+            month_explicit = int(date_month_match.group(2))
+            try:
+                dates.append(date(annee, month_explicit, jour))
+            except ValueError:
+                pass
             return dates
 
         # Extraire tous les numéros de jours (dates simples ou composées)

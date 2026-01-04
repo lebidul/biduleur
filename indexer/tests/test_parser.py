@@ -805,5 +805,82 @@ Dimanche 21
         assert "Éphémère" in event.lieu_raw
 
 
+class TestSplitOnDatesV2NoFalseSplit:
+    """Tests pour éviter les faux splits sur 'de 18 mois', 'de 14 ans', etc."""
+
+    def test_no_split_on_de_18_mois(self):
+        """'de 18 mois à 4 ans' ne doit pas être splitté."""
+        text = '" Le Grand Saut " (th. de Guimbarde) de 18 mois à 4 ans, Esp. H. Salvador Coulaines 10h et 15h, 5 & 5,80€'
+        parts = split_on_dates_v2(text)
+        assert len(parts) == 1
+        assert "de 18 mois" in parts[0]
+
+    def test_no_split_on_de_14_ans(self):
+        """'de 14 ans' ne doit pas être splitté."""
+        text = 'Les Spectaculaires : « Gargantua » (théâtre et objets, à partir de 14 ans) par Julien Mellano, S.J.Carmet, Allonnes, 20h30, 6€'
+        parts = split_on_dates_v2(text)
+        assert len(parts) == 1
+        assert "de 14 ans" in parts[0]
+
+    def test_no_split_on_le_25(self):
+        """'le 25 décembre' ne doit pas être splitté (le n'est pas un jour)."""
+        text = 'Concert spécial le 25 décembre, salle des fêtes'
+        parts = split_on_dates_v2(text)
+        assert len(parts) == 1
+
+
+class TestParseDatePrefixV2WithMonth:
+    """Tests pour le parsing des dates avec mois explicite (DD/MM format)."""
+
+    def test_parse_du_31_au_03_02(self):
+        """Du 31 au 03/02 doit créer 4 dates (31/01, 01/02, 02/02, 03/02)."""
+        date_list, remaining = parse_date_prefix_v2("Du 31 au 03/02: dummy", 1, 2013)
+        assert len(date_list) == 4
+        assert date_list[0] == date(2013, 1, 31)
+        assert date_list[1] == date(2013, 2, 1)
+        assert date_list[2] == date(2013, 2, 2)
+        assert date_list[3] == date(2013, 2, 3)
+        assert remaining == "dummy"
+
+    def test_parse_ve_01_02(self):
+        """Ve 01/02 doit créer 1 date (01/02)."""
+        date_list, remaining = parse_date_prefix_v2("Ve 01/02: dummy", 1, 2013)
+        assert len(date_list) == 1
+        assert date_list[0] == date(2013, 2, 1)
+        assert remaining == "dummy"
+
+    def test_parse_sa_15_03(self):
+        """Sa 15/03 doit créer 1 date (15/03)."""
+        date_list, remaining = parse_date_prefix_v2("Sa 15/03: dummy", 1, 2013)
+        assert len(date_list) == 1
+        assert date_list[0] == date(2013, 3, 15)
+
+
+class TestEventParserInlineWithMonthDates:
+    """Tests pour le parsing inline avec dates au format DD/MM."""
+
+    @pytest.fixture
+    def parser(self):
+        return EventParser(bidul_mois=1, bidul_annee=2013, date_format='inline')
+
+    def test_du_31_au_03_02_creates_4_events(self, parser):
+        """Du 31 au 03/02 doit créer 4 événements."""
+        text = 'Du 31 au 03/02: " Dis à ma fille que je pars en voyage >> La Fonderie, Le Mans, 20h30'
+        events = parser.parse_with_referentiel(text, [], [])
+        assert len(events) == 4
+        dates = sorted([e.date_evenement for e in events])
+        assert dates[0] == date(2013, 1, 31)
+        assert dates[1] == date(2013, 2, 1)
+        assert dates[2] == date(2013, 2, 2)
+        assert dates[3] == date(2013, 2, 3)
+
+    def test_ve_01_02_creates_1_event(self, parser):
+        """Ve 01/02 doit créer 1 événement."""
+        text = 'Ve 01/02: << L\'Événement >> La Fonderie, Le Mans, 21h'
+        events = parser.parse_with_referentiel(text, [], [])
+        assert len(events) == 1
+        assert events[0].date_evenement == date(2013, 2, 1)
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

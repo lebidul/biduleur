@@ -39,9 +39,12 @@ INFO_PATTERNS = [
 ]
 
 # Patterns de fragments de date/en-tête à exclure
-# Ex: "au 31 juillet 2011", "au 31 Août 2011 Les Arts SERVICES"
+# Ex: "au 31 juillet 2011", "au 31 Août 2011 Les Arts SERVICES", "janvier au 1er février"
 DATE_FRAGMENT_PATTERNS = [
     r'^au\s+\d{1,2}\s+(?:janvier|f[ée]vrier|mars|avril|mai|juin|juillet|ao[uû]t|septembre|octobre|novembre|d[ée]cembre)\s+\d{4}',
+    # "mois au Xer mois" - fragment de période sans événement
+    # Ex: "janvier au 1er février", "mars au 15 avril"
+    r'^(?:janvier|f[ée]vrier|mars|avril|mai|juin|juillet|ao[uû]t|septembre|octobre|novembre|d[ée]cembre)\s+au\s+\d{1,2}(?:er)?\s+(?:janvier|f[ée]vrier|mars|avril|mai|juin|juillet|ao[uû]t|septembre|octobre|novembre|d[ée]cembre)\s*$',
 ]
 
 # Patterns de références lieu hors région à exclure
@@ -66,7 +69,8 @@ class ArtifactDetection:
 def detect_artifact(raw_text: str, raw_text_clean: Optional[str] = None,
                     lieu_raw: Optional[str] = None,
                     artistes: Optional[list] = None,
-                    spectacles: Optional[list] = None) -> ArtifactDetection:
+                    spectacles: Optional[list] = None,
+                    nom_evenement: Optional[str] = None) -> ArtifactDetection:
     """
     Détecte si un événement est un artifact (faux événement).
 
@@ -76,6 +80,7 @@ def detect_artifact(raw_text: str, raw_text_clean: Optional[str] = None,
         lieu_raw: Nom du lieu extrait
         artistes: Liste des artistes extraits
         spectacles: Liste des spectacles extraits
+        nom_evenement: Nom de l'événement extrait (Soirée X, Festival X, etc.)
 
     Returns:
         ArtifactDetection avec is_artifact et reason
@@ -126,11 +131,13 @@ def detect_artifact(raw_text: str, raw_text_clean: Optional[str] = None,
     has_lieu = bool(lieu_raw and lieu_raw.strip())
     has_artiste = bool(artistes and len(artistes) > 0)
     has_spectacle = bool(spectacles and len(spectacles) > 0)
+    has_nom_evenement = bool(nom_evenement and nom_evenement.strip())
 
-    if not has_lieu and not has_artiste and not has_spectacle:
+    # Un événement avec un nom reconnu (Soirée X, Festival X) est valide même sans lieu/artiste/spectacle
+    if not has_lieu and not has_artiste and not has_spectacle and not has_nom_evenement:
         return ArtifactDetection(
             is_artifact=True,
-            reason="Sans lieu ni artiste ni spectacle"
+            reason="Sans lieu ni artiste ni spectacle ni nom d'événement"
         )
 
     # === Pas un artifact ===
@@ -156,6 +163,7 @@ def is_bidul_sans_evenements(numero: int) -> bool:
 def is_artifact(raw_text: str, raw_text_clean: Optional[str] = None,
                 lieu_raw: Optional[str] = None,
                 artistes: Optional[list] = None,
-                spectacles: Optional[list] = None) -> bool:
+                spectacles: Optional[list] = None,
+                nom_evenement: Optional[str] = None) -> bool:
     """Version simplifiée: retourne True si c'est un artifact."""
-    return detect_artifact(raw_text, raw_text_clean, lieu_raw, artistes, spectacles).is_artifact
+    return detect_artifact(raw_text, raw_text_clean, lieu_raw, artistes, spectacles, nom_evenement).is_artifact
