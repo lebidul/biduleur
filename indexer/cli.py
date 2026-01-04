@@ -692,7 +692,9 @@ def cmd_populate(args):
             date_format = config.date_format if config else None
 
             # Re-parser le texte brut complet avec EventParser (supporte format bloc)
-            parser = EventParser(bidul_mois=mois, bidul_annee=annee, date_format=date_format)
+            # Si include_regional=False, exclure la section "Et un peu plus loin..." dès le parsing
+            parser = EventParser(bidul_mois=mois, bidul_annee=annee, date_format=date_format,
+                                 include_regional=include_regional)
             parsed_events = parser.parse_with_referentiel(
                 bidul_raw_text,
                 lieu_ref_list,
@@ -922,7 +924,9 @@ def cmd_populate(args):
 
             # Récupérer le date_format depuis la config (si disponible)
             date_format = config.date_format if config else None
-            parser = EventParser(bidul_mois=mois, bidul_annee=annee, date_format=date_format)
+            # Si include_regional=False, exclure la section "Et un peu plus loin..." dès le parsing
+            parser = EventParser(bidul_mois=mois, bidul_annee=annee, date_format=date_format,
+                                 include_regional=include_regional)
             # Utiliser parse_with_referentiel pour la stratégie "lieu d'abord"
             parsed_events = parser.parse_with_referentiel(
                 full_text,

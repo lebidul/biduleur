@@ -1135,6 +1135,85 @@ def split_fused_lines(raw_text: str) -> list[str]:
     return events if events else [raw_text]
 
 
+# =============================================================================
+# DÉTECTION SECTION RÉGIONALE "Et un peu plus loin..."
+# =============================================================================
+
+# Patterns pour détecter le début de la section régionale
+# Note: \s+ inclut les sauts de ligne, donc "Et un peu \nplus loin" est matché
+REGIONAL_SECTION_PATTERNS = [
+    r'Et\s+un\s+peu\s+plus\s+loin\.{0,3}',  # "Et un peu plus loin..." avec ... optionnel
+    r'un\s+peu\s+plus\s+loin\.{0,3}',        # OCR peut couper le "Et"
+]
+
+REGIONAL_SECTION_RE = re.compile(
+    '|'.join(REGIONAL_SECTION_PATTERNS),
+    re.IGNORECASE | re.MULTILINE
+)
+
+
+def split_regional_section(text: str) -> tuple[str, str]:
+    """
+    Sépare le texte en partie locale et partie régionale.
+
+    La section régionale commence par "Et un peu plus loin..." et contient
+    les événements hors département (Orne, Maine-et-Loire, etc.).
+
+    Le texte peut avoir un header de département juste avant le marqueur:
+    - "Dans l'Orne (61):"
+    - "Et un peu plus loin..."
+
+    Args:
+        text: Texte brut complet
+
+    Returns:
+        Tuple (texte_local, texte_regional)
+        - texte_local: Événements de la Sarthe (avant "Et un peu plus loin...")
+        - texte_regional: Événements hors Sarthe (après le marqueur)
+
+    Example:
+        >>> local, regional = split_regional_section(ocr_text)
+        >>> if not include_regional:
+        ...     text = local  # Ignorer la partie régionale
+    """
+    match = REGIONAL_SECTION_RE.search(text)
+    if match:
+        # Trouver le début de la ligne contenant le marqueur
+        start_pos = match.start()
+        # Remonter au début de la ligne
+        line_start = text.rfind('\n', 0, start_pos)
+        if line_start == -1:
+            line_start = 0
+        else:
+            line_start += 1  # Après le \n
+
+        # Vérifier si la ligne précédente contient un header de département
+        # Ex: "Dans l'Orne (61):", "Dans le Maine-et-Loire (49):"
+        if line_start > 0:
+            prev_line_end = line_start - 1
+            prev_line_start = text.rfind('\n', 0, prev_line_end)
+            if prev_line_start == -1:
+                prev_line_start = 0
+            else:
+                prev_line_start += 1
+
+            prev_line = text[prev_line_start:prev_line_end].strip()
+            # Si la ligne précédente est un header de département, l'inclure dans la section régionale
+            if re.match(r"Dans\s+l[e']", prev_line, re.IGNORECASE):
+                line_start = prev_line_start
+
+        local_text = text[:line_start].strip()
+        regional_text = text[line_start:].strip()
+
+        logger.debug(f"Section régionale détectée à position {line_start}")
+        logger.debug(f"  Local: {len(local_text)} caractères")
+        logger.debug(f"  Régional: {len(regional_text)} caractères")
+
+        return local_text, regional_text
+
+    return text, ""
+
+
 def split_bloc_fused_events(raw_text: str) -> list[str]:
     """
     Sépare les événements fusionnés dans un bloc (format sans dates inline).
@@ -3898,7 +3977,7 @@ class EventParser:
     SPECTACLE_PATTERN = re.compile(r'[""«]([^""»]+)[""»]')
 
     def __init__(self, bidul_mois: Optional[int] = None, bidul_annee: Optional[int] = None,
-                 date_format: Optional[str] = None):
+                 date_format: Optional[str] = None, include_regional: bool = True):
         """
         Initialise le parser.
 
@@ -3909,10 +3988,13 @@ class EventParser:
                 - 'inline': chaque ligne commence par la date (ex: "Je 02 : CONCERT...")
                 - 'par bloc': dates en en-têtes de sections, événements listés en dessous
                 - None: auto-détection (essaie les deux formats)
+            include_regional: Si False, exclut la section "Et un peu plus loin..."
+                contenant les événements hors département (61, 49, 53, etc.)
         """
         self.bidul_mois = bidul_mois
         self.bidul_annee = bidul_annee
         self.date_format = date_format
+        self.include_regional = include_regional
         # Support juillet/août: sections de mois détectées et lignes du texte
         self._month_sections: list[MonthSection] = []
         self._lines: list[str] = []
@@ -3977,6 +4059,13 @@ class EventParser:
         Returns:
             Liste d'événements parsés (dédoublonnés)
         """
+        # Exclure la section régionale "Et un peu plus loin..." si demandé
+        if not self.include_regional:
+            local_text, regional_text = split_regional_section(text)
+            if regional_text:
+                logger.info(f"Section régionale exclue ({len(regional_text)} caractères)")
+            text = local_text
+
         # Détecter les sections de mois pour les Biduls d'été (juillet couvrant juillet+août)
         if is_summer_bidul(self.bidul_mois):
             self._month_sections = detect_month_sections(text)
@@ -5296,6 +5385,13 @@ class EventParser:
         Returns:
             Liste d'événements parsés (dédoublonnés)
         """
+        # Exclure la section régionale "Et un peu plus loin..." si demandé
+        if not self.include_regional:
+            local_text, regional_text = split_regional_section(text)
+            if regional_text:
+                logger.info(f"Section régionale exclue ({len(regional_text)} caractères)")
+            text = local_text
+
         # Détecter les sections de mois pour les Biduls d'été (juillet couvrant juillet+août)
         if is_summer_bidul(self.bidul_mois):
             self._month_sections = detect_month_sections(text)

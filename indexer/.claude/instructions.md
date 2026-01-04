@@ -65,10 +65,17 @@ Lors d'une nouvelle version:
 ## Logique du parser
 
 ### Architecture de parsing
-1. **Détection du format** : `inline` ou `par bloc` via `corpus/biduls.description.csv`
-2. **Découpage sur dates** : `split_on_dates_v2()` sépare le texte par dates
-3. **Séparation événements fusionnés** : `split_bloc_fused_events()` sépare les événements collés
-4. **Parsing individuel** : `parse_event_line_v2()` extrait les champs
+1. **Exclusion régionale** : `split_regional_section()` coupe le texte avant "Et un peu plus loin..."
+2. **Détection du format** : `inline` ou `par bloc` via `corpus/biduls.description.csv`
+3. **Découpage sur dates** : `split_on_dates_v2()` sépare le texte par dates
+4. **Séparation événements fusionnés** : `split_bloc_fused_events()` sépare les événements collés
+5. **Parsing individuel** : `parse_event_line_v2()` extrait les champs
+
+### Section régionale "Et un peu plus loin..."
+- La section régionale contient les événements hors département (Orne 61, Mayenne 53, etc.)
+- `split_regional_section(text)` → tuple (texte_local, texte_regional)
+- Activé via `EventParser(include_regional=False)` ou CLI `--include-regional`
+- Détecte aussi les headers "Dans l'Orne (61):" avant le marqueur
 
 ### Patterns de `split_bloc_fused_events()`
 La fonction sépare les événements fusionnés sur ces patterns :
@@ -113,4 +120,17 @@ python cli.py ocr "archives/bidul_XXX.pdf" --engine google -o temp_ocr.txt
 
 # Extraction seule sans filtrage (debug uniquement)
 python cli.py extract --numero XXX
+```
+
+### Accès au texte OCR stocké
+Le texte OCR brut est stocké dans la table `bidul`, attribut `raw_text`:
+```python
+import sqlite3
+conn = sqlite3.connect('database/bidul_archives.db')
+cursor = conn.cursor()
+cursor.execute('SELECT raw_text FROM bidul WHERE numero = 132')
+row = cursor.fetchone()
+if row and row[0]:
+    print(row[0])  # Texte OCR complet du bidul
+conn.close()
 ```

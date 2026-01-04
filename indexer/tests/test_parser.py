@@ -986,5 +986,45 @@ class TestSplitBlocFusedEvents:
         assert '<<Pièce montée' in parts[1]
 
 
+class TestSplitRegionalSection:
+    """Tests pour la détection de la section régionale 'Et un peu plus loin...'."""
+
+    def test_split_regional_section_found(self):
+        """Détecte et sépare la section régionale."""
+        from core.parser import split_regional_section
+        text = """Concert local, Le Mans, 21h
+Et un peu plus loin...
+Dans l'Orne (61):
+CALI (chanson), 21h, 25 à 30€
+PASCALE PICARD (pop rock), 21h"""
+
+        local, regional = split_regional_section(text)
+        assert 'Concert local' in local
+        assert 'Et un peu plus loin' in regional
+        assert 'CALI' in regional
+        assert 'CALI' not in local
+
+    def test_split_regional_section_not_found(self):
+        """Pas de section régionale, tout reste local."""
+        from core.parser import split_regional_section
+        text = """Concert 1, Le Mans, 21h
+Concert 2, Allonnes, 20h"""
+
+        local, regional = split_regional_section(text)
+        assert local == text
+        assert regional == ""
+
+    def test_split_regional_section_ocr_variation(self):
+        """Supporte les variations OCR (sans 'Et')."""
+        from core.parser import split_regional_section
+        text = """Concert local
+un peu plus loin...
+Concert régional"""
+
+        local, regional = split_regional_section(text)
+        assert 'Concert local' in local
+        assert 'un peu plus loin' in regional
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
