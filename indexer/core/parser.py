@@ -1135,6 +1135,62 @@ def split_fused_lines(raw_text: str) -> list[str]:
     return events if events else [raw_text]
 
 
+def split_bloc_fused_events(raw_text: str) -> list[str]:
+    """
+    Sépare les événements fusionnés dans un bloc (format sans dates inline).
+
+    Dans le format "bloc", plusieurs événements d'un même jour peuvent être
+    fusionnés sur une seule ligne, séparés par un pattern:
+    - Prix (X€) suivi d'un nom en MAJUSCULES ou "Soirée"
+
+    Ex: "ARTISTE1 (style), Lieu, 21h, 0€ ARTISTE2 (style), Lieu, 20h, 3€"
+    Ex: "...5€ SOIREE funk avec DJ, Lieu, 23h, 0€ Soirées Indépendantes..."
+
+    Returns:
+        Liste de textes d'événements séparés
+    """
+    # Pattern: prix (chiffre + € ou E) suivi d'espace puis:
+    # - Nom en MAJUSCULES (2+ lettres consécutives en majuscules)
+    # - Ou "Soirée/Soirées" (avec ou sans accent)
+    # Le lookahead préserve le nom dans le résultat
+    split_pattern = r'(\d+(?:[.,]\d+)?[€E])\s+(?=[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ]{2,}|[Ss]oir[ée]es?\s)'
+
+    parts = re.split(split_pattern, raw_text)
+
+    if len(parts) <= 1:
+        return [raw_text]
+
+    events = []
+
+    # Premier événement (avant le premier split, peut être vide)
+    first_part = parts[0].strip()
+    if first_part:
+        # Ajouter le prix du premier split s'il existe
+        if len(parts) > 1:
+            events.append(f"{first_part} {parts[1]}".strip())
+        else:
+            events.append(first_part)
+    elif len(parts) > 2:
+        # Le texte commence directement par un événement après un prix implicite
+        # Reconstituer: prix + texte suivant
+        events.append(f"{parts[1]} {parts[2]}".strip())
+
+    # Événements suivants: texte + prix (du prochain split)
+    i = 2
+    while i < len(parts):
+        text_part = parts[i].strip() if i < len(parts) else ''
+        price_part = parts[i + 1] if i + 1 < len(parts) else ''
+
+        if text_part:
+            if price_part:
+                events.append(f"{text_part} {price_part}".strip())
+            else:
+                events.append(text_part)
+        i += 2
+
+    return events if events else [raw_text]
+
+
 def split_festival_multi_day(raw_text: str, base_month: int, base_year: int) -> list[dict]:
     """
     Détecte et splitte les festivals/événements multi-jours avec programme détaillé.
@@ -1752,11 +1808,15 @@ def split_on_dates_v2(raw_text: str) -> list[str]:
     # Support des horaires par date "Je 01/Ve 02 à 20h30 et Di 04 à 17h:"
     # Support des dates avec mois explicite: "Ve 01/02:" (Ve 01 février)
     # Support des plages avec mois: "Du 31 au 03/02:" (du 31 janvier au 3 février)
+    # Support des caractères parasites OCR avant les dates: +, t, † (ex: "+Ma 14:", "tJe 16:")
     # Pattern strict pour les abréviations de jours (évite de matcher "de 18", "le 14", etc.)
     JOURS_ABBREV = r'(?:[Ll]u|[Mm]a|[Mm]e|[Jj]e|[Vv]e|[Ss]a|[Dd]i)'
+    # Caractères parasites OCR qui peuvent précéder une date
+    OCR_PARASITES = r'[+†t]?'
 
     split_pattern = (
         r'(?<![0-9]€)(?<!au )(?<!et )(?<!Du )(?<=[\s€,.])\s*'  # Précédé de espace/€/,/. mais pas après prix décimal, "au ", "et " ou "Du "
+        rf'{OCR_PARASITES}'  # Caractère parasite OCR optionnel (+, t, †)
         rf'((?:Du\s+)?'  # Optionnel "Du "
         rf'{JOURS_ABBREV}\s*\d{{1,2}}(?:/\d{{2}})?'  # Premier jour: Lu 02 ou Ve 01/02 (avec mois optionnel)
         rf'(?:\s+(?:au|à)\s+(?:{JOURS_ABBREV}\s*)?\d{{1,2}}(?:/\d{{2}})?)?'  # Plage optionnelle: au Sa 05 ou au 03/02
@@ -1775,6 +1835,7 @@ def split_on_dates_v2(raw_text: str) -> list[str]:
     # Utilisé pour les cas OCR où le ":" est omis (ex: "Ma 28 <<LE CIRQUE...")
     alt_pattern = (
         r'(?<![0-9]€)(?<!au )(?<!et )(?<=[\s€,.\n])\s*'
+        rf'{OCR_PARASITES}'  # Caractère parasite OCR optionnel
         r'((?<!Du\s)'  # NE PAS matcher après "Du " (début de plage)
         rf'{JOURS_ABBREV}\s*\d{{1,2}}(?:/\d{{2}})?'  # Jour simple: Sa 11 ou Ve 01/02
         r')\s+'  # Juste un espace (pas de séparateur)
@@ -5347,47 +5408,55 @@ class EventParser:
                 if len(event_text.strip()) < 10:
                     continue
 
-                # Utiliser parse_event_line_v2 pour chaque ligne
-                # Passer le mois/année contextuels (avec mois explicite si présent)
-                parsed_events = parse_event_line_v2(
-                    event_text.strip(),
-                    mois,
-                    annee,
-                    lieu_ref_list,
-                    ville_ref_list
-                )
+                # Séparer les événements fusionnés (ex: "ARTISTE1, lieu, 5€ ARTISTE2, lieu, 3€")
+                # Ceci gère les cas où plusieurs événements sont sur la même ligne
+                sub_events = split_bloc_fused_events(event_text.strip())
 
-                for parsed in parsed_events:
-                    # Convertir le dict en ParsedEvent
-                    # Pour les dates composées, créer un événement par date
-                    event_dates = self._parse_all_dates(date_str, line_number)
+                for sub_event_text in sub_events:
+                    if len(sub_event_text.strip()) < 10:
+                        continue
 
-                    if not event_dates:
-                        # Pas de date spécifique (plage ou date invalide)
-                        # Utiliser la première date trouvée ou None
-                        event = self._dict_to_parsed_event(parsed, date_str)
-                        if event:
-                            signature = self._event_signature(event)
-                            if signature not in seen_signatures:
-                                seen_signatures.add(signature)
-                                events.append(event)
-                    else:
-                        # Créer un événement pour chaque date
-                        for event_date in event_dates:
-                            # Reconstruire date_str pour cette date spécifique
-                            jours = ['Lu', 'Ma', 'Me', 'Je', 'Ve', 'Sa', 'Di']
-                            single_date_str = f"{jours[event_date.weekday()]} {event_date.day}"
+                    # Utiliser parse_event_line_v2 pour chaque ligne
+                    # Passer le mois/année contextuels (avec mois explicite si présent)
+                    parsed_events = parse_event_line_v2(
+                        sub_event_text.strip(),
+                        mois,
+                        annee,
+                        lieu_ref_list,
+                        ville_ref_list
+                    )
 
-                            event = self._dict_to_parsed_event(parsed, single_date_str)
+                    for parsed in parsed_events:
+                        # Convertir le dict en ParsedEvent
+                        # Pour les dates composées, créer un événement par date
+                        event_dates = self._parse_all_dates(date_str, line_number)
+
+                        if not event_dates:
+                            # Pas de date spécifique (plage ou date invalide)
+                            # Utiliser la première date trouvée ou None
+                            event = self._dict_to_parsed_event(parsed, date_str)
                             if event:
-                                # Forcer la date du bloc SEULEMENT si l'événement n'a pas
-                                # sa propre date (extraite d'un split mid-text)
-                                if not parsed.get('date_evenement'):
-                                    event.date_evenement = event_date
                                 signature = self._event_signature(event)
                                 if signature not in seen_signatures:
                                     seen_signatures.add(signature)
                                     events.append(event)
+                        else:
+                            # Créer un événement pour chaque date
+                            for event_date in event_dates:
+                                # Reconstruire date_str pour cette date spécifique
+                                jours = ['Lu', 'Ma', 'Me', 'Je', 'Ve', 'Sa', 'Di']
+                                single_date_str = f"{jours[event_date.weekday()]} {event_date.day}"
+
+                                event = self._dict_to_parsed_event(parsed, single_date_str)
+                                if event:
+                                    # Forcer la date du bloc SEULEMENT si l'événement n'a pas
+                                    # sa propre date (extraite d'un split mid-text)
+                                    if not parsed.get('date_evenement'):
+                                        event.date_evenement = event_date
+                                    signature = self._event_signature(event)
+                                    if signature not in seen_signatures:
+                                        seen_signatures.add(signature)
+                                        events.append(event)
 
         return events
 

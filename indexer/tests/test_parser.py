@@ -882,5 +882,64 @@ class TestEventParserInlineWithMonthDates:
         assert events[0].date_evenement == date(2013, 2, 1)
 
 
+class TestSplitOnDatesV2WithParasiticChars:
+    """Tests pour le split avec caractères parasites OCR (+, t, †)."""
+
+    def test_split_on_plus_ma(self):
+        """+Ma 14: doit être splitté correctement."""
+        text = 'Premier event 21h30 +Ma 14: Deuxieme event'
+        parts = split_on_dates_v2(text)
+        assert len(parts) == 2
+        assert 'Ma 14' in parts[1]
+
+    def test_split_on_t_je(self):
+        """tJe 16: doit être splitté correctement."""
+        text = 'Premier event 21h tJe 16: Deuxieme event'
+        parts = split_on_dates_v2(text)
+        assert len(parts) == 2
+        assert 'Je 16' in parts[1]
+
+    def test_bidul_72_pattern(self):
+        """Test complet du pattern bidul 72."""
+        text = 'Soiree Reggae, 21h30 +Ma 14: BOB HOUNSLOW, Le Mackeson, 21h tJe 16: MISTER JO, PCV, 21h30'
+        parts = split_on_dates_v2(text)
+        assert len(parts) == 3
+        assert 'Reggae' in parts[0]
+        assert 'BOB HOUNSLOW' in parts[1]
+        assert 'MISTER JO' in parts[2]
+
+
+class TestSplitBlocFusedEvents:
+    """Tests pour le split des événements fusionnés en format bloc."""
+
+    def test_split_on_price_then_majuscules(self):
+        """Split après prix suivi de nom en MAJUSCULES."""
+        text = 'ARTISTE1 (jazz), Le Zoo, 21h, 0E ARTISTE2 (rock), Le Bar, 20h, 3E'
+        from core.parser import split_bloc_fused_events
+        parts = split_bloc_fused_events(text)
+        assert len(parts) == 2
+        assert 'ARTISTE1' in parts[0]
+        assert 'ARTISTE2' in parts[1]
+
+    def test_split_on_price_then_soiree(self):
+        """Split après prix suivi de Soirée."""
+        text = 'CONCERT (rock), Lieu, 21h, 0E Soiree funk avec DJ, Lieu, 23h, 5E'
+        from core.parser import split_bloc_fused_events
+        parts = split_bloc_fused_events(text)
+        assert len(parts) == 2
+        assert 'CONCERT' in parts[0]
+        assert 'Soiree funk' in parts[1]
+
+    def test_bidul_175_pattern(self):
+        """Test complet du pattern bidul 175."""
+        text = 'SANDRA CAROLL (jazz), Le Zoo 21h, 0E BOBBY SIX KILLERS (rock), Bar, 20h, 3E LE MANS CITE CHANSON, Lieu, 20h30, 0E'
+        from core.parser import split_bloc_fused_events
+        parts = split_bloc_fused_events(text)
+        assert len(parts) == 3
+        assert 'SANDRA CAROLL' in parts[0]
+        assert 'BOBBY SIX KILLERS' in parts[1]
+        assert 'LE MANS CITE CHANSON' in parts[2]
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

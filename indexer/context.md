@@ -53,6 +53,8 @@ contenu_evenement (source de vérité pour artistes/spectacles)
 
 **Note v1.8** : Support du Bidul d'été (juillet/août), dates avec nom de mois, amélioration de l'extraction des lieux hors référentiel (guillemets orphelins OCR, acronymes de lieux, codes département).
 
+**Note v1.9** : Correction des faux splits ("de 18 mois", "de 14 ans"), support des dates DD/MM pour événements multi-mois, gestion des caractères OCR parasites avant dates, découpage des événements fusionnés (format bloc).
+
 ## Mapping Bidul <-> Date
 
 Référence : **Bidul 280 = Mai 2023**

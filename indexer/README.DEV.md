@@ -80,6 +80,8 @@ events = parser.parse_with_referentiel(text, lieu_ref_list, ville_ref_list)
 - `extract_lieu_fallback()` - Extraction heuristique quand le lieu n'est pas dans le référentiel
 - `strip_formatting_tags()` - Retire les balises pour comparaison
 - `find_lieu_position_heuristic()` - Trouve la position du lieu dans le texte (v1.4 : corrige position texte original)
+- `split_on_dates_v2()` - Découpe le texte sur les dates inline (v1.9 : ignore caractères OCR parasites)
+- `split_bloc_fused_events()` - Sépare les événements fusionnés sur pattern `prix€ MAJUSCULES` (v1.9)
 
 ### `core/db.py` - Base de données
 
