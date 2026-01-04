@@ -567,13 +567,28 @@ def extract_formatted_spectacles(text: str) -> list[dict]:
             if not any(s['nom'] == nom for s in spectacles):
                 spectacles.append({'nom': nom, 'style': style})
 
-    # Pattern 5: <<Spectacle> (style) - OCR avec << ouvrant et > fermant (mal lu)
-    # Cas spécial: <<Marrons gagnants> (contes), <<Guth Després> (contes)
-    # Le < final est un guillemet fermant mal reconnu
-    pattern5 = r'<<\s*([^<>]+?)\s*>\s*\(([^)]+)\)'
+    # Pattern 5: <<Spectacle"> (style) - OCR avec << ouvrant et "> fermant
+    # Cas spécial: <<Rien ne laisse présager de l'Etat de l'Eau"> (danse)
+    # Le "> est un guillemet fermant mal reconnu (combinaison de " et >)
+    # NOTE: Ce pattern doit être AVANT le pattern <<...> pour éviter de capturer " dans le nom
+    pattern5 = r'<<\s*([^<>"]+?)\s*">\s*\(([^)]+)\)'
     matches5 = re.finditer(pattern5, text, re.IGNORECASE)
 
     for match in matches5:
+        nom = match.group(1).strip()
+        style = _clean_style(match.group(2)) if match.group(2) else None
+        if nom and len(nom) > 2:
+            if not any(s['nom'] == nom for s in spectacles):
+                spectacles.append({'nom': nom, 'style': style})
+
+    # Pattern 5b: <<Spectacle> (style) - OCR avec << ouvrant et > fermant (mal lu)
+    # Cas spécial: <<Marrons gagnants> (contes), <<Guth Després> (contes)
+    # Le < final est un guillemet fermant mal reconnu
+    # NOTE: Exclure " pour ne pas matcher les cas <<..."> qui sont gérés par Pattern 5
+    pattern5b = r'<<\s*([^<>"]+?)\s*>\s*\(([^)]+)\)'
+    matches5b = re.finditer(pattern5b, text, re.IGNORECASE)
+
+    for match in matches5b:
         nom = match.group(1).strip()
         style = _clean_style(match.group(2)) if match.group(2) else None
         if nom and len(nom) > 2:
@@ -586,6 +601,18 @@ def extract_formatted_spectacles(text: str) -> list[dict]:
     matches6 = re.finditer(pattern6, text, re.IGNORECASE)
 
     for match in matches6:
+        nom = match.group(1).strip()
+        style = _clean_style(match.group(2)) if match.group(2) else None
+        if nom and len(nom) > 2:
+            if not any(s['nom'] == nom for s in spectacles):
+                spectacles.append({'nom': nom, 'style': style})
+
+    # Pattern 7: "Spectacle> (style) - OCR avec " ouvrant et > fermant
+    # Cas spécial: "Métis'sages> (contes et légendes d'ailleurs)
+    pattern7 = r'"([^"<>]+?)>\s*\(([^)]+)\)'
+    matches7 = re.finditer(pattern7, text, re.IGNORECASE)
+
+    for match in matches7:
         nom = match.group(1).strip()
         style = _clean_style(match.group(2)) if match.group(2) else None
         if nom and len(nom) > 2:
@@ -1253,7 +1280,10 @@ def split_bloc_fused_events(raw_text: str) -> list[str]:
         r'(0\d\s+\d{2}\s+\d{2}\s+\d{2}\s+\d{2})\s+(?=[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ]{2,})',
         # Pattern 4: "chapeau" suivi d'un nom propre avec deux-points
         r'(chapeau)\s+(?=[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][a-zàâäéèêëïîôùûüç]*\s*:)',
-        # Pattern 5: parenthèse fermante suivie de guillemets OCR << (double chevron)
+        # Pattern 5: "chapeau" suivi d'un jour de semaine (Lu/Ma/Me/Je/Ve/Sa/Di + numéro)
+        # Ex: "au chapeau Ve 06/Sa 07" -> split avant Ve
+        r'(chapeau)\s+(?=[LMJVSDlmjvsd][uaeie]\s+\d{1,2})',
+        # Pattern 6: parenthèse fermante suivie de guillemets OCR << (double chevron)
         # Ex: "résa.) <<Pièce montée" -> split avant <<
         r'(\))\s+(?=<<[A-Za-zÀ-ÿ])',
     ]
@@ -1921,9 +1951,9 @@ def split_on_dates_v2(raw_text: str) -> list[str]:
         rf'((?:Du\s+)?'  # Optionnel "Du "
         rf'{JOURS_ABBREV}\s*\d{{1,2}}(?:/\d{{2}})?'  # Premier jour: Lu 02 ou Ve 01/02 (avec mois optionnel)
         rf'(?:\s+(?:au|à)\s+(?:{JOURS_ABBREV}\s*)?\d{{1,2}}(?:/\d{{2}})?)?'  # Plage optionnelle: au Sa 05 ou au 03/02
-        r'(?:\s+(?:à|a)\s+\d{1,2}h\d{0,2})?'  # Horaire optionnel après premier jour: à 20h30
-        rf'(?:\s*[&,/]\s*{JOURS_ABBREV}\s*\d{{1,2}}(?:/\d{{2}})?(?:\s+(?:à|a)\s+\d{{1,2}}h\d{{0,2}})?)*'  # Jours additionnels avec horaire: /Ve 30 à 20h
-        rf'(?:\s+et\s+{JOURS_ABBREV}\s*\d{{1,2}}(?:/\d{{2}})?(?:\s+(?:à|a)\s+\d{{1,2}}h\d{{0,2}})?)*'  # "et Di 04 à 17h" optionnel
+        r'(?:\s+(?:(?:à|a)\s+)?\d{1,2}h\d{0,2})?'  # Horaire optionnel (avec ou sans "à"): 20h30 ou à 20h30
+        rf'(?:\s*[&,/]\s*{JOURS_ABBREV}\s*\d{{1,2}}(?:/\d{{2}})?(?:\s+(?:(?:à|a)\s+)?\d{{1,2}}h\d{{0,2}})?)*'  # Jours additionnels avec horaire
+        rf'(?:\s+et\s+{JOURS_ABBREV}\s*\d{{1,2}}(?:/\d{{2}})?(?:\s+(?:(?:à|a)\s+)?\d{{1,2}}h\d{{0,2}})?)*'  # "et Di 04 à 17h" optionnel
         r')\s*[:–-]\s*'  # Séparateur : ou - ou –
     )
 
@@ -2102,14 +2132,15 @@ def parse_date_prefix_v2(text: str, base_month: int, base_year: int) -> tuple[li
 
     # Pattern 2: Dates complexes avec horaires (ex: "Je 01/Ve 02 à 20h30 et Di 04 à 17h :")
     # Supporte aussi: "Ma 27 à 19h/Ve 30 à 20h :" (horaire après chaque jour)
+    # Supporte aussi: "Ve 06/Sa 07 20h30/Di 08 15h:" (horaire sans "à" - format OCR)
     # Ce pattern capture toute la partie date complexe avant le séparateur
     complex_date_pattern = (
         r'^('
         r'[DLMJVS][a-z]\s*\d{1,2}(?:er|ère|e|ème)?'  # Premier jour
-        r'(?:\s+(?:à|a)\s+\d{1,2}h\d{0,2})?'  # Horaire optionnel après premier jour
-        r'(?:\s*[&,/]\s*[A-Za-z]{2,3}\s*\d{1,2}(?:er|ère|e|ème)?(?:\s+(?:à|a)\s+\d{1,2}h\d{0,2})?)*'  # Jours additionnels avec horaire
+        r'(?:\s+(?:(?:à|a)\s+)?\d{1,2}h\d{0,2})?'  # Horaire optionnel (avec ou sans "à")
+        r'(?:\s*[&,/]\s*[A-Za-z]{2,3}\s*\d{1,2}(?:er|ère|e|ème)?(?:\s+(?:(?:à|a)\s+)?\d{1,2}h\d{0,2})?)*'  # Jours additionnels
         r'(?:\s+(?:au|à)\s+[A-Za-z]{2,3}\s*\d{1,2}(?:er|ère|e|ème)?)?'  # Plage "au Ve 09"
-        r'(?:\s+et\s+[A-Za-z]{2,3}\s*\d{1,2}(?:er|ère|e|ème)?(?:\s+(?:à|a)\s+\d{1,2}h\d{0,2})?)*'  # "et Di 04 à 17h"
+        r'(?:\s+et\s+[A-Za-z]{2,3}\s*\d{1,2}(?:er|ère|e|ème)?(?:\s+(?:(?:à|a)\s+)?\d{1,2}h\d{0,2})?)*'  # "et Di 04 à 17h"
         r')'
         r'\s*[:–-]\s*(.+)$'  # Séparateur et contenu
     )
@@ -4035,13 +4066,13 @@ class EventParser:
         rf'(?:Du\s+)?(?:{_JOURS_INLINE})\s+\d{{1,2}}(?:/\d{{2}})?(?:er|ère|ème|eme)?'
         r')'
         r'(?:'
-        # Jours additionnels avec / ou &, chaque jour pouvant avoir une heure
-        # Ex: "Ve 1/Sa 02 à 21h/Di 03 à 15h30"
-        rf'(?:\s*[/&]\s*(?:{_JOURS_INLINE})?\s*\d{{1,2}}(?:er|ère|ème|eme)?(?:\s+(?:à|a)\s+\d{{1,2}}h\d{{0,2}})?)*'
+        # Jours additionnels avec / ou &, chaque jour pouvant avoir une heure (avec ou sans "à")
+        # Ex: "Ve 1/Sa 02 à 21h/Di 03 15h30" ou "Ve 06/Sa 07 20h30/Di 08 15h"
+        rf'(?:\s*[/&]\s*(?:{_JOURS_INLINE})?\s*\d{{1,2}}(?:er|ère|ème|eme)?(?:\s+(?:(?:à|a)\s+)?\d{{1,2}}h\d{{0,2}})?)*'
         # Plage "au Ve 09" ou "au 03/02" (avec mois explicite)
         rf'(?:\s+(?:au|à)\s+(?:{_JOURS_INLINE}\s*)?\d{{1,2}}(?:/\d{{2}})?(?:er|ère|ème|eme)?)?'
-        r'(?:\s+(?:à|a)\s+\d{1,2}h\d{0,2})?'  # Horaire optionnel pour le premier jour
-        rf'(?:\s+et\s+(?:{_JOURS_INLINE})?\s*\d{{1,2}}(?:er|ère|ème|eme)?(?:\s+(?:à|a)\s+\d{{1,2}}h\d{{0,2}})?)*'  # "et Di 04 à 17h"
+        r'(?:\s+(?:(?:à|a)\s+)?\d{1,2}h\d{0,2})?'  # Horaire optionnel (avec ou sans "à")
+        rf'(?:\s+et\s+(?:{_JOURS_INLINE})?\s*\d{{1,2}}(?:er|ère|ème|eme)?(?:\s+(?:(?:à|a)\s+)?\d{{1,2}}h\d{{0,2}})?)*'  # "et Di 04 à 17h"
         r')?'
         r')'  # Fin groupe 1
         # Séparateur: soit : - – soit espace suivi de:

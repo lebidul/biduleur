@@ -985,6 +985,47 @@ class TestSplitBlocFusedEvents:
         assert 'Les Spectaculaires' in parts[0]
         assert '<<Pièce montée' in parts[1]
 
+    def test_split_on_chapeau_then_day(self):
+        """Split après 'chapeau' suivi d'un jour de semaine."""
+        text = '"Electre"> (théâtre), Théâtre de Chaoué Allonnes 20h30, tarif: au chapeau Ve 06/Sa 07 20h30/Di 08 15h: "Métis\'sages>'
+        from core.parser import split_bloc_fused_events
+        parts = split_bloc_fused_events(text)
+        assert len(parts) == 2
+        assert 'Electre' in parts[0]
+        assert 'chapeau' in parts[0]
+        assert 'Métis' in parts[1]
+
+
+class TestExtractFormattedSpectacles:
+    """Tests pour l'extraction de spectacles avec formats OCR."""
+
+    def test_ocr_double_chevron_quote_closing(self):
+        """OCR avec << ouvrant et "> fermant (combinaison " et >)."""
+        from core.parser import extract_formatted_spectacles
+        text = '<<Rien ne laisse présager de l\'Etat de l\'Eau"> (danse), par O. Duboc'
+        spectacles = extract_formatted_spectacles(text)
+        assert len(spectacles) == 1
+        assert spectacles[0]['nom'] == "Rien ne laisse présager de l'Etat de l'Eau"
+        assert spectacles[0]['style'] == 'danse'
+
+    def test_ocr_double_chevron_simple_closing(self):
+        """OCR avec << ouvrant et > fermant simple."""
+        from core.parser import extract_formatted_spectacles
+        text = '<<Marrons gagnants> (contes)'
+        spectacles = extract_formatted_spectacles(text)
+        assert len(spectacles) == 1
+        assert spectacles[0]['nom'] == 'Marrons gagnants'
+        assert spectacles[0]['style'] == 'contes'
+
+    def test_ocr_quote_chevron_closing(self):
+        """OCR avec " ouvrant et > fermant."""
+        from core.parser import extract_formatted_spectacles
+        text = '"Métis\'sages> (contes et légendes d\'ailleurs)'
+        spectacles = extract_formatted_spectacles(text)
+        assert len(spectacles) == 1
+        assert spectacles[0]['nom'] == "Métis'sages"
+        assert spectacles[0]['style'] == "contes et légendes d'ailleurs"
+
 
 class TestSplitRegionalSection:
     """Tests pour la détection de la section régionale 'Et un peu plus loin...'."""
