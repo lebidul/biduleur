@@ -3856,19 +3856,27 @@ class EventParser:
     # - Sans séparateur OCR: "Ma 28 <<LE CIRQUE" (guillemet OCR suivi de MAJUSCULES)
     # Group 1: Date complète (tout avant le séparateur)
     # Group 2: Contenu de l'événement (après le séparateur)
+    # Pattern strict pour les abréviations de jours (évite de matcher "de 14", "le 25", etc.)
+    # Lu, Ma, Me, Je, Ve, Sa, Di + formes longues
+    _JOURS_INLINE = r'(?:[Ll]u|[Mm]a|[Mm]e|[Jj]e|[Vv]e|[Ss]a|[Dd]i|[Ll]undi|[Mm]ardi|[Mm]ercredi|[Jj]eudi|[Vv]endredi|[Ss]amedi|[Dd]imanche)'
+
     INLINE_DATE_PATTERN = re.compile(
         r'^('  # Groupe 1: Date complète
-        r'(?:Du\s+)?'  # Optionnel "Du " pour les plages de dates
-        r'(?:[MLJVSD][aeiou]|[Ll]undi|[Mm]ardi|[Mm]ercredi|[Jj]eudi|[Vv]endredi|[Ss]amedi|[Dd]imanche)\s+'
-        r'\d{1,2}(?:/\d{2})?(?:er|ère|ème|eme)?'  # Jour optionnel avec mois DD/MM
+        r'(?:'
+        # Option 1: "Du DD" sans jour de semaine (ex: "Du 31 au 03/02:")
+        r'Du\s+\d{1,2}(?:er|ère|ème|eme)?'
+        r'|'
+        # Option 2: "Jour DD" avec jour de semaine optionnel "Du" (ex: "Ma 29:", "Du Je 31:")
+        rf'(?:Du\s+)?(?:{_JOURS_INLINE})\s+\d{{1,2}}(?:/\d{{2}})?(?:er|ère|ème|eme)?'
+        r')'
         r'(?:'
         # Jours additionnels avec / ou &, chaque jour pouvant avoir une heure
         # Ex: "Ve 1/Sa 02 à 21h/Di 03 à 15h30"
-        r'(?:\s*[/&]\s*[MLJVSD][aeiou]?\s*\d{1,2}(?:er|ère|ème|eme)?(?:\s+(?:à|a)\s+\d{1,2}h\d{0,2})?)*'
+        rf'(?:\s*[/&]\s*(?:{_JOURS_INLINE})?\s*\d{{1,2}}(?:er|ère|ème|eme)?(?:\s+(?:à|a)\s+\d{{1,2}}h\d{{0,2}})?)*'
         # Plage "au Ve 09" ou "au 03/02" (avec mois explicite)
-        r'(?:\s+(?:au|à)\s+(?:[MLJVSD][aeiou]?\s*)?\d{1,2}(?:/\d{2})?(?:er|ère|ème|eme)?)?'
+        rf'(?:\s+(?:au|à)\s+(?:{_JOURS_INLINE}\s*)?\d{{1,2}}(?:/\d{{2}})?(?:er|ère|ème|eme)?)?'
         r'(?:\s+(?:à|a)\s+\d{1,2}h\d{0,2})?'  # Horaire optionnel pour le premier jour
-        r'(?:\s+et\s+[MLJVSD][aeiou]?\s*\d{1,2}(?:er|ère|ème|eme)?(?:\s+(?:à|a)\s+\d{1,2}h\d{0,2})?)*'  # "et Di 04 à 17h"
+        rf'(?:\s+et\s+(?:{_JOURS_INLINE})?\s*\d{{1,2}}(?:er|ère|ème|eme)?(?:\s+(?:à|a)\s+\d{{1,2}}h\d{{0,2}})?)*'  # "et Di 04 à 17h"
         r')?'
         r')'  # Fin groupe 1
         # Séparateur: soit : - – soit espace suivi de:
