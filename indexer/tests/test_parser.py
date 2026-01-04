@@ -940,6 +940,51 @@ class TestSplitBlocFusedEvents:
         assert 'BOBBY SIX KILLERS' in parts[1]
         assert 'LE MANS CITE CHANSON' in parts[2]
 
+    def test_split_on_price_then_quote(self):
+        """Split après prix suivi de guillemet ouvrant."""
+        text = 'Blues in Box (blues), Lieu, 21h30, 0E "Openspace" (th.), par La Cie'
+        from core.parser import split_bloc_fused_events
+        parts = split_bloc_fused_events(text)
+        assert len(parts) == 2
+        assert 'Blues in Box' in parts[0]
+        assert '"Openspace"' in parts[1]
+
+    def test_split_on_hour_then_les(self):
+        """Split après heure suivie de 'Les Spectaculaires'."""
+        text = 'LE SYNDROME DU CHAT (rock), Le Passeport, 22h Les Spectaculaires: Soirée PETITES'
+        from core.parser import split_bloc_fused_events
+        parts = split_bloc_fused_events(text)
+        assert len(parts) == 2
+        assert 'LE SYNDROME DU CHAT' in parts[0]
+        assert 'Les Spectaculaires' in parts[1]
+
+    def test_split_on_phone_then_majuscules(self):
+        """Split après numéro de téléphone suivi de MAJUSCULES."""
+        text = 'Concert, Lieu, 7/15E, résa.: 02 43 80 80 82 LE MANS CITE CHANSON: Présélection'
+        from core.parser import split_bloc_fused_events
+        parts = split_bloc_fused_events(text)
+        assert len(parts) == 2
+        assert 'Concert' in parts[0]
+        assert 'LE MANS CITE CHANSON' in parts[1]
+
+    def test_split_on_price_then_birdland(self):
+        """Split après prix suivi de Birdland."""
+        text = 'Soirée open mix, Le Passeport, 23h-4h, 0E Birdland présente Olivier Mugot Trio'
+        from core.parser import split_bloc_fused_events
+        parts = split_bloc_fused_events(text)
+        assert len(parts) == 2
+        assert 'Soirée open mix' in parts[0]
+        assert 'Birdland' in parts[1]
+
+    def test_split_on_parenthesis_then_double_chevron(self):
+        """Split après parenthèse fermante suivie de << (guillemets OCR)."""
+        text = 'Les Spectaculaires: Soirée PETITES FORMES (àpd 12ans): "Pitt" + "Ma foi" + "Bertha", Jean Carmet, Allonnes 19h, 15€ repas compris (sur résa.) <<Pièce montée" (th.), Espace Scélia Sargé, 20h30, 6/10€'
+        from core.parser import split_bloc_fused_events
+        parts = split_bloc_fused_events(text)
+        assert len(parts) == 2
+        assert 'Les Spectaculaires' in parts[0]
+        assert '<<Pièce montée' in parts[1]
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

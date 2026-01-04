@@ -1140,53 +1140,65 @@ def split_bloc_fused_events(raw_text: str) -> list[str]:
     Sépare les événements fusionnés dans un bloc (format sans dates inline).
 
     Dans le format "bloc", plusieurs événements d'un même jour peuvent être
-    fusionnés sur une seule ligne, séparés par un pattern:
-    - Prix (X€) suivi d'un nom en MAJUSCULES ou "Soirée"
+    fusionnés sur une seule ligne, séparés par différents patterns:
+    - Prix (X€) suivi d'un nom en MAJUSCULES, "Soirée", ou guillemet
+    - Heure (XXh) suivie d'un nom en MAJUSCULES (ex: "22h Les Spectaculaires")
+    - Numéro de téléphone suivi de MAJUSCULES (ex: "02 43 80 80 82 LE MANS")
+    - "chapeau" suivi de MAJUSCULES (ex: "au chapeau Des Astres")
 
     Ex: "ARTISTE1 (style), Lieu, 21h, 0€ ARTISTE2 (style), Lieu, 20h, 3€"
-    Ex: "...5€ SOIREE funk avec DJ, Lieu, 23h, 0€ Soirées Indépendantes..."
+    Ex: "...0€ \"Spectacle\" (th.), Lieu, 20h30"
+    Ex: "...22h Les Spectaculaires: Soirée..."
 
     Returns:
         Liste de textes d'événements séparés
     """
-    # Pattern: prix (chiffre + € ou E) suivi d'espace puis:
-    # - Nom en MAJUSCULES (2+ lettres consécutives en majuscules)
-    # - Ou "Soirée/Soirées" (avec ou sans accent)
-    # Le lookahead préserve le nom dans le résultat
-    split_pattern = r'(\d+(?:[.,]\d+)?[€E])\s+(?=[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ]{2,}|[Ss]oir[ée]es?\s)'
+    # Liste des patterns de split (groupe capturant = ce qui précède le split)
+    # Chaque pattern capture le "séparateur" qui reste avec l'événement précédent
+    split_patterns = [
+        # Pattern 1: prix (X€) suivi de MAJUSCULES, Soirée, Birdland, ou guillemet
+        r'(\d+(?:[.,/]\d+)?[€E])\s+(?=[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ]{2,}|[Ss]oir[ée]es?\s|Birdland\s|[«"<])',
+        # Pattern 2: heure (XXh) suivie de nom propre commençant par majuscule - ex: "22h Les Spectaculaires"
+        r'(\d{1,2}h(?:\d{2})?)\s+(?=Les\s+[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ])',
+        # Pattern 3: numéro de téléphone complet (02 XX XX XX XX) suivi de MAJUSCULES
+        r'(0\d\s+\d{2}\s+\d{2}\s+\d{2}\s+\d{2})\s+(?=[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ]{2,})',
+        # Pattern 4: "chapeau" suivi d'un nom propre avec deux-points
+        r'(chapeau)\s+(?=[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][a-zàâäéèêëïîôùûüç]*\s*:)',
+        # Pattern 5: parenthèse fermante suivie de guillemets OCR << (double chevron)
+        # Ex: "résa.) <<Pièce montée" -> split avant <<
+        r'(\))\s+(?=<<[A-Za-zÀ-ÿ])',
+    ]
 
-    parts = re.split(split_pattern, raw_text)
-
-    if len(parts) <= 1:
-        return [raw_text]
-
-    events = []
-
-    # Premier événement (avant le premier split, peut être vide)
-    first_part = parts[0].strip()
-    if first_part:
-        # Ajouter le prix du premier split s'il existe
-        if len(parts) > 1:
-            events.append(f"{first_part} {parts[1]}".strip())
-        else:
-            events.append(first_part)
-    elif len(parts) > 2:
-        # Le texte commence directement par un événement après un prix implicite
-        # Reconstituer: prix + texte suivant
-        events.append(f"{parts[1]} {parts[2]}".strip())
-
-    # Événements suivants: texte + prix (du prochain split)
-    i = 2
-    while i < len(parts):
-        text_part = parts[i].strip() if i < len(parts) else ''
-        price_part = parts[i + 1] if i + 1 < len(parts) else ''
-
-        if text_part:
-            if price_part:
-                events.append(f"{text_part} {price_part}".strip())
+    # Appliquer les patterns successivement
+    events = [raw_text]
+    for pattern in split_patterns:
+        new_events = []
+        for event in events:
+            parts = re.split(pattern, event)
+            if len(parts) <= 1:
+                new_events.append(event)
             else:
-                events.append(text_part)
-        i += 2
+                # re.split avec groupe capturant: [texte1, sep1, texte2, sep2, texte3, ...]
+                # On veut: [texte1 + sep1, texte2 + sep2, texte3]
+                i = 0
+                while i < len(parts):
+                    text_part = parts[i].strip()
+                    # Si le prochain élément est un séparateur capturé, l'ajouter au texte
+                    if i + 1 < len(parts):
+                        sep_part = parts[i + 1]
+                        combined = f"{text_part} {sep_part}".strip()
+                        if combined and len(combined) >= 10:
+                            new_events.append(combined)
+                        i += 2
+                    else:
+                        # Dernier élément (après le dernier séparateur)
+                        if text_part and len(text_part) >= 10:
+                            new_events.append(text_part)
+                        i += 1
+        events = new_events
+
+    # Nettoyer les événements vides ou trop courts
+    events = [e for e in events if e and len(e.strip()) >= 10]
 
     return events if events else [raw_text]
 
