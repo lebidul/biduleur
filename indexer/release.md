@@ -74,6 +74,13 @@ Les événements avec un nom reconnu (Soirée X, Festival X, etc.) ne sont plus 
 - `TestSplitOnDatesV2WithParasiticChars` : 3 tests pour les caractères OCR
 - `TestSplitBlocFusedEvents` : 3 tests pour les événements fusionnés
 
+### Benchmarks
+
+| Bidul | Score v1.8 | Score v1.9 |
+|-------|------------|------------|
+| 184 | 95.1% | 95.4% |
+| 190 | 91.2% | 91.2% |
+
 ---
 
 # Release Notes - Indexer v1.8
