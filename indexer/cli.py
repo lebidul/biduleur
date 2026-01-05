@@ -1454,8 +1454,13 @@ def cmd_ocr(args):
     start_time = time.time()
 
     # Extraction
-    extractor = ScanExtractor(ocr_engine=args.engine, dpi=args.dpi)
+    use_sections = not getattr(args, 'no_sections', False)
+    extractor = ScanExtractor(ocr_engine=args.engine, dpi=args.dpi, use_sections=use_sections)
     result = extractor.extract_from_pdf(pdf_path, config)
+
+    # Afficher le mode d'extraction utilisé
+    extraction_mode = result.metadata.get('extraction_mode', 'classic')
+    print(f"  Mode d'extraction: {extraction_mode}")
 
     if result.error:
         print(f"  Erreur: {result.error}")
@@ -1598,7 +1603,8 @@ def cmd_ocr_extract(args):
         return 1
 
     engine = getattr(args, 'engine', 'google')
-    extractor = ScanExtractor(ocr_engine=engine, dpi=args.dpi)
+    use_sections = not getattr(args, 'no_sections', False)
+    extractor = ScanExtractor(ocr_engine=engine, dpi=args.dpi, use_sections=use_sections)
     postprocessor = OCRPostProcessor()
 
     # Charger les référentiels pour le parsing
@@ -2251,6 +2257,7 @@ Maintenance (normalisation v2):
     p_ocr.add_argument('--dpi', '-d', type=int, default=200, help='Résolution pour conversion PDF (défaut: 200)')
     p_ocr.add_argument('--output', '-o', help='Fichier de sortie pour le texte extrait')
     p_ocr.add_argument('--raw', action='store_true', help='Ne pas appliquer le post-traitement')
+    p_ocr.add_argument('--no-sections', action='store_true', help='Désactiver l\'extraction par sections A6')
 
     # ocr-test - Teste l'OCR sur un échantillon
     p_ocr_test = subparsers.add_parser('ocr-test', help='Teste l\'OCR sur un échantillon de PDFs scannés')
@@ -2265,6 +2272,7 @@ Maintenance (normalisation v2):
                                help='Moteur OCR (défaut: google)')
     p_ocr_extract.add_argument('--dpi', '-d', type=int, default=200, help='Résolution pour conversion PDF (défaut: 200)')
     p_ocr_extract.add_argument('--dry-run', action='store_true', help='Ne pas sauvegarder en base')
+    p_ocr_extract.add_argument('--no-sections', action='store_true', help='Désactiver l\'extraction par sections A6')
 
     # ==========================================================================
     # Corpus Commands

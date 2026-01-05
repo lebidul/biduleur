@@ -682,17 +682,28 @@ class OCRResult:
 class ScanExtractor:
     """Extracteur de texte pour PDFs scannés."""
 
-    def __init__(self, ocr_engine: str = 'paddleocr', dpi: int = 200):
+    def __init__(self, ocr_engine: str = 'paddleocr', dpi: int = 200, use_sections: bool = True):
         """
         Initialise l'extracteur OCR.
 
         Args:
-            ocr_engine: Moteur OCR à utiliser ('paddleocr' ou 'easyocr')
+            ocr_engine: Moteur OCR à utiliser ('paddleocr', 'easyocr', 'google')
             dpi: Résolution pour la conversion PDF → Image (200 par défaut, bon compromis vitesse/qualité)
+            use_sections: Si True, utilise l'extraction par sections A6 quand configuré
         """
         self.ocr = OCREngine(engine=ocr_engine)
         self.preprocessor = ImagePreprocessor()
         self.dpi = dpi
+        self.use_sections = use_sections
+        self._section_extractor = None
+
+    @property
+    def section_extractor(self):
+        """Lazy loading du SectionOCRExtractor."""
+        if self._section_extractor is None:
+            from .section_extractor import SectionOCRExtractor
+            self._section_extractor = SectionOCRExtractor(self.ocr)
+        return self._section_extractor
 
     def extract_from_pdf(self, pdf_path: str, config: Optional[ScanConfig] = None) -> OCRResult:
         """
@@ -718,6 +729,120 @@ class ScanExtractor:
         if config is None and numero:
             config = load_bidul_config(numero)
 
+        # Essayer l'extraction par sections si activée
+        if self.use_sections and numero:
+            section_result = self._extract_with_sections(pdf_path, numero, mois, annee)
+            if section_result:
+                return section_result
+
+        # Fallback: extraction classique (page entière)
+        return self._extract_classic(pdf_path, config, numero, mois, annee)
+
+    def _extract_with_sections(
+        self,
+        pdf_path: str,
+        numero: int,
+        mois: Optional[int],
+        annee: Optional[int]
+    ) -> Optional[OCRResult]:
+        """
+        Extraction par sections A6 si configuré.
+
+        Returns:
+            OCRResult si l'extraction par sections est possible, None sinon
+        """
+        from .section_extractor import load_section_config
+
+        section_config = load_section_config(numero)
+        if not section_config:
+            logger.debug(f"Bidul {numero}: pas de config sections, utilise extraction classique")
+            return None
+
+        # Vérifier qu'il y a des sections configurées
+        if not section_config.page1 and not section_config.page2:
+            logger.debug(f"Bidul {numero}: config sans sections définies")
+            return None
+
+        try:
+            # Convertir PDF en images
+            images = convert_from_path(str(pdf_path), dpi=self.dpi)
+            num_pages = len(images)
+
+            # Déterminer les pages à traiter
+            pages_to_process = section_config.get_pages_to_process(num_pages)
+
+            logger.info(f"Bidul {numero}: extraction par sections, pages {pages_to_process}")
+
+            result = OCRResult(
+                pdf_path=pdf_path,
+                bidul_numero=numero,
+                mois=mois,
+                annee=annee,
+                num_pages=num_pages,
+                metadata={
+                    'dpi': self.dpi,
+                    'ocr_engine': self.ocr.engine_name,
+                    'extraction_mode': 'sections',
+                    'date_format': section_config.date_format,
+                    'pages_processed': pages_to_process,
+                }
+            )
+
+            all_texts = []
+
+            for page_num in pages_to_process:
+                pil_image = images[page_num - 1]  # images est 0-indexed
+                image = self.preprocessor.pil_to_cv2(pil_image)
+
+                # Prétraitement basique (deskew, denoise)
+                image = self._preprocess_basic(image)
+
+                # Obtenir la config de la page
+                page_config = section_config.get_page_config(page_num)
+
+                if page_config and page_config.sections_utiles:
+                    # Extraction par sections
+                    page_result = self.section_extractor.extract_page_by_sections(
+                        image, page_num, page_config
+                    )
+                    page_text = page_result.full_text
+                    sections_info = [s.section.value for s in page_result.sections]
+                    logger.info(f"Page {page_num}: sections {sections_info}, {len(page_text)} caractères")
+                else:
+                    # Pas de config pour cette page, extraction classique
+                    page_text = self.ocr.ocr_image(image, num_columns=1)
+                    logger.info(f"Page {page_num}: extraction complète, {len(page_text)} caractères")
+
+                all_texts.append(page_text)
+
+                page_ocr_result = OCRPageResult(
+                    page_num=page_num,
+                    text=page_text,
+                    char_count=len(page_text),
+                    config_applied={
+                        'sections': [s.value for s in page_config.sections_utiles] if page_config else [],
+                        'colonnes': page_config.colonnes_par_section if page_config else 1,
+                        'orientation_texte': page_config.orientation_texte.value if page_config else 'portrait',
+                    }
+                )
+                result.pages.append(page_ocr_result)
+
+            result.full_text = '\n\n'.join(t for t in all_texts if t)
+            return result
+
+        except Exception as e:
+            logger.error(f"Erreur extraction sections Bidul {numero}: {e}")
+            return None
+
+    def _extract_classic(
+        self,
+        pdf_path: str,
+        config: Optional[ScanConfig],
+        numero: Optional[int],
+        mois: Optional[int],
+        annee: Optional[int]
+    ) -> OCRResult:
+        """Extraction classique (page entière, sans découpage en sections)."""
         try:
             # Convertir PDF en images
             images = convert_from_path(str(pdf_path), dpi=self.dpi)
@@ -740,6 +865,7 @@ class ScanExtractor:
                 metadata={
                     'dpi': self.dpi,
                     'ocr_engine': self.ocr.engine_name,
+                    'extraction_mode': 'classic',
                     'config_numero': config.numero if config else None,
                     'date_format': config.date_format if config else 'inline',
                     'page1_sections': config.page1_sections if config else '',
@@ -790,6 +916,14 @@ class ScanExtractor:
                 num_pages=0,
                 error=str(e)
             )
+
+    def _preprocess_basic(self, image: np.ndarray) -> np.ndarray:
+        """Prétraitement basique sans rotation (utilisé pour l'extraction par sections)."""
+        # Correction d'inclinaison légère
+        image = self.preprocessor.deskew(image)
+        # Débruitage léger
+        image = self.preprocessor.denoise(image, strength=5)
+        return image
 
     def _get_page_config(self, config: Optional[ScanConfig], page_num: int) -> dict:
         """Extrait la config pour une page spécifique."""
