@@ -1436,9 +1436,20 @@ def cmd_ocr(args):
     from indexer.core.ocr_postprocess import OCRPostProcessor
 
     pdf_path = args.pdf_path
-
-    # Détecter le numéro du Bidul depuis le nom de fichier ou argument
     numero = args.numero
+
+    # Si --numero fourni sans pdf_path, chercher le PDF automatiquement
+    if pdf_path is None:
+        if numero is None:
+            print("Erreur: spécifiez un chemin PDF ou --numero")
+            return 1
+        pdf_file = find_pdf(numero)
+        if not pdf_file:
+            print(f"Erreur: PDF non trouvé pour Bidul {numero}")
+            return 1
+        pdf_path = str(pdf_file)
+
+    # Détecter le numéro du Bidul depuis le nom de fichier si non fourni
     if numero is None:
         match = re.search(r'Bidul[_\s-]*(\d+)', pdf_path, re.IGNORECASE)
         numero = int(match.group(1)) if match else None
@@ -2250,8 +2261,8 @@ Maintenance (normalisation v2):
 
     # ocr - Extrait le texte d'un PDF scanné
     p_ocr = subparsers.add_parser('ocr', help='Extrait le texte d\'un PDF scanné par OCR')
-    p_ocr.add_argument('pdf_path', help='Chemin vers le PDF à traiter')
-    p_ocr.add_argument('--numero', '-n', type=int, help='Numéro du Bidul (auto-détecté si non fourni)')
+    p_ocr.add_argument('pdf_path', nargs='?', help='Chemin vers le PDF à traiter (ou utiliser --numero)')
+    p_ocr.add_argument('--numero', '-n', type=int, help='Numéro du Bidul (cherche le PDF automatiquement)')
     p_ocr.add_argument('--engine', '-e', default='paddleocr', choices=['paddleocr', 'easyocr', 'google'],
                        help='Moteur OCR (défaut: paddleocr)')
     p_ocr.add_argument('--dpi', '-d', type=int, default=200, help='Résolution pour conversion PDF (défaut: 200)')
