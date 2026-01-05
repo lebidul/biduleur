@@ -124,6 +124,9 @@ python benchmark/compare_bidul.py 184
 # Voir le texte OCR extrait
 python cli.py ocr "archives/bidul_XXX.pdf" --engine google -o temp_ocr.txt
 
+# OCR avec numéro (lookup automatique du PDF)
+python cli.py ocr --numero 132 --engine google
+
 # Extraction seule sans filtrage (debug uniquement)
 python cli.py extract --numero XXX
 ```
@@ -152,3 +155,49 @@ if row and row[0]:
     print(row[0])  # Texte OCR complet du bidul
 conn.close()
 ```
+
+## Extraction OCR par sections
+
+### Architecture des sections A6
+Chaque page A4 est divisée en 4 sections A6 :
+- **S1** : Haut-gauche (0-50% X, 0-50% Y)
+- **S2** : Haut-droite (50-100% X, 0-50% Y)
+- **S3** : Bas-gauche (0-50% X, 50-100% Y)
+- **S4** : Bas-droite (50-100% X, 50-100% Y)
+
+### Configuration des sections
+Le mapping est défini dans `corpus/biduls.description.csv` :
+- `page#.sections utiles` : Sections à extraire (ex: "S1,S2,S3,S4")
+- `page#.orientation texte` : "portrait" ou "paysage" (rotation 90°)
+- `page#.colonne par section` : Nombre de colonnes par section
+
+### Modules OCR
+
+| Module | Fichier | Usage |
+|--------|---------|-------|
+| `section_extractor` | `core/section_extractor.py` | Extraction par sections A6 configurées |
+| `layout_analyzer` | `core/layout_analyzer.py` | Détection automatique colonnes/orientation |
+
+### Options CLI OCR
+
+```bash
+# Mode standard (extraction par sections activée par défaut)
+python cli.py populate --numero 132 --replace
+
+# Désactiver l'extraction par sections (page entière)
+python cli.py populate --numero 132 --no-sections
+
+# Détection automatique du layout (colonnes)
+python cli.py populate --numero 132 --auto-layout
+
+# Combiner les options
+python cli.py ocr --numero 132 --engine google --no-sections --auto-layout
+```
+
+### Héritage de configuration
+Les biduls sans mapping dans `biduls.description.csv` héritent automatiquement de la configuration du bidul le plus proche (par numéro).
+
+### Logique de pages
+- **PDF 3 pages** : Extrait uniquement page 3 (résumé agenda)
+- **PDF 2 pages** : Utilise la config page1 + page2
+- **pages_override** : Priorité sur la logique automatique
