@@ -1,3 +1,52 @@
+# Release Notes - Indexer v1.10
+
+## Vue d'ensemble
+
+Version avec amélioration majeure de la gestion des événements régionaux : flag `is_regional` correctement assigné, dashboard HTML avec distinction local/régional, et récupération des événements locaux mixés dans la section régionale (problème OCR colonnes mélangées).
+
+## Nouveautés v1.10
+
+### Flag `is_regional` correctement assigné
+
+Le flag `is_regional` est maintenant automatiquement assigné à chaque événement en utilisant `detect_regional()` :
+
+| Source | Détection |
+|--------|-----------|
+| Lieu sarthois (Le PCV, Bar Le Palais...) | `is_regional = False` |
+| Ville sarthoise (Le Mans, Allonnes...) | `is_regional = False` |
+| Code département (72) | `is_regional = False` |
+| Code département hors 72 (49, 53, 61...) | `is_regional = True` |
+| Lieu/ville hors Sarthe (Chabada, Tours...) | `is_regional = True` |
+
+**Impact** : Les événements locaux incorrectement placés dans la section régionale (à cause d'un OCR mélangé) sont maintenant récupérés.
+
+### Dashboard HTML avec distinction local/régional
+
+Le dashboard HTML (`python cli.py stats --html`) affiche maintenant :
+
+- **KPIs séparés** : événements totaux, locaux (97.4%), régionaux (2.6%)
+- **Graphique avec barres empilées** : cyan pour local, violet pour régional
+- **Boutons de filtre** : Tous, Événements, Locaux, Régionaux, Contenus
+- **Tooltip enrichi** : affiche le détail local + régional au survol
+- **Scores qualité par type** : score_local, score_regional
+
+### Refactorisation du parser pour la section régionale
+
+Les fonctions `parse_with_referentiel()` ont été refactorisées pour :
+
+1. Séparer le texte en sections locale et régionale via `split_regional_section()`
+2. Parser chaque section indépendamment
+3. Appliquer `detect_regional()` sur chaque événement
+4. Log des corrections (événements locaux récupérés de la section régionale)
+
+### Tests
+
+Tous les 112 tests passent. Benchmarks stables :
+- Bidul 184 : 95.4%
+- Bidul 190 : 91.2%
+
+---
+
 # Release Notes - Indexer v1.9
 
 ## Vue d'ensemble

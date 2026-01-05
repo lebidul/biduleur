@@ -882,6 +882,29 @@ class TestEventParserInlineWithMonthDates:
         assert events[0].date_evenement == date(2013, 2, 1)
 
 
+class TestEventParserInlineWithDateRange:
+    """Tests pour le parsing inline avec plages de dates DD-DD."""
+
+    @pytest.fixture
+    def parser(self):
+        return EventParser(bidul_mois=3, bidul_annee=2009, date_format='inline')
+
+    def test_lu_ma_me_range_creates_6_events(self, parser):
+        """Lu 30/Ma 31/Me 01-04: doit créer 6 événements (30, 31 mars + 1-4 avril)."""
+        text = 'Lu 30/Ma 31/Me 01-04: Apéro concert avec YURI HU, Bar Le Palais, 19h'
+        events = parser.parse_with_referentiel(text, [], [])
+        assert len(events) == 6
+        dates = sorted([e.date_evenement for e in events])
+        # Mars
+        assert dates[0] == date(2009, 3, 30)
+        assert dates[1] == date(2009, 3, 31)
+        # Avril (mois suivant)
+        assert dates[2] == date(2009, 4, 1)
+        assert dates[3] == date(2009, 4, 2)
+        assert dates[4] == date(2009, 4, 3)
+        assert dates[5] == date(2009, 4, 4)
+
+
 class TestSplitOnDatesV2WithParasiticChars:
     """Tests pour le split avec caractères parasites OCR (+, t, †)."""
 
@@ -1033,7 +1056,9 @@ class TestSplitRegionalSection:
     def test_split_regional_section_found(self):
         """Détecte et sépare la section régionale."""
         from core.parser import split_regional_section
-        text = """Concert local, Le Mans, 21h
+        # Le marqueur doit être APRÈS des événements avec dates pour être détecté
+        text = """Ve 04: Concert local, Le Mans, 21h
+Sa 05: Autre concert, Allonnes, 20h
 Et un peu plus loin...
 Dans l'Orne (61):
 CALI (chanson), 21h, 25 à 30€
@@ -1058,13 +1083,29 @@ Concert 2, Allonnes, 20h"""
     def test_split_regional_section_ocr_variation(self):
         """Supporte les variations OCR (sans 'Et')."""
         from core.parser import split_regional_section
-        text = """Concert local
+        # Le marqueur doit être APRÈS des événements avec dates pour être détecté
+        text = """Ve 04: Concert local, Le Mans, 21h
 un peu plus loin...
 Concert régional"""
 
         local, regional = split_regional_section(text)
         assert 'Concert local' in local
         assert 'un peu plus loin' in regional
+
+    def test_split_regional_section_marker_before_events(self):
+        """Le marqueur avant les événements est ignoré (ancien format)."""
+        from core.parser import split_regional_section
+        # Dans certains anciens Biduls, "et même un peu plus loin" est un sous-titre
+        # qui apparaît AVANT les événements
+        text = """En Sarthe
+et même un peu plus loin...
+Ve 04: Concert, Le Mans, 21h
+Sa 05: Autre concert, Allonnes, 20h"""
+
+        local, regional = split_regional_section(text)
+        # Pas de split car le marqueur est AVANT les événements
+        assert local == text
+        assert regional == ""
 
 
 if __name__ == "__main__":

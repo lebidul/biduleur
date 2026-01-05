@@ -22,6 +22,7 @@ from core.month_detector import (
     is_summer_bidul,
     MonthSection
 )
+from core.regional_filter import detect_regional
 
 logger = logging.getLogger(__name__)
 
@@ -922,7 +923,10 @@ def extract_event_name(text: str) -> Optional[str]:
         r'^(Soirée\s+\w+)[»""]',
         # Soirée X avec DJ → extraire seulement "Soirée X"
         r'^(Soirée\s+[\w\s]+?)\s+avec\s+',
-        # Soirée X (sans "avec")
+        # Soirée X: DJ Y → extraire seulement "Soirée X" (deux-points comme séparateur)
+        # Ex: "Soirée Mix Music Festiv': DJ SUPER LUCIEN" → "Soirée Mix Music Festiv'"
+        r"^(Soirée\s+[\w\s']+?):\s+",
+        # Soirée X (sans "avec" ni ":")
         r'^(Soirée\s+[\w\s]+?)(?:\s*,|$)',
         r'^(Labo\s+d.Impro\s*:\s*"[^"]+")' ,
         # Festival avec numéro d'édition: "8° festival Soirs au Village"
@@ -1196,6 +1200,11 @@ def split_regional_section(text: str) -> tuple[str, str]:
     La section régionale commence par "Et un peu plus loin..." et contient
     les événements hors département (Orne, Maine-et-Loire, etc.).
 
+    IMPORTANT: Le marqueur doit apparaître APRÈS des événements avec des dates
+    pour être considéré comme un séparateur régional. Si le marqueur apparaît
+    AVANT les événements (comme dans certains anciens Biduls où c'est un sous-titre
+    de la section locale), il est ignoré.
+
     Le texte peut avoir un header de département juste avant le marqueur:
     - "Dans l'Orne (61):"
     - "Et un peu plus loin..."
@@ -1217,6 +1226,19 @@ def split_regional_section(text: str) -> tuple[str, str]:
     if match:
         # Trouver le début de la ligne contenant le marqueur
         start_pos = match.start()
+
+        # VÉRIFICATION: Le marqueur doit être APRÈS des événements avec des dates
+        # Si le marqueur est AVANT les dates, c'est un sous-titre (ex: "En Sarthe et même un peu plus loin...")
+        # Pattern pour détecter une ligne d'événement avec date: "Lu 02:", "Ve 04:", etc.
+        date_pattern = re.compile(r'^[LMJVSD][aeiou]\s+\d{1,2}\s*:', re.MULTILINE | re.IGNORECASE)
+        text_before_marker = text[:start_pos]
+        has_events_before = bool(date_pattern.search(text_before_marker))
+
+        if not has_events_before:
+            # Le marqueur est AVANT les événements, ne pas splitter
+            logger.debug("Marqueur régional ignoré: apparaît avant les événements (sous-titre)")
+            return text, ""
+
         # Remonter au début de la ligne
         line_start = text.rfind('\n', 0, start_pos)
         if line_start == -1:
@@ -2128,6 +2150,67 @@ def parse_date_prefix_v2(text: str, base_month: int, base_year: int) -> tuple[li
             dates.append(date(base_year, base_month, day2))
         except ValueError:
             pass
+        return dates, event_text
+
+    # Pattern 1c: Dates multiples avec plage à la fin (ex: "Lu 30/Ma 31/Me 01-04:")
+    # Le dernier jour peut avoir une plage DD-DD indiquant continuation dans le mois suivant
+    # Lu 30/Ma 31/Me 01-04: → Lu 30 (mars), Ma 31 (mars), puis Me 01 à 04 (avril)
+    range_at_end_pattern = (
+        rf'^({JOURS_PATTERN})\s*(\d{{1,2}})'  # Premier jour
+        rf'(?:\s*[&,/]\s*(?:{JOURS_PATTERN})\s*(\d{{1,2}}))*'  # Jours intermédiaires optionnels
+        rf'\s*[&,/]\s*({JOURS_PATTERN})\s*(\d{{1,2}})-(\d{{1,2}})'  # Dernier jour avec plage DD-DD
+        r'\s*:\s*(.+)$'  # Séparateur : et contenu
+    )
+    range_end_match = re.match(range_at_end_pattern, text_stripped, re.IGNORECASE | re.DOTALL)
+
+    if range_end_match:
+        # Extraire tous les jours individuels du texte
+        all_days_pattern = rf'({JOURS_PATTERN})\s*(\d{{1,2}})(?!-)'
+        individual_days = re.findall(all_days_pattern, text_stripped, re.IGNORECASE)
+
+        # Extraire la plage finale
+        range_pattern = rf'({JOURS_PATTERN})\s*(\d{{1,2}})-(\d{{1,2}})\s*:'
+        range_match_inner = re.search(range_pattern, text_stripped, re.IGNORECASE)
+
+        dates = []
+        prev_day = 0
+
+        # Ajouter les jours individuels
+        for day_abbr, day_num in individual_days:
+            day_int = int(day_num)
+            # Détecter transition de mois: si le jour est plus petit que le précédent
+            # et dans une séquence valide (ex: 30, 31, 1 → mois suivant pour 1)
+            if day_int < prev_day and prev_day >= 28:
+                # Transition au mois suivant
+                next_month = base_month + 1 if base_month < 12 else 1
+                next_year = base_year if base_month < 12 else base_year + 1
+                try:
+                    dates.append(date(next_year, next_month, day_int))
+                except ValueError:
+                    pass
+            else:
+                try:
+                    dates.append(date(base_year, base_month, day_int))
+                except ValueError:
+                    pass
+            prev_day = day_int
+
+        # Ajouter la plage finale (toujours dans le mois suivant)
+        if range_match_inner:
+            range_start = int(range_match_inner.group(2))
+            range_end = int(range_match_inner.group(3))
+            next_month = base_month + 1 if base_month < 12 else 1
+            next_year = base_year if base_month < 12 else base_year + 1
+
+            for day in range(range_start, range_end + 1):
+                try:
+                    dates.append(date(next_year, next_month, day))
+                except ValueError:
+                    pass
+
+        # Extraire le texte de l'événement (après le :)
+        event_text = text_stripped.split(':', 1)[1].strip() if ':' in text_stripped else ''
+
         return dates, event_text
 
     # Pattern 2: Dates complexes avec horaires (ex: "Je 01/Ve 02 à 20h30 et Di 04 à 17h :")
@@ -4068,18 +4151,20 @@ class EventParser:
         r'(?:'
         # Jours additionnels avec / ou &, chaque jour pouvant avoir une heure (avec ou sans "à")
         # Ex: "Ve 1/Sa 02 à 21h/Di 03 15h30" ou "Ve 06/Sa 07 20h30/Di 08 15h"
-        rf'(?:\s*[/&]\s*(?:{_JOURS_INLINE})?\s*\d{{1,2}}(?:er|ère|ème|eme)?(?:\s+(?:(?:à|a)\s+)?\d{{1,2}}h\d{{0,2}})?)*'
+        # Le dernier jour peut avoir une plage DD-DD (ex: "Me 01-04") pour les événements récurrents
+        rf'(?:\s*[/&]\s*(?:{_JOURS_INLINE})?\s*\d{{1,2}}(?:-\d{{1,2}})?(?:er|ère|ème|eme)?(?:\s+(?:(?:à|a)\s+)?\d{{1,2}}h\d{{0,2}})?)*'
         # Plage "au Ve 09" ou "au 03/02" (avec mois explicite)
         rf'(?:\s+(?:au|à)\s+(?:{_JOURS_INLINE}\s*)?\d{{1,2}}(?:/\d{{2}})?(?:er|ère|ème|eme)?)?'
         r'(?:\s+(?:(?:à|a)\s+)?\d{1,2}h\d{0,2})?'  # Horaire optionnel (avec ou sans "à")
         rf'(?:\s+et\s+(?:{_JOURS_INLINE})?\s*\d{{1,2}}(?:er|ère|ème|eme)?(?:\s+(?:(?:à|a)\s+)?\d{{1,2}}h\d{{0,2}})?)*'  # "et Di 04 à 17h"
         r')?'
         r')'  # Fin groupe 1
-        # Séparateur: soit : - – soit espace suivi de:
+        # Séparateur: soit : ou – soit espace suivi de:
         # - mot Title Case (Afro-latino)
         # - guillemet ouvrant + mot majuscule (<<LE, <LE, "LE, «LE)
         # - mot tout en MAJUSCULES d'au moins 2 lettres
-        r'(?:\s*[:–-]\s*|\s+(?=[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ"][a-zàâäéèêëïîôùûüç]|<{1,2}[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ]|[«"][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ]|[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ]{2}))'
+        # Note: le - seul n'est PAS un séparateur valide (utilisé pour plages DD-DD)
+        r'(?:\s*[:–]\s*|\s+(?=[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ"][a-zàâäéèêëïîôùûüç]|<{1,2}[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ]|[«"][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ]|[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ]{2}))'
         r'(.+)$',  # Contenu (groupe 2)
         re.MULTILINE | re.IGNORECASE
     )
@@ -4100,12 +4185,15 @@ class EventParser:
         Returns:
             Liste d'événements parsés (dédoublonnés)
         """
-        # Exclure la section régionale "Et un peu plus loin..." si demandé
+        # Séparer le texte local et régional
+        local_text, regional_text = split_regional_section(text)
+
         if not self.include_regional:
-            local_text, regional_text = split_regional_section(text)
+            # Mode exclusion: ignorer la section régionale
             if regional_text:
                 logger.info(f"Section régionale exclue ({len(regional_text)} caractères)")
             text = local_text
+            regional_text = ""
 
         # Détecter les sections de mois pour les Biduls d'été (juillet couvrant juillet+août)
         if is_summer_bidul(self.bidul_mois):
@@ -4115,6 +4203,58 @@ class EventParser:
                 logger.info(f"Bidul juillet: {len(self._month_sections)} section(s) de mois détectée(s)")
                 for section in self._month_sections:
                     logger.debug(f"  - Ligne {section.line_number}: mois={section.month} ({section.header_text})")
+
+        # Parser les événements locaux
+        local_events = self._parse_text_section(local_text)
+
+        # Parser les événements régionaux si inclus
+        regional_events = []
+        if regional_text and self.include_regional:
+            regional_events = self._parse_text_section(regional_text)
+            logger.info(f"Section régionale: {len(regional_events)} événements parsés")
+
+        # Appliquer le flag is_regional en utilisant detect_regional() pour vérification
+        all_events = []
+
+        for event in local_events:
+            # Vérifier si l'événement est vraiment local avec detect_regional()
+            detection = detect_regional(event.raw_text, event.lieu_raw, event.ville_raw)
+            event.is_regional = detection.is_regional
+            all_events.append(event)
+
+        for event in regional_events:
+            # Vérifier si l'événement est vraiment régional avec detect_regional()
+            detection = detect_regional(event.raw_text, event.lieu_raw, event.ville_raw)
+            # Si dans la section régionale mais detect_regional dit local, on garde local
+            # Si detect_regional dit régional, on le marque régional
+            event.is_regional = detection.is_regional
+            all_events.append(event)
+
+        # Log des corrections
+        local_in_local = sum(1 for e in local_events if not e.is_regional)
+        regional_in_local = sum(1 for e in local_events if e.is_regional)
+        local_in_regional = sum(1 for e in regional_events if not e.is_regional)
+        regional_in_regional = sum(1 for e in regional_events if e.is_regional)
+
+        if regional_in_local > 0:
+            logger.debug(f"Événements régionaux trouvés dans section locale: {regional_in_local}")
+        if local_in_regional > 0:
+            logger.info(f"Événements locaux récupérés de section régionale: {local_in_regional}")
+
+        return all_events
+
+    def _parse_text_section(self, text: str) -> list['ParsedEvent']:
+        """
+        Parse une section de texte (locale ou régionale).
+
+        Args:
+            text: Texte de la section
+
+        Returns:
+            Liste d'événements parsés (sans le flag is_regional assigné)
+        """
+        if not text.strip():
+            return []
 
         # Si le format est spécifié, l'utiliser directement
         if self.date_format == 'inline':
@@ -5426,21 +5566,83 @@ class EventParser:
         Returns:
             Liste d'événements parsés (dédoublonnés)
         """
-        # Exclure la section régionale "Et un peu plus loin..." si demandé
+        # Séparer le texte local et régional
+        local_text, regional_text = split_regional_section(text)
+
         if not self.include_regional:
-            local_text, regional_text = split_regional_section(text)
+            # Mode exclusion: ignorer la section régionale
             if regional_text:
                 logger.info(f"Section régionale exclue ({len(regional_text)} caractères)")
-            text = local_text
+            regional_text = ""
 
         # Détecter les sections de mois pour les Biduls d'été (juillet couvrant juillet+août)
         if is_summer_bidul(self.bidul_mois):
-            self._month_sections = detect_month_sections(text)
-            self._lines = text.split('\n')
+            self._month_sections = detect_month_sections(local_text)
+            self._lines = local_text.split('\n')
             if self._month_sections:
                 logger.info(f"Bidul juillet: {len(self._month_sections)} section(s) de mois détectée(s)")
                 for section in self._month_sections:
                     logger.debug(f"  - Ligne {section.line_number}: mois={section.month} ({section.header_text})")
+
+        # Parser les événements locaux
+        local_events = self._parse_text_section_with_referentiel(local_text, lieu_ref_list, ville_ref_list)
+
+        # Parser les événements régionaux si inclus
+        regional_events = []
+        if regional_text and self.include_regional:
+            regional_events = self._parse_text_section_with_referentiel(regional_text, lieu_ref_list, ville_ref_list)
+            logger.info(f"Section régionale: {len(regional_events)} événements parsés")
+
+        # Appliquer le flag is_regional en utilisant detect_regional() pour vérification
+        all_events = []
+
+        for event in local_events:
+            # Vérifier si l'événement est vraiment local avec detect_regional()
+            detection = detect_regional(event.raw_text, event.lieu_raw, event.ville_raw)
+            event.is_regional = detection.is_regional
+            if event.is_valid():
+                all_events.append(event)
+
+        for event in regional_events:
+            # Vérifier si l'événement est vraiment régional avec detect_regional()
+            detection = detect_regional(event.raw_text, event.lieu_raw, event.ville_raw)
+            # Si detect_regional dit local, on le marque local (récupération)
+            event.is_regional = detection.is_regional
+            if event.is_valid():
+                all_events.append(event)
+
+        # Log des corrections
+        local_in_local = sum(1 for e in local_events if not e.is_regional)
+        regional_in_local = sum(1 for e in local_events if e.is_regional)
+        local_in_regional = sum(1 for e in regional_events if not e.is_regional)
+        regional_in_regional = sum(1 for e in regional_events if e.is_regional)
+
+        if regional_in_local > 0:
+            logger.debug(f"Événements régionaux trouvés dans section locale: {regional_in_local}")
+        if local_in_regional > 0:
+            logger.info(f"Événements locaux récupérés de section régionale: {local_in_regional}")
+
+        return all_events
+
+    def _parse_text_section_with_referentiel(
+        self,
+        text: str,
+        lieu_ref_list: list,
+        ville_ref_list: list
+    ) -> list['ParsedEvent']:
+        """
+        Parse une section de texte (locale ou régionale) avec les référentiels.
+
+        Args:
+            text: Texte de la section
+            lieu_ref_list: Liste de tuples (id, nom, ville) pour les lieux
+            ville_ref_list: Liste de tuples (id, nom) pour les villes
+
+        Returns:
+            Liste d'événements parsés (sans le flag is_regional assigné)
+        """
+        if not text.strip():
+            return []
 
         # Si le format est spécifié, l'utiliser directement
         if self.date_format == 'inline':
@@ -5448,8 +5650,7 @@ class EventParser:
             # Fallback sur l'autre format si rien trouvé
             if not events:
                 events = self._parse_bloc_with_referentiel(text, lieu_ref_list, ville_ref_list)
-            # Filtrer les événements invalides
-            return [e for e in events if e.is_valid()]
+            return events
         elif self.date_format == 'inline_inherited':
             # Format hybride des anciens Biduls (1-16)
             # Date sur la première ligne du jour, événements suivants héritent
@@ -5457,15 +5658,13 @@ class EventParser:
             # Fallback sur inline si rien trouvé
             if not events:
                 events = self._parse_inline_with_referentiel(text, lieu_ref_list, ville_ref_list)
-            # Filtrer les événements invalides
-            return [e for e in events if e.is_valid()]
+            return events
         elif self.date_format == 'par bloc':
             events = self._parse_bloc_with_referentiel(text, lieu_ref_list, ville_ref_list)
             # Fallback sur l'autre format si rien trouvé
             if not events:
                 events = self._parse_inline_with_referentiel(text, lieu_ref_list, ville_ref_list)
-            # Filtrer les événements invalides
-            return [e for e in events if e.is_valid()]
+            return events
         elif self.date_format == 'mixte':
             # Format mixte: combine inline ET bloc
             # Utilisé quand un bidul a plusieurs sections avec des formats différents
@@ -5504,8 +5703,7 @@ class EventParser:
                         seen_raw_texts.add(raw_norm)
                         events.append(event)
 
-            # Filtrer les événements invalides
-            return [e for e in events if e.is_valid()]
+            return events
 
         # Auto-détection: essayer d'abord le format par bloc
         events = self._parse_bloc_with_referentiel(text, lieu_ref_list, ville_ref_list)
@@ -5514,8 +5712,7 @@ class EventParser:
         if not events:
             events = self._parse_inline_with_referentiel(text, lieu_ref_list, ville_ref_list)
 
-        # Filtrer les événements invalides
-        return [e for e in events if e.is_valid()]
+        return events
 
     def _parse_bloc_with_referentiel(
         self,

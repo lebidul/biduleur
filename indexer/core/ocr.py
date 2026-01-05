@@ -307,18 +307,28 @@ class OCREngine:
 
         self._engine = vision.ImageAnnotatorClient()
 
-    def ocr_image(self, image: np.ndarray) -> str:
-        """Effectue l'OCR sur une image numpy."""
+    def ocr_image(self, image: np.ndarray, num_columns: int = 1) -> str:
+        """Effectue l'OCR sur une image numpy.
+
+        Args:
+            image: Image numpy array
+            num_columns: Nombre de colonnes pour la lecture (1 = normal, 2+ = par colonnes)
+        """
         if self.engine_name == 'paddleocr':
-            return self._ocr_paddle(image)
+            return self._ocr_paddle(image, num_columns)
         elif self.engine_name == 'easyocr':
             return self._ocr_easyocr(image)
         elif self.engine_name == 'google':
-            return self._ocr_google(image)
+            return self._ocr_google(image, num_columns)
         return ""
 
-    def _ocr_paddle(self, image: np.ndarray) -> str:
-        """OCR avec PaddleOCR."""
+    def _ocr_paddle(self, image: np.ndarray, num_columns: int = 1) -> str:
+        """OCR avec PaddleOCR.
+
+        Args:
+            image: Image numpy array
+            num_columns: Nombre de colonnes (utilisé pour le tri des résultats)
+        """
         try:
             # PaddleOCR 3.x utilise predict() au lieu de ocr()
             if hasattr(self._engine, 'predict'):
@@ -405,8 +415,13 @@ class OCREngine:
 
         return '\n'.join(lines)
 
-    def _ocr_google(self, image: np.ndarray) -> str:
-        """OCR avec Google Cloud Vision API."""
+    def _ocr_google(self, image: np.ndarray, num_columns: int = 1) -> str:
+        """OCR avec Google Cloud Vision API.
+
+        Args:
+            image: Image numpy array
+            num_columns: Nombre de colonnes à détecter (1 = lecture normale, 2+ = lecture par colonnes)
+        """
         import io
         from PIL import Image
         from google.cloud import vision
@@ -431,10 +446,87 @@ class OCREngine:
             logger.error(f"Google Vision error: {response.error.message}")
             return ""
 
-        # Extraire le texte
-        if response.full_text_annotation:
+        if not response.full_text_annotation:
+            return ""
+
+        # Si une seule colonne ou pas de pages, retourner le texte brut
+        if num_columns <= 1 or not response.full_text_annotation.pages:
             return response.full_text_annotation.text
-        return ""
+
+        # Extraction avec respect des colonnes
+        return self._extract_text_by_columns(response.full_text_annotation, num_columns, image.shape[1])
+
+    def _extract_text_by_columns(self, annotation, num_columns: int, image_width: int) -> str:
+        """
+        Extrait le texte en respectant l'ordre des colonnes.
+
+        Les colonnes sont détectées en divisant l'image en num_columns zones verticales.
+        Les blocs sont ensuite triés par colonne (X) puis par position verticale (Y).
+        """
+        if not annotation.pages:
+            return annotation.text
+
+        # Collecter tous les paragraphes avec leurs coordonnées
+        paragraphs = []
+
+        for page in annotation.pages:
+            for block in page.blocks:
+                # Calculer la bounding box du bloc
+                vertices = block.bounding_box.vertices
+                if not vertices:
+                    continue
+
+                x_min = min(v.x for v in vertices)
+                y_min = min(v.y for v in vertices)
+                x_center = (min(v.x for v in vertices) + max(v.x for v in vertices)) / 2
+
+                # Extraire le texte du bloc
+                block_text = []
+                for paragraph in block.paragraphs:
+                    para_text = []
+                    for word in paragraph.words:
+                        word_text = ''.join(
+                            symbol.text for symbol in word.symbols
+                        )
+                        para_text.append(word_text)
+                    block_text.append(' '.join(para_text))
+
+                if block_text:
+                    paragraphs.append({
+                        'x_center': x_center,
+                        'x_min': x_min,
+                        'y_min': y_min,
+                        'text': '\n'.join(block_text)
+                    })
+
+        if not paragraphs:
+            return annotation.text
+
+        # Déterminer la colonne de chaque paragraphe
+        column_width = image_width / num_columns
+
+        for para in paragraphs:
+            # Assigner à une colonne basé sur la position X centrale
+            para['column'] = int(para['x_center'] / column_width)
+            # Limiter au nombre de colonnes
+            para['column'] = min(para['column'], num_columns - 1)
+
+        # Trier par colonne puis par position Y
+        paragraphs.sort(key=lambda p: (p['column'], p['y_min']))
+
+        # Assembler le texte
+        result_lines = []
+        current_column = -1
+
+        for para in paragraphs:
+            if para['column'] != current_column:
+                if current_column >= 0:
+                    # Ajouter une séparation visuelle entre colonnes (optionnel)
+                    result_lines.append('')
+                current_column = para['column']
+            result_lines.append(para['text'])
+
+        return '\n'.join(result_lines)
 
 
 class ImagePreprocessor:
@@ -666,8 +758,12 @@ class ScanExtractor:
                 # Prétraitement selon config
                 image = self._preprocess(image, page_config)
 
-                # OCR
-                page_text = self.ocr.ocr_image(image)
+                # OCR avec nombre de colonnes
+                num_columns = page_config.get('colonnes', 1)
+                page_text = self.ocr.ocr_image(image, num_columns=num_columns)
+
+                if num_columns > 1:
+                    logger.debug(f"Page {page_num}: OCR avec {num_columns} colonnes")
 
                 page_result = OCRPageResult(
                     page_num=page_num,
@@ -760,8 +856,12 @@ class ScanExtractor:
             image = self.preprocessor.pil_to_cv2(pil_image)
             image = self._preprocess(image, page_config)
 
-            # OCR
-            text = self.ocr.ocr_image(image)
+            # OCR avec nombre de colonnes
+            num_columns = page_config.get('colonnes', 1)
+            text = self.ocr.ocr_image(image, num_columns=num_columns)
+
+            if num_columns > 1:
+                logger.debug(f"Page {page_num}: OCR avec {num_columns} colonnes")
 
             return OCRPageResult(
                 page_num=page_num,

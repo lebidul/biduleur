@@ -76,6 +76,12 @@ Lors d'une nouvelle version:
 - `split_regional_section(text)` → tuple (texte_local, texte_regional)
 - Activé via `EventParser(include_regional=False)` ou CLI `--include-regional`
 - Détecte aussi les headers "Dans l'Orne (61):" avant le marqueur
+- Le marqueur est ignoré s'il apparaît AVANT les événements (sous-titre vs séparateur)
+
+### Distinction local/régional en base
+- Colonne `evenement.is_regional` (BOOLEAN) : 0=local, 1=régional
+- Pour parser avec les événements régionaux : `python cli.py populate --include-regional`
+- Stats actuelles : ~97% locaux, ~3% régionaux
 
 ### Patterns de `split_bloc_fused_events()`
 La fonction sépare les événements fusionnés sur ces patterns :
@@ -121,6 +127,18 @@ python cli.py ocr "archives/bidul_XXX.pdf" --engine google -o temp_ocr.txt
 # Extraction seule sans filtrage (debug uniquement)
 python cli.py extract --numero XXX
 ```
+
+### Statistiques HTML
+```bash
+# Générer le dashboard HTML avec KPIs local/régional
+python cli.py stats --html
+# Fichier généré : stats/bidul_stats.html
+```
+Le dashboard inclut :
+- KPIs séparés : événements totaux, locaux, régionaux, contenus
+- Graphique avec barres empilées (cyan=local, violet=régional)
+- Boutons de filtre : Tous, Événements, Locaux, Régionaux, Contenus
+- Score qualité par type (local/régional)
 
 ### Accès au texte OCR stocké
 Le texte OCR brut est stocké dans la table `bidul`, attribut `raw_text`:

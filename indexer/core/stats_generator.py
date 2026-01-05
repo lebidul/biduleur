@@ -66,6 +66,44 @@ def get_quality_data(db_path: str) -> Dict[str, Any]:
     result['total'] = total
     result['score_global'] = round(result['complets'] / total * 100, 1) if total > 0 else 0
 
+    # Distinction local/régional
+    cur.execute("SELECT COUNT(*) FROM evenement WHERE is_regional = 1")
+    result['total_regional'] = cur.fetchone()[0]
+    result['total_local'] = total - result['total_regional']
+
+    # Score global par type
+    cur.execute("""
+        SELECT COUNT(DISTINCT e.id)
+        FROM evenement e
+        JOIN contenu_evenement ce ON ce.evenement_id = e.id
+        WHERE e.is_regional = 1
+          AND e.lieu_ref_id IS NOT NULL
+          AND e.ville_ref_id IS NOT NULL
+          AND e.heure IS NOT NULL AND e.heure != ''
+          AND e.tarif_raw IS NOT NULL AND e.tarif_raw != ''
+          AND (ce.artiste_ref_id IS NOT NULL OR (ce.style IS NOT NULL AND ce.style != ''))
+    """)
+    complets_regional = cur.fetchone()[0]
+
+    cur.execute("""
+        SELECT COUNT(*)
+        FROM evenement e
+        LEFT JOIN contenu_evenement ce ON ce.evenement_id = e.id
+        WHERE e.is_regional = 1
+          AND ce.id IS NULL
+          AND e.nom IS NOT NULL AND e.nom != ''
+          AND e.lieu_ref_id IS NOT NULL
+          AND e.ville_ref_id IS NOT NULL
+          AND e.heure IS NOT NULL AND e.heure != ''
+          AND e.tarif_raw IS NOT NULL AND e.tarif_raw != ''
+    """)
+    complets_regional += cur.fetchone()[0]
+
+    result['complets_regional'] = complets_regional
+    result['complets_local'] = result['complets'] - complets_regional
+    result['score_regional'] = round(complets_regional / result['total_regional'] * 100, 1) if result['total_regional'] > 0 else 0
+    result['score_local'] = round(result['complets_local'] / result['total_local'] * 100, 1) if result['total_local'] > 0 else 0
+
     # Complétude par champ
     cur.execute("""
         SELECT
@@ -182,7 +220,7 @@ def get_stats_data(db_path: str) -> List[Dict[str, Any]]:
     Récupère les statistiques d'événements et contenus par Bidul.
 
     Returns:
-        Liste de dicts avec: bidul, events, content, missing
+        Liste de dicts avec: bidul, events, events_local, events_regional, content, missing
     """
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
@@ -191,7 +229,7 @@ def get_stats_data(db_path: str) -> List[Dict[str, Any]]:
     cur.execute("SELECT numero FROM bidul ORDER BY numero")
     existing_biduls = set(row[0] for row in cur.fetchall())
 
-    # Récupérer les stats avec CTE récursive
+    # Récupérer les stats avec CTE récursive - incluant local/regional
     cur.execute("""
         WITH RECURSIVE all_numeros(numero) AS (
             SELECT 1
@@ -201,6 +239,8 @@ def get_stats_data(db_path: str) -> List[Dict[str, Any]]:
         SELECT
             a.numero as bidul_numero,
             COUNT(DISTINCT e.id) as nb_evenements,
+            COUNT(DISTINCT CASE WHEN e.is_regional = 0 OR e.is_regional IS NULL THEN e.id END) as nb_local,
+            COUNT(DISTINCT CASE WHEN e.is_regional = 1 THEN e.id END) as nb_regional,
             COALESCE(COUNT(CASE WHEN ce.artiste IS NOT NULL OR ce.nom_spectacle IS NOT NULL THEN 1 END), 0) as nb_contenus
         FROM all_numeros a
         LEFT JOIN evenement e ON e.bidul_numero = a.numero
@@ -214,7 +254,9 @@ def get_stats_data(db_path: str) -> List[Dict[str, Any]]:
         data.append({
             "bidul": row[0],
             "events": row[1],
-            "content": row[2],
+            "events_local": row[2],
+            "events_regional": row[3],
+            "content": row[4],
             "missing": row[0] not in existing_biduls
         })
 
@@ -430,6 +472,16 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
             <div class="stat-sub" id="avgEvents">-</div>
         </div>
         <div class="stat">
+            <div class="stat-label">Locaux</div>
+            <div class="stat-value cyan" id="totalLocal">-</div>
+            <div class="stat-sub" id="pctLocal">-</div>
+        </div>
+        <div class="stat">
+            <div class="stat-label">Regionaux</div>
+            <div class="stat-value" style="color:#a78bfa" id="totalRegional">-</div>
+            <div class="stat-sub" id="pctRegional">-</div>
+        </div>
+        <div class="stat">
             <div class="stat-label">Contenus</div>
             <div class="stat-value amber" id="totalContent">-</div>
             <div class="stat-sub" id="avgContent">-</div>
@@ -492,14 +544,17 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
     </div>
 
     <div class="controls">
-        <button class="btn active" onclick="setView('both')">Les deux</button>
+        <button class="btn active" onclick="setView('both')">Tous</button>
         <button class="btn" onclick="setView('events')">Evenements</button>
+        <button class="btn" onclick="setView('local')">Locaux</button>
+        <button class="btn" onclick="setView('regional')">Regionaux</button>
         <button class="btn" onclick="setView('content')">Contenus</button>
         <button class="btn purple" id="qualityBtn" onclick="toggleQuality()">Qualite</button>
     </div>
 
     <div class="legend">
-        <div class="legend-item"><div class="legend-color" style="background:#06b6d4"></div> Evenements</div>
+        <div class="legend-item"><div class="legend-color" style="background:#06b6d4"></div> Evenements locaux</div>
+        <div class="legend-item"><div class="legend-color" style="background:#a78bfa"></div> Evenements regionaux</div>
         <div class="legend-item"><div class="legend-color" style="background:#f59e0b"></div> Artistes/Spectacles</div>
         <div class="legend-item"><div class="legend-color" style="background:#8b5cf6"></div> Score Qualite</div>
         <div class="legend-item"><div class="legend-color" style="background:#831843; border: 1px solid #be185d"></div> PDF manquant</div>
@@ -558,12 +613,16 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
         // Calculs
         const existing = data.filter(d => !d.missing);
         const eventsTotal = existing.reduce((s, d) => s + d.events, 0);
+        const eventsLocalTotal = existing.reduce((s, d) => s + (d.events_local || 0), 0);
+        const eventsRegionalTotal = existing.reduce((s, d) => s + (d.events_regional || 0), 0);
         const contentTotal = existing.reduce((s, d) => s + d.content, 0);
         const eventsAvg = eventsTotal / existing.length;
         const contentAvg = contentTotal / existing.length;
         const ratio = eventsTotal > 0 ? contentTotal / eventsTotal : 0;
         const missingBiduls = data.filter(d => d.missing).map(d => d.bidul);
         const emptyBiduls = data.filter(d => d.events === 0 && !d.missing).map(d => d.bidul);
+        const pctLocal = eventsTotal > 0 ? (eventsLocalTotal / eventsTotal * 100).toFixed(1) : 0;
+        const pctRegional = eventsTotal > 0 ? (eventsRegionalTotal / eventsTotal * 100).toFixed(1) : 0;
 
         // Anomalies (ratio tres different)
         const anomalies = existing.filter(d => {
@@ -578,6 +637,10 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
         // Mise a jour stats
         document.getElementById('totalEvents').textContent = eventsTotal.toLocaleString();
         document.getElementById('avgEvents').textContent = `moy: ${eventsAvg.toFixed(0)}`;
+        document.getElementById('totalLocal').textContent = eventsLocalTotal.toLocaleString();
+        document.getElementById('pctLocal').textContent = `${pctLocal}%`;
+        document.getElementById('totalRegional').textContent = eventsRegionalTotal.toLocaleString();
+        document.getElementById('pctRegional').textContent = `${pctRegional}%`;
         document.getElementById('totalContent').textContent = contentTotal.toLocaleString();
         document.getElementById('avgContent').textContent = `moy: ${contentAvg.toFixed(0)}`;
         document.getElementById('ratio').textContent = ratio.toFixed(2);
@@ -649,11 +712,18 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
         ).join('');
 
         // Couleurs pour les barres
-        function getEventColors() {
+        function getLocalColors() {
             return data.map(d => {
                 if (d.missing) return '#831843';
                 if (d.events === 0) return '#ef4444';
                 return '#06b6d4';
+            });
+        }
+
+        function getRegionalColors() {
+            return data.map(d => {
+                if (d.missing) return '#831843';
+                return '#a78bfa';
             });
         }
 
@@ -669,11 +739,20 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
         const ctx = document.getElementById('mainChart').getContext('2d');
         const datasets = [
             {
-                label: 'Evenements',
-                data: data.map(d => d.events),
-                backgroundColor: getEventColors(),
+                label: 'Evenements locaux',
+                data: data.map(d => d.events_local || 0),
+                backgroundColor: getLocalColors(),
                 borderColor: data.map(d => d.missing ? '#be185d' : 'transparent'),
                 borderWidth: data.map(d => d.missing ? 2 : 0),
+                stack: 'events',
+            },
+            {
+                label: 'Evenements regionaux',
+                data: data.map(d => d.events_regional || 0),
+                backgroundColor: getRegionalColors(),
+                borderColor: data.map(d => d.missing ? '#be185d' : 'transparent'),
+                borderWidth: data.map(d => d.missing ? 2 : 0),
+                stack: 'events',
             },
             {
                 label: 'Contenus',
@@ -681,6 +760,7 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
                 backgroundColor: getContentColors(),
                 borderColor: data.map(d => d.missing ? '#be185d' : 'transparent'),
                 borderWidth: data.map(d => d.missing ? 2 : 0),
+                stack: 'content',
             }
         ];
 
@@ -731,7 +811,10 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
                             afterBody: (items) => {
                                 const d = data[items[0].dataIndex];
                                 if (d.missing || d.events === 0) return '';
-                                return `Ratio: ${(d.content / d.events).toFixed(2)}`;
+                                const lines = [];
+                                lines.push(`Total: ${d.events} (${d.events_local || 0} local + ${d.events_regional || 0} regional)`);
+                                lines.push(`Ratio: ${(d.content / d.events).toFixed(2)}`);
+                                return lines;
                             }
                         }
                     }
@@ -830,8 +913,34 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
             document.querySelectorAll('.btn:not(.purple)').forEach(b => b.classList.remove('active'));
             event.target.classList.add('active');
 
-            chart.data.datasets[0].hidden = view === 'content';
-            chart.data.datasets[1].hidden = view === 'events';
+            // Datasets: 0=local, 1=regional, 2=content, 3=quality(si existe)
+            switch(view) {
+                case 'both':
+                    chart.data.datasets[0].hidden = false;  // local
+                    chart.data.datasets[1].hidden = false;  // regional
+                    chart.data.datasets[2].hidden = false;  // content
+                    break;
+                case 'events':
+                    chart.data.datasets[0].hidden = false;  // local
+                    chart.data.datasets[1].hidden = false;  // regional
+                    chart.data.datasets[2].hidden = true;   // content
+                    break;
+                case 'local':
+                    chart.data.datasets[0].hidden = false;  // local
+                    chart.data.datasets[1].hidden = true;   // regional
+                    chart.data.datasets[2].hidden = true;   // content
+                    break;
+                case 'regional':
+                    chart.data.datasets[0].hidden = true;   // local
+                    chart.data.datasets[1].hidden = false;  // regional
+                    chart.data.datasets[2].hidden = true;   // content
+                    break;
+                case 'content':
+                    chart.data.datasets[0].hidden = true;   // local
+                    chart.data.datasets[1].hidden = true;   // regional
+                    chart.data.datasets[2].hidden = false;  // content
+                    break;
+            }
             chart.update();
         }
 
