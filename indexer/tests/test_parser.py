@@ -805,5 +805,308 @@ Dimanche 21
         assert "Éphémère" in event.lieu_raw
 
 
+class TestSplitOnDatesV2NoFalseSplit:
+    """Tests pour éviter les faux splits sur 'de 18 mois', 'de 14 ans', etc."""
+
+    def test_no_split_on_de_18_mois(self):
+        """'de 18 mois à 4 ans' ne doit pas être splitté."""
+        text = '" Le Grand Saut " (th. de Guimbarde) de 18 mois à 4 ans, Esp. H. Salvador Coulaines 10h et 15h, 5 & 5,80€'
+        parts = split_on_dates_v2(text)
+        assert len(parts) == 1
+        assert "de 18 mois" in parts[0]
+
+    def test_no_split_on_de_14_ans(self):
+        """'de 14 ans' ne doit pas être splitté."""
+        text = 'Les Spectaculaires : « Gargantua » (théâtre et objets, à partir de 14 ans) par Julien Mellano, S.J.Carmet, Allonnes, 20h30, 6€'
+        parts = split_on_dates_v2(text)
+        assert len(parts) == 1
+        assert "de 14 ans" in parts[0]
+
+    def test_no_split_on_le_25(self):
+        """'le 25 décembre' ne doit pas être splitté (le n'est pas un jour)."""
+        text = 'Concert spécial le 25 décembre, salle des fêtes'
+        parts = split_on_dates_v2(text)
+        assert len(parts) == 1
+
+
+class TestParseDatePrefixV2WithMonth:
+    """Tests pour le parsing des dates avec mois explicite (DD/MM format)."""
+
+    def test_parse_du_31_au_03_02(self):
+        """Du 31 au 03/02 doit créer 4 dates (31/01, 01/02, 02/02, 03/02)."""
+        date_list, remaining = parse_date_prefix_v2("Du 31 au 03/02: dummy", 1, 2013)
+        assert len(date_list) == 4
+        assert date_list[0] == date(2013, 1, 31)
+        assert date_list[1] == date(2013, 2, 1)
+        assert date_list[2] == date(2013, 2, 2)
+        assert date_list[3] == date(2013, 2, 3)
+        assert remaining == "dummy"
+
+    def test_parse_ve_01_02(self):
+        """Ve 01/02 doit créer 1 date (01/02)."""
+        date_list, remaining = parse_date_prefix_v2("Ve 01/02: dummy", 1, 2013)
+        assert len(date_list) == 1
+        assert date_list[0] == date(2013, 2, 1)
+        assert remaining == "dummy"
+
+    def test_parse_sa_15_03(self):
+        """Sa 15/03 doit créer 1 date (15/03)."""
+        date_list, remaining = parse_date_prefix_v2("Sa 15/03: dummy", 1, 2013)
+        assert len(date_list) == 1
+        assert date_list[0] == date(2013, 3, 15)
+
+
+class TestEventParserInlineWithMonthDates:
+    """Tests pour le parsing inline avec dates au format DD/MM."""
+
+    @pytest.fixture
+    def parser(self):
+        return EventParser(bidul_mois=1, bidul_annee=2013, date_format='inline')
+
+    def test_du_31_au_03_02_creates_4_events(self, parser):
+        """Du 31 au 03/02 doit créer 4 événements."""
+        text = 'Du 31 au 03/02: " Dis à ma fille que je pars en voyage >> La Fonderie, Le Mans, 20h30'
+        events = parser.parse_with_referentiel(text, [], [])
+        assert len(events) == 4
+        dates = sorted([e.date_evenement for e in events])
+        assert dates[0] == date(2013, 1, 31)
+        assert dates[1] == date(2013, 2, 1)
+        assert dates[2] == date(2013, 2, 2)
+        assert dates[3] == date(2013, 2, 3)
+
+    def test_ve_01_02_creates_1_event(self, parser):
+        """Ve 01/02 doit créer 1 événement."""
+        text = 'Ve 01/02: << L\'Événement >> La Fonderie, Le Mans, 21h'
+        events = parser.parse_with_referentiel(text, [], [])
+        assert len(events) == 1
+        assert events[0].date_evenement == date(2013, 2, 1)
+
+
+class TestEventParserInlineWithDateRange:
+    """Tests pour le parsing inline avec plages de dates DD-DD."""
+
+    @pytest.fixture
+    def parser(self):
+        return EventParser(bidul_mois=3, bidul_annee=2009, date_format='inline')
+
+    def test_lu_ma_me_range_creates_6_events(self, parser):
+        """Lu 30/Ma 31/Me 01-04: doit créer 6 événements (30, 31 mars + 1-4 avril)."""
+        text = 'Lu 30/Ma 31/Me 01-04: Apéro concert avec YURI HU, Bar Le Palais, 19h'
+        events = parser.parse_with_referentiel(text, [], [])
+        assert len(events) == 6
+        dates = sorted([e.date_evenement for e in events])
+        # Mars
+        assert dates[0] == date(2009, 3, 30)
+        assert dates[1] == date(2009, 3, 31)
+        # Avril (mois suivant)
+        assert dates[2] == date(2009, 4, 1)
+        assert dates[3] == date(2009, 4, 2)
+        assert dates[4] == date(2009, 4, 3)
+        assert dates[5] == date(2009, 4, 4)
+
+
+class TestSplitOnDatesV2WithParasiticChars:
+    """Tests pour le split avec caractères parasites OCR (+, t, †)."""
+
+    def test_split_on_plus_ma(self):
+        """+Ma 14: doit être splitté correctement."""
+        text = 'Premier event 21h30 +Ma 14: Deuxieme event'
+        parts = split_on_dates_v2(text)
+        assert len(parts) == 2
+        assert 'Ma 14' in parts[1]
+
+    def test_split_on_t_je(self):
+        """tJe 16: doit être splitté correctement."""
+        text = 'Premier event 21h tJe 16: Deuxieme event'
+        parts = split_on_dates_v2(text)
+        assert len(parts) == 2
+        assert 'Je 16' in parts[1]
+
+    def test_bidul_72_pattern(self):
+        """Test complet du pattern bidul 72."""
+        text = 'Soiree Reggae, 21h30 +Ma 14: BOB HOUNSLOW, Le Mackeson, 21h tJe 16: MISTER JO, PCV, 21h30'
+        parts = split_on_dates_v2(text)
+        assert len(parts) == 3
+        assert 'Reggae' in parts[0]
+        assert 'BOB HOUNSLOW' in parts[1]
+        assert 'MISTER JO' in parts[2]
+
+
+class TestSplitBlocFusedEvents:
+    """Tests pour le split des événements fusionnés en format bloc."""
+
+    def test_split_on_price_then_majuscules(self):
+        """Split après prix suivi de nom en MAJUSCULES."""
+        text = 'ARTISTE1 (jazz), Le Zoo, 21h, 0E ARTISTE2 (rock), Le Bar, 20h, 3E'
+        from core.parser import split_bloc_fused_events
+        parts = split_bloc_fused_events(text)
+        assert len(parts) == 2
+        assert 'ARTISTE1' in parts[0]
+        assert 'ARTISTE2' in parts[1]
+
+    def test_split_on_price_then_soiree(self):
+        """Split après prix suivi de Soirée."""
+        text = 'CONCERT (rock), Lieu, 21h, 0E Soiree funk avec DJ, Lieu, 23h, 5E'
+        from core.parser import split_bloc_fused_events
+        parts = split_bloc_fused_events(text)
+        assert len(parts) == 2
+        assert 'CONCERT' in parts[0]
+        assert 'Soiree funk' in parts[1]
+
+    def test_bidul_175_pattern(self):
+        """Test complet du pattern bidul 175."""
+        text = 'SANDRA CAROLL (jazz), Le Zoo 21h, 0E BOBBY SIX KILLERS (rock), Bar, 20h, 3E LE MANS CITE CHANSON, Lieu, 20h30, 0E'
+        from core.parser import split_bloc_fused_events
+        parts = split_bloc_fused_events(text)
+        assert len(parts) == 3
+        assert 'SANDRA CAROLL' in parts[0]
+        assert 'BOBBY SIX KILLERS' in parts[1]
+        assert 'LE MANS CITE CHANSON' in parts[2]
+
+    def test_split_on_price_then_quote(self):
+        """Split après prix suivi de guillemet ouvrant."""
+        text = 'Blues in Box (blues), Lieu, 21h30, 0E "Openspace" (th.), par La Cie'
+        from core.parser import split_bloc_fused_events
+        parts = split_bloc_fused_events(text)
+        assert len(parts) == 2
+        assert 'Blues in Box' in parts[0]
+        assert '"Openspace"' in parts[1]
+
+    def test_split_on_hour_then_les(self):
+        """Split après heure suivie de 'Les Spectaculaires'."""
+        text = 'LE SYNDROME DU CHAT (rock), Le Passeport, 22h Les Spectaculaires: Soirée PETITES'
+        from core.parser import split_bloc_fused_events
+        parts = split_bloc_fused_events(text)
+        assert len(parts) == 2
+        assert 'LE SYNDROME DU CHAT' in parts[0]
+        assert 'Les Spectaculaires' in parts[1]
+
+    def test_split_on_phone_then_majuscules(self):
+        """Split après numéro de téléphone suivi de MAJUSCULES."""
+        text = 'Concert, Lieu, 7/15E, résa.: 02 43 80 80 82 LE MANS CITE CHANSON: Présélection'
+        from core.parser import split_bloc_fused_events
+        parts = split_bloc_fused_events(text)
+        assert len(parts) == 2
+        assert 'Concert' in parts[0]
+        assert 'LE MANS CITE CHANSON' in parts[1]
+
+    def test_split_on_price_then_birdland(self):
+        """Split après prix suivi de Birdland."""
+        text = 'Soirée open mix, Le Passeport, 23h-4h, 0E Birdland présente Olivier Mugot Trio'
+        from core.parser import split_bloc_fused_events
+        parts = split_bloc_fused_events(text)
+        assert len(parts) == 2
+        assert 'Soirée open mix' in parts[0]
+        assert 'Birdland' in parts[1]
+
+    def test_split_on_parenthesis_then_double_chevron(self):
+        """Split après parenthèse fermante suivie de << (guillemets OCR)."""
+        text = 'Les Spectaculaires: Soirée PETITES FORMES (àpd 12ans): "Pitt" + "Ma foi" + "Bertha", Jean Carmet, Allonnes 19h, 15€ repas compris (sur résa.) <<Pièce montée" (th.), Espace Scélia Sargé, 20h30, 6/10€'
+        from core.parser import split_bloc_fused_events
+        parts = split_bloc_fused_events(text)
+        assert len(parts) == 2
+        assert 'Les Spectaculaires' in parts[0]
+        assert '<<Pièce montée' in parts[1]
+
+    def test_split_on_chapeau_then_day(self):
+        """Split après 'chapeau' suivi d'un jour de semaine."""
+        text = '"Electre"> (théâtre), Théâtre de Chaoué Allonnes 20h30, tarif: au chapeau Ve 06/Sa 07 20h30/Di 08 15h: "Métis\'sages>'
+        from core.parser import split_bloc_fused_events
+        parts = split_bloc_fused_events(text)
+        assert len(parts) == 2
+        assert 'Electre' in parts[0]
+        assert 'chapeau' in parts[0]
+        assert 'Métis' in parts[1]
+
+
+class TestExtractFormattedSpectacles:
+    """Tests pour l'extraction de spectacles avec formats OCR."""
+
+    def test_ocr_double_chevron_quote_closing(self):
+        """OCR avec << ouvrant et "> fermant (combinaison " et >)."""
+        from core.parser import extract_formatted_spectacles
+        text = '<<Rien ne laisse présager de l\'Etat de l\'Eau"> (danse), par O. Duboc'
+        spectacles = extract_formatted_spectacles(text)
+        assert len(spectacles) == 1
+        assert spectacles[0]['nom'] == "Rien ne laisse présager de l'Etat de l'Eau"
+        assert spectacles[0]['style'] == 'danse'
+
+    def test_ocr_double_chevron_simple_closing(self):
+        """OCR avec << ouvrant et > fermant simple."""
+        from core.parser import extract_formatted_spectacles
+        text = '<<Marrons gagnants> (contes)'
+        spectacles = extract_formatted_spectacles(text)
+        assert len(spectacles) == 1
+        assert spectacles[0]['nom'] == 'Marrons gagnants'
+        assert spectacles[0]['style'] == 'contes'
+
+    def test_ocr_quote_chevron_closing(self):
+        """OCR avec " ouvrant et > fermant."""
+        from core.parser import extract_formatted_spectacles
+        text = '"Métis\'sages> (contes et légendes d\'ailleurs)'
+        spectacles = extract_formatted_spectacles(text)
+        assert len(spectacles) == 1
+        assert spectacles[0]['nom'] == "Métis'sages"
+        assert spectacles[0]['style'] == "contes et légendes d'ailleurs"
+
+
+class TestSplitRegionalSection:
+    """Tests pour la détection de la section régionale 'Et un peu plus loin...'."""
+
+    def test_split_regional_section_found(self):
+        """Détecte et sépare la section régionale."""
+        from core.parser import split_regional_section
+        # Le marqueur doit être APRÈS des événements avec dates pour être détecté
+        text = """Ve 04: Concert local, Le Mans, 21h
+Sa 05: Autre concert, Allonnes, 20h
+Et un peu plus loin...
+Dans l'Orne (61):
+CALI (chanson), 21h, 25 à 30€
+PASCALE PICARD (pop rock), 21h"""
+
+        local, regional = split_regional_section(text)
+        assert 'Concert local' in local
+        assert 'Et un peu plus loin' in regional
+        assert 'CALI' in regional
+        assert 'CALI' not in local
+
+    def test_split_regional_section_not_found(self):
+        """Pas de section régionale, tout reste local."""
+        from core.parser import split_regional_section
+        text = """Concert 1, Le Mans, 21h
+Concert 2, Allonnes, 20h"""
+
+        local, regional = split_regional_section(text)
+        assert local == text
+        assert regional == ""
+
+    def test_split_regional_section_ocr_variation(self):
+        """Supporte les variations OCR (sans 'Et')."""
+        from core.parser import split_regional_section
+        # Le marqueur doit être APRÈS des événements avec dates pour être détecté
+        text = """Ve 04: Concert local, Le Mans, 21h
+un peu plus loin...
+Concert régional"""
+
+        local, regional = split_regional_section(text)
+        assert 'Concert local' in local
+        assert 'un peu plus loin' in regional
+
+    def test_split_regional_section_marker_before_events(self):
+        """Le marqueur avant les événements est ignoré (ancien format)."""
+        from core.parser import split_regional_section
+        # Dans certains anciens Biduls, "et même un peu plus loin" est un sous-titre
+        # qui apparaît AVANT les événements
+        text = """En Sarthe
+et même un peu plus loin...
+Ve 04: Concert, Le Mans, 21h
+Sa 05: Autre concert, Allonnes, 20h"""
+
+        local, regional = split_regional_section(text)
+        # Pas de split car le marqueur est AVANT les événements
+        assert local == text
+        assert regional == ""
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

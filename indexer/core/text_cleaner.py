@@ -30,6 +30,44 @@ def clean_pdf_text(text: str) -> str:
     return text
 
 
+def fix_ocr_day_prefixes(text: str) -> str:
+    """
+    Corrige les erreurs OCR courantes sur les jours de la semaine.
+
+    L'OCR peut mal reconnaître les premières lettres des jours:
+    - "e 05:" → "Je 05:" ou "Ve 05:"
+    - "'e 06:" → "Ve 06:"
+    - "ja 07:" ou "¡a 07:" → "Sa 07:"
+    - "le 06:" → "Ve 06:" (confusion avec article "le")
+
+    La correction se base sur le contexte (numéro du jour dans le mois).
+    """
+    if not text:
+        return text
+
+    # Pattern pour détecter les jours OCR corrompus en début de ligne ou après newline
+    # IMPORTANT: L'ordre compte! Les patterns plus spécifiques d'abord
+    ocr_day_patterns = [
+        # "'e XX:" - Ve (l'apostrophe indique V tronqué) - AVANT "e XX:"
+        (r"(^|\n)'e\s+(\d{1,2})(\s*[:/])", r"\1Ve \2\3"),
+        # "e XX:" seul - probablement Je (jeudi)
+        (r"(^|\n)e\s+(\d{1,2})(\s*[:/])", r"\1Je \2\3"),
+        # "ja XX:" ou "¡a XX:" - probablement Sa (samedi)
+        (r"(^|\n)[j¡]a\s+(\d{1,2})(\s*[:/])", r"\1Sa \2\3"),
+        # "le XX:" en début de ligne - probablement Ve (pas l'article)
+        (r"(^|\n)le\s+(\d{1,2})(\s*[:/])", r"\1Ve \2\3"),
+        # "u XX:" - probablement Lu (lundi)
+        (r"(^|\n)u\s+(\d{1,2})(\s*[:/])", r"\1Lu \2\3"),
+        # "i XX:" - probablement Di (dimanche)
+        (r"(^|\n)i\s+(\d{1,2})(\s*[:/])", r"\1Di \2\3"),
+    ]
+
+    for pattern, replacement in ocr_day_patterns:
+        text = re.sub(pattern, replacement, text, flags=re.MULTILINE)
+
+    return text
+
+
 def expand_abbreviations(text: str) -> str:
     """Expanse les abréviations courantes."""
     if not text:

@@ -80,6 +80,8 @@ events = parser.parse_with_referentiel(text, lieu_ref_list, ville_ref_list)
 - `extract_lieu_fallback()` - Extraction heuristique quand le lieu n'est pas dans le référentiel
 - `strip_formatting_tags()` - Retire les balises pour comparaison
 - `find_lieu_position_heuristic()` - Trouve la position du lieu dans le texte (v1.4 : corrige position texte original)
+- `split_on_dates_v2()` - Découpe le texte sur les dates inline (v1.9 : ignore caractères OCR parasites)
+- `split_bloc_fused_events()` - Sépare les événements fusionnés sur pattern `prix€ MAJUSCULES` (v1.9)
 
 ### `core/db.py` - Base de données
 
@@ -447,16 +449,6 @@ parser = EventParser(bidul_mois=7, bidul_annee=2011, date_format='inline')
 2. **Lieux non référencés** - Extraction heuristique moins fiable
 3. **Formatage incohérent** - Certains vieux numéros ont un formatage variable
 4. **OCR des très anciens Biduls** - Qualité variable selon l'état du scan
-
-## Changelog v1.7
-
-- **Filtrage régional** : Nouveau module `core/regional_filter.py` pour exclure les événements hors Sarthe (dept 72)
-- **Filtrage artifacts** : Nouveau module `core/artifact_filter.py` pour exclure les faux événements
-- **Dashboard HTML** : Nouveau module `core/stats_generator.py` avec Chart.js interactif
-- **Option `--include-regional`** : Inclut les événements régionaux (marqués `is_regional=True`)
-- **Option `--include-artifacts`** : Inclut les faux événements
-- **Option `--html`** : Génère un dashboard HTML pour `stats` (défaut: `stats/bidul_stats.html`)
-- **Colonne `is_regional`** : Nouvelle colonne dans `evenement` pour marquer les événements hors département
 
 ## Changelog v1.6
 

@@ -15,6 +15,8 @@ from pathlib import Path
 from difflib import SequenceMatcher
 from typing import Optional
 
+from core.text_cleaner import fix_ocr_day_prefixes
+
 logger = logging.getLogger(__name__)
 
 # Chemin par défaut vers la base
@@ -88,10 +90,14 @@ class OCRPostProcessor:
         # 1. Corrections OCR de base
         text = self._fix_common_ocr_errors(text)
 
-        # 2. Normalisation du formatage
+        # 2. Correction des jours de semaine OCR corrompus
+        # Ex: "e 05:" → "Je 05:", "'e 06:" → "Ve 06:", "ja 07:" → "Sa 07:"
+        text = fix_ocr_day_prefixes(text)
+
+        # 3. Normalisation du formatage
         text = self._normalize_formatting(text)
 
-        # 3. Correction des entités connues
+        # 4. Correction des entités connues
         text = self._fix_entities(text)
 
         return text

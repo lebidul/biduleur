@@ -24,8 +24,14 @@
 - [x] Déplacer insecabilité dans biduleur (sur lieu et ville) ? (autorise moins de flexibiité though) -> pas fait. géré avec replacement engine
 - [x] Fichiers svg outputs prennent le nom du fichier pdf
 - [x] Améliorer affichage optimisée des logos (plusieurs propals ?)
+- [ ] Trop d'espace perdu avec police automatique (eg. C:\Users\thiba\tibo\bidul\miseEnPage\2601\debug_run_2026-01-02_21-35-22)
+- [ ] "Nan" dans le cas de sv sans nom pour ariste spectacle 2,3,4
+- [ ] remplacer euros pour sigle dans prix
+- [ ] Saint pas remplacé si suivi d'un tiret
+- [ ] enlever virgule après horaire si pas de prix
 - [ ] Unit tests
 - [ ] Cleaner logos de Gaëlle. Càd les avoir en couleur
+- [ ] cucaracha texte et path fichier couv pas sauvegardé dans config
 
 ## Priorité Moyenne
 - [x] Amélioration lisibilité finale (ex. caractère de bullet point comme paramètre, cadre pour date)

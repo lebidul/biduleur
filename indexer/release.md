@@ -1,3 +1,137 @@
+# Release Notes - Indexer v1.10
+
+## Vue d'ensemble
+
+Version avec amélioration majeure de la gestion des événements régionaux : flag `is_regional` correctement assigné, dashboard HTML avec distinction local/régional, et récupération des événements locaux mixés dans la section régionale (problème OCR colonnes mélangées).
+
+## Nouveautés v1.10
+
+### Flag `is_regional` correctement assigné
+
+Le flag `is_regional` est maintenant automatiquement assigné à chaque événement en utilisant `detect_regional()` :
+
+| Source | Détection |
+|--------|-----------|
+| Lieu sarthois (Le PCV, Bar Le Palais...) | `is_regional = False` |
+| Ville sarthoise (Le Mans, Allonnes...) | `is_regional = False` |
+| Code département (72) | `is_regional = False` |
+| Code département hors 72 (49, 53, 61...) | `is_regional = True` |
+| Lieu/ville hors Sarthe (Chabada, Tours...) | `is_regional = True` |
+
+**Impact** : Les événements locaux incorrectement placés dans la section régionale (à cause d'un OCR mélangé) sont maintenant récupérés.
+
+### Dashboard HTML avec distinction local/régional
+
+Le dashboard HTML (`python cli.py stats --html`) affiche maintenant :
+
+- **KPIs séparés** : événements totaux, locaux (97.4%), régionaux (2.6%)
+- **Graphique avec barres empilées** : cyan pour local, violet pour régional
+- **Boutons de filtre** : Tous, Événements, Locaux, Régionaux, Contenus
+- **Tooltip enrichi** : affiche le détail local + régional au survol
+- **Scores qualité par type** : score_local, score_regional
+
+### Refactorisation du parser pour la section régionale
+
+Les fonctions `parse_with_referentiel()` ont été refactorisées pour :
+
+1. Séparer le texte en sections locale et régionale via `split_regional_section()`
+2. Parser chaque section indépendamment
+3. Appliquer `detect_regional()` sur chaque événement
+4. Log des corrections (événements locaux récupérés de la section régionale)
+
+### Tests
+
+Tous les 112 tests passent. Benchmarks stables :
+- Bidul 184 : 95.4%
+- Bidul 190 : 91.2%
+
+---
+
+# Release Notes - Indexer v1.9
+
+## Vue d'ensemble
+
+Version avec corrections majeures du parsing de dates et amélioration du découpage des événements pour les formats inline et bloc.
+
+## Nouveautés v1.9
+
+### Correction des faux splits sur "de 18 mois", "de 14 ans"
+
+Le pattern de jour abrégé `[DLMJVS][aeiou]?` matchait incorrectement "de" comme un jour de semaine. Remplacé par un pattern strict avec les abréviations exactes :
+
+```
+Lu, Ma, Me, Je, Ve, Sa, Di
+```
+
+**Avant :**
+```
+Ma 29: Les Spectaculaires : « Gargantua » (à partir
+de 14 ans) par Julien Mellano...
+→ 2 événements (split sur "de 14")
+```
+
+**Après :**
+```
+→ 1 événement (texte multi-ligne préservé)
+```
+
+### Support du format date avec mois explicite (DD/MM)
+
+Nouveaux patterns de date reconnus :
+
+| Pattern | Exemple | Résultat |
+|---------|---------|----------|
+| Du DD au DD/MM | `Du 31 au 03/02:` | 4 événements (31 jan, 1, 2, 3 fév) |
+| Jour DD/MM | `Ve 01/02:` | 1 événement (1er février) |
+| Jour DD/MM | `Sa 15/03:` | 1 événement (15 mars) |
+
+Utile pour les événements à cheval sur deux mois.
+
+### Gestion des caractères parasites OCR avant les dates
+
+Les caractères OCR parasites (`+`, `t`, `†`) avant les dates sont maintenant ignorés :
+
+| Texte OCR | Résultat |
+|-----------|----------|
+| `+Ma 14: Événement` | Split sur `Ma 14` ✓ |
+| `tJe 16: Événement` | Split sur `Je 16` ✓ |
+| `†Ve 17: Événement` | Split sur `Ve 17` ✓ |
+
+### Découpage des événements fusionnés (format bloc)
+
+Nouvelle fonction `split_bloc_fused_events()` pour séparer les événements collés sur une même ligne :
+
+**Pattern détecté :** `prix€ NOM_EN_MAJUSCULES` ou `prix€ Soirée`
+
+**Exemple :**
+```
+ARTISTE1 (style), Lieu, 21h, 0€ ARTISTE2 (style), Lieu, 20h, 3€
+→ 2 événements distincts
+```
+
+Cette fonction est automatiquement appelée dans le parsing des blocs.
+
+### Paramètre `nom_evenement` pour la détection d'artifacts
+
+Les événements avec un nom reconnu (Soirée X, Festival X, etc.) ne sont plus filtrés comme artifacts même sans lieu/artiste/spectacle.
+
+### Tests ajoutés
+
+- `TestSplitOnDatesV2NoFalseSplit` : 3 tests pour éviter les faux splits
+- `TestParseDatePrefixV2WithMonth` : 3 tests pour les dates DD/MM
+- `TestEventParserInlineWithMonthDates` : 2 tests d'intégration
+- `TestSplitOnDatesV2WithParasiticChars` : 3 tests pour les caractères OCR
+- `TestSplitBlocFusedEvents` : 3 tests pour les événements fusionnés
+
+### Benchmarks
+
+| Bidul | Score v1.8 | Score v1.9 |
+|-------|------------|------------|
+| 184 | 95.1% | 95.4% |
+| 190 | 91.2% | 91.2% |
+
+---
+
 # Release Notes - Indexer v1.8
 
 ## Vue d'ensemble

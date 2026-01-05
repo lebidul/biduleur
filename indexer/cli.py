@@ -43,7 +43,7 @@ from indexer.core.csv_importer import find_csv_for_bidul as find_csv_files, impo
 from indexer.core.ocr import ScanExtractor, load_bidul_config, is_scan_from_csv
 from indexer.core.ocr_postprocess import OCRPostProcessor
 from indexer.core.regional_filter import detect_regional
-from indexer.core.artifact_filter import detect_artifact
+from indexer.core.artifact_filter import detect_artifact, is_bidul_sans_evenements
 
 # Configuration
 ARCHIVES_DIR = Path(__file__).parent / "archives"
@@ -680,12 +680,21 @@ def cmd_populate(args):
             if not args.dry_run:
                 db.delete_evenements(numero)
 
+            # Vérifier si c'est un bidul sans événements (cas particulier)
+            if is_bidul_sans_evenements(numero):
+                if args.verbose:
+                    logging.info(f"[{numero}] Bidul sans événements (cas particulier)")
+                reparsed_biduls += 1
+                continue
+
             # Charger la config du Bidul pour obtenir date_format
             config = load_bidul_config(numero)
             date_format = config.date_format if config else None
 
             # Re-parser le texte brut complet avec EventParser (supporte format bloc)
-            parser = EventParser(bidul_mois=mois, bidul_annee=annee, date_format=date_format)
+            # Si include_regional=False, exclure la section "Et un peu plus loin..." dès le parsing
+            parser = EventParser(bidul_mois=mois, bidul_annee=annee, date_format=date_format,
+                                 include_regional=include_regional)
             parsed_events = parser.parse_with_referentiel(
                 bidul_raw_text,
                 lieu_ref_list,
@@ -700,7 +709,8 @@ def cmd_populate(args):
                     event.raw_text,
                     lieu_raw=event.lieu_raw,
                     artistes=event.artistes,
-                    spectacles=event.spectacles
+                    spectacles=event.spectacles,
+                    nom_evenement=event.nom
                 )
 
                 if artifact_detection.is_artifact:
@@ -914,7 +924,9 @@ def cmd_populate(args):
 
             # Récupérer le date_format depuis la config (si disponible)
             date_format = config.date_format if config else None
-            parser = EventParser(bidul_mois=mois, bidul_annee=annee, date_format=date_format)
+            # Si include_regional=False, exclure la section "Et un peu plus loin..." dès le parsing
+            parser = EventParser(bidul_mois=mois, bidul_annee=annee, date_format=date_format,
+                                 include_regional=include_regional)
             # Utiliser parse_with_referentiel pour la stratégie "lieu d'abord"
             parsed_events = parser.parse_with_referentiel(
                 full_text,
@@ -932,7 +944,8 @@ def cmd_populate(args):
                     e.raw_text,
                     lieu_raw=e.lieu_raw,
                     artistes=e.artistes,
-                    spectacles=e.spectacles
+                    spectacles=e.spectacles,
+                    nom_evenement=e.nom
                 )
 
                 if artifact_detection.is_artifact:
