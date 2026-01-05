@@ -307,19 +307,20 @@ class OCREngine:
 
         self._engine = vision.ImageAnnotatorClient()
 
-    def ocr_image(self, image: np.ndarray, num_columns: int = 1) -> str:
+    def ocr_image(self, image: np.ndarray, num_columns: int = 1, auto_layout: bool = False) -> str:
         """Effectue l'OCR sur une image numpy.
 
         Args:
             image: Image numpy array
             num_columns: Nombre de colonnes pour la lecture (1 = normal, 2+ = par colonnes)
+            auto_layout: Si True, détecte automatiquement le layout (Google Vision uniquement)
         """
         if self.engine_name == 'paddleocr':
             return self._ocr_paddle(image, num_columns)
         elif self.engine_name == 'easyocr':
             return self._ocr_easyocr(image)
         elif self.engine_name == 'google':
-            return self._ocr_google(image, num_columns)
+            return self._ocr_google(image, num_columns, auto_layout=auto_layout)
         return ""
 
     def _ocr_paddle(self, image: np.ndarray, num_columns: int = 1) -> str:
@@ -415,12 +416,13 @@ class OCREngine:
 
         return '\n'.join(lines)
 
-    def _ocr_google(self, image: np.ndarray, num_columns: int = 1) -> str:
+    def _ocr_google(self, image: np.ndarray, num_columns: int = 1, auto_layout: bool = False) -> str:
         """OCR avec Google Cloud Vision API.
 
         Args:
             image: Image numpy array
             num_columns: Nombre de colonnes à détecter (1 = lecture normale, 2+ = lecture par colonnes)
+            auto_layout: Si True, détecte automatiquement le layout (colonnes, orientation)
         """
         import io
         from PIL import Image
@@ -449,11 +451,20 @@ class OCREngine:
         if not response.full_text_annotation:
             return ""
 
+        # Mode auto-layout : détection automatique de la structure
+        if auto_layout and response.full_text_annotation.pages:
+            from .layout_analyzer import extract_text_with_auto_layout
+            return extract_text_with_auto_layout(
+                response.full_text_annotation,
+                image.shape[1],  # width
+                image.shape[0],  # height
+            )
+
         # Si une seule colonne ou pas de pages, retourner le texte brut
         if num_columns <= 1 or not response.full_text_annotation.pages:
             return response.full_text_annotation.text
 
-        # Extraction avec respect des colonnes
+        # Extraction avec respect des colonnes (nombre fixe)
         return self._extract_text_by_columns(response.full_text_annotation, num_columns, image.shape[1])
 
     def _extract_text_by_columns(self, annotation, num_columns: int, image_width: int) -> str:
@@ -682,7 +693,7 @@ class OCRResult:
 class ScanExtractor:
     """Extracteur de texte pour PDFs scannés."""
 
-    def __init__(self, ocr_engine: str = 'paddleocr', dpi: int = 200, use_sections: bool = True):
+    def __init__(self, ocr_engine: str = 'paddleocr', dpi: int = 200, use_sections: bool = True, auto_layout: bool = False):
         """
         Initialise l'extracteur OCR.
 
@@ -690,11 +701,13 @@ class ScanExtractor:
             ocr_engine: Moteur OCR à utiliser ('paddleocr', 'easyocr', 'google')
             dpi: Résolution pour la conversion PDF → Image (200 par défaut, bon compromis vitesse/qualité)
             use_sections: Si True, utilise l'extraction par sections A6 quand configuré
+            auto_layout: Si True, détecte automatiquement le layout (colonnes, orientation)
         """
         self.ocr = OCREngine(engine=ocr_engine)
         self.preprocessor = ImagePreprocessor()
         self.dpi = dpi
         self.use_sections = use_sections
+        self.auto_layout = auto_layout
         self._section_extractor = None
 
     @property
@@ -865,7 +878,8 @@ class ScanExtractor:
                 metadata={
                     'dpi': self.dpi,
                     'ocr_engine': self.ocr.engine_name,
-                    'extraction_mode': 'classic',
+                    'extraction_mode': 'auto-layout' if self.auto_layout else 'classic',
+                    'auto_layout': self.auto_layout,
                     'config_numero': config.numero if config else None,
                     'date_format': config.date_format if config else 'inline',
                     'page1_sections': config.page1_sections if config else '',
@@ -884,12 +898,15 @@ class ScanExtractor:
                 # Prétraitement selon config
                 image = self._preprocess(image, page_config)
 
-                # OCR avec nombre de colonnes
-                num_columns = page_config.get('colonnes', 1)
-                page_text = self.ocr.ocr_image(image, num_columns=num_columns)
-
-                if num_columns > 1:
-                    logger.debug(f"Page {page_num}: OCR avec {num_columns} colonnes")
+                # OCR avec nombre de colonnes ou auto-layout
+                if self.auto_layout:
+                    page_text = self.ocr.ocr_image(image, num_columns=1, auto_layout=True)
+                    logger.debug(f"Page {page_num}: OCR avec auto-layout")
+                else:
+                    num_columns = page_config.get('colonnes', 1)
+                    page_text = self.ocr.ocr_image(image, num_columns=num_columns)
+                    if num_columns > 1:
+                        logger.debug(f"Page {page_num}: OCR avec {num_columns} colonnes")
 
                 page_result = OCRPageResult(
                     page_num=page_num,
