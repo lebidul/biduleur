@@ -5946,8 +5946,14 @@ class EventParser:
         seen_signatures = set()
 
         # Pattern pour détecter une ligne qui commence par une date
+        # Note: Le contenu (groupe 3) est optionnel car la date peut être seule
+        # sur sa ligne (ex: "Je 05:") avec les événements sur les lignes suivantes
+        # Supporte:
+        #   - Abréviations 2 lettres: Lu, Ma, Me, Je, Ve, Sa, Di
+        #   - Abréviations 3 lettres: lun, mar, mer, jeu, ven, sam, dim
+        #   - Avec ou sans deux-points après le numéro
         date_line_pattern = re.compile(
-            r'^([MLJVSD][aeiou])\s+(\d{1,2})(?:er|ème|eme)?\s*[:\s]+(.+)$',
+            r'^(lu[n]?|ma[r]?|me[r]?|je[u]?|ve[n]?|sa[m]?|di[m]?)\s+(\d{1,2})(?:er|ème|eme)?\s*[:]?\s*(.*)$',
             re.IGNORECASE
         )
 
@@ -6027,10 +6033,9 @@ class EventParser:
         current_date = None
 
         for line_idx, line in enumerate(joined_lines):
-            if len(line) < 10:
-                continue
-
             # Vérifier si la ligne commence par une date
+            # Note: on vérifie d'abord la date car des lignes courtes comme "Je 05:"
+            # sont valides et doivent établir la date courante
             date_match = date_line_pattern.match(line)
 
             if date_match:
@@ -6050,8 +6055,9 @@ class EventParser:
                         events, seen_signatures
                     )
 
-            elif current_date_str and is_new_event_line(line):
+            elif current_date_str and len(line) >= 10 and is_new_event_line(line):
                 # Nouvel événement sans date - hérite de la date courante
+                # Note: len >= 10 pour éviter les lignes trop courtes
                 self._process_inherited_event(
                     line, current_date_str, current_date,
                     mois, annee, lieu_ref_list, ville_ref_list,

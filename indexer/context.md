@@ -57,6 +57,8 @@ contenu_evenement (source de vérité pour artistes/spectacles)
 
 **Note v1.10** : Flag `is_regional` correctement assigné via `detect_regional()`, dashboard HTML avec distinction local/régional (KPIs, barres empilées, filtres), récupération des événements locaux mixés dans la section régionale (problème OCR colonnes mélangées).
 
+**Note v1.11** : Extraction OCR par sections améliorée : rotation de page entière avant découpage (sections définies après rotation), colonnes `p*_orientation_pdf` pour distinguer orientation PDF vs texte, découpage physique des colonnes pour OCR séquentiel (gauche→droite), support format `inline_inherited` avec patterns 2-3 lettres.
+
 ## Mapping Bidul <-> Date
 
 Référence : **Bidul 280 = Mai 2023**

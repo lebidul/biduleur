@@ -52,11 +52,17 @@ class ScanConfig:
 
     @classmethod
     def from_csv_row(cls, row: dict) -> Optional['ScanConfig']:
-        """Crée une config depuis une ligne du CSV biduls.description.csv."""
+        """Crée une config depuis une ligne du CSV biduls.description.csv.
+
+        Supporte à la fois l'ancien format (colonnes 'numéros', 'scan/texte', 'date',
+        'page1.orientation pdf', etc.) et le nouveau format (colonnes 'numero', 'type',
+        'date_format', 'p1_orientation', etc.).
+        """
         try:
             # Le nom de colonne peut avoir des variantes d'encodage
+            # Nouveau format: 'numero', ancien: 'numéros'
             numero = 0
-            for key in ['numéros', 'numeros', 'num\xe9ros', 'num\ufffdros']:
+            for key in ['numero', 'numéros', 'numeros', 'num\xe9ros', 'num\ufffdros']:
                 if key in row:
                     try:
                         numero = int(row[key])
@@ -67,37 +73,88 @@ class ScanConfig:
             if numero == 0:
                 return None
 
-            type_source = row.get('scan/texte', 'scan')
+            # Type source: nouveau 'type', ancien 'scan/texte'
+            type_source = (row.get('type') or row.get('scan/texte') or 'scan').strip().lower()
             if type_source != 'scan':
                 return None  # Ne charge que les scans
 
-            # Lire le format de date: 'inline' ou 'par bloc'
-            date_format = row.get('date', 'inline') or 'inline'
+            # Format de date: nouveau 'date_format', ancien 'date'
+            date_format = (row.get('date_format') or row.get('date') or 'inline').strip().lower()
+
+            # Page 1 config: nouveau format 'p1_*', ancien 'page1.*'
+            p1_orientation_texte = (
+                row.get('p1_orientation') or
+                row.get('page1.orientation texte') or
+                'portrait'
+            ).strip().lower()
+            p1_orientation_pdf = (
+                row.get('p1_orientation_pdf') or
+                row.get('page1.orientation pdf') or
+                p1_orientation_texte  # Défaut = même que texte
+            ).strip().lower()
+            p1_sections = (
+                row.get('p1_sections') or
+                row.get('page1.sections texte utile') or
+                ''
+            ).strip()
+            p1_colonnes_str = (
+                row.get('p1_colonnes') or
+                row.get('page1.colonne par section') or
+                '1'
+            )
+            p1_colonnes = int(p1_colonnes_str) if p1_colonnes_str else 1
+
+            # Page 2 config: nouveau format 'p2_*', ancien 'page2.*'
+            p2_orientation_texte = (
+                row.get('p2_orientation') or
+                row.get('page2.orientation texte') or
+                'portrait'
+            ).strip().lower()
+            p2_orientation_pdf = (
+                row.get('p2_orientation_pdf') or
+                row.get('page2.orientation pdf') or
+                p2_orientation_texte  # Défaut = même que texte
+            ).strip().lower()
+            p2_sections = (
+                row.get('p2_sections') or
+                row.get('page2.sections texte utile') or
+                ''
+            ).strip()
+            p2_colonnes_str = (
+                row.get('p2_colonnes') or
+                row.get('page2.colonne par section') or
+                '1'
+            )
+            p2_colonnes = int(p2_colonnes_str) if p2_colonnes_str else 1
 
             return cls(
                 numero=numero,
                 type_source=type_source,
                 date_format=date_format,
-                page1_orientation_pdf=row.get('page1.orientation pdf', 'portrait') or 'portrait',
-                page1_orientation_texte=row.get('page1.orientation texte', 'portrait') or 'portrait',
-                page1_sections=row.get('page1.sections texte utile', '') or '',
-                page1_colonnes=int(row.get('page1.colonne par section', 1) or 1),
-                page2_orientation_pdf=row.get('page2.orientation pdf', 'portrait') or 'portrait',
-                page2_orientation_texte=row.get('page2.orientation texte', 'portrait') or 'portrait',
-                page2_sections=row.get('page2.sections texte utile', '') or '',
-                page2_colonnes=int(row.get('page2.colonne par section', 1) or 1),
-                date_par_evenement=date_format == 'inline',  # Compatibilité: inline = date par événement
+                page1_orientation_pdf=p1_orientation_pdf,
+                page1_orientation_texte=p1_orientation_texte,
+                page1_sections=p1_sections,
+                page1_colonnes=p1_colonnes,
+                page2_orientation_pdf=p2_orientation_pdf,
+                page2_orientation_texte=p2_orientation_texte,
+                page2_sections=p2_sections,
+                page2_colonnes=p2_colonnes,
+                date_par_evenement=date_format == 'inline',  # Compatibilité
             )
         except (ValueError, KeyError) as e:
             logger.debug(f"Erreur parsing config row: {e}")
             return None
 
     def needs_rotation(self, page_num: int) -> bool:
-        """Vérifie si une page nécessite une rotation de 90°."""
+        """Vérifie si une page nécessite une rotation de 90°.
+
+        Rotation nécessaire quand l'orientation du PDF diffère de celle du texte.
+        Ex: PDF portrait + texte paysage = rotation 90° nécessaire.
+        """
         if page_num == 1:
-            return self.page1_orientation_texte == 'paysage'
+            return self.page1_orientation_pdf != self.page1_orientation_texte
         else:
-            return self.page2_orientation_texte == 'paysage'
+            return self.page2_orientation_pdf != self.page2_orientation_texte
 
     def get_sections(self, page_num: int) -> list[str]:
         """Retourne les sections à extraire pour une page."""
@@ -146,7 +203,10 @@ class ScanConfigLoader:
         for encoding in encodings:
             try:
                 with open(self.csv_path, 'r', encoding=encoding) as f:
-                    reader = csv.DictReader(f)
+                    # Filtrer les lignes de commentaires (commençant par #)
+                    lines = [line for line in f if not line.strip().startswith('#')]
+                    from io import StringIO
+                    reader = csv.DictReader(StringIO(''.join(lines)))
                     for row in reader:
                         config = ScanConfig.from_csv_row(row)
                         if config:
@@ -307,19 +367,20 @@ class OCREngine:
 
         self._engine = vision.ImageAnnotatorClient()
 
-    def ocr_image(self, image: np.ndarray, num_columns: int = 1) -> str:
+    def ocr_image(self, image: np.ndarray, num_columns: int = 1, auto_layout: bool = False) -> str:
         """Effectue l'OCR sur une image numpy.
 
         Args:
             image: Image numpy array
             num_columns: Nombre de colonnes pour la lecture (1 = normal, 2+ = par colonnes)
+            auto_layout: Si True, détecte automatiquement le layout (Google Vision uniquement)
         """
         if self.engine_name == 'paddleocr':
             return self._ocr_paddle(image, num_columns)
         elif self.engine_name == 'easyocr':
             return self._ocr_easyocr(image)
         elif self.engine_name == 'google':
-            return self._ocr_google(image, num_columns)
+            return self._ocr_google(image, num_columns, auto_layout=auto_layout)
         return ""
 
     def _ocr_paddle(self, image: np.ndarray, num_columns: int = 1) -> str:
@@ -415,12 +476,13 @@ class OCREngine:
 
         return '\n'.join(lines)
 
-    def _ocr_google(self, image: np.ndarray, num_columns: int = 1) -> str:
+    def _ocr_google(self, image: np.ndarray, num_columns: int = 1, auto_layout: bool = False) -> str:
         """OCR avec Google Cloud Vision API.
 
         Args:
             image: Image numpy array
             num_columns: Nombre de colonnes à détecter (1 = lecture normale, 2+ = lecture par colonnes)
+            auto_layout: Si True, détecte automatiquement le layout (colonnes, orientation)
         """
         import io
         from PIL import Image
@@ -449,11 +511,20 @@ class OCREngine:
         if not response.full_text_annotation:
             return ""
 
+        # Mode auto-layout : détection automatique de la structure
+        if auto_layout and response.full_text_annotation.pages:
+            from .layout_analyzer import extract_text_with_auto_layout
+            return extract_text_with_auto_layout(
+                response.full_text_annotation,
+                image.shape[1],  # width
+                image.shape[0],  # height
+            )
+
         # Si une seule colonne ou pas de pages, retourner le texte brut
         if num_columns <= 1 or not response.full_text_annotation.pages:
             return response.full_text_annotation.text
 
-        # Extraction avec respect des colonnes
+        # Extraction avec respect des colonnes (nombre fixe)
         return self._extract_text_by_columns(response.full_text_annotation, num_columns, image.shape[1])
 
     def _extract_text_by_columns(self, annotation, num_columns: int, image_width: int) -> str:
@@ -682,17 +753,30 @@ class OCRResult:
 class ScanExtractor:
     """Extracteur de texte pour PDFs scannés."""
 
-    def __init__(self, ocr_engine: str = 'paddleocr', dpi: int = 200):
+    def __init__(self, ocr_engine: str = 'paddleocr', dpi: int = 200, use_sections: bool = True, auto_layout: bool = False):
         """
         Initialise l'extracteur OCR.
 
         Args:
-            ocr_engine: Moteur OCR à utiliser ('paddleocr' ou 'easyocr')
+            ocr_engine: Moteur OCR à utiliser ('paddleocr', 'easyocr', 'google')
             dpi: Résolution pour la conversion PDF → Image (200 par défaut, bon compromis vitesse/qualité)
+            use_sections: Si True, utilise l'extraction par sections A6 quand configuré
+            auto_layout: Si True, détecte automatiquement le layout (colonnes, orientation)
         """
         self.ocr = OCREngine(engine=ocr_engine)
         self.preprocessor = ImagePreprocessor()
         self.dpi = dpi
+        self.use_sections = use_sections
+        self.auto_layout = auto_layout
+        self._section_extractor = None
+
+    @property
+    def section_extractor(self):
+        """Lazy loading du SectionOCRExtractor."""
+        if self._section_extractor is None:
+            from .section_extractor import SectionOCRExtractor
+            self._section_extractor = SectionOCRExtractor(self.ocr)
+        return self._section_extractor
 
     def extract_from_pdf(self, pdf_path: str, config: Optional[ScanConfig] = None) -> OCRResult:
         """
@@ -718,6 +802,120 @@ class ScanExtractor:
         if config is None and numero:
             config = load_bidul_config(numero)
 
+        # Essayer l'extraction par sections si activée
+        if self.use_sections and numero:
+            section_result = self._extract_with_sections(pdf_path, numero, mois, annee)
+            if section_result:
+                return section_result
+
+        # Fallback: extraction classique (page entière)
+        return self._extract_classic(pdf_path, config, numero, mois, annee)
+
+    def _extract_with_sections(
+        self,
+        pdf_path: str,
+        numero: int,
+        mois: Optional[int],
+        annee: Optional[int]
+    ) -> Optional[OCRResult]:
+        """
+        Extraction par sections A6 si configuré.
+
+        Returns:
+            OCRResult si l'extraction par sections est possible, None sinon
+        """
+        from .section_extractor import load_section_config
+
+        section_config = load_section_config(numero)
+        if not section_config:
+            logger.debug(f"Bidul {numero}: pas de config sections, utilise extraction classique")
+            return None
+
+        # Vérifier qu'il y a des sections configurées
+        if not section_config.page1 and not section_config.page2:
+            logger.debug(f"Bidul {numero}: config sans sections définies")
+            return None
+
+        try:
+            # Convertir PDF en images
+            images = convert_from_path(str(pdf_path), dpi=self.dpi)
+            num_pages = len(images)
+
+            # Déterminer les pages à traiter
+            pages_to_process = section_config.get_pages_to_process(num_pages)
+
+            logger.info(f"Bidul {numero}: extraction par sections, pages {pages_to_process}")
+
+            result = OCRResult(
+                pdf_path=pdf_path,
+                bidul_numero=numero,
+                mois=mois,
+                annee=annee,
+                num_pages=num_pages,
+                metadata={
+                    'dpi': self.dpi,
+                    'ocr_engine': self.ocr.engine_name,
+                    'extraction_mode': 'sections',
+                    'date_format': section_config.date_format,
+                    'pages_processed': pages_to_process,
+                }
+            )
+
+            all_texts = []
+
+            for page_num in pages_to_process:
+                pil_image = images[page_num - 1]  # images est 0-indexed
+                image = self.preprocessor.pil_to_cv2(pil_image)
+
+                # Prétraitement basique (deskew, denoise)
+                image = self._preprocess_basic(image)
+
+                # Obtenir la config de la page
+                page_config = section_config.get_page_config(page_num)
+
+                if page_config and page_config.sections_utiles:
+                    # Extraction par sections
+                    page_result = self.section_extractor.extract_page_by_sections(
+                        image, page_num, page_config
+                    )
+                    page_text = page_result.full_text
+                    sections_info = [s.section.value for s in page_result.sections]
+                    logger.info(f"Page {page_num}: sections {sections_info}, {len(page_text)} caractères")
+                else:
+                    # Pas de config pour cette page, extraction classique
+                    page_text = self.ocr.ocr_image(image, num_columns=1)
+                    logger.info(f"Page {page_num}: extraction complète, {len(page_text)} caractères")
+
+                all_texts.append(page_text)
+
+                page_ocr_result = OCRPageResult(
+                    page_num=page_num,
+                    text=page_text,
+                    char_count=len(page_text),
+                    config_applied={
+                        'sections': [s.value for s in page_config.sections_utiles] if page_config else [],
+                        'colonnes': page_config.colonnes_par_section if page_config else 1,
+                        'orientation_texte': page_config.orientation_texte.value if page_config else 'portrait',
+                    }
+                )
+                result.pages.append(page_ocr_result)
+
+            result.full_text = '\n\n'.join(t for t in all_texts if t)
+            return result
+
+        except Exception as e:
+            logger.error(f"Erreur extraction sections Bidul {numero}: {e}")
+            return None
+
+    def _extract_classic(
+        self,
+        pdf_path: str,
+        config: Optional[ScanConfig],
+        numero: Optional[int],
+        mois: Optional[int],
+        annee: Optional[int]
+    ) -> OCRResult:
+        """Extraction classique (page entière, sans découpage en sections)."""
         try:
             # Convertir PDF en images
             images = convert_from_path(str(pdf_path), dpi=self.dpi)
@@ -740,6 +938,8 @@ class ScanExtractor:
                 metadata={
                     'dpi': self.dpi,
                     'ocr_engine': self.ocr.engine_name,
+                    'extraction_mode': 'auto-layout' if self.auto_layout else 'classic',
+                    'auto_layout': self.auto_layout,
                     'config_numero': config.numero if config else None,
                     'date_format': config.date_format if config else 'inline',
                     'page1_sections': config.page1_sections if config else '',
@@ -758,12 +958,15 @@ class ScanExtractor:
                 # Prétraitement selon config
                 image = self._preprocess(image, page_config)
 
-                # OCR avec nombre de colonnes
-                num_columns = page_config.get('colonnes', 1)
-                page_text = self.ocr.ocr_image(image, num_columns=num_columns)
-
-                if num_columns > 1:
-                    logger.debug(f"Page {page_num}: OCR avec {num_columns} colonnes")
+                # OCR avec nombre de colonnes ou auto-layout
+                if self.auto_layout:
+                    page_text = self.ocr.ocr_image(image, num_columns=1, auto_layout=True)
+                    logger.debug(f"Page {page_num}: OCR avec auto-layout")
+                else:
+                    num_columns = page_config.get('colonnes', 1)
+                    page_text = self.ocr.ocr_image(image, num_columns=num_columns)
+                    if num_columns > 1:
+                        logger.debug(f"Page {page_num}: OCR avec {num_columns} colonnes")
 
                 page_result = OCRPageResult(
                     page_num=page_num,
@@ -790,6 +993,14 @@ class ScanExtractor:
                 num_pages=0,
                 error=str(e)
             )
+
+    def _preprocess_basic(self, image: np.ndarray) -> np.ndarray:
+        """Prétraitement basique sans rotation (utilisé pour l'extraction par sections)."""
+        # Correction d'inclinaison légère
+        image = self.preprocessor.deskew(image)
+        # Débruitage léger
+        image = self.preprocessor.denoise(image, strength=5)
+        return image
 
     def _get_page_config(self, config: Optional[ScanConfig], page_num: int) -> dict:
         """Extrait la config pour une page spécifique."""

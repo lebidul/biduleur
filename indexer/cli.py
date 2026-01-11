@@ -224,7 +224,13 @@ def cmd_extract(args):
             # Initialisation lazy de l'OCR (une seule fois)
             if ocr_extractor is None:
                 try:
-                    ocr_extractor = ScanExtractor(dpi=getattr(args, 'dpi', 200))
+                    use_sections = not getattr(args, 'no_sections', False)
+                    auto_layout = getattr(args, 'auto_layout', False)
+                    ocr_extractor = ScanExtractor(
+                        dpi=getattr(args, 'dpi', 200),
+                        use_sections=use_sections,
+                        auto_layout=auto_layout
+                    )
                     ocr_postprocessor = OCRPostProcessor()
                 except Exception as e:
                     print(f"  Erreur init OCR: {e}")
@@ -903,9 +909,22 @@ def cmd_populate(args):
                 if ocr_extractor is None:
                     try:
                         engine = getattr(args, 'engine', 'google')
-                        ocr_extractor = ScanExtractor(ocr_engine=engine, dpi=getattr(args, 'dpi', 200))
+                        use_sections = not getattr(args, 'no_sections', False)
+                        auto_layout = getattr(args, 'auto_layout', False)
+                        ocr_extractor = ScanExtractor(
+                            ocr_engine=engine,
+                            dpi=getattr(args, 'dpi', 200),
+                            use_sections=use_sections,
+                            auto_layout=auto_layout
+                        )
                         ocr_postprocessor = OCRPostProcessor()
-                        print(f"OCR initialisé ({engine})")
+                        mode_info = []
+                        if use_sections:
+                            mode_info.append("sections")
+                        if auto_layout:
+                            mode_info.append("auto-layout")
+                        mode_str = f" ({', '.join(mode_info)})" if mode_info else ""
+                        print(f"OCR initialisé ({engine}{mode_str})")
                     except Exception as e:
                         print(f"[{numero}] Erreur init OCR: {e}")
                         skipped += 1
@@ -1436,9 +1455,20 @@ def cmd_ocr(args):
     from indexer.core.ocr_postprocess import OCRPostProcessor
 
     pdf_path = args.pdf_path
-
-    # Détecter le numéro du Bidul depuis le nom de fichier ou argument
     numero = args.numero
+
+    # Si --numero fourni sans pdf_path, chercher le PDF automatiquement
+    if pdf_path is None:
+        if numero is None:
+            print("Erreur: spécifiez un chemin PDF ou --numero")
+            return 1
+        pdf_file = find_pdf(numero)
+        if not pdf_file:
+            print(f"Erreur: PDF non trouvé pour Bidul {numero}")
+            return 1
+        pdf_path = str(pdf_file)
+
+    # Détecter le numéro du Bidul depuis le nom de fichier si non fourni
     if numero is None:
         match = re.search(r'Bidul[_\s-]*(\d+)', pdf_path, re.IGNORECASE)
         numero = int(match.group(1)) if match else None
@@ -1454,8 +1484,14 @@ def cmd_ocr(args):
     start_time = time.time()
 
     # Extraction
-    extractor = ScanExtractor(ocr_engine=args.engine, dpi=args.dpi)
+    use_sections = not getattr(args, 'no_sections', False)
+    auto_layout = getattr(args, 'auto_layout', False)
+    extractor = ScanExtractor(ocr_engine=args.engine, dpi=args.dpi, use_sections=use_sections, auto_layout=auto_layout)
     result = extractor.extract_from_pdf(pdf_path, config)
+
+    # Afficher le mode d'extraction utilisé
+    extraction_mode = result.metadata.get('extraction_mode', 'classic')
+    print(f"  Mode d'extraction: {extraction_mode}")
 
     if result.error:
         print(f"  Erreur: {result.error}")
@@ -1598,7 +1634,9 @@ def cmd_ocr_extract(args):
         return 1
 
     engine = getattr(args, 'engine', 'google')
-    extractor = ScanExtractor(ocr_engine=engine, dpi=args.dpi)
+    use_sections = not getattr(args, 'no_sections', False)
+    auto_layout = getattr(args, 'auto_layout', False)
+    extractor = ScanExtractor(ocr_engine=engine, dpi=args.dpi, use_sections=use_sections, auto_layout=auto_layout)
     postprocessor = OCRPostProcessor()
 
     # Charger les référentiels pour le parsing
@@ -2171,6 +2209,8 @@ Maintenance (normalisation v2):
     p_extract.add_argument('--force', action='store_true', help='Forcer l\'extraction même en cas d\'erreur')
     p_extract.add_argument('--no-ocr', action='store_true', help='Désactiver l\'OCR pour les scans')
     p_extract.add_argument('--dpi', type=int, default=200, help='Résolution OCR (défaut: 200)')
+    p_extract.add_argument('--no-sections', action='store_true', help='Désactiver l\'extraction par sections A6')
+    p_extract.add_argument('--auto-layout', action='store_true', help='Détection automatique du layout (colonnes, orientation)')
 
     # validate
     p_validate = subparsers.add_parser('validate', help='Valide une extraction')
@@ -2203,6 +2243,8 @@ Maintenance (normalisation v2):
     p_populate.add_argument('--engine', '-e', default='google', choices=['paddleocr', 'easyocr', 'google'],
                            help='Moteur OCR (défaut: google)')
     p_populate.add_argument('--dpi', type=int, default=200, help='Résolution OCR (défaut: 200)')
+    p_populate.add_argument('--no-sections', action='store_true', help='Désactiver l\'extraction par sections A6')
+    p_populate.add_argument('--auto-layout', action='store_true', help='Détection automatique du layout (colonnes, orientation)')
     p_populate.add_argument('--include-regional', action='store_true',
                            help='Inclure les événements hors département (marqués is_regional=True)')
     p_populate.add_argument('--include-artifacts', action='store_true',
@@ -2244,13 +2286,15 @@ Maintenance (normalisation v2):
 
     # ocr - Extrait le texte d'un PDF scanné
     p_ocr = subparsers.add_parser('ocr', help='Extrait le texte d\'un PDF scanné par OCR')
-    p_ocr.add_argument('pdf_path', help='Chemin vers le PDF à traiter')
-    p_ocr.add_argument('--numero', '-n', type=int, help='Numéro du Bidul (auto-détecté si non fourni)')
+    p_ocr.add_argument('pdf_path', nargs='?', help='Chemin vers le PDF à traiter (ou utiliser --numero)')
+    p_ocr.add_argument('--numero', '-n', type=int, help='Numéro du Bidul (cherche le PDF automatiquement)')
     p_ocr.add_argument('--engine', '-e', default='paddleocr', choices=['paddleocr', 'easyocr', 'google'],
                        help='Moteur OCR (défaut: paddleocr)')
     p_ocr.add_argument('--dpi', '-d', type=int, default=200, help='Résolution pour conversion PDF (défaut: 200)')
     p_ocr.add_argument('--output', '-o', help='Fichier de sortie pour le texte extrait')
     p_ocr.add_argument('--raw', action='store_true', help='Ne pas appliquer le post-traitement')
+    p_ocr.add_argument('--no-sections', action='store_true', help='Désactiver l\'extraction par sections A6')
+    p_ocr.add_argument('--auto-layout', action='store_true', help='Détection automatique du layout (colonnes, orientation)')
 
     # ocr-test - Teste l'OCR sur un échantillon
     p_ocr_test = subparsers.add_parser('ocr-test', help='Teste l\'OCR sur un échantillon de PDFs scannés')
@@ -2265,6 +2309,8 @@ Maintenance (normalisation v2):
                                help='Moteur OCR (défaut: google)')
     p_ocr_extract.add_argument('--dpi', '-d', type=int, default=200, help='Résolution pour conversion PDF (défaut: 200)')
     p_ocr_extract.add_argument('--dry-run', action='store_true', help='Ne pas sauvegarder en base')
+    p_ocr_extract.add_argument('--no-sections', action='store_true', help='Désactiver l\'extraction par sections A6')
+    p_ocr_extract.add_argument('--auto-layout', action='store_true', help='Détection automatique du layout (colonnes, orientation)')
 
     # ==========================================================================
     # Corpus Commands

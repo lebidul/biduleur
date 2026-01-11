@@ -3,6 +3,9 @@
 * cas particuliers
   * 2010-09 Bidul 147 bis.pdf
   * 2019-03 Bidul 242 Marion.pdf, 2019-03 Bidul 242 Stef@n.pdf
+  * #10 concert kha farnaum p1 à rentrer à la main
+  * #60 ajouter festival crève la dalle à la main
+  * #61 bebop à rajouter à la main
   * #92 seulement 14 evenements (juillet aout)
   * #132
     * evt regionaux non elimines
@@ -35,3 +38,5 @@
 * faire fichiers benchmark
 * consolidation parsing à continuer
 * ajouter d'autres KPI de la qualité du dataset à stats --html
+* ajouter biduls 309 et 310
+* accélerer populate (peut-être avec moins d'info logged)

@@ -1,3 +1,74 @@
+# Release Notes - Indexer v1.11
+
+## Vue d'ensemble
+
+Version avec amélioration de l'extraction OCR par sections : rotation de page entière avant découpage, découpage en colonnes physiques, et support des colonnes `p*_orientation_pdf` pour distinguer l'orientation du PDF de celle du texte.
+
+## Nouveautés v1.11
+
+### Rotation de page entière avant découpage
+
+L'extraction par sections applique maintenant la rotation sur la page **entière** avant de découper les sections A6. Cela corrige le problème où les sections étaient définies sur l'image PDF non rotée.
+
+**Workflow d'extraction :**
+1. Rotation 90° horaire de la page (si `orientation_pdf != orientation_texte`)
+2. Découpage en sections S1/S2/S3/S4 sur l'image rotée
+3. OCR de chaque section avec découpage physique des colonnes
+
+### Colonnes `p*_orientation_pdf`
+
+Nouvelles colonnes dans `biduls.description.csv` pour distinguer l'orientation du PDF de celle du texte :
+
+| Colonne | Description |
+|---------|-------------|
+| `p1_orientation_pdf` | Orientation du PDF page 1 (portrait/paysage) |
+| `p2_orientation_pdf` | Orientation du PDF page 2 (portrait/paysage) |
+
+**Cas d'usage** : Biduls 2-11 où le PDF est en portrait mais le texte est imprimé en paysage.
+
+### Découpage physique des colonnes
+
+Pour les sections avec plusieurs colonnes (`p*_colonnes > 1`), l'image est maintenant physiquement coupée en bandes verticales avant OCR. Chaque colonne est OCR séparément puis les résultats sont concaténés dans l'ordre de lecture (gauche → droite).
+
+**Avant** : Google Vision triait les blocs par position X (résultats incohérents)
+**Après** : Colonnes physiquement séparées, OCR indépendant par colonne
+
+### Format date `inline_inherited`
+
+Support amélioré du format `inline_inherited` (biduls 1-16) :
+- Patterns de date : `jeu 05:`, `ven 06:`, etc. (2-3 lettres, deux-points optionnel)
+- Lignes de continuation jointes à l'événement précédent
+- Héritage de date pour les événements sans date explicite
+
+### Tests ajoutés
+
+- `TestPageSectionConfigRotation` : 4 tests pour la logique rotation PDF vs texte
+- `TestSectionCropperRotation` : 2 tests pour rotation clockwise/counter-clockwise
+- `TestBidulSectionConfigOrientationPdf` : 3 tests pour config bidul 5
+
+### Marge inter-colonnes (gutter)
+
+Pour éviter le chevauchement de texte entre colonnes adjacentes, une marge de 3% est rognée de chaque côté de la frontière entre colonnes. Pour 2 colonnes, cela crée une "zone morte" de 6% au centre.
+
+**Avant** : Le texte de la colonne droite ("lun", "SORTIR?") apparaissait dans la colonne gauche
+**Après** : Colonnes proprement séparées sans chevauchement
+
+### Benchmarks
+
+| Bidul | Score v1.10 | Score v1.11 |
+|-------|-------------|-------------|
+| 5 | N/A | 53 événements (nouveau) |
+| 184 | 95.4% | 95.4% |
+| 190 | 91.2% | 91.2% |
+
+### Prochaines étapes (v1.12)
+
+- [ ] Templates SVG pour définir les zones d'extraction avec précision
+- [ ] Édition manuelle des zones problématiques
+- [ ] Fallback automatique : SVG personnalisé > config CSV > calcul par défaut
+
+---
+
 # Release Notes - Indexer v1.10
 
 ## Vue d'ensemble
