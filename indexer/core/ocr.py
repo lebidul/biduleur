@@ -52,11 +52,17 @@ class ScanConfig:
 
     @classmethod
     def from_csv_row(cls, row: dict) -> Optional['ScanConfig']:
-        """Crée une config depuis une ligne du CSV biduls.description.csv."""
+        """Crée une config depuis une ligne du CSV biduls.description.csv.
+
+        Supporte à la fois l'ancien format (colonnes 'numéros', 'scan/texte', 'date',
+        'page1.orientation pdf', etc.) et le nouveau format (colonnes 'numero', 'type',
+        'date_format', 'p1_orientation', etc.).
+        """
         try:
             # Le nom de colonne peut avoir des variantes d'encodage
+            # Nouveau format: 'numero', ancien: 'numéros'
             numero = 0
-            for key in ['numéros', 'numeros', 'num\xe9ros', 'num\ufffdros']:
+            for key in ['numero', 'numéros', 'numeros', 'num\xe9ros', 'num\ufffdros']:
                 if key in row:
                     try:
                         numero = int(row[key])
@@ -67,37 +73,88 @@ class ScanConfig:
             if numero == 0:
                 return None
 
-            type_source = row.get('scan/texte', 'scan')
+            # Type source: nouveau 'type', ancien 'scan/texte'
+            type_source = (row.get('type') or row.get('scan/texte') or 'scan').strip().lower()
             if type_source != 'scan':
                 return None  # Ne charge que les scans
 
-            # Lire le format de date: 'inline' ou 'par bloc'
-            date_format = row.get('date', 'inline') or 'inline'
+            # Format de date: nouveau 'date_format', ancien 'date'
+            date_format = (row.get('date_format') or row.get('date') or 'inline').strip().lower()
+
+            # Page 1 config: nouveau format 'p1_*', ancien 'page1.*'
+            p1_orientation_texte = (
+                row.get('p1_orientation') or
+                row.get('page1.orientation texte') or
+                'portrait'
+            ).strip().lower()
+            p1_orientation_pdf = (
+                row.get('p1_orientation_pdf') or
+                row.get('page1.orientation pdf') or
+                p1_orientation_texte  # Défaut = même que texte
+            ).strip().lower()
+            p1_sections = (
+                row.get('p1_sections') or
+                row.get('page1.sections texte utile') or
+                ''
+            ).strip()
+            p1_colonnes_str = (
+                row.get('p1_colonnes') or
+                row.get('page1.colonne par section') or
+                '1'
+            )
+            p1_colonnes = int(p1_colonnes_str) if p1_colonnes_str else 1
+
+            # Page 2 config: nouveau format 'p2_*', ancien 'page2.*'
+            p2_orientation_texte = (
+                row.get('p2_orientation') or
+                row.get('page2.orientation texte') or
+                'portrait'
+            ).strip().lower()
+            p2_orientation_pdf = (
+                row.get('p2_orientation_pdf') or
+                row.get('page2.orientation pdf') or
+                p2_orientation_texte  # Défaut = même que texte
+            ).strip().lower()
+            p2_sections = (
+                row.get('p2_sections') or
+                row.get('page2.sections texte utile') or
+                ''
+            ).strip()
+            p2_colonnes_str = (
+                row.get('p2_colonnes') or
+                row.get('page2.colonne par section') or
+                '1'
+            )
+            p2_colonnes = int(p2_colonnes_str) if p2_colonnes_str else 1
 
             return cls(
                 numero=numero,
                 type_source=type_source,
                 date_format=date_format,
-                page1_orientation_pdf=row.get('page1.orientation pdf', 'portrait') or 'portrait',
-                page1_orientation_texte=row.get('page1.orientation texte', 'portrait') or 'portrait',
-                page1_sections=row.get('page1.sections texte utile', '') or '',
-                page1_colonnes=int(row.get('page1.colonne par section', 1) or 1),
-                page2_orientation_pdf=row.get('page2.orientation pdf', 'portrait') or 'portrait',
-                page2_orientation_texte=row.get('page2.orientation texte', 'portrait') or 'portrait',
-                page2_sections=row.get('page2.sections texte utile', '') or '',
-                page2_colonnes=int(row.get('page2.colonne par section', 1) or 1),
-                date_par_evenement=date_format == 'inline',  # Compatibilité: inline = date par événement
+                page1_orientation_pdf=p1_orientation_pdf,
+                page1_orientation_texte=p1_orientation_texte,
+                page1_sections=p1_sections,
+                page1_colonnes=p1_colonnes,
+                page2_orientation_pdf=p2_orientation_pdf,
+                page2_orientation_texte=p2_orientation_texte,
+                page2_sections=p2_sections,
+                page2_colonnes=p2_colonnes,
+                date_par_evenement=date_format == 'inline',  # Compatibilité
             )
         except (ValueError, KeyError) as e:
             logger.debug(f"Erreur parsing config row: {e}")
             return None
 
     def needs_rotation(self, page_num: int) -> bool:
-        """Vérifie si une page nécessite une rotation de 90°."""
+        """Vérifie si une page nécessite une rotation de 90°.
+
+        Rotation nécessaire quand l'orientation du PDF diffère de celle du texte.
+        Ex: PDF portrait + texte paysage = rotation 90° nécessaire.
+        """
         if page_num == 1:
-            return self.page1_orientation_texte == 'paysage'
+            return self.page1_orientation_pdf != self.page1_orientation_texte
         else:
-            return self.page2_orientation_texte == 'paysage'
+            return self.page2_orientation_pdf != self.page2_orientation_texte
 
     def get_sections(self, page_num: int) -> list[str]:
         """Retourne les sections à extraire pour une page."""
@@ -146,7 +203,10 @@ class ScanConfigLoader:
         for encoding in encodings:
             try:
                 with open(self.csv_path, 'r', encoding=encoding) as f:
-                    reader = csv.DictReader(f)
+                    # Filtrer les lignes de commentaires (commençant par #)
+                    lines = [line for line in f if not line.strip().startswith('#')]
+                    from io import StringIO
+                    reader = csv.DictReader(StringIO(''.join(lines)))
                     for row in reader:
                         config = ScanConfig.from_csv_row(row)
                         if config:

@@ -1108,5 +1108,86 @@ Sa 05: Autre concert, Allonnes, 20h"""
         assert regional == ""
 
 
+class TestInlineInheritedDateFormat:
+    """Tests pour le format inline_inherited (biduls 1-16)."""
+
+    def test_date_only_line_sets_current_date(self):
+        """Une ligne 'Je 05:' seule doit établir la date pour les événements suivants."""
+        text = """Je 05:
+URANUS BRILLANT, bar Le Viking's, LE MANS, 21h30
+NICOLAS ET TOMY, pub Le Terminus, LE MANS, 21h00"""
+
+        lieu_ref = [(1, "bar Le Viking's", "Le Mans"), (2, "Le Terminus", "Le Mans")]
+        ville_ref = [(1, "Le Mans")]
+
+        parser = EventParser(bidul_mois=2, bidul_annee=1998, date_format='inline_inherited')
+        events = parser.parse_with_referentiel(text, lieu_ref, ville_ref)
+
+        assert len(events) == 2
+        assert events[0].date_evenement == date(1998, 2, 5)
+        assert events[1].date_evenement == date(1998, 2, 5)
+        assert "URANUS" in events[0].raw_text
+        assert "NICOLAS" in events[1].raw_text
+
+    def test_date_with_content_on_same_line(self):
+        """Format 'Ma 03: ARTISTE, lieu' doit créer un événement avec la date."""
+        text = """Ma 03: TONGZ, bar Le Mackeson, LE MANS, 22h15
+MICHEL EDELIN QUARTET, Le Théâtre, LE MANS, 21h00"""
+
+        lieu_ref = [(1, "Le Mackeson", "Le Mans"), (2, "Le Théâtre", "Le Mans")]
+        ville_ref = [(1, "Le Mans")]
+
+        parser = EventParser(bidul_mois=2, bidul_annee=1998, date_format='inline_inherited')
+        events = parser.parse_with_referentiel(text, lieu_ref, ville_ref)
+
+        assert len(events) == 2
+        assert events[0].date_evenement == date(1998, 2, 3)
+        assert events[1].date_evenement == date(1998, 2, 3)
+
+    def test_continuation_lines_are_joined(self):
+        """Les lignes de continuation (ville, heure) sont jointes à l'événement précédent."""
+        text = """Je 05:
+NICOLAS ET TOMY, pub Le Terminus
+LE MANS 21h00"""
+
+        lieu_ref = [(1, "Le Terminus", "Le Mans")]
+        ville_ref = [(1, "Le Mans")]
+
+        parser = EventParser(bidul_mois=2, bidul_annee=1998, date_format='inline_inherited')
+        events = parser.parse_with_referentiel(text, lieu_ref, ville_ref)
+
+        assert len(events) == 1
+        assert events[0].date_evenement == date(1998, 2, 5)
+        # LE MANS doit être joint à l'événement
+        assert "LE MANS" in events[0].raw_text or events[0].ville_raw == "Le Mans"
+
+    def test_new_date_resets_inheritance(self):
+        """Une nouvelle date doit réinitialiser l'héritage."""
+        text = """Je 05:
+URANUS BRILLANT, bar Le Viking's, LE MANS, 21h30
+Ve 06: SAMEBLOOD, L'Inventaire, LE MANS, 22h00"""
+
+        lieu_ref = [(1, "bar Le Viking's", "Le Mans"), (2, "L'Inventaire", "Le Mans")]
+        ville_ref = [(1, "Le Mans")]
+
+        parser = EventParser(bidul_mois=2, bidul_annee=1998, date_format='inline_inherited')
+        events = parser.parse_with_referentiel(text, lieu_ref, ville_ref)
+
+        assert len(events) == 2
+        assert events[0].date_evenement == date(1998, 2, 5)
+        assert events[1].date_evenement == date(1998, 2, 6)
+
+    def test_fallback_to_inline_if_no_events(self):
+        """Si inline_inherited ne trouve rien, fallback sur inline."""
+        # Texte sans format inline_inherited valide
+        text = "Simple text without dates"
+
+        parser = EventParser(bidul_mois=2, bidul_annee=1998, date_format='inline_inherited')
+        events = parser.parse_with_referentiel(text, [], [])
+
+        # Pas d'erreur, juste 0 événements
+        assert len(events) == 0
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
