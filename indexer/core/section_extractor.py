@@ -60,26 +60,31 @@ class PageSectionConfig:
         Args:
             row: Ligne du CSV biduls.description.csv
             page_num: Numéro de la page (1 ou 2)
+
+        Nouveau format CSV (v2):
+            p1_sections, p1_orientation, p1_orientation_pdf, p1_colonnes
+            p2_sections, p2_orientation, p2_orientation_pdf, p2_colonnes
         """
-        prefix = f'page{page_num}.'
+        prefix = f'p{page_num}_'
 
-        # Vérifier si des colonnes sont définies pour cette page
-        orientation_pdf_key = f'{prefix}orientation pdf'
-        orientation_texte_key = f'{prefix}orientation texte'
-        sections_key = f'{prefix}sections texte utile'
-        colonnes_key = f'{prefix}colonne par section'
+        # Clés du nouveau format
+        sections_key = f'{prefix}sections'
+        orientation_key = f'{prefix}orientation'
+        orientation_pdf_key = f'{prefix}orientation_pdf'
+        colonnes_key = f'{prefix}colonnes'
 
-        # Si aucune colonne n'est définie, la page n'a pas de config
-        has_config = any(row.get(k) for k in [orientation_pdf_key, sections_key])
+        # Si aucune colonne n'est définie, la page n'a pas de config spécifique
+        has_config = any(row.get(k) for k in [sections_key, orientation_key])
         if not has_config:
             return None
 
-        # Parser l'orientation
-        orientation_pdf_str = (row.get(orientation_pdf_key) or 'portrait').lower().strip()
-        orientation_texte_str = (row.get(orientation_texte_key) or 'portrait').lower().strip()
+        # Parser l'orientation du texte
+        orientation_str = (row.get(orientation_key) or 'portrait').lower().strip()
+        orientation_texte = Orientation.PAYSAGE if orientation_str == 'paysage' else Orientation.PORTRAIT
 
+        # Parser l'orientation du PDF (défaut = même que texte)
+        orientation_pdf_str = (row.get(orientation_pdf_key) or orientation_str).lower().strip()
         orientation_pdf = Orientation.PAYSAGE if orientation_pdf_str == 'paysage' else Orientation.PORTRAIT
-        orientation_texte = Orientation.PAYSAGE if orientation_texte_str == 'paysage' else Orientation.PORTRAIT
 
         # Parser les sections
         sections_str = row.get(sections_key, '') or ''
@@ -107,8 +112,12 @@ class PageSectionConfig:
         )
 
     def needs_rotation(self) -> bool:
-        """True si le texte nécessite une rotation pour être lu."""
-        return self.orientation_texte == Orientation.PAYSAGE
+        """True si le texte nécessite une rotation pour être lu.
+
+        Rotation nécessaire quand l'orientation du PDF diffère de celle du texte.
+        Ex: PDF portrait + texte paysage = rotation 90° nécessaire.
+        """
+        return self.orientation_pdf != self.orientation_texte
 
     def get_section_order(self) -> list[Section]:
         """Retourne l'ordre de lecture des sections selon l'orientation du texte."""
@@ -129,10 +138,10 @@ class BidulSectionConfig:
 
     @classmethod
     def from_csv_row(cls, row: dict) -> Optional['BidulSectionConfig']:
-        """Crée une config depuis une ligne du CSV biduls.description.csv."""
+        """Crée une config depuis une ligne du CSV biduls.description.csv (format v2)."""
         # Extraire le numéro
         numero = 0
-        for key in ['numéros', 'numeros', 'num\xe9ros', 'num\ufffdros']:
+        for key in ['numero', 'numéros', 'numeros', 'num\xe9ros', 'num\ufffdros']:
             if key in row:
                 try:
                     numero = int(row[key])
@@ -143,17 +152,17 @@ class BidulSectionConfig:
         if numero == 0:
             return None
 
-        type_source = (row.get('scan/texte') or '').strip().lower()
-        if not type_source:
-            return None
+        # Nouveau format: colonne 'type' au lieu de 'scan/texte'
+        type_source = (row.get('type') or row.get('scan/texte') or 'scan').strip().lower()
 
-        date_format = row.get('date', 'inline') or 'inline'
+        # Nouveau format: colonne 'date_format' au lieu de 'date'
+        date_format = row.get('date_format') or row.get('date', 'inline') or 'inline'
 
-        # Parser pages_override
+        # Nouveau format: colonne 'pages' au lieu de 'pages_override'
         pages_override = []
-        override_str = row.get('pages_override', '') or ''
+        override_str = row.get('pages') or row.get('pages_override', '') or ''
         if override_str:
-            for p in override_str.split(','):
+            for p in str(override_str).replace(',', ' ').split():
                 try:
                     pages_override.append(int(p.strip()))
                 except ValueError:
@@ -232,11 +241,15 @@ class SectionConfigLoader:
         for encoding in encodings:
             try:
                 with open(self.csv_path, 'r', encoding=encoding) as f:
-                    reader = csv.DictReader(f)
-                    for row in reader:
-                        config = BidulSectionConfig.from_csv_row(row)
-                        if config:
-                            self.configs[config.numero] = config
+                    # Filtrer les lignes de commentaires (commençant par #)
+                    lines = [line for line in f if not line.strip().startswith('#')]
+
+                from io import StringIO
+                reader = csv.DictReader(StringIO(''.join(lines)))
+                for row in reader:
+                    config = BidulSectionConfig.from_csv_row(row)
+                    if config:
+                        self.configs[config.numero] = config
 
                 logger.info(f"Chargé {len(self.configs)} configurations section depuis {self.csv_path}")
                 return
@@ -468,10 +481,22 @@ class SectionOCRExtractor:
 
         Returns:
             PageSectionsOCRResult avec le texte de chaque section
+
+        Note:
+            Les sections S1/S2/S3/S4 sont définies APRÈS rotation de la page.
+            Si le PDF est en portrait mais le texte en paysage, on fait d'abord
+            la rotation de la page entière, puis on découpe les sections.
         """
         result = PageSectionsOCRResult(page_num=page_num)
 
-        # Obtenir l'ordre de lecture des sections
+        # 1. Appliquer la rotation à la page entière AVANT de découper les sections
+        # PDF portrait + texte paysage = rotation 90° horaire pour lire le texte
+        page_image = image
+        if page_config.needs_rotation():
+            page_image = self.cropper.rotate_for_text(image, clockwise=True)
+            logger.debug(f"Page {page_num}: rotation 90° horaire appliquée (PDF portrait, texte paysage)")
+
+        # 2. Obtenir l'ordre de lecture des sections (basé sur l'orientation du texte)
         section_order = page_config.get_section_order()
 
         # Filtrer pour ne garder que les sections utiles, dans l'ordre
@@ -482,17 +507,18 @@ class SectionOCRExtractor:
 
         logger.debug(f"Page {page_num}: sections à traiter = {[s.value for s in sections_to_process]}")
 
+        # 3. Découper et OCR chaque section sur l'image rotée
         for section in sections_to_process:
-            # Découper la section
-            section_image = self.cropper.crop_section(image, section)
+            # Découper la section sur l'image déjà rotée
+            section_image = self.cropper.crop_section(page_image, section)
 
-            # Appliquer rotation si texte en paysage
-            if page_config.needs_rotation():
-                section_image = self.cropper.rotate_for_text(section_image, clockwise=False)
-                logger.debug(f"Section {section.value}: rotation appliquée (texte paysage)")
-
-            # OCR avec le nombre de colonnes configuré
-            text = self.ocr.ocr_image(section_image, num_columns=page_config.colonnes_par_section)
+            # OCR avec gestion des colonnes
+            num_cols = page_config.colonnes_par_section
+            if num_cols > 1:
+                # Couper physiquement l'image en colonnes et OCR chaque partie
+                text = self._ocr_by_columns(section_image, num_cols, reverse_order=False)
+            else:
+                text = self.ocr.ocr_image(section_image, num_columns=1)
 
             section_result = SectionOCRResult(
                 section=section,
@@ -507,6 +533,63 @@ class SectionOCRExtractor:
 
         return result
 
+    def _ocr_by_columns(self, image: np.ndarray, num_columns: int, reverse_order: bool = False,
+                         gutter_percent: float = 0.03) -> str:
+        """
+        Effectue l'OCR en coupant physiquement l'image en colonnes.
+
+        Plutôt que de faire confiance au tri par position X des blocs OCR,
+        on coupe l'image en num_columns parties verticales et on OCR chaque
+        partie séparément, puis on concatène les résultats.
+
+        Args:
+            image: Image numpy (après rotation si nécessaire)
+            num_columns: Nombre de colonnes à extraire
+            reverse_order: Si True, lit les colonnes de droite à gauche.
+            gutter_percent: Pourcentage de la largeur à rogner de chaque côté
+                           de la zone centrale (pour éviter le chevauchement).
+                           Défaut 3% = 6% de zone morte au milieu pour 2 colonnes.
+
+        Returns:
+            Texte concaténé de toutes les colonnes (dans l'ordre de lecture)
+        """
+        h, w = image.shape[:2]
+
+        # Calculer la marge à rogner de chaque côté de la zone centrale
+        margin = int(w * gutter_percent)
+
+        # Pour 2 colonnes : on divise en 2 moitiés, puis on rogne les bords intérieurs
+        # Colonne 1 : de 0 à (w/2 - margin)
+        # Colonne 2 : de (w/2 + margin) à w
+        half_width = w // num_columns
+
+        texts = []
+        col_indices = range(num_columns - 1, -1, -1) if reverse_order else range(num_columns)
+
+        for col_idx in col_indices:
+            # Bornes brutes de la colonne
+            x_start = col_idx * half_width
+            x_end = (col_idx + 1) * half_width if col_idx < num_columns - 1 else w
+
+            # Rogner le bord intérieur (éviter le texte de l'autre colonne)
+            if col_idx > 0:
+                # Pas la première colonne : rogner le bord gauche
+                x_start += margin
+            if col_idx < num_columns - 1:
+                # Pas la dernière colonne : rogner le bord droit
+                x_end -= margin
+
+            # Extraire la colonne
+            column_image = image[:, x_start:x_end].copy()
+
+            # OCR sur cette colonne
+            col_text = self.ocr.ocr_image(column_image, num_columns=1)
+            if col_text:
+                texts.append(col_text.strip())
+                logger.debug(f"Colonne {col_idx + 1}/{num_columns}: {len(col_text)} caractères (x={x_start}-{x_end})")
+
+        return '\n\n'.join(texts)
+
     def extract_full_page(
         self,
         image: np.ndarray,
@@ -518,7 +601,10 @@ class SectionOCRExtractor:
 
         Utilisé quand aucune config de sections n'est disponible.
         """
-        text = self.ocr.ocr_image(image, num_columns=num_columns)
+        if num_columns > 1:
+            text = self._ocr_by_columns(image, num_columns)
+        else:
+            text = self.ocr.ocr_image(image, num_columns=1)
 
         result = PageSectionsOCRResult(page_num=page_num)
         result.sections.append(SectionOCRResult(

@@ -207,13 +207,13 @@ class TestLoadSectionConfig:
         assert config.page1 is not None or config.page2 is not None
 
     def test_load_inherits_from_nearest(self):
-        # Bidul 60 n'a pas de sections, doit hériter
-        config = load_section_config(60)
+        # Bidul 500 n'existe pas, doit hériter d'un proche
+        config = load_section_config(500)
         assert config is not None
         # Doit avoir hérité des sections
         assert config.page1 is not None or config.page2 is not None
-        # Le numéro doit être celui du bidul source (pas 60)
-        assert config.numero != 60
+        # Le numéro doit être celui du bidul source (pas 500)
+        assert config.numero != 500
 
     def test_load_bidul_6_paysage(self):
         # Bidul 6 a un texte en paysage avec 2 colonnes
@@ -222,3 +222,135 @@ class TestLoadSectionConfig:
         assert config.page2 is not None
         assert config.page2.orientation_texte == Orientation.PAYSAGE
         assert config.page2.colonnes_par_section == 2
+
+
+class TestPageSectionConfigRotation:
+    """Tests pour la logique de rotation PDF vs texte."""
+
+    def test_needs_rotation_same_orientation(self):
+        """Pas de rotation si PDF et texte ont la même orientation."""
+        # Portrait/Portrait
+        config = PageSectionConfig(
+            orientation_pdf=Orientation.PORTRAIT,
+            orientation_texte=Orientation.PORTRAIT
+        )
+        assert not config.needs_rotation()
+
+        # Paysage/Paysage
+        config = PageSectionConfig(
+            orientation_pdf=Orientation.PAYSAGE,
+            orientation_texte=Orientation.PAYSAGE
+        )
+        assert not config.needs_rotation()
+
+    def test_needs_rotation_different_orientation(self):
+        """Rotation si PDF et texte ont des orientations différentes."""
+        # PDF portrait, texte paysage (cas biduls 2-11)
+        config = PageSectionConfig(
+            orientation_pdf=Orientation.PORTRAIT,
+            orientation_texte=Orientation.PAYSAGE
+        )
+        assert config.needs_rotation()
+
+        # PDF paysage, texte portrait
+        config = PageSectionConfig(
+            orientation_pdf=Orientation.PAYSAGE,
+            orientation_texte=Orientation.PORTRAIT
+        )
+        assert config.needs_rotation()
+
+    def test_from_csv_row_with_orientation_pdf(self):
+        """Test parsing CSV avec colonnes p*_orientation_pdf."""
+        row = {
+            'p2_sections': 'S1 S2 S3',
+            'p2_orientation': 'paysage',
+            'p2_orientation_pdf': 'portrait',
+            'p2_colonnes': '2'
+        }
+        config = PageSectionConfig.from_csv_row(row, 2)
+        assert config is not None
+        assert config.orientation_texte == Orientation.PAYSAGE
+        assert config.orientation_pdf == Orientation.PORTRAIT
+        assert config.needs_rotation()
+        assert config.colonnes_par_section == 2
+
+    def test_from_csv_row_orientation_pdf_defaults_to_texte(self):
+        """Si orientation_pdf n'est pas défini, il prend la valeur de orientation."""
+        row = {
+            'p2_sections': 'S1 S2 S3 S4',
+            'p2_orientation': 'paysage',
+            # p2_orientation_pdf non défini
+            'p2_colonnes': '1'
+        }
+        config = PageSectionConfig.from_csv_row(row, 2)
+        assert config is not None
+        assert config.orientation_texte == Orientation.PAYSAGE
+        assert config.orientation_pdf == Orientation.PAYSAGE  # Défaut = texte
+        assert not config.needs_rotation()  # Pas de rotation car même orientation
+
+
+class TestSectionCropperRotation:
+    """Tests pour la rotation de SectionCropper."""
+
+    def test_rotate_clockwise(self):
+        """Test rotation 90° horaire."""
+        # Image 50x100 (plus haute que large)
+        # Marquer le coin supérieur gauche en rouge
+        image = np.zeros((100, 50, 3), dtype=np.uint8)
+        image[0:25, 0:25] = [255, 0, 0]  # Rouge en haut-gauche
+
+        cropper = SectionCropper()
+        rotated = cropper.rotate_for_text(image, clockwise=True)
+
+        # Après rotation CW, dimensions inversées: 50x100
+        assert rotated.shape == (50, 100, 3)
+        # Le coin haut-gauche devient haut-droite après rotation CW
+        assert np.all(rotated[0:25, 75:100] == [255, 0, 0])
+
+    def test_rotate_counter_clockwise(self):
+        """Test rotation 90° anti-horaire."""
+        # Image 50x100 (plus haute que large)
+        # Marquer le coin supérieur gauche en rouge
+        image = np.zeros((100, 50, 3), dtype=np.uint8)
+        image[0:25, 0:25] = [255, 0, 0]  # Rouge en haut-gauche
+
+        cropper = SectionCropper()
+        rotated = cropper.rotate_for_text(image, clockwise=False)
+
+        # Après rotation CCW, dimensions inversées: 50x100
+        assert rotated.shape == (50, 100, 3)
+        # Le coin haut-gauche devient bas-gauche après rotation CCW
+        assert np.all(rotated[25:50, 0:25] == [255, 0, 0])
+
+
+class TestBidulSectionConfigOrientationPdf:
+    """Tests pour BidulSectionConfig avec orientation_pdf."""
+
+    def test_bidul_5_config(self):
+        """Bidul 5 a page2: PDF portrait, texte paysage, 2 colonnes."""
+        config = load_section_config(5)
+        assert config is not None
+        assert config.page2 is not None
+        assert config.page2.orientation_pdf == Orientation.PORTRAIT
+        assert config.page2.orientation_texte == Orientation.PAYSAGE
+        assert config.page2.needs_rotation()
+        assert config.page2.colonnes_par_section == 2
+
+    def test_bidul_5_section_order(self):
+        """Bidul 5 en paysage utilise l'ordre S1→S3→S2→S4."""
+        config = load_section_config(5)
+        assert config is not None
+        assert config.page2 is not None
+        order = config.page2.get_section_order()
+        assert order == [Section.S1, Section.S3, Section.S2, Section.S4]
+
+    def test_bidul_5_sections(self):
+        """Bidul 5 page2 a sections S1, S2, S3 (pas S4)."""
+        config = load_section_config(5)
+        assert config is not None
+        assert config.page2 is not None
+        sections = config.page2.sections_utiles
+        assert Section.S1 in sections
+        assert Section.S2 in sections
+        assert Section.S3 in sections
+        assert Section.S4 not in sections

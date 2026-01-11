@@ -32,9 +32,14 @@ python benchmark/compare_bidul.py 190
 Vérifier le format dans `corpus/biduls.description.csv`:
 ```bash
 grep "^175" corpus/biduls.description.csv
-# Colonnes: numero,scan/texte,source,date_format,...
-# date_format: "inline" ou "par bloc"
+# Colonnes: numero,type,date_format,pages,ocr_mode,p1_sections,p1_orientation,p1_colonnes,...
 ```
+
+**Formats de date disponibles** (`date_format`):
+- `inline` : Chaque ligne commence par la date (ex: "Je 02: ARTISTE, Lieu")
+- `par bloc` : Dates en en-têtes de sections, événements listés en dessous
+- `inline_inherited` : Date sur la première ligne du jour, événements suivants héritent (biduls 1-16)
+- `mixte` : Combine inline ET bloc (sections avec formats différents)
 
 ## Fonctions clés du parser
 
@@ -45,6 +50,7 @@ grep "^175" corpus/biduls.description.csv
 | `parse_event_line_v2()` | Parse une ligne d'événement |
 | `_parse_inline_with_referentiel()` | Format inline (Je 02: ARTISTE, Lieu) |
 | `_parse_bloc_with_referentiel()` | Format bloc (dates en en-têtes) |
+| `_parse_inline_inherited_date()` | Format inline_inherited (date héritée, biduls 1-16) |
 
 ## Workflow de modification
 
@@ -166,10 +172,13 @@ Chaque page A4 est divisée en 4 sections A6 :
 - **S4** : Bas-droite (50-100% X, 50-100% Y)
 
 ### Configuration des sections
-Le mapping est défini dans `corpus/biduls.description.csv` :
-- `page#.sections utiles` : Sections à extraire (ex: "S1,S2,S3,S4")
-- `page#.orientation texte` : "portrait" ou "paysage" (rotation 90°)
-- `page#.colonne par section` : Nombre de colonnes par section
+Le mapping est défini dans `corpus/biduls.description.csv` (nouveau format) :
+- `p1_sections` / `p2_sections` : Sections à extraire (ex: "S1 S2 S3 S4")
+- `p1_orientation` / `p2_orientation` : Orientation du **texte** (portrait/paysage)
+- `p1_orientation_pdf` / `p2_orientation_pdf` : Orientation du **PDF** (défaut = même que texte)
+- `p1_colonnes` / `p2_colonnes` : Nombre de colonnes par section
+
+**Rotation automatique** : Si `orientation_pdf != orientation` (ex: PDF portrait + texte paysage), une rotation 90° est appliquée automatiquement. Cas typique : biduls 2-11 où le PDF est portrait mais le texte est imprimé en paysage.
 
 ### Modules OCR
 
@@ -201,3 +210,129 @@ Les biduls sans mapping dans `biduls.description.csv` héritent automatiquement 
 - **PDF 3 pages** : Extrait uniquement page 3 (résumé agenda)
 - **PDF 2 pages** : Utilise la config page1 + page2
 - **pages_override** : Priorité sur la logique automatique
+
+## Architecture des configurations CSV
+
+### Deux systèmes de chargement (IMPORTANT)
+Le fichier `corpus/biduls.description.csv` est lu par **deux classes différentes** qui doivent rester synchronisées :
+
+| Classe | Fichier | Usage |
+|--------|---------|-------|
+| `ScanConfig` | `core/ocr.py` | Configuration OCR + `date_format` pour le parser |
+| `BidulSectionConfig` | `core/section_extractor.py` | Configuration sections A6 + `date_format` |
+
+**Attention** : Si vous modifiez le format du CSV, vous devez mettre à jour les deux méthodes `from_csv_row()` dans les deux fichiers.
+
+### Format CSV actuel (v1.11+)
+```
+numero,type,date_format,pages,ocr_mode,p1_sections,p1_orientation,p1_orientation_pdf,p1_colonnes,p2_sections,p2_orientation,p2_orientation_pdf,p2_colonnes,notes
+```
+
+Les lignes commençant par `#` sont ignorées (commentaires).
+
+### Workflow d'extraction par sections
+
+L'extraction suit ce workflow :
+
+1. **Rotation de la page entière** (si `orientation_pdf != orientation`)
+   - Rotation 90° horaire (clockwise) appliquée à toute la page
+   - Les sections sont définies **APRÈS** rotation sur l'image lisible
+
+2. **Découpage en sections A6** sur l'image rotée
+   - S1 = haut-gauche (0-50% X, 0-50% Y)
+   - S2 = haut-droite (50-100% X, 0-50% Y)
+   - S3 = bas-gauche (0-50% X, 50-100% Y)
+   - S4 = bas-droite (50-100% X, 50-100% Y)
+
+3. **OCR par colonne** (si `colonnes > 1`)
+   - L'image de section est coupée physiquement en colonnes
+   - Chaque colonne est OCR séparément
+   - Les résultats sont concaténés gauche → droite
+
+4. **Ordre de lecture des sections**
+   - Mode portrait : S1 → S2 → S3 → S4 (ligne par ligne)
+   - Mode paysage : S1 → S3 → S2 → S4 (colonne par colonne)
+
+**Exemple bidul 5** :
+- PDF portrait, texte paysage → rotation 90° horaire
+- Après rotation, sections S1 (SARTHE DIT D), S3, S2 (FÊTE DE LA MUSIQUE)
+- 2 colonnes par section → lecture gauche puis droite
+
+### Colonnes principales
+| Colonne | Valeurs | Description |
+|---------|---------|-------------|
+| `numero` | 1-305 | Numéro du bidul |
+| `type` | scan, texte | Type de PDF |
+| `date_format` | inline, par bloc, inline_inherited, mixte | Format de parsing des dates |
+| `pages` | 1, 2, 3, 1-2 | Pages à extraire (override) |
+| `ocr_mode` | classic, sections, auto | Mode OCR |
+| `p1_sections` | S1 S2 S3 S4 | Sections page 1 |
+| `p1_orientation` | portrait, paysage | Orientation du texte page 1 |
+| `p1_orientation_pdf` | portrait, paysage | Orientation du PDF page 1 (défaut = p1_orientation) |
+| `p1_colonnes` | 1, 2 | Colonnes par section page 1 |
+
+### Format inline_inherited (biduls 1-16)
+Format hybride où la date apparaît seulement sur la première ligne d'un jour :
+```
+Ma 03: TONGZ, bar Le Mackeson LE MANS, 22h15
+MICHEL EDELIN QUARTET, Théâtre Paul Scarron    <- hérite de Ma 03
+LE MANS, 21h00
+Je 05:                                          <- nouvelle date (contenu sur lignes suivantes)
+URANUS BRILLANT, bar Le Viking's, LE MANS
+NICOLAS ET TOMY, pub Le Terminus               <- hérite de Je 05
+```
+
+La fonction `_parse_inline_inherited_date()` gère ce format avec :
+1. Première passe : jointure des lignes de continuation (villes, heures)
+2. Deuxième passe : attribution des dates héritées aux événements
+
+## Templates SVG pour zones d'extraction (v1.12 - prévu)
+
+### Concept
+
+Les templates SVG permettent de définir avec précision les zones d'extraction du texte OCR. Chaque zone est un rectangle SVG avec un ID structuré.
+
+### Structure des fichiers
+
+```
+corpus/
+├── biduls.description.csv      # Colonne 'svg_template' pour référencer le template
+└── templates/
+    ├── bidul_005.svg           # Template personnalisé
+    ├── bidul_006.svg
+    └── default_paysage_2col.svg  # Templates génériques réutilisables
+```
+
+### Format SVG
+
+```xml
+<svg viewBox="0 0 1654 2339" xmlns="http://www.w3.org/2000/svg">
+  <!-- Page 2, Section S1, Colonne 1 -->
+  <rect id="p2-s1-col1" x="0" y="0" width="571" height="860"
+        fill="none" stroke="red" stroke-width="2"/>
+  <!-- Page 2, Section S1, Colonne 2 -->
+  <rect id="p2-s1-col2" x="643" y="0" width="572" height="860"
+        fill="none" stroke="blue" stroke-width="2"/>
+</svg>
+```
+
+### Convention de nommage des IDs
+
+- `p{page}-s{section}-col{colonne}` : Zone de colonne
+- `p{page}-s{section}` : Zone de section entière (si pas de colonnes)
+- `p{page}-exclude` : Zone à exclure (logos, headers)
+
+### Priorité de chargement
+
+1. **SVG personnalisé** : `corpus/templates/bidul_{numero}.svg`
+2. **Template générique** : Via colonne `svg_template` dans CSV
+3. **Calcul par défaut** : Sections A6 + colonnes calculées
+
+### Colonne CSV
+
+```csv
+numero,...,svg_template,notes
+5,...,bidul_005.svg,Template personnalisé pour layout complexe
+6,...,default_paysage_2col.svg,Utilise template générique
+7,...,,Pas de template - calcul par défaut
+```
