@@ -6427,8 +6427,10 @@ class EventParser:
         #   - Avec ou sans deux-points après le numéro
         #   - Caractères OCR mal reconnus après le numéro (ex: "dim 01À" au lieu de "dim 01:")
         #   - Dates consécutives: "Je 06,07,08" (groupe 2 capture tous les numéros)
+        #   - Dates avec "et": "Ma 02 et Me 03" (groupe 2 capture la partie complète)
+        _JOURS_ABBR = r'(?:lu[n]?|ma[r]?|me[r]?|je[u]?|ve[n]?|sa[m]?|di[m]?)'
         date_line_pattern = re.compile(
-            r'^(lu[n]?|ma[r]?|me[r]?|je[u]?|ve[n]?|sa[m]?|di[m]?)\s+(\d{1,2}(?:,\s*\d{1,2})*)(?:er|ème|eme)?[^a-zA-Z0-9]*(.*)$',
+            rf'^({_JOURS_ABBR})\s+(\d{{1,2}}(?:er|ème|eme)?(?:\s+et\s+{_JOURS_ABBR}\s+\d{{1,2}}(?:er|ème|eme)?)?(?:,\s*\d{{1,2}})*)[^a-zA-Z0-9]*(.*)$',
             re.IGNORECASE
         )
 
@@ -6572,13 +6574,14 @@ class EventParser:
             date_match = date_line_pattern.match(line)
 
             if date_match:
-                # Nouvelle date (potentiellement multiple: "Je 06,07,08")
+                # Nouvelle date (potentiellement multiple: "Je 06,07,08" ou "Ma 02 et Me 03")
                 jour_abbr = date_match.group(1)
                 jour_nums_str = date_match.group(2)
                 event_content = date_match.group(3).strip()
 
                 # Extraire tous les numéros de jour
-                jour_nums = [int(n.strip()) for n in jour_nums_str.split(',') if n.strip().isdigit()]
+                # Supporte: "06,07,08" ou "02 et Me 03" ou "02"
+                jour_nums = [int(n) for n in re.findall(r'\d{1,2}', jour_nums_str)]
 
                 if not jour_nums:
                     continue
