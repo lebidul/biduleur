@@ -4269,6 +4269,14 @@ class EventParser:
             if not events:
                 events = self._parse_inline_format(text)
             return events
+        elif self.date_format == 'inline_inherited':
+            # Format hybride des anciens Biduls (1-16)
+            # Date sur la première ligne du jour, événements suivants héritent
+            events = self._parse_inline_inherited_format(text)
+            # Fallback sur inline si rien trouvé
+            if not events:
+                events = self._parse_inline_format(text)
+            return events
 
         # Auto-détection: essayer d'abord le format standard (par bloc)
         events = self._parse_standard_format(text)
@@ -4369,6 +4377,141 @@ class EventParser:
                 if signature not in seen_signatures:
                     seen_signatures.add(signature)
                     events.append(event)
+
+        return events
+
+    def _parse_inline_inherited_format(self, text: str) -> list[ParsedEvent]:
+        """
+        Parse le format inline_inherited des anciens Biduls (1-16).
+
+        Format hybride où la date apparaît sur la première ligne d'un jour
+        et les événements suivants héritent de cette date:
+
+            dim 01: À CHŒUR OUVERT, PCC, Le Mans, 15h00
+            BIG BAND de Changé, Salle François Rabelais, 15h00  <- hérite de dim 01
+            mar 03 Concert: LA SORCIERE DU PLACARD
+            -PANDORA, Pirate Café, Le Mans, 21h30  <- hérite de mar 03
+        """
+        events = []
+        seen_signatures = set()
+
+        # Pattern pour détecter une ligne qui commence par une date
+        # Supporte: dim 01:, mar 03, jeu 05:, etc.
+        date_line_pattern = re.compile(
+            r'^(lu[n]?|ma[r]?|me[r]?|je[u]?|ve[n]?|sa[m]?|di[m]?)\s+(\d{1,2})(?:er|ème|eme)?[^a-zA-Z0-9]*(.*)$',
+            re.IGNORECASE
+        )
+
+        # Pattern pour détecter si une ligne est une continuation
+        continuation_pattern = re.compile(
+            r'^(?:[Ll][Ee]\s*[Mm][Aa][Nn][Ss]|[Mm]ulsanne|[Aa]llonnes|\([^)]+\)|[a-zàâäéèêëïîôùûüç]|\d{1,2}[hH]|[Dd]e \d)'
+        )
+
+        # Mots-clés qui indiquent une continuation (lieux, parties de texte)
+        continuation_starts = (
+            'Salle ', 'salle ', 'Conservatoire', 'Église', 'église', 'Eglise',
+            'Nationale', 'nationale', 'École', 'école', 'Ecole', 'ecole',
+            'Théâtre', 'théâtre', 'Theatre', 'theatre', 'Cathédrale', 'cathédrale',
+            'Place ', 'place ', 'Château', 'château', 'Chateau',
+            'Face ', 'face ', 'Espace', 'espace',
+        )
+
+        def is_new_event_line(line: str) -> bool:
+            """Vérifie si une ligne est un nouvel événement (pas une continuation)."""
+            if continuation_pattern.match(line):
+                return False
+            if line.startswith(continuation_starts):
+                return False
+            # Un nouvel événement commence par un tiret suivi d'un nom
+            if line.startswith('-') and len(line) > 2:
+                return True
+            # Un nouvel événement contient une virgule et commence par un nom en MAJUSCULES
+            if ',' in line and len(line) > 5:
+                first_part = line.split(',')[0].strip()
+                if len(first_part) >= 3 and first_part.isupper():
+                    return True
+                # Mots-clés d'événements
+                event_keywords = ('Concert', 'Audition', 'Soirée', 'Spectacle', 'Festival')
+                if first_part.startswith(event_keywords):
+                    return True
+            return False
+
+        lines = text.split('\n')
+        mois = self.bidul_mois or 1
+        annee = self.bidul_annee or 2023
+
+        # Première passe: joindre les lignes de continuation
+        joined_lines = []
+        current_line = None
+
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            if is_noise_line(line):
+                continue
+
+            is_new_date = date_line_pattern.match(line) is not None
+            is_continuation = continuation_pattern.match(line) is not None
+            is_new_event = is_new_event_line(line)
+
+            if is_new_date:
+                if current_line:
+                    joined_lines.append(current_line)
+                current_line = line
+            elif is_continuation and current_line:
+                current_line = current_line + ' ' + line
+            elif is_new_event:
+                if current_line:
+                    joined_lines.append(current_line)
+                current_line = line
+            elif current_line:
+                current_line = current_line + ' ' + line
+            else:
+                current_line = line
+
+        if current_line:
+            joined_lines.append(current_line)
+
+        # Deuxième passe: parser les événements
+        current_date_str = None
+        current_date = None
+
+        for line_idx, line in enumerate(joined_lines):
+            date_match = date_line_pattern.match(line)
+
+            if date_match:
+                # Nouvelle date
+                jour_abbr = date_match.group(1)
+                jour_num = date_match.group(2)
+                event_content = date_match.group(3).strip()
+
+                current_date_str = f"{jour_abbr} {jour_num}"
+                current_date = self._parse_date(current_date_str, line_idx)
+
+                # Parser l'événement sur cette ligne
+                if event_content and len(event_content) >= 5:
+                    event = self._parse_event(event_content, current_date_str, line_idx)
+                    if event:
+                        if current_date and not event.date_evenement:
+                            event.date_evenement = current_date
+                        signature = self._event_signature(event)
+                        if signature not in seen_signatures:
+                            seen_signatures.add(signature)
+                            events.append(event)
+
+            elif current_date_str and len(line) >= 10 and is_new_event_line(line):
+                # Nouvel événement sans date - hérite de la date courante
+                # Retirer le tiret initial si présent
+                event_text = line[1:].strip() if line.startswith('-') else line
+                event = self._parse_event(event_text, current_date_str, line_idx)
+                if event:
+                    if current_date and not event.date_evenement:
+                        event.date_evenement = current_date
+                    signature = self._event_signature(event)
+                    if signature not in seen_signatures:
+                        seen_signatures.add(signature)
+                        events.append(event)
 
         return events
 
@@ -5952,8 +6095,9 @@ class EventParser:
         #   - Abréviations 2 lettres: Lu, Ma, Me, Je, Ve, Sa, Di
         #   - Abréviations 3 lettres: lun, mar, mer, jeu, ven, sam, dim
         #   - Avec ou sans deux-points après le numéro
+        #   - Caractères OCR mal reconnus après le numéro (ex: "dim 01À" au lieu de "dim 01:")
         date_line_pattern = re.compile(
-            r'^(lu[n]?|ma[r]?|me[r]?|je[u]?|ve[n]?|sa[m]?|di[m]?)\s+(\d{1,2})(?:er|ème|eme)?\s*[:]?\s*(.*)$',
+            r'^(lu[n]?|ma[r]?|me[r]?|je[u]?|ve[n]?|sa[m]?|di[m]?)\s+(\d{1,2})(?:er|ème|eme)?[^a-zA-Z0-9]*(.*)$',
             re.IGNORECASE
         )
 
@@ -5978,12 +6122,33 @@ class EventParser:
             # Une continuation commence par une ville, heure, prix, parenthèse, ou minuscule
             if continuation_pattern.match(line):
                 return False
+
+            # Lignes qui sont clairement des continuations (lieux, parties d'événements)
+            # et pas de nouveaux événements
+            continuation_starts = (
+                'Salle ', 'salle ', 'Conservatoire', 'Église', 'église', 'Eglise',
+                'Nationale', 'nationale', 'École', 'école', 'Ecole', 'ecole',
+                'Théâtre', 'théâtre', 'Theatre', 'theatre', 'Cathédrale', 'cathédrale',
+                'Place ', 'place ', 'Château', 'château', 'Chateau',
+                'Face ', 'face ', 'Espace', 'espace',
+            )
+            if line.startswith(continuation_starts):
+                return False
+
+            # Un nouvel événement commence par un tiret suivi d'un nom
+            if line.startswith('-') and len(line) > 2:
+                return True
+
             # Un nouvel événement contient une virgule et commence par quelque chose
-            # qui ressemble à un nom (pas juste des chiffres)
+            # qui ressemble à un nom d'artiste (typiquement en MAJUSCULES ou avec mots-clés)
             if ',' in line and len(line) > 5:
-                # Vérifie que le début ressemble à un artiste/spectacle
                 first_part = line.split(',')[0].strip()
-                if len(first_part) >= 2 and first_part[0].isupper():
+                # Nom d'artiste en majuscules (ex: "SATANAS & LES DIABOLOS")
+                if len(first_part) >= 3 and first_part.isupper():
+                    return True
+                # Mots-clés d'événements (Concert:, Audition, Soirée, etc.)
+                event_keywords = ('Concert', 'Audition', 'Soirée', 'Spectacle', 'Festival')
+                if first_part.startswith(event_keywords):
                     return True
             return False
 

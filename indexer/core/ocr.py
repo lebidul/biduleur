@@ -210,8 +210,12 @@ class ScanConfigLoader:
         for encoding in encodings:
             try:
                 with open(self.csv_path, 'r', encoding=encoding) as f:
-                    # Filtrer les lignes de commentaires (commençant par #)
-                    lines = [line for line in f if not line.strip().startswith('#')]
+                    # Filtrer les lignes de commentaires (commençant par # ou "#)
+                    lines = [
+                        line for line in f
+                        if not line.strip().startswith('#')
+                        and not line.strip().startswith('"#')
+                    ]
                     from io import StringIO
                     reader = csv.DictReader(StringIO(''.join(lines)))
                     for row in reader:
@@ -867,8 +871,13 @@ class ScanExtractor:
             num_pages = len(images)
 
             # Déterminer les pages à traiter
-            if use_svg and svg_template:
-                pages_to_process = svg_template.get_all_page_nums()
+            # Priorité: pages_override du CSV > pages du template SVG > pages de la config sections
+            if section_config.pages_override:
+                # Le CSV spécifie explicitement les pages à traiter
+                pages_to_process = [p for p in section_config.pages_override if 1 <= p <= num_pages]
+            elif use_svg and svg_template:
+                # Utiliser les pages définies dans le template SVG
+                pages_to_process = [p for p in svg_template.get_all_page_nums() if p <= num_pages]
             else:
                 pages_to_process = section_config.get_pages_to_process(num_pages)
 
@@ -907,7 +916,7 @@ class ScanExtractor:
                 if use_svg and svg_template:
                     # Extraction par template SVG
                     page_result = self.section_extractor.extract_page_by_svg_template(
-                        image, page_num, svg_template
+                        image, page_num, svg_template, section_config=section_config
                     )
                     page_text = page_result.full_text
                     zones_info = [s.section.value for s in page_result.sections]

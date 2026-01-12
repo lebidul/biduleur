@@ -510,7 +510,7 @@ class SectionOCRExtractor:
         image: np.ndarray,
         page_num: int,
         template,
-        apply_rotation: bool = True
+        section_config=None
     ) -> PageSectionsOCRResult:
         """
         Extrait le texte d'une page en utilisant un template SVG.
@@ -519,7 +519,7 @@ class SectionOCRExtractor:
             image: Image de la page complète (après prétraitement basique)
             page_num: Numéro de la page
             template: SVGTemplate avec les zones d'extraction
-            apply_rotation: Si True, applique la rotation selon le template
+            section_config: BidulSectionConfig pour la rotation (prioritaire sur le template)
 
         Returns:
             PageSectionsOCRResult avec le texte de chaque zone
@@ -529,8 +529,17 @@ class SectionOCRExtractor:
         result = PageSectionsOCRResult(page_num=page_num)
 
         # 1. Appliquer la rotation si nécessaire
+        # Priorité: config CSV > métadonnées du template
+        needs_rotation = False
+        if section_config:
+            page_config = section_config.get_page_config(page_num)
+            if page_config:
+                needs_rotation = page_config.needs_rotation()
+        else:
+            needs_rotation = template.needs_rotation()
+
         page_image = image
-        if apply_rotation and template.needs_rotation():
+        if needs_rotation:
             page_image = self.cropper.rotate_for_text(image, clockwise=True)
             logger.debug(f"Page {page_num}: rotation 90° horaire appliquée (template SVG)")
 
