@@ -1334,6 +1334,12 @@ def split_bloc_fused_events(raw_text: str) -> list[str]:
     split_patterns = [
         # Pattern 1: prix (X€) suivi de MAJUSCULES, Soirée, Birdland, ou guillemet
         r'(\d+(?:[.,/]\d+)?[€E])\s+(?=[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ]{2,}|[Ss]oir[ée]es?\s|Birdland\s|[«"<])',
+        # Pattern 1b: prix en Francs (XF ou X-YF) suivi de : puis MAJUSCULES (anciens biduls)
+        # Ex: "60-80F: RAG MAMA RAG" -> split avant RAG
+        r'(\d+(?:[-/]\d+)?F)\s*:\s*(?=[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ]{2,})',
+        # Pattern 1c: heure (XXh ou XXhXX) suivie de : puis MAJUSCULES (anciens biduls)
+        # Ex: "21h30: TEMPO SLAVIA" -> split avant TEMPO
+        r'(\d{1,2}h\d{0,2})\s*:\s*(?=[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ]{2,})',
         # Pattern 2: heure (XXh) suivie de nom propre commençant par majuscule - ex: "22h Les Spectaculaires"
         r'(\d{1,2}h(?:\d{2})?)\s+(?=Les\s+[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ])',
         # Pattern 3: numéro de téléphone complet (02 XX XX XX XX) suivi de MAJUSCULES
