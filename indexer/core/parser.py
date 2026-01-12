@@ -3537,6 +3537,13 @@ def extract_lieu_fallback(text: str, ville_ref_list: list) -> tuple[Optional[str
         if artiste_pattern.match(part) and part.upper() not in lieux_acronymes:
             continue
 
+        # Ignorer les titres de spectacles avec guillemet orphelin (OCR)
+        # Ex: 'ZE CHATEAU"' (guillemet fermant sans ouvrant) - probablement un titre
+        # Pattern: texte en MAJUSCULES suivi d'un guillemet (", », ")
+        orphan_quote_pattern = re.compile(r'^[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s\'\-\&\.0-9]+[""»]$')
+        if orphan_quote_pattern.match(part):
+            continue
+
         # Ignorer les compagnies de théâtre (Cie XXX)
         if cie_pattern.match(part):
             continue
