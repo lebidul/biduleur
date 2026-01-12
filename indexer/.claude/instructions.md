@@ -48,9 +48,14 @@ grep "^175" corpus/biduls.description.csv
 | `split_on_dates_v2()` | Découpe sur dates inline (Lu 02, Ma 03...) |
 | `split_bloc_fused_events()` | Sépare événements fusionnés (prix€ + MAJUSCULES) |
 | `parse_event_line_v2()` | Parse une ligne d'événement |
-| `_parse_inline_with_referentiel()` | Format inline (Je 02: ARTISTE, Lieu) |
-| `_parse_bloc_with_referentiel()` | Format bloc (dates en en-têtes) |
-| `_parse_inline_inherited_date()` | Format inline_inherited (date héritée, biduls 1-16) |
+| `_parse_inline_with_referentiel()` | Format inline avec référentiels (Je 02: ARTISTE, Lieu) |
+| `_parse_bloc_with_referentiel()` | Format bloc avec référentiels (dates en en-têtes) |
+| `_parse_inline_inherited_date()` | Format inline_inherited avec référentiels (biduls 1-16) |
+| `_parse_inline_inherited_format()` | Format inline_inherited sans référentiels (pour `parse()`) |
+
+**Note importante**: Le format `inline_inherited` a deux implémentations:
+- `_parse_inline_inherited_date()` : utilisé par `parse_with_referentiel()`
+- `_parse_inline_inherited_format()` : utilisé par `parse()` (sans référentiels)
 
 ## Workflow de modification
 
@@ -218,17 +223,19 @@ Le fichier `corpus/biduls.description.csv` est lu par **deux classes différente
 
 | Classe | Fichier | Usage |
 |--------|---------|-------|
-| `ScanConfig` | `core/ocr.py` | Configuration OCR + `date_format` pour le parser |
-| `BidulSectionConfig` | `core/section_extractor.py` | Configuration sections A6 + `date_format` |
+| `ScanConfig` / `ScanConfigLoader` | `core/ocr.py` | Configuration OCR + `date_format` pour le parser via `load_bidul_config()` |
+| `BidulSectionConfig` / `SectionConfigLoader` | `core/section_extractor.py` | Configuration sections A6 + `date_format` |
 
-**Attention** : Si vous modifiez le format du CSV, vous devez mettre à jour les deux méthodes `from_csv_row()` dans les deux fichiers.
+**Attention** :
+- Si vous modifiez le format du CSV, vous devez mettre à jour les deux méthodes `from_csv_row()` dans les deux fichiers.
+- Les deux loaders doivent filtrer les commentaires de la même manière (lignes commençant par `#` ou `"#`).
 
 ### Format CSV actuel (v1.11+)
 ```
 numero,type,date_format,pages,ocr_mode,p1_sections,p1_orientation,p1_orientation_pdf,p1_colonnes,p2_sections,p2_orientation,p2_orientation_pdf,p2_colonnes,notes
 ```
 
-Les lignes commençant par `#` sont ignorées (commentaires).
+Les lignes commençant par `#` ou `"#` sont ignorées (commentaires).
 
 ### Workflow d'extraction par sections
 
