@@ -3515,10 +3515,27 @@ def extract_lieu_fallback(text: str, ville_ref_list: list) -> tuple[Optional[str
 
         # Ignorer les heures et prix, mais d'abord essayer d'extraire un lieu embarqué
         # Ex: "Bar Le Palais de 19h à 21h" -> extraire "Bar Le Palais"
+        # Ex: "Le Barouf 21h" -> extraire "Le Barouf"
         if heure_pattern.search(part) or prix_pattern.search(part):
             lieu_match = lieu_in_text_pattern.search(part)
             if lieu_match and lieu is None:
                 lieu = lieu_match.group(1).strip()
+            # Si pas de match explicite, essayer d'extraire le texte avant l'heure
+            # Pattern: "Lieu XXh" où Lieu commence par majuscule et n'est pas un artiste
+            elif lieu is None and heure_pattern.search(part):
+                # Extraire le texte avant l'heure
+                before_hour = re.split(r'\s*\d{1,2}h', part)[0].strip()
+                # Vérifier que c'est un lieu valide (pas en MAJUSCULES = pas un artiste)
+                # et commence par Le/La/L' ou est un nom propre (première lettre maj, reste minuscule)
+                if before_hour and len(before_hour) >= 3:
+                    # Pattern "Le/La/L' + Nom" -> probablement un lieu
+                    if re.match(r'^[Ll][ea\']\s*[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][a-zàâäéèêëïîôùûüç]+', before_hour):
+                        lieu = before_hour
+                    # Pattern "Nom" avec première maj puis minuscules (pas tout majuscules)
+                    elif re.match(r'^[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][a-zàâäéèêëïîôùûüç]+', before_hour) and not before_hour.isupper():
+                        # Vérifier que ce n'est pas un genre/style entre parenthèses tronqué
+                        if not before_hour.startswith('('):
+                            lieu = before_hour
             continue
 
         # Ignorer les genres seuls entre parenthèses
