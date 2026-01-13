@@ -290,11 +290,17 @@ def is_scan_from_csv(numero: int) -> Optional[bool]:
     for encoding in encodings:
         try:
             with open(csv_path, 'r', encoding=encoding) as f:
-                reader = csv.DictReader(f)
+                # Filtrer les lignes de commentaires
+                lines = [line for line in f if not line.startswith('#') and not line.startswith('"#')]
+                if not lines:
+                    return None
+
+                import io
+                reader = csv.DictReader(io.StringIO(''.join(lines)))
                 for row in reader:
-                    # Chercher le numéro
+                    # Chercher le numéro (nouveau format: 'numero', ancien: 'numéros')
                     row_numero = 0
-                    for key in ['numéros', 'numeros', 'num\xe9ros']:
+                    for key in ['numero', 'numéros', 'numeros', 'num\xe9ros']:
                         if key in row:
                             try:
                                 row_numero = int(row[key])
@@ -303,7 +309,8 @@ def is_scan_from_csv(numero: int) -> Optional[bool]:
                                 continue
 
                     if row_numero == numero:
-                        type_source = row.get('scan/texte', '').strip().lower()
+                        # Nouveau format: 'type', ancien: 'scan/texte'
+                        type_source = row.get('type', row.get('scan/texte', '')).strip().lower()
                         if type_source == 'scan':
                             return True
                         elif type_source == 'texte':
