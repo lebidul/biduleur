@@ -179,6 +179,7 @@ def truncate_noise_in_line(line: str) -> str:
 
     # Pattern pour détecter le prix ou l'heure (fin typique d'un événement)
     # Supporte: €, E, F (Francs), et les formats "de X à Y"
+    # Note: "prix libre" en minuscules seulement, car "PRIX LIBRE" peut être un nom d'artiste
     prix_pattern = re.compile(
         r'(?:de\s+)?'  # Optionnel: "de " (pour "de 40 à 90F")
         r'(\d+(?:[.,]\d+)?(?:\s*/\s*\d+(?:[.,]\d+)?)?(?:\s*[àa-]\s*\d+(?:[.,]\d+)?)?\s*[€eEfF]'
@@ -186,6 +187,12 @@ def truncate_noise_in_line(line: str) -> str:
         r'(?:\s*\([^)]*\))?',  # Optionnel: (- 14 ans)
         re.IGNORECASE
     )
+
+    # Ne pas matcher "PRIX LIBRE" en majuscules dans balise <b> (c'est un nom d'artiste)
+    if re.search(r'<b>PRIX LIBRE</b>', line):
+        # Désactiver la détection de prix pour cette ligne
+        prix_pattern = re.compile(r'(?!)')  # Pattern qui ne match jamais
+
     heure_pattern = re.compile(r'\d{1,2}[hH]\d{0,2}')
 
     # Chercher le prix et l'heure
@@ -3901,9 +3908,14 @@ def parse_event_line_v2(
             lieu_nom, lieu_id, lieu_start, lieu_end = lieu_match
             # Texte avant le lieu trouvé
             text_before_lieu = event_text[:lieu_start].strip()
-            # Si le texte avant + lieu forme un pattern d'événement nommé, invalider le lieu
+
+            # Ne PAS invalider le lieu s'il est précédé d'une virgule ou parenthèse fermante
+            # Ex: "MOULE FRIPES #5 // DJ Sets, Le Barouf" - la virgule indique que Le Barouf est le lieu
+            precedes_with_separator = text_before_lieu.endswith(',') or text_before_lieu.endswith(')')
+
+            # Si le texte avant + lieu forme un pattern d'événement nommé ET pas de séparateur, invalider le lieu
             text_including_lieu = event_text[:lieu_end].strip()
-            if is_named_event(text_including_lieu) or is_named_event(text_before_lieu + " " + lieu_nom):
+            if not precedes_with_separator and (is_named_event(text_including_lieu) or is_named_event(text_before_lieu + " " + lieu_nom)):
                 # Le lieu fait partie du nom d'événement - chercher le vrai lieu plus loin
                 # Chercher à partir de la position après le lieu actuel
                 remaining = event_text[lieu_end:]
@@ -6209,6 +6221,11 @@ class EventParser:
         """Parse le format par bloc (dates en en-têtes) avec les référentiels."""
         events = []
         seen_signatures = set()
+
+        # Prétraitement: convertir les lignes K isolées en bullet points
+        # Prétraitement: convertir les lignes K isolées en bullet points
+        # Le K isolé est un artefact OCR du bullet point •
+        text = re.sub(r'\nK\n', '\n•\n', text)
 
         # Découper par dates
         date_blocks = self._split_by_dates(text)

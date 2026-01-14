@@ -117,6 +117,27 @@ Les patterns doivent éviter de matcher :
 - Numéros de téléphone partiels
 - Codes département dans les villes
 
+### Extraction du nom d'événement via double slash (`//`)
+Le pattern `Organisateur // ARTISTES` permet d'extraire le nom de l'événement.
+- Pattern : `^(.+?)\s*//\s*(.+)` avec `re.DOTALL` pour le texte multiline
+- Exemple : `Orga Garage5 // 6RME (bass)` → nom="Orga Garage5", artiste="6RME"
+- Le flag `re.DOTALL` est essentiel car le texte peut contenir des newlines
+
+### Validation du lieu (éviter faux positifs)
+Le parser vérifie que le lieu détecté est bien un lieu et non partie du nom d'événement :
+- Si le lieu est précédé d'une **virgule** ou **parenthèse fermante** → lieu valide
+- Exemple : `MOULE FRIPES #5 // DJ Sets, Le Barouf` → "Le Barouf" est le lieu
+- La fonction `is_named_event()` détecte les noms d'événements (patterns comme `#N`, `édition`)
+- Si `is_named_event(text_before_lieu + lieu)` et pas de séparateur → lieu invalidé
+
+### Détection artiste "PRIX LIBRE"
+- `PRIX LIBRE` en majuscules dans `<b>PRIX LIBRE</b>` est un nom d'artiste, pas un tarif
+- La fonction `truncate_noise_in_line()` ignore ce pattern pour éviter de tronquer l'événement
+
+### Bullet point K (artefact OCR)
+- Le caractère `K` isolé sur une ligne (`\nK\n`) est un artefact OCR du bullet `•`
+- Prétraitement dans `_parse_bloc_with_referentiel()` : `re.sub(r'\nK\n', '\n•\n', text)`
+
 ## Bonnes pratiques
 
 ### Tests avant commit
