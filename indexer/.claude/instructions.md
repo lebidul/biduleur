@@ -251,7 +251,7 @@ Le fichier `corpus/biduls.description.csv` est lu par **deux classes différente
 - Si vous modifiez le format du CSV, vous devez mettre à jour les deux méthodes `from_csv_row()` dans les deux fichiers.
 - Les deux loaders doivent filtrer les commentaires de la même manière (lignes commençant par `#` ou `"#`).
 
-### Format CSV actuel (v1.11+)
+### Format CSV actuel (v1.13+)
 ```
 numero,type,date_format,pages,ocr_mode,p1_sections,p1_orientation,p1_orientation_pdf,p1_colonnes,p2_sections,p2_orientation,p2_orientation_pdf,p2_colonnes,notes
 ```
@@ -314,7 +314,7 @@ La fonction `_parse_inline_inherited_date()` gère ce format avec :
 1. Première passe : jointure des lignes de continuation (villes, heures)
 2. Deuxième passe : attribution des dates héritées aux événements
 
-## Templates SVG pour zones d'extraction (v1.12 - prévu)
+## Templates SVG pour zones d'extraction
 
 ### Concept
 

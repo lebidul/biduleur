@@ -59,6 +59,8 @@ contenu_evenement (source de vérité pour artistes/spectacles)
 
 **Note v1.11** : Extraction OCR par sections améliorée : rotation de page entière avant découpage (sections définies après rotation), colonnes `p*_orientation_pdf` pour distinguer orientation PDF vs texte, découpage physique des colonnes pour OCR séquentiel (gauche→droite), support format `inline_inherited` avec patterns 2-3 lettres.
 
+**Note v1.13** : Extraction lieux Allonnes (Les Métairies, Salle G. Moquet, CHS, Maison des arts, Guinguette). Alias pour noms abrégés (`Th. de Chaoué`). Corrections parsing bidul 309 : PRIX LIBRE détecté comme artiste, bullet K OCR, validation lieu avec séparateur virgule, double slash multiline.
+
 ## Mapping Bidul <-> Date
 
 Référence : **Bidul 280 = Mai 2023**

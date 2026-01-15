@@ -1,3 +1,48 @@
+# Release Notes - Indexer v1.13
+
+## Vue d'ensemble
+
+Version avec amélioration de l'extraction des lieux pour les événements Allonnes et correction des patterns de parsing pour bidul 309.
+
+## Nouveautés v1.13
+
+### Extraction des lieux Allonnes
+
+Ajout des lieux spécifiques pour Allonnes au référentiel :
+- **Les Métairies** : Salle de spectacle
+- **Salle G. Moquet** : Salle municipale
+- **CHS** : Centre hospitalier
+- **Maison des arts** : Lieu culturel
+- **Guinguette** : Espace festif
+- **Parvis de la Mairie place du Mail** : Espace extérieur
+
+### Alias pour noms abrégés
+
+Nouveaux alias dans `lieu_alias.csv` pour les formats OCR abrégés :
+- `Th. de Chaoué` → `Théâtre de Chaoué`
+- `Les Métairies` → `Les Métairies`
+
+### Corrections parsing bidul 309
+
+- **PRIX LIBRE** : L'artiste "PRIX LIBRE" en `<b>PRIX LIBRE</b>` n'est plus confondu avec un tarif
+- **Bullet K OCR** : Le caractère `K` isolé (`\nK\n`) est reconnu comme bullet point `•`
+- **Validation lieu** : Les lieux précédés de virgule/parenthèse sont correctement validés (ex: "MOULE FRIPES #5, Le Barouf")
+- **Double slash multiline** : Le pattern `//` pour extraction nom/artiste supporte les newlines (`re.DOTALL`)
+
+### Benchmarks
+
+| Bidul | Score v1.12 | Score v1.13 |
+|-------|-------------|-------------|
+| 184 | 95.7% | 95.7% |
+| 309 | N/A | 18 événements Allonnes OK |
+
+### Tests
+
+- 122 tests unitaires passent
+- Benchmark 184 : 95.7%
+
+---
+
 # Release Notes - Indexer v1.11
 
 ## Vue d'ensemble
