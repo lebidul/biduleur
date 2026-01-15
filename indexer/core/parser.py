@@ -3654,8 +3654,9 @@ def extract_lieu_fallback(text: str, ville_ref_list: list) -> tuple[Optional[str
     lieu_info_pattern = re.compile(r'\((?:ext[ée]rieur|int[ée]rieur|jardin|terrasse|parking|parvis|cour|dehors|plein air|\d{2,3})\)$', re.IGNORECASE)
     # Texte contenant "+" suivi de texte (probablement artistes/guests)
     multi_artiste_pattern = re.compile(r'\+\s*(?:[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ]|guests)', re.IGNORECASE)
-    # Noms d'événements: contient "avec", "invite", ":", "soirée", "concert", "scène ouverte", etc.
-    event_name_pattern = re.compile(r'\b(?:avec|featuring|feat\.?|invite)\b|^(?:soirée|concert|carte blanche|sc[èe]ne ouverte)', re.IGNORECASE)
+    # Noms d'événements: contient "avec", "invite", ":", "soirée", "concert", "scène ouverte", "apéro", "jam", etc.
+    # Ex: "Apéro Jazz Manouche", "Jam Session", "Concert Rock", "Soirée Electro"
+    event_name_pattern = re.compile(r'\b(?:avec|featuring|feat\.?|invite)\b|^(?:soirée|concert|carte blanche|sc[èe]ne ouverte|ap[ée]ro|jam|b[oœ]uf)', re.IGNORECASE)
     # Pattern pour extraire un lieu bar/espace/salle/centre/théâtre/place en fin de chaîne ou avant "de Xh"
     lieu_in_text_pattern = re.compile(r'\b((?:bar|espace|salle|centre|théâtre|pub|médiathèque|péniche|café|place|parvis|esplanade)\s+(?:le\s+|la\s+|l\'|du\s+|de\s+la\s+|des\s+)?[A-Za-zÀ-ÿ\s\-\']+?)(?:\s+de\s+\d{1,2}h|$)', re.IGNORECASE)
     # Fragments de parenthèses (genre coupé) - inclut les artistes avec parenthèse non fermée
@@ -3663,12 +3664,13 @@ def extract_lieu_fallback(text: str, ville_ref_list: list) -> tuple[Optional[str
 
     # Pattern pour identifier un lieu explicite (commence par Salle, Bar, Espace, Place, etc.)
     # Prioritaire sur les candidats génériques
+    # Inclut aussi "L'Epicerie", "L'Oasis", etc. (L' + Nom en Title Case)
     explicit_lieu_pattern = re.compile(
         r'^(?:salle|bar|espace|centre|théâtre|theater|pub|médiathèque|mediatheque|'
         r'péniche|peniche|café|cafe|place|parvis|esplanade|'
         r'le\s+(?:bar|café|cafe|théâtre|theater|centre)|'
         r'la\s+(?:salle|médiathèque|mediatheque|péniche|peniche|place)|'
-        r'l\'(?:espace|espal|esplanade))\b',
+        r'l\'(?:espace|espal|esplanade|[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][a-zàâäéèêëïîôùûüç]+))\b',
         re.IGNORECASE
     )
 
