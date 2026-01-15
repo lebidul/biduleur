@@ -2003,29 +2003,32 @@ def normalize_truncated_date(text: str) -> str:
     Returns:
         Texte avec la date normalisée si applicable
     """
-    # Pattern: lettre isolée + espace + numéro au début du texte
-    # Suivi d'un horaire ou d'un séparateur pour confirmer que c'est une date
+    # Pattern: lettre isolée ou "la" + espace + numéro au début du texte
+    # Suivi d'un horaire, séparateur, "/" ou "et" pour confirmer que c'est une date
+    # Note: "la" est une erreur OCR courante où "Ma" est lu comme "la" (M→l)
     truncated_pattern = re.compile(
-        r'^([uUaAeEiI])\s+(\d{1,2})\s+'  # Lettre tronquée + numéro
-        r'(?=[àa]?\s*\d{1,2}h|[:–-]|/)'  # Suivi de: horaire, séparateur, ou /
+        r'^([uUaAeEiI]|[lL]a?)\s+(\d{1,2})'  # Lettre tronquée ou "la" + numéro
+        r'(?:\s+(?=[àa]?\s*\d{1,2}h|[:–-]|et\s)|(?=\s*/)|(?=\s+[:–-]))'  # Suivi de: espace+horaire, espace+et, /, ou espace+séparateur
     )
 
     match = truncated_pattern.match(text)
     if not match:
         return text
 
-    letter = match.group(1).lower()
+    truncated = match.group(1).lower()
     day_num = match.group(2)
 
-    # Mapping lettre tronquée → jour complet (préférence en cas d'ambiguïté)
-    letter_to_day = {
+    # Mapping lettre/mot tronqué → jour complet (préférence en cas d'ambiguïté)
+    truncated_to_day = {
         'u': 'Lu',  # Lu uniquement
         'a': 'Sa',  # Ma ou Sa - préférence Sa (samedi plus fréquent)
         'e': 'Je',  # Me, Je ou Ve - préférence Je (jeudi plus fréquent)
         'i': 'Di',  # Di uniquement
+        'l': 'Ma',  # OCR "l" seul au lieu de "Ma"
+        'la': 'Ma',  # OCR "la" au lieu de "Ma" - le M devient l
     }
 
-    normalized_day = letter_to_day.get(letter)
+    normalized_day = truncated_to_day.get(truncated)
     if normalized_day:
         return f"{normalized_day} {day_num} {text[match.end():]}"
 
@@ -2076,7 +2079,13 @@ def split_on_dates_v2(raw_text: str) -> list[str]:
     # Pattern pour les abréviations de jours tronquées par l'OCR (début de ligne croppé)
     # u = Lu (lundi), a = Ma/Sa (mardi/samedi), e = Me/Je/Ve (mercredi/jeudi/vendredi), i = Di (dimanche)
     # Note: ne pas matcher "a" seul car trop ambigu, seulement dans le contexte d'un pattern de date complet
-    JOURS_TRONQUES = r'(?:[uU]|[aA]|[eE]|[iI])'
+    # Lettres tronquées possibles:
+    # u/U → Lu (Lundi)
+    # a/A → Ma ou Sa (préférence Sa)
+    # e/E → Me, Je ou Ve (préférence Je)
+    # i/I → Di (Dimanche)
+    # la/La → Ma (OCR "la" au lieu de "Ma" - le M devient l, formant "la" avec le a)
+    JOURS_TRONQUES = r'(?:[uU]|[aA]|[eE]|[iI]|[lL]a?)'
     # Caractères parasites OCR qui peuvent précéder une date
     OCR_PARASITES = r'[+†t]?'
 
@@ -2129,10 +2138,14 @@ def split_on_dates_v2(raw_text: str) -> list[str]:
 
     # Pattern alternatif pour dates tronquées SANS horaire mais avec séparateur ou guillemet
     # Ex: "5€ e 18 "<Lettre" ou "15€ a 18: <<Didier" ou "13€ a 19 "Les excuses"
+    # Ex: "4-5€ la 22/Me 23: Le Palais" - date tronquée suivie de /Jour et :
     # Plus permissif mais exige un contexte clair (séparateur : ou guillemet ouvrant)
     truncated_date_alt_pattern = (
         r'(?<=[\s€E,.])\s*'  # Précédé de espace/€/E/,/.
-        rf'({JOURS_TRONQUES}\s*\d{{1,2}})'  # Lettre tronquée + numéro: e 18, a 19
+        rf'({JOURS_TRONQUES}\s*\d{{1,2}}'  # Lettre tronquée + numéro: e 18, a 19, la 22
+        rf'(?:\s*/\s*{JOURS_ABBREV}\s*\d{{1,2}})?'  # Optionnel: /Jour DD (ex: /Me 23)
+        rf'(?:\s+et\s+{JOURS_ABBREV}\s*\d{{1,2}})?'  # Optionnel: et Jour DD (ex: et Ve 25)
+        r')'
         r'\s*'
         r'(?:[:–-]\s*|(?=[""«<]))'  # Suivi de séparateur OU guillemet ouvrant (lookahead)
     )
