@@ -896,6 +896,11 @@ def is_named_event(text: str) -> bool:
         # Pattern: "Les X:" suivi d'un spectacle entre guillemets
         # Ex: "Les Veillées: \"Traces\" (théâtre) par..."
         r'^[«""„]?Les\s+[A-ZÀ-Ÿa-zà-ÿ]+\s*:\s*[""«]',
+        # Pattern: "Titre" avec ARTISTES - titre entre guillemets suivi de "avec"
+        # Ex: '"Bal populaire dépoussiéré" avec DECIBAL RUTABAGA'
+        # Note: Le titre peut être entre guillemets HTML <b>"Titre"</b> ou simplement "Titre"
+        # Note: [«""„"\'"] inclut guillemets français «», typographiques "", et ASCII "
+        r'^(?:<b>)?[«""„"\'"][^»"""\'"]+[»"""\'"]+(?:</b>)?\s+avec\s+',
     ]
 
     for pattern in named_event_patterns:
@@ -916,11 +921,8 @@ def extract_event_name(text: str) -> Optional[str]:
     if not is_named_event(text):
         return None
 
-    # Retirer les guillemets de début et fin pour simplifier l'extraction
-    clean_text = text.strip()
-    clean_text = re.sub(r'^[«""„"\']', '', clean_text)
-    clean_text = re.sub(r'[»"""\']$', '', clean_text)
-    clean_text = clean_text.strip()
+    # Retirer les balises HTML mais garder les guillemets pour le pattern matching
+    clean_text = strip_formatting_tags(text).strip()
 
     # Extraire le nom jusqu'au premier ":" ou "avec" ou artiste
     patterns = [
@@ -996,6 +998,11 @@ def extract_event_name(text: str) -> Optional[str]:
         # Pattern: "Les X:" suivi d'un spectacle entre guillemets
         # Ex: "Les Veillées: \"Traces\" (théâtre) par..." → "Les Veillées"
         r'^(Les\s+[A-ZÀ-Ÿa-zà-ÿ]+)\s*:\s*[""«]',
+        # Pattern: "Titre" avec ARTISTES - titre entre guillemets suivi de "avec"
+        # Ex: '"Bal populaire dépoussiéré" avec DECIBAL RUTABAGA' → "Bal populaire dépoussiéré"
+        # Capture le contenu entre guillemets (sans les guillemets)
+        # Note: [«""„"\'"] inclut guillemets français «», typographiques "", et ASCII "
+        r'^(?:<b>)?[«""„"\'"]([^»"""\'"]+)[»"""\'"]+(?:</b>)?\s+avec\s+',
     ]
 
     for pattern in patterns:
@@ -1974,6 +1981,57 @@ def find_lieu_in_text_v2(text: str, lieu_patterns: list) -> Optional[tuple]:
     return None
 
 
+def normalize_truncated_date(text: str) -> str:
+    """
+    Normalise les dates tronquées par l'OCR au début d'un texte.
+
+    Quand le scan coupe le début des lignes, on peut perdre la première lettre
+    des abréviations de jours:
+    - u 17 → Lu 17 (Lundi)
+    - a 17 → Sa 17 (Samedi) ou Ma 17 (Mardi) - préférence Samedi car plus fréquent en soirée
+    - e 17 → Je 17 (Jeudi) ou Ve 17 (Vendredi) ou Me 17 (Mercredi) - préférence Jeudi
+    - i 17 → Di 17 (Dimanche)
+
+    Le contexte permet parfois de trancher (horaire, date suivante, etc.) mais
+    en cas d'ambiguïté, on préfère:
+    - a → Sa (samedi est le jour le plus courant pour les événements)
+    - e → Je (jeudi est plus fréquent que mercredi pour les événements)
+
+    Args:
+        text: Texte commençant potentiellement par une date tronquée
+
+    Returns:
+        Texte avec la date normalisée si applicable
+    """
+    # Pattern: lettre isolée + espace + numéro au début du texte
+    # Suivi d'un horaire ou d'un séparateur pour confirmer que c'est une date
+    truncated_pattern = re.compile(
+        r'^([uUaAeEiI])\s+(\d{1,2})\s+'  # Lettre tronquée + numéro
+        r'(?=[àa]?\s*\d{1,2}h|[:–-]|/)'  # Suivi de: horaire, séparateur, ou /
+    )
+
+    match = truncated_pattern.match(text)
+    if not match:
+        return text
+
+    letter = match.group(1).lower()
+    day_num = match.group(2)
+
+    # Mapping lettre tronquée → jour complet (préférence en cas d'ambiguïté)
+    letter_to_day = {
+        'u': 'Lu',  # Lu uniquement
+        'a': 'Sa',  # Ma ou Sa - préférence Sa (samedi plus fréquent)
+        'e': 'Je',  # Me, Je ou Ve - préférence Je (jeudi plus fréquent)
+        'i': 'Di',  # Di uniquement
+    }
+
+    normalized_day = letter_to_day.get(letter)
+    if normalized_day:
+        return f"{normalized_day} {day_num} {text[match.end():]}"
+
+    return text
+
+
 def split_on_dates_v2(raw_text: str) -> list[str]:
     """
     Sépare le texte sur les patterns de date au milieu.
@@ -2015,6 +2073,10 @@ def split_on_dates_v2(raw_text: str) -> list[str]:
     # Support des caractères parasites OCR avant les dates: +, t, † (ex: "+Ma 14:", "tJe 16:")
     # Pattern strict pour les abréviations de jours (évite de matcher "de 18", "le 14", etc.)
     JOURS_ABBREV = r'(?:[Ll]u|[Mm]a|[Mm]e|[Jj]e|[Vv]e|[Ss]a|[Dd]i)'
+    # Pattern pour les abréviations de jours tronquées par l'OCR (début de ligne croppé)
+    # u = Lu (lundi), a = Ma/Sa (mardi/samedi), e = Me/Je/Ve (mercredi/jeudi/vendredi), i = Di (dimanche)
+    # Note: ne pas matcher "a" seul car trop ambigu, seulement dans le contexte d'un pattern de date complet
+    JOURS_TRONQUES = r'(?:[uU]|[aA]|[eE]|[iI])'
     # Caractères parasites OCR qui peuvent précéder une date
     OCR_PARASITES = r'[+†t]?'
 
@@ -2050,6 +2112,24 @@ def split_on_dates_v2(raw_text: str) -> list[str]:
     # Si pas de split avec séparateur, essayer sans séparateur sur le texte entier
     if len(parts) <= 1:
         parts = re.split(alt_pattern, raw_text, flags=re.IGNORECASE)
+
+    # Pattern pour les dates tronquées par l'OCR (début de ligne croppé)
+    # Ex: "9 à 26€ e 17 à 14h30/Ve 18" - où "e 17" est "Je 17" ou "Ve 17" tronqué
+    # Ce pattern est plus strict: exige un horaire après la date tronquée
+    # pour éviter les faux positifs avec "e 17" dans d'autres contextes
+    # Note: Le lookbehind doit accepter espace, €, virgule, point, E (majuscule de € mal OCR)
+    # Supporte aussi "/ 14h30" (horaire sans jour) après une date complète
+    truncated_date_pattern = (
+        r'(?<=[\s€E,.])\s*'  # Précédé de espace/€/E/,/.
+        rf'({JOURS_TRONQUES}\s*\d{{1,2}}'  # Lettre tronquée + numéro: e 17, a 18
+        r'\s+(?:(?:à|a)\s+)?\d{1,2}h\d{0,2}'  # Horaire OBLIGATOIRE: à 14h30
+        rf'(?:\s*/\s*(?:{JOURS_ABBREV}|{JOURS_TRONQUES})?\s*\d{{1,2}}(?:h\d{{0,2}}|\s+(?:(?:à|a)\s+)?\d{{1,2}}h\d{{0,2}}))*'  # Dates/horaires additionnels: /Ve 18 à 10h30 ou / 14h30
+        r')\s*[:–-]\s*'  # Séparateur : ou - ou – obligatoire
+    )
+
+    # Essayer le pattern de dates tronquées si toujours pas de split
+    if len(parts) <= 1:
+        parts = re.split(truncated_date_pattern, raw_text, flags=re.IGNORECASE)
 
     if len(parts) <= 1:
         return [raw_text]
@@ -2098,6 +2178,9 @@ def split_on_dates_v2(raw_text: str) -> list[str]:
                 j += 2
         else:
             final_events.append(event)
+
+    # Normaliser les dates tronquées par l'OCR (e 17 → Je 17, etc.)
+    final_events = [normalize_truncated_date(event) for event in final_events]
 
     return final_events if final_events else [raw_text]
 
@@ -2267,12 +2350,19 @@ def parse_date_prefix_v2(text: str, base_month: int, base_year: int) -> tuple[li
     # Pattern 2: Dates complexes avec horaires (ex: "Je 01/Ve 02 à 20h30 et Di 04 à 17h :")
     # Supporte aussi: "Ma 27 à 19h/Ve 30 à 20h :" (horaire après chaque jour)
     # Supporte aussi: "Ve 06/Sa 07 20h30/Di 08 15h:" (horaire sans "à" - format OCR)
+    # Supporte aussi: "Je 17 a 14h30/Ve 18 a 10h30 / 14h30:" (horaires sans jour - séances additionnelles)
+    # Note: NE PAS matcher "Ve 01/02:" qui est une date avec mois (Pattern 3a)
     # Ce pattern capture toute la partie date complexe avant le séparateur
     complex_date_pattern = (
         r'^('
         r'[DLMJVS][a-z]\s*\d{1,2}(?:er|ère|e|ème)?'  # Premier jour
         r'(?:\s+(?:(?:à|a)\s+)?\d{1,2}h\d{0,2})?'  # Horaire optionnel (avec ou sans "à")
-        r'(?:\s*[&,/]\s*[A-Za-z]{2,3}\s*\d{1,2}(?:er|ère|e|ème)?(?:\s+(?:(?:à|a)\s+)?\d{1,2}h\d{0,2})?)*'  # Jours additionnels
+        # Jours additionnels: /Jour DD ou / XXh (mais PAS /DD seul qui serait un mois)
+        r'(?:\s*[&,/]\s*(?:'
+            r'[A-Za-z]{2,3}\s*\d{1,2}(?:er|ère|e|ème)?'  # /Jour DD (jour obligatoire)
+            r'|'
+            r'\d{1,2}h\d{0,2}'  # ou /XXh (horaire seul - doit avoir le h)
+        r')(?:\s+(?:(?:à|a)\s+)?\d{1,2}h\d{0,2})?)*'
         r'(?:\s+(?:au|à)\s+[A-Za-z]{2,3}\s*\d{1,2}(?:er|ère|e|ème)?)?'  # Plage "au Ve 09"
         r'(?:\s+et\s+[A-Za-z]{2,3}\s*\d{1,2}(?:er|ère|e|ème)?(?:\s+(?:(?:à|a)\s+)?\d{1,2}h\d{0,2})?)*'  # "et Di 04 à 17h"
         r')'
@@ -2745,6 +2835,18 @@ def extract_before_lieu(text: str, lieu_start: int) -> dict:
         # Pattern "guests" ou "guests!!"
         if re.search(r'\bguests?!*\b', before_stripped, re.IGNORECASE):
             result['artistes'].append({'nom': 'Guests', 'style': None, 'is_musical': True})
+
+        # Pattern DJ/Dj non formaté: "+ Dj Set XXX" ou "+ DJ XXX" après les artistes en gras
+        # Ex: "ARTISTE1 + ARTISTE2 + Dj Set Electro swing and roll"
+        # Ces artistes DJ ne sont pas en <b> mais doivent être capturés
+        dj_pattern = r'\+\s*(Dj\s+(?:Set\s+)?[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s\-\']+?)(?:\s*\+|\s*,|\s*$)'
+        dj_matches = re.findall(dj_pattern, before_stripped, re.IGNORECASE)
+        for dj_nom in dj_matches:
+            dj_nom = dj_nom.strip()
+            if dj_nom and len(dj_nom) > 2:
+                # Éviter les doublons
+                if not any(a['nom'].lower() == dj_nom.lower() for a in result['artistes']):
+                    result['artistes'].append({'nom': dj_nom, 'style': None, 'is_musical': True})
 
         # Extraire les artistes de théâtre: "par XXX" après un spectacle
         # Ces artistes ne sont PAS en gras
@@ -3496,19 +3598,19 @@ def extract_lieu_fallback(text: str, ville_ref_list: list) -> tuple[Optional[str
     multi_artiste_pattern = re.compile(r'\+\s*(?:[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ]|guests)', re.IGNORECASE)
     # Noms d'événements: contient "avec", "invite", ":", "soirée", "concert", "scène ouverte", etc.
     event_name_pattern = re.compile(r'\b(?:avec|featuring|feat\.?|invite)\b|^(?:soirée|concert|carte blanche|sc[èe]ne ouverte)', re.IGNORECASE)
-    # Pattern pour extraire un lieu bar/espace/salle/centre/théâtre en fin de chaîne ou avant "de Xh"
-    lieu_in_text_pattern = re.compile(r'\b((?:bar|espace|salle|centre|théâtre|pub|médiathèque|péniche|café)\s+(?:le\s+|la\s+|l\'|du\s+|de\s+la\s+|des\s+)?[A-Za-zÀ-ÿ\s\-\']+?)(?:\s+de\s+\d{1,2}h|$)', re.IGNORECASE)
+    # Pattern pour extraire un lieu bar/espace/salle/centre/théâtre/place en fin de chaîne ou avant "de Xh"
+    lieu_in_text_pattern = re.compile(r'\b((?:bar|espace|salle|centre|théâtre|pub|médiathèque|péniche|café|place|parvis|esplanade)\s+(?:le\s+|la\s+|l\'|du\s+|de\s+la\s+|des\s+)?[A-Za-zÀ-ÿ\s\-\']+?)(?:\s+de\s+\d{1,2}h|$)', re.IGNORECASE)
     # Fragments de parenthèses (genre coupé) - inclut les artistes avec parenthèse non fermée
     fragment_pattern = re.compile(r'^[^(]*\)|\([^)]*$|^[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s\'\-\&\.0-9]+\s*\([^)]*$')
 
-    # Pattern pour identifier un lieu explicite (commence par Salle, Bar, Espace, etc.)
+    # Pattern pour identifier un lieu explicite (commence par Salle, Bar, Espace, Place, etc.)
     # Prioritaire sur les candidats génériques
     explicit_lieu_pattern = re.compile(
         r'^(?:salle|bar|espace|centre|théâtre|theater|pub|médiathèque|mediatheque|'
-        r'péniche|peniche|café|cafe|'
+        r'péniche|peniche|café|cafe|place|parvis|esplanade|'
         r'le\s+(?:bar|café|cafe|théâtre|theater|centre)|'
-        r'la\s+(?:salle|médiathèque|mediatheque|péniche|peniche)|'
-        r'l\'(?:espace|espal))\b',
+        r'la\s+(?:salle|médiathèque|mediatheque|péniche|peniche|place)|'
+        r'l\'(?:espace|espal|esplanade))\b',
         re.IGNORECASE
     )
 
@@ -3520,29 +3622,41 @@ def extract_lieu_fallback(text: str, ville_ref_list: list) -> tuple[Optional[str
         if not part:
             continue
 
-        # Ignorer les heures et prix, mais d'abord essayer d'extraire un lieu embarqué
+        # Ignorer les heures et prix, mais d'abord essayer d'extraire un lieu ou ville embarqué
         # Ex: "Bar Le Palais de 19h à 21h" -> extraire "Bar Le Palais"
         # Ex: "Le Barouf 21h" -> extraire "Le Barouf"
+        # Ex: "La Flèche dès 16h" -> extraire "La Flèche" comme ville
         if heure_pattern.search(part) or prix_pattern.search(part):
             lieu_match = lieu_in_text_pattern.search(part)
             if lieu_match and lieu is None:
                 lieu = lieu_match.group(1).strip()
             # Si pas de match explicite, essayer d'extraire le texte avant l'heure
-            # Pattern: "Lieu XXh" où Lieu commence par majuscule et n'est pas un artiste
-            elif lieu is None and heure_pattern.search(part):
-                # Extraire le texte avant l'heure
-                before_hour = re.split(r'\s*\d{1,2}h', part)[0].strip()
-                # Vérifier que c'est un lieu valide (pas en MAJUSCULES = pas un artiste)
-                # et commence par Le/La/L' ou est un nom propre (première lettre maj, reste minuscule)
+            # Pattern: "Lieu/Ville XXh" où Lieu commence par majuscule et n'est pas un artiste
+            elif heure_pattern.search(part):
+                # Extraire le texte avant l'heure (supporte "dès Xh", "de Xh", "Xh")
+                before_hour = re.split(r'\s*(?:dès|de|à)?\s*\d{1,2}h', part)[0].strip()
                 if before_hour and len(before_hour) >= 3:
-                    # Pattern "Le/La/L' + Nom" -> probablement un lieu
-                    if re.match(r'^[Ll][ea\']\s*[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][a-zàâäéèêëïîôùûüç]+', before_hour):
-                        lieu = before_hour
-                    # Pattern "Nom" avec première maj puis minuscules (pas tout majuscules)
-                    elif re.match(r'^[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][a-zàâäéèêëïîôùûüç]+', before_hour) and not before_hour.isupper():
-                        # Vérifier que ce n'est pas un genre/style entre parenthèses tronqué
-                        if not before_hour.startswith('('):
+                    # Vérifier d'abord si c'est une ville connue
+                    ville_id, ville_norm = normalize_ville(before_hour)
+                    from core.normalizer import normalize_for_matching
+                    before_normalized = normalize_for_matching(before_hour)
+                    ville_normalized = normalize_for_matching(ville_norm)
+                    # C'est une ville si le nom retourné correspond
+                    if ville_norm.lower() != 'le mans' or before_normalized == ville_normalized:
+                        villes_trouvees.append({
+                            'nom': ville_norm,
+                            'is_lemans': ville_norm.lower() == 'le mans'
+                        })
+                    # Sinon, vérifier si c'est un lieu valide (pas en MAJUSCULES = pas un artiste)
+                    elif lieu is None:
+                        # Pattern "Le/La/L' + Nom" -> probablement un lieu
+                        if re.match(r'^[Ll][ea\']\s*[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][a-zàâäéèêëïîôùûüç]+', before_hour):
                             lieu = before_hour
+                        # Pattern "Nom" avec première maj puis minuscules (pas tout majuscules)
+                        elif re.match(r'^[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][a-zàâäéèêëïîôùûüç]+', before_hour) and not before_hour.isupper():
+                            # Vérifier que ce n'est pas un genre/style entre parenthèses tronqué
+                            if not before_hour.startswith('('):
+                                lieu = before_hour
             continue
 
         # Ignorer les genres seuls entre parenthèses
@@ -3913,9 +4027,19 @@ def parse_event_line_v2(
             # Ex: "MOULE FRIPES #5 // DJ Sets, Le Barouf" - la virgule indique que Le Barouf est le lieu
             precedes_with_separator = text_before_lieu.endswith(',') or text_before_lieu.endswith(')')
 
-            # Si le texte avant + lieu forme un pattern d'événement nommé ET pas de séparateur, invalider le lieu
+            # Ne PAS invalider le lieu s'il est précédé d'un mot-clé de lieu explicite
+            # Ex: "...THE NAME, salle EVE (Université)" - "salle" indique que EVE est un lieu
+            explicit_lieu_keywords = re.compile(
+                r'(?:salle|bar|espace|centre|théâtre|theater|pub|médiathèque|'
+                r'péniche|café|place|parvis|esplanade|le|la|l\')\s*$',
+                re.IGNORECASE
+            )
+            precedes_with_lieu_keyword = bool(explicit_lieu_keywords.search(text_before_lieu))
+
+            # Si le texte avant + lieu forme un pattern d'événement nommé ET pas de séparateur
+            # ET pas de mot-clé de lieu, invalider le lieu
             text_including_lieu = event_text[:lieu_end].strip()
-            if not precedes_with_separator and (is_named_event(text_including_lieu) or is_named_event(text_before_lieu + " " + lieu_nom)):
+            if not precedes_with_separator and not precedes_with_lieu_keyword and (is_named_event(text_including_lieu) or is_named_event(text_before_lieu + " " + lieu_nom)):
                 # Le lieu fait partie du nom d'événement - chercher le vrai lieu plus loin
                 # Chercher à partir de la position après le lieu actuel
                 remaining = event_text[lieu_end:]
@@ -4299,13 +4423,17 @@ class EventParser:
         # Mois optionnel après la date (ex: "Sa 1er Nov", "Di 31 Déc")
         rf'(?:\s+{_MOIS_INLINE})?'
         r'(?:'
+        # Horaire optionnel pour le premier jour (avant les jours additionnels)
+        # Ex: "Je 17 a 14h30/Ve 18" - le premier jour a son horaire avant le /
+        r'(?:\s+(?:(?:à|a)\s+)?\d{1,2}h\d{0,2})?'
         # Jours additionnels avec / ou &, chaque jour pouvant avoir une heure (avec ou sans "à")
         # Ex: "Ve 1/Sa 02 à 21h/Di 03 15h30" ou "Ve 06/Sa 07 20h30/Di 08 15h"
         # Le dernier jour peut avoir une plage DD-DD (ex: "Me 01-04") pour les événements récurrents
-        rf'(?:\s*[/&]\s*(?:{_JOURS_INLINE})?\s*\d{{1,2}}(?:-\d{{1,2}})?(?:er|ère|ème|eme)?(?:\s+(?:(?:à|a)\s+)?\d{{1,2}}h\d{{0,2}})?)*'
+        # Supporte aussi les horaires sans jour (/ 14h30) pour les séances supplémentaires
+        rf'(?:\s*[/&]\s*(?:(?:{_JOURS_INLINE})?\s*\d{{1,2}}(?:-\d{{1,2}})?(?:er|ère|ème|eme)?)?(?:\s+(?:(?:à|a)\s+)?\d{{1,2}}h\d{{0,2}})?)*'
         # Plage "au Ve 09" ou "au 03/02" (avec mois explicite)
         rf'(?:\s+(?:au|à)\s+(?:{_JOURS_INLINE}\s*)?\d{{1,2}}(?:/\d{{2}})?(?:er|ère|ème|eme)?)?'
-        r'(?:\s+(?:(?:à|a)\s+)?\d{1,2}h\d{0,2})?'  # Horaire optionnel (avec ou sans "à")
+        r'(?:\s+(?:(?:à|a)\s+)?\d{1,2}h\d{0,2})?'  # Horaire final optionnel
         rf'(?:\s+et\s+(?:{_JOURS_INLINE})?\s*\d{{1,2}}(?:er|ère|ème|eme)?(?:\s+(?:(?:à|a)\s+)?\d{{1,2}}h\d{{0,2}})?)*'  # "et Di 04 à 17h"
         r')?'
         r')'  # Fin groupe 1
