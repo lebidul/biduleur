@@ -2127,9 +2127,23 @@ def split_on_dates_v2(raw_text: str) -> list[str]:
         r')\s*[:–-]\s*'  # Séparateur : ou - ou – obligatoire
     )
 
+    # Pattern alternatif pour dates tronquées SANS horaire mais avec séparateur ou guillemet
+    # Ex: "5€ e 18 "<Lettre" ou "15€ a 18: <<Didier" ou "13€ a 19 "Les excuses"
+    # Plus permissif mais exige un contexte clair (séparateur : ou guillemet ouvrant)
+    truncated_date_alt_pattern = (
+        r'(?<=[\s€E,.])\s*'  # Précédé de espace/€/E/,/.
+        rf'({JOURS_TRONQUES}\s*\d{{1,2}})'  # Lettre tronquée + numéro: e 18, a 19
+        r'\s*'
+        r'(?:[:–-]\s*|(?=[""«<]))'  # Suivi de séparateur OU guillemet ouvrant (lookahead)
+    )
+
     # Essayer le pattern de dates tronquées si toujours pas de split
     if len(parts) <= 1:
         parts = re.split(truncated_date_pattern, raw_text, flags=re.IGNORECASE)
+
+    # Essayer le pattern alternatif (sans horaire mais avec guillemet/séparateur)
+    if len(parts) <= 1:
+        parts = re.split(truncated_date_alt_pattern, raw_text, flags=re.IGNORECASE)
 
     if len(parts) <= 1:
         return [raw_text]
@@ -2179,10 +2193,38 @@ def split_on_dates_v2(raw_text: str) -> list[str]:
         else:
             final_events.append(event)
 
-    # Normaliser les dates tronquées par l'OCR (e 17 → Je 17, etc.)
-    final_events = [normalize_truncated_date(event) for event in final_events]
+    # Troisième passe: appliquer les patterns de dates tronquées sur chaque événement
+    # pour séparer les cas comme "...5€ e 18 "<Lettre..." ou "...15€ a 18: <<Didier..."
+    final_events_2 = []
+    for event in final_events:
+        # Essayer d'abord le pattern strict (avec horaire)
+        sub_parts = re.split(truncated_date_pattern, event, flags=re.IGNORECASE)
+        if len(sub_parts) <= 1:
+            # Sinon essayer le pattern alternatif (sans horaire mais avec guillemet/séparateur)
+            sub_parts = re.split(truncated_date_alt_pattern, event, flags=re.IGNORECASE)
 
-    return final_events if final_events else [raw_text]
+        if len(sub_parts) > 1:
+            # Premier sous-événement
+            first_sub = sub_parts[0].strip()
+            if first_sub:
+                if not re.search(r'\b(?:au|à)\s*$', first_sub, re.IGNORECASE):
+                    first_sub = first_sub.rstrip(',').rstrip()
+                final_events_2.append(first_sub)
+            # Sous-événements suivants
+            j = 1
+            while j < len(sub_parts):
+                sub_date = sub_parts[j] if j < len(sub_parts) else ''
+                sub_text = sub_parts[j + 1] if j + 1 < len(sub_parts) else ''
+                if sub_date and sub_text.strip():
+                    final_events_2.append(f"{sub_date} : {sub_text}".strip())
+                j += 2
+        else:
+            final_events_2.append(event)
+
+    # Normaliser les dates tronquées par l'OCR (e 17 → Je 17, etc.)
+    final_events_2 = [normalize_truncated_date(event) for event in final_events_2]
+
+    return final_events_2 if final_events_2 else [raw_text]
 
 
 def parse_date_prefix_v2(text: str, base_month: int, base_year: int) -> tuple[list[date], str]:
@@ -4027,6 +4069,12 @@ def parse_event_line_v2(
             # Ex: "MOULE FRIPES #5 // DJ Sets, Le Barouf" - la virgule indique que Le Barouf est le lieu
             precedes_with_separator = text_before_lieu.endswith(',') or text_before_lieu.endswith(')')
 
+            # Ne PAS invalider le lieu si le texte avant contient une parenthèse ouvrante non fermée
+            # Ex: "... SOUND (reggae/dancehal Le Bakoua" - parenthèse non fermée = style/genre, pas nom d'événement
+            open_parens = text_before_lieu.count('(')
+            close_parens = text_before_lieu.count(')')
+            has_unclosed_paren = open_parens > close_parens
+
             # Ne PAS invalider le lieu s'il est précédé d'un mot-clé de lieu explicite
             # Ex: "...THE NAME, salle EVE (Université)" - "salle" indique que EVE est un lieu
             explicit_lieu_keywords = re.compile(
@@ -4037,9 +4085,9 @@ def parse_event_line_v2(
             precedes_with_lieu_keyword = bool(explicit_lieu_keywords.search(text_before_lieu))
 
             # Si le texte avant + lieu forme un pattern d'événement nommé ET pas de séparateur
-            # ET pas de mot-clé de lieu, invalider le lieu
+            # ET pas de mot-clé de lieu ET pas de parenthèse non fermée, invalider le lieu
             text_including_lieu = event_text[:lieu_end].strip()
-            if not precedes_with_separator and not precedes_with_lieu_keyword and (is_named_event(text_including_lieu) or is_named_event(text_before_lieu + " " + lieu_nom)):
+            if not precedes_with_separator and not precedes_with_lieu_keyword and not has_unclosed_paren and (is_named_event(text_including_lieu) or is_named_event(text_before_lieu + " " + lieu_nom)):
                 # Le lieu fait partie du nom d'événement - chercher le vrai lieu plus loin
                 # Chercher à partir de la position après le lieu actuel
                 remaining = event_text[lieu_end:]
