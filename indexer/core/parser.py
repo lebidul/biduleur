@@ -933,7 +933,10 @@ def extract_event_name(text: str) -> Optional[str]:
         # Soirée "titre" avec guillemets - avec ou sans style entre parenthèses
         # Ex: 'Soirée "électro festif" avec Dj...' → 'Soirée "électro festif"'
         # Ex: 'Soirée "Prosper au passeport" (rock-hip hop) Le Passeport' → 'Soirée "Prosper au passeport"'
-        r'^(Soirée\s*[""«][^""»]+[""»])(?:\s*\([^)]+\))?\s*(?:avec\s+|,|\s+[A-Z])',
+        # Ex: 'Soirée Tériaki "Les escales expérimentales>>' → 'Soirée Tériaki "Les escales expérimentales>>'
+        # Note: ">>" est une erreur OCR courante pour "»" (guillemet fermant)
+        r'^(Soirée\s+\w+\s*[""«][^""»>]+(?:[""»]|>>))(?:\s*\([^)]+\))?\s*(?:avec\s+|,|\s+[A-Z])',
+        r'^(Soirée\s*[""«][^""»>]+(?:[""»]|>>))(?:\s*\([^)]+\))?\s*(?:avec\s+|,|\s+[A-Z])',
         # "Soirée X" entre guillemets → extraire Soirée X sans guillemets
         r'^(Soirée\s+\w+)[»""]',
         # Soirée X avec DJ → extraire seulement "Soirée X"
