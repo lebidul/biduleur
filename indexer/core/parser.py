@@ -896,6 +896,11 @@ def is_named_event(text: str) -> bool:
         # Pattern: "Les X:" suivi d'un spectacle entre guillemets
         # Ex: "Les Veillées: \"Traces\" (théâtre) par..."
         r'^[«""„]?Les\s+[A-ZÀ-Ÿa-zà-ÿ]+\s*:\s*[""«]',
+        # Pattern: "Les Veillées" suivi de possessif ou description
+        # Ex: "Les veillées d'Allonnes, banquets populaires..."
+        # "Les Veillées" est un festival récurrent à Allonnes
+        # Note: ^\W* ignore les caractères non-alpha au début (bullets OCR comme \uf0b5)
+        r'^\W*Les\s+[Vv]eill[ée]es\b',
         # Pattern: "Titre" avec ARTISTES - titre entre guillemets suivi de "avec"
         # Ex: '"Bal populaire dépoussiéré" avec DECIBAL RUTABAGA'
         # Note: Le titre peut être entre guillemets HTML <b>"Titre"</b> ou simplement "Titre"
@@ -1001,6 +1006,11 @@ def extract_event_name(text: str) -> Optional[str]:
         # Pattern: "Les X:" suivi d'un spectacle entre guillemets
         # Ex: "Les Veillées: \"Traces\" (théâtre) par..." → "Les Veillées"
         r'^(Les\s+[A-ZÀ-Ÿa-zà-ÿ]+)\s*:\s*[""«]',
+        # Pattern: "Les Veillées d'Allonnes" - festival récurrent
+        # Ex: "Les veillées d'Allonnes, banquets populaires..." → "Les veillées d'Allonnes"
+        # Note: ^\W* ignore les caractères non-alpha au début (bullets OCR comme \uf0b5)
+        # Note: ['\u2019] inclut apostrophe ASCII ' (U+0027) et typographique ' (U+2019)
+        r"^\W*(Les\s+[Vv]eill[ée]es(?:\s+d['\u2019][A-ZÀ-Ÿa-zà-ÿ]+)?)",
         # Pattern: "Titre" avec ARTISTES - titre entre guillemets suivi de "avec"
         # Ex: '"Bal populaire dépoussiéré" avec DECIBAL RUTABAGA' → "Bal populaire dépoussiéré"
         # Capture le contenu entre guillemets (sans les guillemets)
@@ -3775,6 +3785,15 @@ def extract_lieu_fallback(text: str, ville_ref_list: list) -> tuple[Optional[str
         if len(part) > 50:
             continue
 
+        # Ignorer les descriptions d'événements (pas des lieux)
+        # Ex: "banquets populaires et spectacles en plein air"
+        description_pattern = re.compile(
+            r'\b(?:spectacles?|banquets?|concerts?|animations?|festivités|ateliers?)\b.*\bet\b',
+            re.IGNORECASE
+        )
+        if description_pattern.search(part):
+            continue
+
         # Ignorer les segments trop courts (moins de 3 caractères)
         if len(part) < 3:
             continue
@@ -3801,6 +3820,10 @@ def extract_lieu_fallback(text: str, ville_ref_list: list) -> tuple[Optional[str
             continue
 
         # Candidat valide pour un lieu
+        # Vérifier d'abord que ce n'est pas un nom d'événement
+        if is_named_event(part):
+            continue
+
         # Priorité aux lieux explicites (Salle X, Bar le Y, etc.)
         if explicit_lieu_pattern.match(part):
             # Lieu explicite trouvé - remplace tout candidat générique
@@ -5938,6 +5961,19 @@ class EventParser:
 
             # Ignorer les segments trop longs (probablement description)
             if len(part) > 50:
+                continue
+
+            # Ignorer les noms d'événements (festival, soirée, etc.)
+            if is_named_event(part):
+                continue
+
+            # Ignorer les descriptions d'événements (pas des lieux)
+            # Ex: "banquets populaires et spectacles en plein air"
+            description_pattern = re.compile(
+                r'\b(?:spectacles?|banquets?|concerts?|animations?|festivités|ateliers?)\b.*\bet\b',
+                re.IGNORECASE
+            )
+            if description_pattern.search(part):
                 continue
 
             candidates.append(part)
