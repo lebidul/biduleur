@@ -951,9 +951,9 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
             const btn = document.getElementById('qualityBtn');
             btn.classList.toggle('active', qualityVisible);
 
-            // Toggle quality dataset in main chart
-            if (chart.data.datasets.length > 2) {
-                chart.data.datasets[2].hidden = !qualityVisible;
+            // Toggle quality dataset in main chart (index 3 = quality line)
+            if (chart.data.datasets.length > 3) {
+                chart.data.datasets[3].hidden = !qualityVisible;
                 chart.options.scales.y1.display = qualityVisible;
                 chart.update();
             }

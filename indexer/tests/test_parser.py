@@ -1189,5 +1189,71 @@ Ve 06: SAMEBLOOD, L'Inventaire, LE MANS, 22h00"""
         assert len(events) == 0
 
 
+class TestInlineInheritedWithoutReferentiel:
+    """Tests pour le format inline_inherited via parse() sans référentiels."""
+
+    def test_parse_without_referentiel_basic(self):
+        """EventParser.parse() doit fonctionner avec inline_inherited."""
+        text = """dim 01: À CHŒUR OUVERT, PCC, Le Mans, 15h00
+mar 03 Concert: LA SORCIERE, L'Espal, Le Mans, 20h30"""
+
+        parser = EventParser(bidul_mois=6, bidul_annee=1997, date_format='inline_inherited')
+        events = parser.parse(text)
+
+        assert len(events) == 2
+        assert events[0].date_evenement == date(1997, 6, 1)
+        assert events[1].date_evenement == date(1997, 6, 3)
+
+    def test_parse_without_referentiel_inherited_date(self):
+        """Les événements sans date héritent de la date précédente."""
+        text = """jeu 05 SATANAS, Le Viking, Le Mans
+-PANDORA, Pirate Café, Le Mans, 21h30"""
+
+        parser = EventParser(bidul_mois=6, bidul_annee=1997, date_format='inline_inherited')
+        events = parser.parse(text)
+
+        assert len(events) == 2
+        # Les deux événements héritent de jeu 05
+        assert events[0].date_evenement == date(1997, 6, 5)
+        assert events[1].date_evenement == date(1997, 6, 5)
+
+    def test_parse_without_referentiel_continuation_joined(self):
+        """Les lignes de continuation sont jointes à l'événement."""
+        text = """mar 03 Concert: ARTISTE
+Le Mans, 20h30"""
+
+        parser = EventParser(bidul_mois=6, bidul_annee=1997, date_format='inline_inherited')
+        events = parser.parse(text)
+
+        assert len(events) == 1
+        assert events[0].date_evenement == date(1997, 6, 3)
+        # Le Mans est joint
+        assert "Le Mans" in events[0].raw_text or events[0].ville_raw == "Le Mans"
+
+    def test_parse_without_referentiel_venue_keywords_not_split(self):
+        """Les lignes commençant par des mots-clés de lieux ne créent pas de nouveaux événements."""
+        text = """dim 01: CONCERT
+Salle François Rabelais, Changé, 15h00"""
+
+        parser = EventParser(bidul_mois=6, bidul_annee=1997, date_format='inline_inherited')
+        events = parser.parse(text)
+
+        # Un seul événement (Salle... est une continuation)
+        assert len(events) == 1
+        assert "Salle" in events[0].raw_text
+
+    def test_parse_without_referentiel_dash_event(self):
+        """Les lignes commençant par - créent de nouveaux événements."""
+        text = """mer 04 PREMIER ARTISTE, Lieu 1, Le Mans
+-DEUXIÈME ARTISTE, Lieu 2, Le Mans"""
+
+        parser = EventParser(bidul_mois=6, bidul_annee=1997, date_format='inline_inherited')
+        events = parser.parse(text)
+
+        assert len(events) == 2
+        # Le - doit être retiré du nom
+        assert events[1].raw_text.startswith("DEUXIÈME") or "DEUXIÈME" in events[1].raw_text
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

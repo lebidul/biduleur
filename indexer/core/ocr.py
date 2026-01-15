@@ -50,6 +50,9 @@ class ScanConfig:
     fond_colore: bool = False  # Nécessite suppression du fond coloré
     date_par_evenement: bool = False  # Chaque événement a sa propre date (legacy, use date_format)
 
+    # Template SVG (v1.12+)
+    svg_template: str = ''  # Nom du fichier template SVG dans corpus/templates/
+
     @classmethod
     def from_csv_row(cls, row: dict) -> Optional['ScanConfig']:
         """Crée une config depuis une ligne du CSV biduls.description.csv.
@@ -127,6 +130,9 @@ class ScanConfig:
             )
             p2_colonnes = int(p2_colonnes_str) if p2_colonnes_str else 1
 
+            # Template SVG (v1.12+)
+            svg_template = (row.get('svg_template') or '').strip()
+
             return cls(
                 numero=numero,
                 type_source=type_source,
@@ -140,6 +146,7 @@ class ScanConfig:
                 page2_sections=p2_sections,
                 page2_colonnes=p2_colonnes,
                 date_par_evenement=date_format == 'inline',  # Compatibilité
+                svg_template=svg_template,
             )
         except (ValueError, KeyError) as e:
             logger.debug(f"Erreur parsing config row: {e}")
@@ -203,8 +210,12 @@ class ScanConfigLoader:
         for encoding in encodings:
             try:
                 with open(self.csv_path, 'r', encoding=encoding) as f:
-                    # Filtrer les lignes de commentaires (commençant par #)
-                    lines = [line for line in f if not line.strip().startswith('#')]
+                    # Filtrer les lignes de commentaires (commençant par # ou "#)
+                    lines = [
+                        line for line in f
+                        if not line.strip().startswith('#')
+                        and not line.strip().startswith('"#')
+                    ]
                     from io import StringIO
                     reader = csv.DictReader(StringIO(''.join(lines)))
                     for row in reader:
@@ -279,11 +290,17 @@ def is_scan_from_csv(numero: int) -> Optional[bool]:
     for encoding in encodings:
         try:
             with open(csv_path, 'r', encoding=encoding) as f:
-                reader = csv.DictReader(f)
+                # Filtrer les lignes de commentaires
+                lines = [line for line in f if not line.startswith('#') and not line.startswith('"#')]
+                if not lines:
+                    return None
+
+                import io
+                reader = csv.DictReader(io.StringIO(''.join(lines)))
                 for row in reader:
-                    # Chercher le numéro
+                    # Chercher le numéro (nouveau format: 'numero', ancien: 'numéros')
                     row_numero = 0
-                    for key in ['numéros', 'numeros', 'num\xe9ros']:
+                    for key in ['numero', 'numéros', 'numeros', 'num\xe9ros']:
                         if key in row:
                             try:
                                 row_numero = int(row[key])
@@ -292,7 +309,8 @@ def is_scan_from_csv(numero: int) -> Optional[bool]:
                                 continue
 
                     if row_numero == numero:
-                        type_source = row.get('scan/texte', '').strip().lower()
+                        # Nouveau format: 'type', ancien: 'scan/texte'
+                        type_source = row.get('type', row.get('scan/texte', '')).strip().lower()
                         if type_source == 'scan':
                             return True
                         elif type_source == 'texte':
@@ -819,20 +837,38 @@ class ScanExtractor:
         annee: Optional[int]
     ) -> Optional[OCRResult]:
         """
-        Extraction par sections A6 si configuré.
+        Extraction par sections A6 ou par template SVG si configuré.
+
+        Priorité:
+        1. Template SVG si svg_template='1' dans CSV ou fichier bidul_{numero}.svg existe
+        2. Extraction par sections A6 selon la config CSV
+        3. None (fallback vers extraction classique)
 
         Returns:
-            OCRResult si l'extraction par sections est possible, None sinon
+            OCRResult si l'extraction par sections/SVG est possible, None sinon
         """
         from .section_extractor import load_section_config
+        from .svg_template import get_template_manager
 
         section_config = load_section_config(numero)
         if not section_config:
             logger.debug(f"Bidul {numero}: pas de config sections, utilise extraction classique")
             return None
 
-        # Vérifier qu'il y a des sections configurées
-        if not section_config.page1 and not section_config.page2:
+        # Vérifier si on doit utiliser un template SVG (priorité absolue)
+        use_svg = section_config.use_svg_template()
+        svg_template = None
+
+        if use_svg:
+            svg_template = get_template_manager().get_template(numero)
+            if svg_template:
+                logger.info(f"Bidul {numero}: utilisation du template SVG (override)")
+            else:
+                logger.warning(f"Bidul {numero}: svg_template=1 mais aucun template trouvé")
+                use_svg = False
+
+        # Si pas de SVG, vérifier qu'il y a des sections configurées
+        if not use_svg and not section_config.page1 and not section_config.page2:
             logger.debug(f"Bidul {numero}: config sans sections définies")
             return None
 
@@ -842,9 +878,18 @@ class ScanExtractor:
             num_pages = len(images)
 
             # Déterminer les pages à traiter
-            pages_to_process = section_config.get_pages_to_process(num_pages)
+            # Priorité: pages_override du CSV > pages du template SVG > pages de la config sections
+            if section_config.pages_override:
+                # Le CSV spécifie explicitement les pages à traiter
+                pages_to_process = [p for p in section_config.pages_override if 1 <= p <= num_pages]
+            elif use_svg and svg_template:
+                # Utiliser les pages définies dans le template SVG
+                pages_to_process = [p for p in svg_template.get_all_page_nums() if p <= num_pages]
+            else:
+                pages_to_process = section_config.get_pages_to_process(num_pages)
 
-            logger.info(f"Bidul {numero}: extraction par sections, pages {pages_to_process}")
+            extraction_mode = 'svg_template' if use_svg else 'sections'
+            logger.info(f"Bidul {numero}: extraction {extraction_mode}, pages {pages_to_process}")
 
             result = OCRResult(
                 pdf_path=pdf_path,
@@ -855,49 +900,73 @@ class ScanExtractor:
                 metadata={
                     'dpi': self.dpi,
                     'ocr_engine': self.ocr.engine_name,
-                    'extraction_mode': 'sections',
+                    'extraction_mode': extraction_mode,
                     'date_format': section_config.date_format,
                     'pages_processed': pages_to_process,
+                    'svg_template': svg_template.source_path.name if svg_template and svg_template.source_path else None,
                 }
             )
 
             all_texts = []
 
             for page_num in pages_to_process:
+                if page_num > len(images):
+                    logger.warning(f"Page {page_num} demandée mais PDF n'a que {len(images)} pages")
+                    continue
+
                 pil_image = images[page_num - 1]  # images est 0-indexed
                 image = self.preprocessor.pil_to_cv2(pil_image)
 
                 # Prétraitement basique (deskew, denoise)
                 image = self._preprocess_basic(image)
 
-                # Obtenir la config de la page
-                page_config = section_config.get_page_config(page_num)
-
-                if page_config and page_config.sections_utiles:
-                    # Extraction par sections
-                    page_result = self.section_extractor.extract_page_by_sections(
-                        image, page_num, page_config
+                if use_svg and svg_template:
+                    # Extraction par template SVG
+                    page_result = self.section_extractor.extract_page_by_svg_template(
+                        image, page_num, svg_template, section_config=section_config
                     )
                     page_text = page_result.full_text
-                    sections_info = [s.section.value for s in page_result.sections]
-                    logger.info(f"Page {page_num}: sections {sections_info}, {len(page_text)} caractères")
+                    zones_info = [s.section.value for s in page_result.sections]
+                    logger.info(f"Page {page_num}: {len(page_result.sections)} zones SVG, {len(page_text)} caractères")
+
+                    page_ocr_result = OCRPageResult(
+                        page_num=page_num,
+                        text=page_text,
+                        char_count=len(page_text),
+                        config_applied={
+                            'svg_template': svg_template.source_path.name if svg_template.source_path else 'generated',
+                            'zones_count': len(page_result.sections),
+                            'orientation_texte': svg_template.orientation_texte,
+                        }
+                    )
                 else:
-                    # Pas de config pour cette page, extraction classique
-                    page_text = self.ocr.ocr_image(image, num_columns=1)
-                    logger.info(f"Page {page_num}: extraction complète, {len(page_text)} caractères")
+                    # Extraction par sections A6
+                    page_config = section_config.get_page_config(page_num)
+
+                    if page_config and page_config.sections_utiles:
+                        page_result = self.section_extractor.extract_page_by_sections(
+                            image, page_num, page_config
+                        )
+                        page_text = page_result.full_text
+                        sections_info = [s.section.value for s in page_result.sections]
+                        logger.info(f"Page {page_num}: sections {sections_info}, {len(page_text)} caractères")
+                    else:
+                        # Pas de config pour cette page, extraction classique
+                        page_text = self.ocr.ocr_image(image, num_columns=1)
+                        logger.info(f"Page {page_num}: extraction complète, {len(page_text)} caractères")
+
+                    page_ocr_result = OCRPageResult(
+                        page_num=page_num,
+                        text=page_text,
+                        char_count=len(page_text),
+                        config_applied={
+                            'sections': [s.value for s in page_config.sections_utiles] if page_config else [],
+                            'colonnes': page_config.colonnes_par_section if page_config else 1,
+                            'orientation_texte': page_config.orientation_texte.value if page_config else 'portrait',
+                        }
+                    )
 
                 all_texts.append(page_text)
-
-                page_ocr_result = OCRPageResult(
-                    page_num=page_num,
-                    text=page_text,
-                    char_count=len(page_text),
-                    config_applied={
-                        'sections': [s.value for s in page_config.sections_utiles] if page_config else [],
-                        'colonnes': page_config.colonnes_par_section if page_config else 1,
-                        'orientation_texte': page_config.orientation_texte.value if page_config else 'portrait',
-                    }
-                )
                 result.pages.append(page_ocr_result)
 
             result.full_text = '\n\n'.join(t for t in all_texts if t)

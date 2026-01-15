@@ -1718,6 +1718,217 @@ def cmd_ocr_extract(args):
 
 
 # =============================================================================
+# SVG Template Commands (v1.12+)
+# =============================================================================
+
+def cmd_svg_generate(args):
+    """Génère un template SVG depuis la config CSV existante."""
+    from core.section_extractor import load_section_config
+    from core.svg_template import SVGTemplateGenerator
+
+    # Déterminer les numéros à traiter
+    if args.numero:
+        numeros = args.numero if isinstance(args.numero, list) else [args.numero]
+    elif args.range:
+        start, end = map(int, args.range.split('-'))
+        numeros = list(range(start, end + 1))
+    else:
+        print("Erreur: spécifiez --numero ou --range")
+        return 1
+
+    generator = SVGTemplateGenerator(dpi=args.dpi)
+    templates_dir = Path(__file__).parent / 'corpus' / 'templates'
+    templates_dir.mkdir(parents=True, exist_ok=True)
+
+    include_background = getattr(args, 'with_background', False)
+    scans_only = getattr(args, 'scans_only', False)
+
+    success_count = 0
+    skipped_count = 0
+    for numero in numeros:
+        config = load_section_config(numero)
+
+        if not config:
+            print(f"[{numero}] Pas de config sections trouvée")
+            continue
+
+        # Filtrer les scans si demandé
+        if scans_only and not config.is_scan():
+            skipped_count += 1
+            continue
+
+        if not config.page1 and not config.page2:
+            print(f"[{numero}] Config sans sections définies")
+            continue
+
+        # Générer le template
+        template = generator.generate_from_config(config)
+
+        # Déterminer le chemin de sortie
+        if args.output and len(numeros) == 1:
+            output_path = Path(args.output)
+        else:
+            output_path = templates_dir / f'bidul_{numero:03d}.svg'
+
+        # Trouver le PDF si on veut inclure le fond
+        pdf_path = None
+        if include_background:
+            pdf_path = find_pdf(numero)
+            if not pdf_path:
+                print(f"[{numero}] PDF non trouvé, génération sans fond")
+
+        # Sauvegarder (passer la config pour rotation par page)
+        if generator.save(template, output_path, pdf_path=pdf_path,
+                         include_background=include_background, section_config=config):
+            bg_info = " (avec fond PDF)" if pdf_path and include_background else ""
+            print(f"[{numero}] Template généré: {output_path}{bg_info}")
+            success_count += 1
+        else:
+            print(f"[{numero}] Erreur lors de la génération")
+
+    print(f"\nGénéré: {success_count}/{len(numeros)} templates")
+    if skipped_count > 0:
+        print(f"Ignorés (type texte): {skipped_count}")
+    return 0
+
+
+def cmd_svg_preview(args):
+    """Affiche un aperçu des zones d'extraction pour un Bidul."""
+    import cv2
+    import numpy as np
+    from pdf2image import convert_from_path
+    from core.section_extractor import load_section_config
+    from core.svg_template import load_svg_template, SVGTemplateGenerator
+
+    numero = args.numero
+    pdf_path = find_pdf(numero)
+
+    if not pdf_path:
+        print(f"PDF non trouvé pour Bidul {numero}")
+        return 1
+
+    # Charger le template SVG ou en générer un depuis la config
+    template = load_svg_template(numero)
+
+    if not template:
+        # Pas de template SVG, générer depuis la config
+        config = load_section_config(numero)
+        if config and (config.page1 or config.page2):
+            generator = SVGTemplateGenerator(dpi=args.dpi)
+            template = generator.generate_from_config(config)
+            print(f"Template généré depuis config CSV")
+        else:
+            print(f"Pas de config disponible pour Bidul {numero}")
+            return 1
+    else:
+        print(f"Template SVG chargé: {template.source_path}")
+
+    # Convertir le PDF en images
+    print(f"Conversion PDF: {pdf_path.name}")
+    images = convert_from_path(str(pdf_path), dpi=args.dpi)
+
+    # Afficher les zones pour chaque page du template
+    pages_in_template = template.get_all_page_nums()
+
+    for page_num in pages_in_template:
+        if page_num > len(images):
+            print(f"Page {page_num} n'existe pas dans le PDF ({len(images)} pages)")
+            continue
+
+        pil_image = images[page_num - 1]
+        image = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
+
+        # Appliquer rotation si nécessaire
+        if template.needs_rotation():
+            image = cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
+            print(f"Page {page_num}: rotation appliquée")
+
+        img_height, img_width = image.shape[:2]
+
+        # Dessiner les zones
+        zones = template.get_zones_for_page(page_num)
+        exclusions = template.get_exclusion_zones(page_num)
+
+        scale_x = img_width / template.viewbox_width
+        scale_y = img_height / template.viewbox_height
+
+        # Dessiner les zones d'extraction
+        for zone in zones:
+            x = int(zone.x * scale_x)
+            y = int(zone.y * scale_y)
+            w = int(zone.width * scale_x)
+            h = int(zone.height * scale_y)
+
+            # Couleur selon l'ordre
+            colors = [(0, 0, 255), (255, 0, 0), (0, 255, 0), (255, 255, 0),
+                      (255, 0, 255), (0, 255, 255), (128, 128, 255), (255, 128, 128)]
+            color = colors[(zone.order - 1) % len(colors)]
+
+            cv2.rectangle(image, (x, y), (x + w, y + h), color, 3)
+            cv2.putText(image, f"{zone.order}: {zone.id}", (x + 5, y + 30),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
+
+        # Dessiner les zones d'exclusion
+        for zone in exclusions:
+            x = int(zone.x * scale_x)
+            y = int(zone.y * scale_y)
+            w = int(zone.width * scale_x)
+            h = int(zone.height * scale_y)
+            cv2.rectangle(image, (x, y), (x + w, y + h), (128, 128, 128), 2)
+            # Hachures diagonales
+            for i in range(0, w + h, 20):
+                x1 = x + min(i, w)
+                y1 = y + max(0, i - w)
+                x2 = x + max(0, i - h)
+                y2 = y + min(i, h)
+                cv2.line(image, (x1, y1), (x2, y2), (128, 128, 128), 1)
+
+        # Info sur la page
+        info_text = f"Page {page_num} | {len(zones)} zones | {template.orientation_texte}"
+        cv2.putText(image, info_text, (20, img_height - 20),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 3)
+        cv2.putText(image, info_text, (20, img_height - 20),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+
+        # Sauvegarder ou afficher
+        if args.output:
+            output_path = Path(args.output)
+            if len(pages_in_template) > 1:
+                output_path = output_path.parent / f"{output_path.stem}_p{page_num}{output_path.suffix}"
+            cv2.imwrite(str(output_path), image)
+            print(f"Page {page_num}: {len(zones)} zones, sauvegardé -> {output_path}")
+        else:
+            output_path = Path(f"temp_bidul_{numero}_p{page_num}_zones.png")
+            cv2.imwrite(str(output_path), image)
+            print(f"Page {page_num}: {len(zones)} zones, sauvegardé -> {output_path}")
+
+    return 0
+
+
+def cmd_svg_list(args):
+    """Liste les templates SVG disponibles."""
+    from core.svg_template import get_template_manager
+
+    manager = get_template_manager()
+    templates = manager.list_templates()
+
+    if not templates:
+        print("Aucun template SVG trouvé dans corpus/templates/")
+        return 0
+
+    print(f"{'Numéro':<8} {'Fichier':<40} {'Zones':<8}")
+    print("=" * 60)
+
+    for numero, path in templates:
+        template = manager.get_template(numero)
+        num_zones = len(template.zones) if template else 0
+        print(f"{numero:<8} {path.name:<40} {num_zones:<8}")
+
+    print(f"\nTotal: {len(templates)} templates")
+    return 0
+
+
+# =============================================================================
 # Corpus Commands
 # =============================================================================
 
@@ -2313,6 +2524,30 @@ Maintenance (normalisation v2):
     p_ocr_extract.add_argument('--auto-layout', action='store_true', help='Détection automatique du layout (colonnes, orientation)')
 
     # ==========================================================================
+    # SVG Template Commands (v1.12+)
+    # ==========================================================================
+
+    # svg-generate - Génère un template SVG depuis la config CSV
+    p_svg_gen = subparsers.add_parser('svg-generate', help='Génère un template SVG depuis la config CSV')
+    p_svg_gen.add_argument('--numero', '-n', type=int, nargs='+', help='Numéro(s) du Bidul')
+    p_svg_gen.add_argument('--range', '-r', help='Plage de numéros (ex: 1-20)')
+    p_svg_gen.add_argument('--output', '-o', help='Fichier de sortie (si un seul numéro)')
+    p_svg_gen.add_argument('--dpi', type=int, default=200, help='Résolution en DPI (défaut: 200)')
+    p_svg_gen.add_argument('--with-background', '-b', action='store_true',
+                           help='Inclure les pages PDF en arrière-plan (pour édition visuelle)')
+    p_svg_gen.add_argument('--scans-only', '-s', action='store_true',
+                           help='Générer uniquement pour les Biduls de type scan')
+
+    # svg-preview - Prévisualise les zones d'extraction sur le PDF
+    p_svg_preview = subparsers.add_parser('svg-preview', help='Prévisualise les zones d\'extraction sur le PDF')
+    p_svg_preview.add_argument('--numero', '-n', type=int, required=True, help='Numéro du Bidul')
+    p_svg_preview.add_argument('--output', '-o', help='Fichier de sortie PNG (défaut: temp_bidul_N_pX_zones.png)')
+    p_svg_preview.add_argument('--dpi', type=int, default=200, help='Résolution en DPI (défaut: 200)')
+
+    # svg-list - Liste les templates SVG disponibles
+    p_svg_list = subparsers.add_parser('svg-list', help='Liste les templates SVG disponibles')
+
+    # ==========================================================================
     # Corpus Commands
     # ==========================================================================
 
@@ -2449,6 +2684,10 @@ Maintenance (normalisation v2):
         'ocr': cmd_ocr,
         'ocr-test': cmd_ocr_test,
         'ocr-extract': cmd_ocr_extract,
+        # SVG Template commands (v1.12+)
+        'svg-generate': cmd_svg_generate,
+        'svg-preview': cmd_svg_preview,
+        'svg-list': cmd_svg_list,
         # Corpus commands
         'corpus-generate': cmd_corpus_generate,
         'corpus-stats': cmd_corpus_stats,

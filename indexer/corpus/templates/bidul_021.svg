@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 1653 2338" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <metadata>
+    <bidul numero="20" orientation_pdf="portrait" orientation_texte="portrait"/>
+  </metadata>
+
+  <!-- Page 1 -->
+  <g id="page-1">
+    <g id="p1-s1">
+      <rect id="p1-s1" x="0" y="0" width="859" height="1215" fill="none" stroke="green" stroke-width="2" data-order="1"/>
+    </g>
+    <g id="p1-s2">
+      <rect id="p1-s2" x="793" y="0" width="860" height="1215" fill="none" stroke="green" stroke-width="2" data-order="2"/>
+    </g>
+    <g id="p1-s3">
+      <rect id="p1-s3" x="0" y="1123" width="859" height="1215" fill="none" stroke="green" stroke-width="2" data-order="3"/>
+    </g>
+    <g id="p1-s4">
+      <rect id="p1-s4" x="793" y="1123" width="860" height="1215" fill="none" stroke="green" stroke-width="2" data-order="4"/>
+    </g>
+  </g>
+
+  <!-- Page 2 -->
+  <g id="page-2">
+    <g id="p2-s1">
+      <rect id="p2-s1" x="0" y="0" width="859" height="1215" fill="none" stroke="green" stroke-width="2" data-order="5"/>
+    </g>
+    <g id="p2-s2">
+      <rect id="p2-s2" x="793" y="0" width="860" height="1215" fill="none" stroke="green" stroke-width="2" data-order="6"/>
+    </g>
+    <g id="p2-s3">
+      <rect id="p2-s3" x="0" y="1123" width="859" height="1215" fill="none" stroke="green" stroke-width="2" data-order="7"/>
+    </g>
+    <g id="p2-s4">
+      <rect id="p2-s4" x="793" y="1123" width="860" height="1215" fill="none" stroke="green" stroke-width="2" data-order="8"/>
+    </g>
+  </g>
+
+</svg>

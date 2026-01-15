@@ -135,6 +135,7 @@ class BidulSectionConfig:
     page1: Optional[PageSectionConfig] = None
     page2: Optional[PageSectionConfig] = None
     pages_override: list[int] = field(default_factory=list)
+    svg_template: str = ''  # Nom du fichier template SVG (v1.12+)
 
     @classmethod
     def from_csv_row(cls, row: dict) -> Optional['BidulSectionConfig']:
@@ -168,18 +169,42 @@ class BidulSectionConfig:
                 except ValueError:
                     continue
 
+        # Template SVG (v1.12+)
+        svg_template = (row.get('svg_template') or '').strip()
+
         return cls(
             numero=numero,
             type_source=type_source,
             date_format=date_format,
             page1=PageSectionConfig.from_csv_row(row, 1),
             page2=PageSectionConfig.from_csv_row(row, 2),
-            pages_override=pages_override
+            pages_override=pages_override,
+            svg_template=svg_template,
         )
 
     def is_scan(self) -> bool:
         """True si le Bidul est un scan (vs texte)."""
         return self.type_source == 'scan'
+
+    def has_svg_template(self) -> bool:
+        """True si un template SVG est spécifié dans la config."""
+        return bool(self.svg_template)
+
+    def use_svg_template(self) -> bool:
+        """
+        True si l'extraction doit utiliser le template SVG.
+
+        Conditions:
+        - svg_template == '1' dans le CSV
+        - OU un fichier bidul_{numero:03d}.svg existe
+
+        Si True, cela override --no-sections, --auto-layout et le mode classique.
+        """
+        if self.svg_template == '1':
+            return True
+        # Vérifier si un fichier template existe
+        from .svg_template import get_template_manager
+        return get_template_manager().has_template(self.numero)
 
     def get_pages_to_process(self, num_pages: int) -> list[int]:
         """
@@ -241,8 +266,12 @@ class SectionConfigLoader:
         for encoding in encodings:
             try:
                 with open(self.csv_path, 'r', encoding=encoding) as f:
-                    # Filtrer les lignes de commentaires (commençant par #)
-                    lines = [line for line in f if not line.strip().startswith('#')]
+                    # Filtrer les lignes de commentaires (commençant par # ou "#)
+                    lines = [
+                        line for line in f
+                        if not line.strip().startswith('#')
+                        and not line.strip().startswith('"#')
+                    ]
 
                 from io import StringIO
                 reader = csv.DictReader(StringIO(''.join(lines)))
@@ -449,11 +478,13 @@ class SectionOCRExtractor:
 
     Workflow:
     1. Charge la config du Bidul depuis biduls.description.csv
-    2. Pour chaque page à traiter:
-       a. Découpe en sections A6 selon la config
-       b. Applique la rotation si texte en paysage
-       c. OCR chaque section avec le bon nombre de colonnes
-       d. Assemble le texte dans l'ordre de lecture
+    2. Vérifie si un template SVG est disponible (prioritaire)
+    3. Pour chaque page à traiter:
+       a. Si template SVG: utilise les zones définies dans le SVG
+       b. Sinon: découpe en sections A6 selon la config CSV
+       c. Applique la rotation si texte en paysage
+       d. OCR chaque zone/section avec le bon nombre de colonnes
+       e. Assemble le texte dans l'ordre de lecture
     """
 
     def __init__(self, ocr_engine):
@@ -464,6 +495,130 @@ class SectionOCRExtractor:
         self.ocr = ocr_engine
         self.cropper = SectionCropper()
         self.config_loader = get_section_config_loader()
+        self._template_manager = None  # Lazy loading
+
+    @property
+    def template_manager(self):
+        """Lazy loading du gestionnaire de templates SVG."""
+        if self._template_manager is None:
+            from .svg_template import get_template_manager
+            self._template_manager = get_template_manager()
+        return self._template_manager
+
+    def extract_page_by_svg_template(
+        self,
+        image: np.ndarray,
+        page_num: int,
+        template,
+        section_config=None
+    ) -> PageSectionsOCRResult:
+        """
+        Extrait le texte d'une page en utilisant un template SVG.
+
+        Args:
+            image: Image de la page complète (après prétraitement basique)
+            page_num: Numéro de la page
+            template: SVGTemplate avec les zones d'extraction
+            section_config: BidulSectionConfig pour la rotation (prioritaire sur le template)
+
+        Returns:
+            PageSectionsOCRResult avec le texte de chaque zone
+        """
+        from .svg_template import SVGTemplate
+
+        result = PageSectionsOCRResult(page_num=page_num)
+
+        # 1. Appliquer la rotation si nécessaire
+        # Priorité: config CSV > métadonnées du template
+        needs_rotation = False
+        if section_config:
+            page_config = section_config.get_page_config(page_num)
+            if page_config:
+                needs_rotation = page_config.needs_rotation()
+        else:
+            needs_rotation = template.needs_rotation()
+
+        page_image = image
+        if needs_rotation:
+            page_image = self.cropper.rotate_for_text(image, clockwise=True)
+            logger.debug(f"Page {page_num}: rotation 90° horaire appliquée (template SVG)")
+
+        # 2. Obtenir les zones pour cette page, triées par ordre
+        zones = template.get_zones_for_page(page_num)
+
+        if not zones:
+            logger.warning(f"Page {page_num}: aucune zone définie dans le template SVG")
+            return result
+
+        logger.debug(f"Page {page_num}: {len(zones)} zones à extraire depuis template SVG")
+
+        # 3. Extraire et OCR chaque zone
+        img_height, img_width = page_image.shape[:2]
+
+        for zone in zones:
+            # Convertir les coordonnées du template vers l'image
+            # (le template peut avoir des dimensions différentes de l'image réelle)
+            scale_x = img_width / template.viewbox_width
+            scale_y = img_height / template.viewbox_height
+
+            x = int(zone.x * scale_x)
+            y = int(zone.y * scale_y)
+            w = int(zone.width * scale_x)
+            h = int(zone.height * scale_y)
+
+            # Clipper aux dimensions de l'image
+            x = max(0, x)
+            y = max(0, y)
+            w = min(w, img_width - x)
+            h = min(h, img_height - y)
+
+            if w <= 0 or h <= 0:
+                logger.warning(f"Zone {zone.id}: dimensions invalides après scaling")
+                continue
+
+            # Extraire la zone
+            zone_image = page_image[y:y+h, x:x+w].copy()
+
+            # Appliquer rotation locale si spécifiée
+            if zone.rotation:
+                if zone.rotation == 90:
+                    zone_image = cv2.rotate(zone_image, cv2.ROTATE_90_CLOCKWISE)
+                elif zone.rotation == -90 or zone.rotation == 270:
+                    zone_image = cv2.rotate(zone_image, cv2.ROTATE_90_COUNTERCLOCKWISE)
+                elif zone.rotation == 180:
+                    zone_image = cv2.rotate(zone_image, cv2.ROTATE_180)
+
+            # OCR sur la zone
+            text = self.ocr.ocr_image(zone_image, num_columns=1)
+
+            # Déterminer la section depuis l'ID de la zone
+            section = self._zone_id_to_section(zone.id)
+
+            section_result = SectionOCRResult(
+                section=section,
+                page_num=page_num,
+                text=text,
+                colonnes=1,  # Les zones SVG sont déjà découpées en colonnes
+                orientation_texte=Orientation.PAYSAGE if template.orientation_texte == 'paysage' else Orientation.PORTRAIT
+            )
+            result.sections.append(section_result)
+
+            logger.debug(f"Zone {zone.id}: {len(text)} caractères extraits")
+
+        return result
+
+    def _zone_id_to_section(self, zone_id: str) -> Section:
+        """Convertit un ID de zone SVG en Section."""
+        zone_id_upper = zone_id.upper()
+        if 'S1' in zone_id_upper:
+            return Section.S1
+        elif 'S2' in zone_id_upper:
+            return Section.S2
+        elif 'S3' in zone_id_upper:
+            return Section.S3
+        elif 'S4' in zone_id_upper:
+            return Section.S4
+        return Section.S1  # Default
 
     def extract_page_by_sections(
         self,
