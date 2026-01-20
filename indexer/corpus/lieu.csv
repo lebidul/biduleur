@@ -33,7 +33,6 @@ camion-théâtre,Le Mans,camiontheatre
 Campus de l'université,Le Mans,campusuniversite
 Casa Minga,Le Mans,casaminga
 Cathédrale Saint-Julien,Le Mans,cathedralesaintjulien
-Cathédrale St Julien,Le Mans,cathedralestjulien
 Cave municipale,Le Mans,cavemunicipale
 centre Cial les Jacobins,Le Mans,centrecialjacobins
 Centre Culturel Athéna,Le Mans,centreculturelathena
@@ -154,7 +153,7 @@ L'Echappée,Le Mans,echappee
 L'Éléphant,Le Mans,elephant
 L'Entracte,Le Mans,entracte
 L'Envol,Le Mans,envol
-L'Éolienne,Le Mans,eolienne
+L'Éolienne,Arnage,eolienne
 L'Épicerie sur le Zinc,Le Mans,epiceriesurzinc
 L'Epidaure,Le Mans,epidaure
 L'Escale,Le Mans,escale
@@ -235,7 +234,6 @@ Les Fêlés du Bocal,Le Mans,felesbocal
 Les Jardins de Belle Garde,Le Mans,jardinsbellegarde
 Les moulins de Paillard,Le Mans,moulinspaillard
 Les prés Marais,Le Mans,presmarais
-Les Quiconces Parvis,Le Mans,quiconcesparvis
 Les Quinconces,Le Mans,quinconces
 Les Quinconces - grand théâtre,Le Mans,quinconcesgrandtheatre
 Les Quinconces – petit Théâtre,Le Mans,quinconcespetittheatre
@@ -263,7 +261,7 @@ Marché de la cité des Pins,Le Mans,marchecitepins
 Marché des jacobins,Le Mans,marchejacobins
 Médiathèque,Le Mans,mediatheque
 Médiathèque George Sand,Le Mans,mediathequegeorgesand
-Médiathèque L. Aragon,Le Mans,mediathequearagon
+Médiathèque Louis Aragon,Le Mans,mediathequelouisaragon
 médiathèque modularium,Le Mans,mediathequemodularium
 MJC Prévert,Le Mans,mjcprevert
 Moulin du Blaireau,Le Mans,moulinblaireau
@@ -333,7 +331,7 @@ Rue des 3 Sonnettes,Le Mans,rue3sonnettes
 Rue du Gué,Le Mans,ruegue
 Salle Aimée le Prilleux,Le Mans,salleaimeeprilleux
 Salle associative,Le Mans,salleassociative
-Salle Atlantis,Le Mans,salleatlantis
+Salle Atlantis,Saint-Cosme-en-Vairais,salleatlantis
 Salle Cattois Roncin,Le Mans,sallecattoisroncin
 Salle Chorus,Le Mans,sallechorus
 Salle de Tresson,salledetresson
@@ -373,7 +371,7 @@ Théâtre de Chaoué,Le Mans,theatrechaoue
 Théâtre de l'Acthalia,Le Mans,theatreacthalia
 Théâtre de l'Écluse,Le Mans,theatreecluse
 Théâtre de la Bertoche,Le Mans,theatrebertoche
-Théâtre de la Halle-au-Blé,Le Mans,theatrehalleble
+Théâtre de la Halle-au-Blé,La Flèche,theatrehalleble
 Théâtre de Mamers,Le Mans,theatremamers
 Théâtre des Quinconces,Le Mans,theatrequinconces
 Théâtre du Passeur,Le Mans,theatrepasseur
@@ -427,3 +425,72 @@ Bât. H rue Maurice Ravel,Allonnes,bathruemauriceravel
 derrière le complexe R. Garnier,Allonnes,derrierelecomplexergarnier
 V&B,Allonnes,vb
 Gymnase André Malraux,Allonnes,gymnaseandremalraux
+Place de l'Europe,Coulaines,placedeleurope
+Salle Les Sources,Coulaines,sallelessources
+Studio 101,Coulaines,studio101
+L'Arena,Coulaines,arena
+L'Herberie,Coulaines,herberie
+Maison des chemins creux,Coulaines,maisondescheminscreux
+Parc de la Gironde,Coulaines,parcdelagironde
+Épicerie du Pré,Le Mans,épiceriedupré
+Le Box Café,Le Mans,boxcafe
+Théâtre de l'Éphémère,Le Mans,théâtredeléphémère
+Kiosque Mozaïc,Le Mans,kiosquemozaïc
+Le Mac Kinley,Le Mans,mackinley
+MJC Jacques Brel,Arnage,mjcjacquesbrel
+Le Sun Rock Avenue,Le Mans,sunrockavenue
+Le Vintage,Le Mans,vintage
+Salle l'Eden,Le Manssalleleden
+Le Carroi,La Flèche,carroi
+Antarès,Le Mans,antarès
+L'Union Jack,Le Mans,unionjack
+La Chaperie,Guécélard,chaperie
+Le RDV,Le Mans,rdv
+Centre St Christophe,La Chapelle-Saint-Aubin,centrestchristophe
+Quai Louis Blanc,Le Mans,quailouisblanc
+Le Road House,Le Mans,roadhouse
+Le Café Crème,Le Mans,cafécrème
+Salle André Voisin,Fresnay-sur-Sarthesalleandrevoisin
+Place St Pierre,Le Mans,placestpierre
+Le Silo,Le Mans,silo
+Le New York Coffee,Le Mans,newyorkcoffee
+Café des Brasseurs,Le Mans,cafedesbrasseurs
+Sun 7 Bar,Le Mans,sun7bar
+Le Spot,Le Mans,spot
+Forum FNAC,Le Mans,forumfnac
+Café Folk,Le Mans,folk
+Bar à Z’Arts,La Flèche,barazarts
+Ô Bord du Loir,Thorée les Pins,obordduloir
+Théâtre des Récollets,Montval sur Loir,théâtredestécollets
+L'Utopitre,Le Mans,utopitre
+Place St Michel,Le Mans,placestmichel
+Place Henri IV,Le Mans,placehenriiv
+Le Petit Pousset,St Michel-de-Chavaignes,petitpousset
+Le New Lord's,Le Mans,newlords
+Esplanade du Bicentenaire,Le Mans,esplanadedubicentenaire
+Cité Plantagenêt,Le Mans,citeplantagenêt
+Café des Arts,La Chartre-sur-le-Loir,cafedesarts
+Un Singe en Hiver,Le Mans,unsingeenhiver
+Twin's Beer,Le Mans,twinsbeer
+Libertà,Le Mans,liberta
+HangArt,Coulans-sur-Gée,hangart
+Eglise de Chevillé,Chevillé,eglisedecheville
+Bateau Lavoir Café,Le Mans,bateaulavoircafe
+Salle Communale,Le Mans,sallecommunale
+Le Moloko,Le Mans,moloko
+Le Manhattan Café,matthancafe
+Le Caveau,Le Mans,caveau
+Vieux Mans,Le Mans,vieuxmans
+Ferme des Grues Rouges,Saint Saturnin,fermedesgruesrouges
+Espace Faïence,Malicorne,espacefaience
+Lac de la Monnerie,La Flèche,lacdelamonnerie
+Verre I Table,Le Mans,verreitable
+Square Dubois,Le Mans,squaredubois
+Librairie Thuard,Le Mans,librairiethuard
+Carré Plantagenêt,Le Mans,carréplantagenêt
+Place du Cardinal Grente,Le Mans,placeducardinalgrente
+Place des Sablons,Le Mans,placedessablons
+Place de la Boussinière,Le Mans,placedelaboussinière
+Place du Jet d'eau,Le Mans,placedujetdeau
+Place d'Alger,Le Mans,placedalger
+Itemm,Le Mans,itemm
