@@ -13,7 +13,6 @@ bar le Lezard,Le Lézard
 bar Le Palais,Le Palais
 Bar Le Palais Le Mans,Le Palais
 Bar le Passeport,Le Passeport
-Bar le Passeport,Le Passeport
 bar le Passeport,Le Passeport
 Cabaret Le Patis,Le Pâtis
 Capitainerie,La Capitainerie
@@ -31,6 +30,15 @@ Cité du cirque,La Cité du cirque
 CFPI,CPFI
 CPFI (11 rue des Fr.Gréban),CPFI
 Esp. H. Salvador,Espace Henri Salvador
+Henri Salvador Coulaines,Espace Henri Salvador
+S. Henri Salvador,Espace Henri Salvador
+Esp. Henri Salvador,Espace Henri Salvador
+Esp. culturel Henri Salvador,Espace Henri Salvador
+E. Salvador,Espace Henri Salvador
+Esp.Salvador,Espace Henri Salvador
+Henri Salvador,Espace Henri Salvador
+Espace Salvador,Espace Henri Salvador
+Esp. Salvador,Espace Henri Salvador
 Espace culturel Scélia,Espace Scélia
 Espace Le Narais,Espace du Narais
 Eve,EVE - Scène universitaire
@@ -44,14 +52,13 @@ inc,l.n.c
 Jardin de la cathédrale,Jardins de la cathédrale
 Jardins de Bellegarde,Les Jardins de Belle Garde
 Jardins des plantes,Jardin des Plantes
-Jardins des plantes,Jardin des Plantes
 L'Alambik,L'Alambik MJC Ronceray
 L'Athena,Centre Culturel Athéna
 L'&cluse,Théâtre de l'Écluse
 L'Ecluse,Théâtre de l'Écluse
 L'Écluse,Théâtre de l'Écluse
 L’Entracte,L'Entracte
-L’Éolienne,L'Éolienne
+L’Eolienne,L'Éolienne
 L'Ilotco,L'Îlot Co
 L'ÎlotCo,L'Îlot Co
 "L'IlôtCo, Lieu-dit Le Gué Perroux",L'Îlot Co
@@ -79,7 +86,7 @@ Maison de la Biennale (théâtre Paul Scarron),Théâtre Paul Scarron
 Maison de quartier G. Moustaki,Maison de quartier Georges Moustaki
 Maison de quartier Les Ardrières,Maison de quartier Les Ardriers
 maison quartier l'oiselière,Maison de quartier l'Oiselière
-Médiathèque Aragon,Médiathèque L. Aragon
+Médiathèque Aragon,Médiathèque Louis Aragon
 Médiathèque G. Sand,Médiathèque George Sand
 MJC J. Prevert,MJC Prevert
 MJC J.Prevert,MJC Prevert
@@ -97,6 +104,7 @@ Peniche Excelsior,La Peniche Excelsior
 Péniche Excelsior,La Péniche Excelsior
 Place de la République (déambulation),Place de la république
 Plaine Ronceray,Plaine du Ronceray
+MJC Plaine du Ronceray Le Mans,Plaine du Ronceray
 Prieuré de Mayanne,Prieuré de Mayenne
 Quai des Arts,Le Quai des Arts
 R-Volt Club,R-Volt
@@ -120,12 +128,10 @@ L’Alambik MJC Ronceray,L'Alambik MJC Ronceray
 MJC Ronceray,L'Alambik MJC Ronceray
 Le Vaud’,Le Vaud'
 Théâtre Scarron,Théâtre Paul Scarron
-Jean Carmet,Salle Jean Carmet
 L’Alambik!,L'Alambik MJC Ronceray
 Scelia,Espace Scélia
 Théâtre de l'Ecluse,Théâtre de l'Écluse
 Th. Chaoué,Théâtre de Chaoué
-L'Écluse,Théâtre de l'Écluse
 Théâtre de l’Écluse,Théâtre de l'Écluse
 Théâtre de l’Acthalia,Théâtre de l'Acthalia
 Centre culturel J.Le Theule,Scène Joël Le Theule
@@ -147,7 +153,6 @@ Le Palais Le Mans,Le Palais
 "ESCAPADE Kiosque Mozaic",Kiosque Mozaïc
 bar Aux Viking's,Le Viking's
 La Halle-au-Blé,Théâtre de la Halle-au-Blé
-S.Jean Carmet,Salle Jean Carmet
 SJ.Carmet,Salle Jean Carmet
 L' Excelsior,La Péniche Excelsior
 L'Excelsior,La Péniche Excelsior
@@ -158,3 +163,127 @@ Parvis de la Mairie place du Mail,Place du Mail
 théâtreChaoué,Théâtre de Chaoué
 Gymnase A. Malraux,Gymnase André Malraux
 Abb. de l'Epau,Abbaye Royale de l'Epau
+salle EVE (Université),EVE - Scène universitaire
+C.C.J.Le Theule,Scène Joël Le Theule
+les Sources,Salle Les Sources
+Epicerie du Pré,Épicerie du Pré
+Quinconce des Jacobins,Les Quinconces
+Th. Passeur,Théâtre du Passeur
+Île Moulinsart,Île de Moulinsart
+Théâtre de l'Ephémère,Théâtre de l'Éphémère
+Centre Joël Le Theule,Scène Joël Le Theule
+Chaoué,Théâtre de Chaoué
+Le Local A Bières,Le Local à Bières
+bar Le Vintage,Le Vintage
+White Club,White-UNDR Club
+salle M. Berger,Salle Michel Berger
+SunRock,Le Sun Rock Avenue
+Sun Rock,Le Sun Rock Avenue
+Théâtre de l'Enfumeraie,Théâtre de Chaoué
+Washington D.C,Washington DC
+L'Epicerie sur le Zinc,L'Épicerie sur le Zinc
+V and B,V&B
+Coppélia,Salle Coppélia
+Centre J.Le Theule,Scène Joël Le Theule
+Promenade de Newton et divers lieux,Promenade Newton
+bar du pilier rouge,Le Pilier Rouge
+Th. la Halle au Blé,Théâtre de la Halle-au-Blé
+MPT J. Moulin,MPT Jean Moulin
+Le P. du Cochon Vert,Le Passeport
+Jardin de Tessé,Parc de Tessé
+Studio Cie Marie Lenfant,Studio de la Cie Marie Lenfant
+Skatepark Le Spot,Le Spot
+Centre J. Brel,MJC Jacques Brel
+Aux Vikings',Le Viking's
+Aux Vikings,Le Viking's
+Aux Vicking's,Le Viking's
+lle Moulin Sart,Île de Moulinsart
+esplanade N. Mandela,Esplanade Nelson Mandela
+The Union Jack,L'Union Jack
+Salle Uto'pitre,L'Utopitre
+Le Portland,Le Portland Pub
+Le Bal-île,Île de Moulinsart
+Kiosque à Musique,Kiosque du jardin des Plantes
+Kiosque du Jardins des Plantes,Kiosque du jardin des Plantes
+"Kiosque à Musique, Jardin des Plantes",Kiosque du jardin des Plantes
+Centre du Val de Vray,Le Val de Vray
+théâtrede Chaoué,Théâtre de Chaoué
+th. Paul Scaron,Théâtre Paul Scarron
+Studio Marie Lenfant,Studio de la Cie Marie Lenfant
+Pub Mac Kinley,Le Mac Kinley
+Paul Scarron,Théâtre Paul Scarron
+Le Royal,Cinéma le Royal
+Laredo Café,Le La Ré Do
+L'Entre'Acte,L'Entracte
+L'Enfumeraie,Théâtre de Chaoué
+L'Alambic,L'Alambik MJC Ronceray
+Domaine de l’Épau,Abbaye Royale de l'Epau
+Chapelle de l’oratoire (extérieur),Chapelle de l'Oratoire
+Bal MoulinSart,Île de Moulinsart
+théâtreLes Quinconces,Les Quinconces - grand théâtre
+White - Club UNDR Club,White-UNDR Club
+White,White-UNDR Club
+Théâtre L' Ecluse,Théâtre de l'Écluse
+Th. Éphémère,Théâtre de l'Éphémère
+Les Quiconces Parvis,Les Quinconces
+complexe culturel Atlantis,Salle Atlantis
+promenade Newton (espace chapiteau),Promenade Newton
+place Saint Michel/porche Royal,Place St Michel
+bar Le Pirate,Pirate Café
+Quinconces des Jacobins,Les Quinconces
+Péniche Allonnes,La Péniche Excelsior
+Parc Monod,Parc Théodore Monod
+P.C.V. Le Mans,Le Passeport
+Médiathèque L. Aragon,Médiathèque Louis Aragon
+Musée de Musique de Dollon,Musée de la musique mécanique
+Moulinsart,Île de Moulinsart
+MJC J. Prévert,MJC Prévert
+Le Viking,Le Viking's
+Le Hangar des Artistes
+Caveau,Le Caveau
+Bar Le Caveau,Le Caveau
+Le Caveau Le Mans,Le Caveau
+Centre culturel J Le Theule,Scène Joël Le Theule
+Centre Jacques Brel,MJC Jacques Brel
+C. J.Le Theule,Scène Joël Le Theule
+C. J. Le Theule,Scène Joël Le Theule
+Centre culturel J. Le Theule,Scène Joël Le Theule
+Centre Culturel J. Le Theule,Scène Joël Le Theule
+C. culturel J.Le Theule,Scène Joël Le Theule
+Centre Culturel du Val de Vray,Le Val de Vray
+Espace culturel l'Elolienne,L'Éolienne
+Au singe en hiver,Un Singe en Hiver
+Épicerie/Zinc,L'Épicerie sur le Zinc
+L'Eolienne - Arnage,L'Éolienne
+Bal-île MoulinSart,Île de Moulinsart
+forum de la fnac,Forum FNAC
+Studio La Cie Marie Lenfant,Studio de la Cie Marie Lenfant
+Salle EVE,EVE - Scène universitaire
+Parc des Expos,Centre des expositions
+Médiat. Aragon,Médiathèque Louis Aragon
+Musée de Tessée,Musée de Tessé
+Mulligan’s,Le Mulligan
+Le Singe en Hiver,Un Singe en Hiver
+Le Laredo,Le La Ré Do
+Esplan. du Bicentenaire,Esplanade du Bicentenaire
+Kiosque Jardin des Plantes,Kiosque du jardin des Plantes
+Espace Faïence de Malicorne,Espace Faïence
+Centre des expo,Centre des expositions
+Camion-Théâtre promenade Newton,Promenade Newton
+Cathédrale du Mans,Cathédrale Saint-Julien
+Cathédrale St Julien,athédrale Saint-Julien
+Le Barout,Le Barouf
+L'ltemm,Itemm
+Kiosque au Jardin des Plantes,Kiosque du jardin des Plantes
+L'Elephant Pub,L'Éléphant
+EVE-Université du Maine,EVE - Scène universitaire
+Collégiale St Pierre,Collégiale Saint-Pierre-la-Cour
+Centre des expos,Centre des expositions
+Centre des Expos,Centre des expositions
+Centre cult. J.Le Theule,Scène Joël Le Theule
+Centre Le Theule,Scène Joël Le Theule
+Centre J.LeTheule,Scène Joël Le Theule
+Centre Culturel Atlantis,Salle Atlantis
+CC Le Courmesnil,Le Courmesnil
+C.C.Joel Le Theule,Scène Joël Le Theule
+C.C.J. Le Theule,Scène Joël Le Theule

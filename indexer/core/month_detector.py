@@ -41,24 +41,38 @@ MONTH_HEADER_PATTERNS = [
     (r'^Du\s+\d+(?:er)?\s+au\s+\d+\s+(juillet)\b', 7),
     (r'^Du\s+\d+(?:er)?\s+au\s+\d+\s+(ao[uû]t)\b', 8),
 
-    # Format "En juillet :" / "En août :"
+    # Format "En juillet :" / "En août :" / "En septembre :"
     (r'^En\s+(juillet)\s*:?\s*$', 7),
     (r'^En\s+(ao[uû]t)\s*:?\s*$', 8),
+    (r'^En\s+(septembre)\s*:?\s*$', 9),
 
-    # Format "Juillet:" / "Août :"
+    # Format "Juillet:" / "Août :" / "Septembre :"
     (r'^(Juillet)\s*:?\s*$', 7),
     (r'^(Ao[uû]t)\s*:?\s*$', 8),
+    (r'^(Septembre)\s*:?\s*$', 9),
 
     # Format simple seul sur la ligne
     (r'^(juillet)\s*$', 7),
     (r'^(aout)\s*$', 8),
     (r'^(août)\s*$', 8),
+    (r'^(septembre)\s*$', 9),
 
     # Format majuscules
     (r'^(JUILLET)\s*$', 7),
     (r'^(AO[UÛ]T)\s*$', 8),
     (r'^(AOUT)\s*$', 8),
+    (r'^(SEPTEMBRE)\s*$', 9),
+
+    # Variations OCR tronquées ou avec erreurs
+    (r'^(AO)\s*$', 8),            # "AOÛT" tronqué en "AO"
+    (r'^(AQU?T)\s*$', 8),         # OCR "Q" au lieu de "O"
+    (r'^(AQUT)\s*$', 8),          # OCR sans accent
 ]
+
+
+def strip_html_tags(text: str) -> str:
+    """Supprime les balises HTML d'une chaîne."""
+    return re.sub(r'<[^>]+>', '', text)
 
 
 def detect_month_sections(text: str) -> List[MonthSection]:
@@ -77,14 +91,16 @@ def detect_month_sections(text: str) -> List[MonthSection]:
 
     for line_num, line in enumerate(lines):
         line_stripped = line.strip()
+        # Nettoyer les balises HTML pour la détection (ex: "<bi>Juillet </bi>" → "Juillet")
+        line_clean = strip_html_tags(line_stripped).strip()
 
         for pattern, month in MONTH_HEADER_PATTERNS:
-            match = re.match(pattern, line_stripped, re.IGNORECASE)
+            match = re.match(pattern, line_clean, re.IGNORECASE)
             if match:
                 sections.append(MonthSection(
                     line_number=line_num,
                     month=month,
-                    header_text=line_stripped,
+                    header_text=line_stripped,  # Garder le texte original pour le debug
                     start_pos=current_pos
                 ))
                 break  # Un seul pattern par ligne

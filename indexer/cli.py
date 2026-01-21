@@ -661,8 +661,9 @@ def cmd_populate(args):
 
             bidul_raw_text = bidul.get('raw_text')
             if not bidul_raw_text:
+                # Pas de raw_text = bidul importé depuis CSV, ne pas supprimer les événements
                 if args.verbose:
-                    print(f"[{numero}] Pas de raw_text dans bidul - ignoré")
+                    print(f"[{numero}] Pas de raw_text dans bidul (source CSV ?) - conservé tel quel")
                 skipped += 1
                 continue
 
@@ -683,6 +684,7 @@ def cmd_populate(args):
             existing_contenu = db.count_contenu_evenement(numero)
 
             # Supprimer TOUS les événements du bidul avant de re-parser
+            # Note: On ne supprime que si raw_text existe (vérifié ci-dessus)
             if not args.dry_run:
                 db.delete_evenements(numero)
 

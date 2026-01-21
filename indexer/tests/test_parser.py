@@ -27,6 +27,7 @@ from core.parser import (
     extract_after_lieu,
     extract_ville_from_text_v2,
     parse_event_line_v2,
+    normalize_truncated_date,
 )
 
 
@@ -1253,6 +1254,300 @@ Salle François Rabelais, Changé, 15h00"""
         assert len(events) == 2
         # Le - doit être retiré du nom
         assert events[1].raw_text.startswith("DEUXIÈME") or "DEUXIÈME" in events[1].raw_text
+
+
+class TestBalPopulairePattern:
+    """Tests pour le pattern 'Titre entre guillemets avec ARTISTES' (bidul 200)."""
+
+    def test_is_named_event_titre_avec_artistes(self):
+        """Le pattern 'Titre' avec ARTISTES est reconnu comme événement nommé."""
+        # Avec balises HTML
+        assert is_named_event('<b>"Bal populaire dépoussiéré"</b> avec DECIBAL RUTABAGA')
+        # Sans balises HTML
+        assert is_named_event('"Bal populaire dépoussiéré" avec DECIBAL RUTABAGA')
+        # Avec guillemets typographiques
+        assert is_named_event('«Bal populaire» avec ARTISTE')
+        # Avec guillemets courbes
+        assert is_named_event('"Titre" avec DJ SET')
+
+    def test_extract_event_name_titre_avec_artistes(self):
+        """Le nom d'événement est correctement extrait du pattern 'Titre' avec."""
+        # Avec balises HTML
+        assert extract_event_name('<b>"Bal populaire dépoussiéré"</b> avec DECIBAL') == "Bal populaire dépoussiéré"
+        # Sans balises
+        assert extract_event_name('"Bal populaire dépoussiéré" avec DECIBAL') == "Bal populaire dépoussiéré"
+        # Avec guillemets typographiques
+        assert extract_event_name('«Titre de soirée» avec DJ') == "Titre de soirée"
+
+    def test_parse_bal_populaire_full(self):
+        """Test du parsing complet du texte du bidul 200."""
+        text = '<b>"Bal populaire dépoussiéré"</b> avec <b>DECIBAL RUTABAGA</b> +<b> TRIO BAKA</b> + Dj Set Electro swing and roll, Place du Champ de Foire, La Flèche dès 16h, 0€'
+
+        events = parse_event_line_v2(text, 6, 2024, [], [])
+
+        assert len(events) == 1
+        event = events[0]
+
+        # Nom d'événement
+        assert event['nom'] == "Bal populaire dépoussiéré"
+
+        # Lieu
+        assert event['lieu_raw'] == "Place du Champ de Foire"
+
+        # Ville
+        assert event['ville_raw'] == "La Flèche"
+
+        # Artistes
+        artiste_noms = [a['nom'] for a in event['artistes']]
+        assert "DECIBAL RUTABAGA" in artiste_noms
+        assert "TRIO BAKA" in artiste_noms
+        assert "Dj Set Electro swing and roll" in artiste_noms
+
+        # Heure et gratuit
+        assert event['heure'] == "16h"
+        assert event['gratuit'] is True
+
+    def test_extract_dj_set_non_formatted(self):
+        """Les DJ non formatés (sans <b>) sont correctement extraits."""
+        text = '<b>ARTISTE1</b> + <b>ARTISTE2</b> + Dj Set Techno, Lieu'
+
+        result = extract_before_lieu(text, text.find(', Lieu'))
+
+        artiste_noms = [a['nom'] for a in result['artistes']]
+        assert "ARTISTE1" in artiste_noms
+        assert "ARTISTE2" in artiste_noms
+        assert "Dj Set Techno" in artiste_noms
+
+    def test_extract_lieu_place_du(self):
+        """Les lieux commençant par 'Place du/de la' sont reconnus comme lieu explicite."""
+        from core.parser import extract_lieu_fallback
+
+        text = "Concert, Place du Champ de Foire, Ville dès 20h"
+        lieu, ville = extract_lieu_fallback(text, [])
+
+        assert lieu == "Place du Champ de Foire"
+
+    def test_extract_ville_before_hour(self):
+        """La ville est extraite même quand suivie d'une heure ('Ville dès 16h')."""
+        from core.parser import extract_lieu_fallback
+
+        text = "Event, Lieu, La Flèche dès 16h, 0€"
+        lieu, ville = extract_lieu_fallback(text, [])
+
+        assert ville == "La Flèche"
+
+
+class TestTruncatedDatePattern:
+    """Tests pour le split et normalisation des dates tronquées par l'OCR (bidul 119)."""
+
+    def test_normalize_truncated_date_e(self):
+        """'e 17' est normalisé en 'Je 17' (Jeudi)."""
+        assert normalize_truncated_date("e 17 a 14h30: Spectacle") == "Je 17 a 14h30: Spectacle"
+        assert normalize_truncated_date("e 31 20h: Theatre") == "Je 31 20h: Theatre"
+
+    def test_normalize_truncated_date_a(self):
+        """'a 18' est normalisé en 'Sa 18' (Samedi - préférence événements)."""
+        assert normalize_truncated_date("a 18 20h: Concert") == "Sa 18 20h: Concert"
+
+    def test_normalize_truncated_date_u(self):
+        """'u 25' est normalisé en 'Lu 25' (Lundi)."""
+        assert normalize_truncated_date("u 25 : Spectacle") == "Lu 25 : Spectacle"
+
+    def test_normalize_truncated_date_i(self):
+        """'i 20' est normalisé en 'Di 20' (Dimanche)."""
+        assert normalize_truncated_date("i 20 18h: Theatre") == "Di 20 18h: Theatre"
+
+    def test_normalize_truncated_date_no_change_for_full_date(self):
+        """Les dates complètes ne sont pas modifiées."""
+        assert normalize_truncated_date("Je 17 : Spectacle") == "Je 17 : Spectacle"
+        assert normalize_truncated_date("Sa 18 20h: Concert") == "Sa 18 20h: Concert"
+
+    def test_normalize_truncated_date_no_change_for_text(self):
+        """Le texte normal (sans pattern de date tronquée) n'est pas modifié."""
+        assert normalize_truncated_date("de 17 ans") == "de 17 ans"
+        assert normalize_truncated_date("le 14 juillet") == "le 14 juillet"
+        assert normalize_truncated_date("Theatre") == "Theatre"
+
+    def test_split_on_dates_v2_truncated_dates(self):
+        """Les événements avec dates tronquées sont correctement splittés."""
+        text = '"Le miroir", Caveau 105, 9 a 26E e 17 a 14h30/Ve 18 a 10h30: "Le vilain" conte'
+
+        parts = split_on_dates_v2(text)
+
+        assert len(parts) == 2
+        assert '"Le miroir"' in parts[0]
+        assert "Caveau 105" in parts[0]
+        assert "Je 17" in parts[1]  # e 17 normalisé en Je 17
+        assert '"Le vilain"' in parts[1]
+
+    def test_split_on_dates_v2_truncated_with_slash_hours(self):
+        """Les horaires sans jour après slash (/ 14h30) sont gérés."""
+        text = "Theatre, 9E e 31 20h: Spectacle, Lieu"
+
+        parts = split_on_dates_v2(text)
+
+        assert len(parts) == 2
+        assert "Theatre" in parts[0]
+        assert "Je 31" in parts[1]
+
+    def test_parse_date_prefix_complex_with_slash_hours(self):
+        """Les dates complexes avec horaires séparés par slash sont parsées."""
+        dates, rest = parse_date_prefix_v2("Je 17 a 14h30/Ve 18 a 10h30 / 14h30 : Spectacle", 1, 2008)
+
+        assert len(dates) == 2
+        assert dates[0] == date(2008, 1, 17)
+        assert dates[1] == date(2008, 1, 18)
+        assert rest == "Spectacle"
+
+    def test_parse_event_line_v2_full_flow_truncated(self):
+        """Le flux complet fonctionne avec les dates tronquées."""
+        # Texte avec horaires cohérents pour que le split fonctionne
+        text = '"Le miroir", Caveau 105, 9 a 26E e 17 a 14h30/Ve 18 a 10h30: "Le vilain" conte, Le Val Rhonne, 4E'
+
+        events = parse_event_line_v2(text, 1, 2008, [], [])
+
+        # Premier événement: Le miroir
+        miroir_events = [e for e in events if e.get('date_evenement') is None]
+        assert len(miroir_events) >= 1
+        assert miroir_events[0]['lieu_raw'] == "Caveau 105"
+
+        # Événements "Le vilain": 17 et 18 janvier
+        vilain_events = [e for e in events if e.get('date_evenement') is not None]
+        assert len(vilain_events) == 2
+        dates = [e['date_evenement'] for e in vilain_events]
+        assert date(2008, 1, 17) in dates
+        assert date(2008, 1, 18) in dates
+
+
+class TestDoubleSlashEventNameCleaning:
+    """Tests pour le nettoyage des noms d'événements avec pattern //."""
+
+    def test_extract_before_lieu_removes_ocr_bullets(self):
+        """Test que les puces OCR Unicode sont supprimées du nom d'événement."""
+        # \uf0b3 est une puce OCR courante
+        text = "\uf0b3 Festidays // <b>SANS PRÉTENTION</b>, Conlie, 18h30"
+        result = extract_before_lieu(text, 50)
+        assert result['nom_evenement'] == "Festidays"
+
+    def test_extract_before_lieu_removes_uf055_bullet(self):
+        """Test que \uf055 (autre puce OCR) est supprimée."""
+        text = "\uf055 Festival Les Trolls // ARTISTES, Lieu"
+        result = extract_before_lieu(text, 40)
+        assert result['nom_evenement'] == "Festival Les Trolls"
+
+    def test_extract_before_lieu_removes_html_tags(self):
+        """Test que les balises HTML sont supprimées du nom d'événement."""
+        text = "<b>Les Affranchis</b> // concert <b>KING AMONG GIANTS</b>, La Flèche"
+        result = extract_before_lieu(text, 60)
+        assert result['nom_evenement'] == "Les Affranchis"
+
+    def test_extract_before_lieu_removes_bullet_and_html(self):
+        """Test combiné: puce OCR + balises HTML."""
+        text = "\uf0b5 <b>Festival Music</b> // <b>ARTISTE</b>, Lieu"
+        result = extract_before_lieu(text, 45)
+        assert result['nom_evenement'] == "Festival Music"
+
+    def test_extract_before_lieu_extracts_style(self):
+        """Test extraction du style entre parenthèses."""
+        text = "Plein Champ #3 (festival d'arts urbains) // <b>JULIEN</b>, Lieu"
+        result = extract_before_lieu(text, 55)
+        assert result['nom_evenement'] == "Plein Champ #3"
+        assert result['style_evenement'] == "festival d'arts urbains"
+
+    def test_extract_before_lieu_no_double_slash(self):
+        """Test sans pattern // - pas de nom d'événement extrait."""
+        text = "<b>ARTISTE</b> (rock), Lieu, 20h"
+        result = extract_before_lieu(text, 20)
+        assert result['nom_evenement'] is None
+
+
+class TestEventParserDoubleSlashCleaning:
+    """Tests pour _extract_double_slash_pattern avec nettoyage."""
+
+    def test_parser_removes_ocr_bullets(self):
+        """Test que le parser supprime les puces OCR du nom."""
+        parser = EventParser(bidul_mois=7, bidul_annee=2024)
+        text = "\uf0b3 Festidays // <b>ARTISTE</b>, Lieu, 20h"
+        nom, reste = parser._extract_double_slash_pattern(text)
+        assert nom == "Festidays"
+
+    def test_parser_removes_html_tags(self):
+        """Test que le parser supprime les balises HTML du nom."""
+        parser = EventParser(bidul_mois=7, bidul_annee=2024)
+        text = "<b>Les Affranchis</b> // concert, La Flèche"
+        nom, reste = parser._extract_double_slash_pattern(text)
+        assert nom == "Les Affranchis"
+
+    def test_parser_removes_multiple_pua_chars(self):
+        """Test avec plusieurs caractères Unicode Private Use Area."""
+        parser = EventParser(bidul_mois=7, bidul_annee=2024)
+        # Plusieurs caractères PUA différents
+        text = "\ue000\uf055 Festival X // ARTISTES"
+        nom, reste = parser._extract_double_slash_pattern(text)
+        assert nom == "Festival X"
+
+    def test_parser_preserves_content_after_slash(self):
+        """Test que le contenu après // est préservé."""
+        parser = EventParser(bidul_mois=7, bidul_annee=2024)
+        text = "Festival Y // <b>ARTISTE1</b> + <b>ARTISTE2</b>, Lieu"
+        nom, reste = parser._extract_double_slash_pattern(text)
+        assert nom == "Festival Y"
+        assert "<b>ARTISTE1</b>" in reste
+
+
+class TestBallotBoxCleaning:
+    """Tests pour le nettoyage des caractères ballot box (☐☑☒)."""
+
+    def test_extract_before_lieu_removes_ballot_box(self):
+        """Test suppression du caractère ☐ (ballot box)."""
+        text = "☐ CORTEX CONCERT // BRACCO (noise), L'Austral, 20h30"
+        lieu_start = text.find("L'Austral")
+        result = extract_before_lieu(text, lieu_start)
+        assert result['nom_evenement'] == "CORTEX CONCERT"
+        assert result['artistes'][0]['nom'] == "BRACCO"
+
+    def test_extract_before_lieu_removes_checked_ballot_box(self):
+        """Test suppression du caractère ☑ (checked ballot box)."""
+        text = "☑ Festival X // ARTISTE, Lieu"
+        lieu_start = text.find("Lieu")
+        result = extract_before_lieu(text, lieu_start)
+        assert result['nom_evenement'] == "Festival X"
+
+    def test_parser_removes_ballot_box(self):
+        """Test que le parser EventParser supprime les ballot box des noms d'événements."""
+        parser = EventParser(bidul_mois=6, bidul_annee=2018)
+        # Utiliser un nom avec "festival" pour qu'il soit reconnu comme nom d'événement
+        text = "☐ Festival Cortex #1 // BRACCO (noise), Lieu"
+        nom, reste = parser._extract_double_slash_pattern(text)
+        assert nom == "Festival Cortex #1"
+
+
+class TestExtractEventNameQuotedWithColon:
+    """Tests pour l'extraction de noms entre guillemets suivis de ':'."""
+
+    def test_quoted_name_with_colon(self):
+        """Test extraction de 'Raggamuffin fest #7' : ARTISTES."""
+        text = '"Raggamuffin fest #7" : <b>SPECTACULAR</b>'
+        assert is_named_event(text) is True
+        assert extract_event_name(text) == "Raggamuffin fest #7"
+
+    def test_quoted_name_with_colon_french_quotes(self):
+        """Test avec guillemets français « »."""
+        text = '«Mon Festival» : <b>ARTISTE</b>'
+        assert is_named_event(text) is True
+        assert extract_event_name(text) == "Mon Festival"
+
+    def test_before_festival_pattern(self):
+        """Test pattern 'Before Festival X :'."""
+        text = "Before Festival Teriaki : LA COLONIE DE VACANCES"
+        assert is_named_event(text) is True
+        assert extract_event_name(text) == "Before Festival Teriaki"
+
+    def test_before_festival_with_ocr_bullet(self):
+        """Test 'Before Festival' avec puce OCR au début."""
+        text = "\uf0b5 Before Festival Teriaki : LA COLONIE"
+        assert is_named_event(text) is True
+        assert extract_event_name(text) == "Before Festival Teriaki"
 
 
 if __name__ == "__main__":

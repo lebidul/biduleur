@@ -4,8 +4,14 @@
 
 ### Tests unitaires
 ```bash
-# Tous les tests du parser
+# Tous les tests
+python -m pytest tests/ -v --tb=short
+
+# Tests du parser
 python -m pytest tests/test_parser.py -v --tb=short
+
+# Tests du month_detector (biduls d'été)
+python -m pytest tests/test_month_detector.py -v
 
 # Un test spécifique
 python -m pytest tests/test_parser.py::TestSplitBlocFusedEvents -v
@@ -21,9 +27,9 @@ python cli.py populate --numero 184 --replace
 python benchmark/compare_bidul.py 184
 python benchmark/compare_bidul.py 190
 
-# Scores de référence v1.9:
-# - Bidul 184: 95.4%
-# - Bidul 190: 91.2%
+# Scores de référence v1.14:
+# - Bidul 184: 95.6%
+# - Bidul 190: 91.8%
 ```
 
 **ATTENTION**: `extract` ne filtre pas les artifacts et produit trop d'événements. Toujours utiliser `populate` pour les benchmarks.
@@ -138,6 +144,63 @@ Le parser vérifie que le lieu détecté est bien un lieu et non partie du nom d
 - Le caractère `K` isolé sur une ligne (`\nK\n`) est un artefact OCR du bullet `•`
 - Prétraitement dans `_parse_bloc_with_referentiel()` : `re.sub(r'\nK\n', '\n•\n', text)`
 
+### Nettoyage des puces OCR et ballot box
+Les puces OCR et caractères ballot box sont nettoyés des noms d'événements :
+- **Unicode Private Use Area** (`\ue000-\uf8ff`) : puces OCR spéciales
+- **Ballot box** (`☐☑☒✓✗✘`) : caractères de case à cocher
+- Nettoyage dans `extract_before_lieu()` et `_extract_double_slash_pattern()`
+
+## Biduls d'été (juillet couvrant juillet+août)
+
+### Numéros concernés
+27 biduls de juillet contiennent les événements de juillet ET août :
+```
+6, 16, 37, 48, 59, 70, 81, 92, 103, 114, 125, 136, 147, 158, 180, 191,
+202, 213, 224, 235, 246, 256, 260, 271, 282, 293, 303
+```
+
+### Module `core/month_detector.py`
+Détecte les sections de mois dans le texte OCR pour attribuer les bonnes dates :
+
+| Fonction | Usage |
+|----------|-------|
+| `detect_month_sections()` | Détecte toutes les sections de mois dans le texte |
+| `get_month_for_line()` | Détermine le mois applicable pour un numéro de ligne |
+| `get_month_for_position()` | Détermine le mois applicable pour une position caractère |
+| `is_summer_bidul()` | Vérifie si c'est un bidul de juillet (mois=7) |
+| `strip_html_tags()` | Nettoie les balises HTML avant détection |
+
+### Patterns de headers de mois supportés
+```
+JUILLET, AOÛT, AOUT, SEPTEMBRE (majuscules)
+Juillet, Août, Septembre (Title Case)
+juillet, août, aout, septembre (minuscules)
+En juillet :, En août : (format avec préfixe)
+Du 1er au 31 juillet (ranges avec mois)
+FIN JUILLET, DÉBUT AOÛT (composés)
+<bi>Juillet </bi> (avec balises HTML)
+AO, AQUT (erreurs OCR tronquées)
+```
+
+### Vérification des biduls d'été
+```python
+import sqlite3
+conn = sqlite3.connect('database/bidul_archives.db')
+cursor = conn.cursor()
+
+# Répartition par mois pour un bidul d'été
+cursor.execute('''
+    SELECT strftime('%Y-%m', date_evenement) as mois, COUNT(*) as nb
+    FROM evenement
+    WHERE bidul_numero = 256
+    GROUP BY mois
+    ORDER BY mois
+''')
+for row in cursor.fetchall():
+    print(f"{row[0]}: {row[1]} événements")
+# Résultat attendu: 2020-07: 71, 2020-08: 46
+```
+
 ## Bonnes pratiques
 
 ### Tests avant commit
@@ -251,7 +314,7 @@ Le fichier `corpus/biduls.description.csv` est lu par **deux classes différente
 - Si vous modifiez le format du CSV, vous devez mettre à jour les deux méthodes `from_csv_row()` dans les deux fichiers.
 - Les deux loaders doivent filtrer les commentaires de la même manière (lignes commençant par `#` ou `"#`).
 
-### Format CSV actuel (v1.13+)
+### Format CSV actuel (v1.14+)
 ```
 numero,type,date_format,pages,ocr_mode,p1_sections,p1_orientation,p1_orientation_pdf,p1_colonnes,p2_sections,p2_orientation,p2_orientation_pdf,p2_colonnes,notes
 ```
