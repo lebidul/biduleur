@@ -110,6 +110,97 @@ Nouveaux alias dans `lieu_alias.csv` pour les formats OCR abrégés :
 
 ---
 
+# Release Notes - Indexer v1.12
+
+## Vue d'ensemble
+
+Version avec système de templates SVG pour définir les zones d'extraction OCR avec précision. Permet de personnaliser les zones d'extraction par bidul et de visualiser/éditer les zones dans Inkscape.
+
+## Nouveautés v1.12
+
+### Système de templates SVG
+
+Nouveau module `core/svg_template.py` pour gérer les zones d'extraction via fichiers SVG :
+
+| Classe | Description |
+|--------|-------------|
+| `ExtractionZone` | Zone rectangulaire avec page, section, colonne |
+| `SVGTemplate` | Collection de zones pour un bidul |
+| `SVGTemplateLoader` | Charge un template depuis un fichier SVG |
+| `SVGTemplateGenerator` | Génère un template depuis la config CSV |
+| `SVGTemplateManager` | Gestion centralisée avec cache |
+
+### Convention de nommage des zones SVG
+
+Les rectangles SVG utilisent des IDs structurés :
+- `p{page}-s{section}-col{colonne}` : Zone de colonne (ex: `p2-s1-col1`)
+- `p{page}-s{section}` : Zone de section entière
+- `p{page}-exclude` : Zone à exclure (logos, headers)
+
+### Priorité de chargement des templates
+
+1. **SVG personnalisé** : `corpus/templates/bidul_{numero}.svg`
+2. **Template générique** : Via colonne `svg_template` dans CSV
+3. **Calcul par défaut** : Sections A6 + colonnes calculées
+
+### Commandes CLI ajoutées
+
+```bash
+# Générer les templates SVG pour tous les scans
+python cli.py svg-generate --scans-only
+
+# Prévisualiser un template
+python cli.py svg-preview 132
+
+# Lister les templates disponibles
+python cli.py svg-list
+```
+
+### Templates générés
+
+82 templates SVG générés pour les biduls 1-82 (scans anciens) avec :
+- Zones d'extraction par section/colonne
+- Dimensions basées sur la résolution PDF (300 DPI)
+- Zones d'exclusion pour headers/logos
+
+### Intégration avec populate
+
+La commande `populate` utilise automatiquement les templates SVG si disponibles :
+```bash
+python cli.py populate --numero 5 --replace
+# Utilise corpus/templates/bidul_005.svg si présent
+```
+
+### Rotation par page
+
+Support de la rotation différenciée par page basée sur `orientation_pdf` vs `orientation_texte`.
+
+### Tests ajoutés
+
+- **24 tests** dans `tests/test_svg_template.py` :
+  - `TestExtractionZone` : 6 tests (création, validation, conversion)
+  - `TestSVGTemplate` : 6 tests (rotation, zones par page)
+  - `TestSVGTemplateLoader` : 4 tests (chargement, exclusions)
+  - `TestSVGTemplateGenerator` : 4 tests (génération portrait/paysage)
+  - `TestSVGTemplateManager` : 4 tests (cache, listing)
+
+### Benchmarks
+
+| Bidul | Score v1.11 | Score v1.12 |
+|-------|-------------|-------------|
+| 184 | 95.4% | 94.8% |
+| 190 | 91.2% | 91.2% |
+
+### Fichiers principaux
+
+| Fichier | Description |
+|---------|-------------|
+| `core/svg_template.py` | Module principal (936 lignes) |
+| `corpus/templates/` | Dossier des templates SVG |
+| `tests/test_svg_template.py` | Tests unitaires (448 lignes) |
+
+---
+
 # Release Notes - Indexer v1.11
 
 ## Vue d'ensemble
