@@ -391,40 +391,56 @@ def get_aggregated_stats(db_path: str, axis: str = 'numero_bidul') -> Dict[str, 
     return result
 
 
-def get_events_by_day_over_time(db_path: str) -> Dict[str, Any]:
+def get_events_by_day_over_time(db_path: str, granularity: str = 'monthly') -> Dict[str, Any]:
     """
     Récupère l'évolution du nombre d'événements par jour de la semaine dans le temps.
 
+    Args:
+        db_path: Chemin vers la base de données
+        granularity: 'monthly' pour agrégation mensuelle, 'weekly' pour hebdomadaire
+
     Returns:
         Dict avec:
-        - labels: liste des mois (YYYY-MM)
-        - datasets: dict {jour: [valeurs par mois]}
+        - labels: liste des périodes (YYYY-MM ou YYYY-WXX)
+        - datasets: dict {jour: [valeurs par période]}
     """
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
 
-    # Récupérer tous les mois
-    cur.execute("""
-        SELECT DISTINCT strftime('%Y-%m', date_evenement) as mois
-        FROM evenement
-        WHERE date_evenement IS NOT NULL
-        ORDER BY mois
-    """)
-    all_months = [row[0] for row in cur.fetchall() if row[0]]
+    if granularity == 'weekly':
+        # Récupérer toutes les semaines
+        cur.execute("""
+            SELECT DISTINCT strftime('%Y-W%W', date_evenement) as semaine
+            FROM evenement
+            WHERE date_evenement IS NOT NULL
+            ORDER BY semaine
+        """)
+        all_periods = [row[0] for row in cur.fetchall() if row[0]]
+        period_format = '%Y-W%W'
+    else:
+        # Récupérer tous les mois
+        cur.execute("""
+            SELECT DISTINCT strftime('%Y-%m', date_evenement) as mois
+            FROM evenement
+            WHERE date_evenement IS NOT NULL
+            ORDER BY mois
+        """)
+        all_periods = [row[0] for row in cur.fetchall() if row[0]]
+        period_format = '%Y-%m'
 
-    # Pour chaque jour de la semaine, récupérer le nombre d'événements par mois
+    # Pour chaque jour de la semaine, récupérer le nombre d'événements par période
     # SQLite %w: 0=dimanche, 1=lundi, ..., 6=samedi
     datasets = {jour: [] for jour in JOURS_SEMAINE}
 
-    for month in all_months:
-        cur.execute("""
+    for period in all_periods:
+        cur.execute(f"""
             SELECT
                 CAST(strftime('%w', date_evenement) AS INTEGER) as dow,
                 COUNT(*) as nb
             FROM evenement
-            WHERE strftime('%Y-%m', date_evenement) = ?
+            WHERE strftime('{period_format}', date_evenement) = ?
             GROUP BY dow
-        """, (month,))
+        """, (period,))
         counts = {row[0]: row[1] for row in cur.fetchall()}
 
         # Convertir SQLite dow (0=dim) vers notre format (0=lun)
@@ -435,7 +451,7 @@ def get_events_by_day_over_time(db_path: str) -> Dict[str, Any]:
             datasets[jour_name].append(counts.get(sqlite_dow, 0))
 
     conn.close()
-    return {'labels': all_months, 'datasets': datasets}
+    return {'labels': all_periods, 'datasets': datasets}
 
 
 def get_top_lieux_evolution(db_path: str, top_n: int = 10) -> Dict[str, Any]:
@@ -557,7 +573,8 @@ def get_extended_stats(db_path: str) -> Dict[str, Any]:
         'by_mois': get_aggregated_stats(db_path, 'mois'),
         'by_semaine': get_aggregated_stats(db_path, 'semaine'),
         'by_jour': get_aggregated_stats(db_path, 'jour'),
-        'events_by_day_over_time': get_events_by_day_over_time(db_path),
+        'events_by_day_monthly': get_events_by_day_over_time(db_path, 'monthly'),
+        'events_by_day_weekly': get_events_by_day_over_time(db_path, 'weekly'),
         'top_lieux_evolution': get_top_lieux_evolution(db_path),
         'top_artistes_evolution': get_top_artistes_evolution(db_path),
     }
@@ -948,6 +965,13 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
             <span class="toggle-icon">&#9660;</span>
         </div>
         <div class="section-content" id="dayOfWeekContent">
+            <div class="axis-selector" style="margin-bottom:10px">
+                <label for="dowGranularity">Granularite:</label>
+                <select id="dowGranularity" onchange="changeDowGranularity(this.value)">
+                    <option value="monthly">Mensuelle</option>
+                    <option value="weekly">Hebdomadaire</option>
+                </select>
+            </div>
             <div class="chart-container" style="height:350px">
                 <canvas id="dayOfWeekChart"></canvas>
             </div>
@@ -1470,10 +1494,44 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
         }
 
         // Initialize KPI charts
+        // Current granularity for day of week chart
+        let currentDowGranularity = 'monthly';
+
+        // Change day of week chart granularity
+        function changeDowGranularity(granularity) {
+            currentDowGranularity = granularity;
+            if (!dayOfWeekChart || !hasExtended) return;
+
+            const dowData = granularity === 'weekly' ? extended.events_by_day_weekly : extended.events_by_day_monthly;
+            if (!dowData || !dowData.labels) return;
+
+            const jours = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'];
+
+            // Update labels
+            dayOfWeekChart.data.labels = dowData.labels;
+
+            // Update each dataset
+            jours.forEach((jour, i) => {
+                dayOfWeekChart.data.datasets[i].data = dowData.datasets[jour] || [];
+            });
+
+            // Update title
+            const titleText = granularity === 'weekly'
+                ? 'Nombre d\\'evenements par jour de la semaine (evolution hebdomadaire)'
+                : 'Nombre d\\'evenements par jour de la semaine (evolution mensuelle)';
+            dayOfWeekChart.options.plugins.title.text = titleText;
+
+            // Update x-axis tick callback based on data density
+            const tickInterval = granularity === 'weekly' ? 12 : 6;
+            dayOfWeekChart.options.scales.x.ticks.callback = (val, idx) => idx % tickInterval === 0 ? dowData.labels[idx] : '';
+
+            dayOfWeekChart.update();
+        }
+
         function initKPICharts() {
             // 1. Events by day of week over time
-            if (extended.events_by_day_over_time && extended.events_by_day_over_time.labels.length > 0) {
-                const dowData = extended.events_by_day_over_time;
+            if (extended.events_by_day_monthly && extended.events_by_day_monthly.labels.length > 0) {
+                const dowData = extended.events_by_day_monthly;
                 const jours = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'];
                 const dowDatasets = jours.map((jour, i) => ({
                     label: jour.charAt(0).toUpperCase() + jour.slice(1),

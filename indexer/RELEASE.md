@@ -24,7 +24,8 @@ Les courbes existantes (événements locaux, régionaux, contenus) s'adaptent au
 Trois nouvelles visualisations accessibles via le bouton "KPI Avancés" :
 
 #### 1. Évolution par jour de la semaine
-- 7 courbes (lundi à dimanche) montrant l'évolution mensuelle
+- 7 courbes (lundi à dimanche) montrant l'évolution temporelle
+- **Sélecteur de granularité** : vue mensuelle (YYYY-MM) ou hebdomadaire (YYYY-WXX)
 - Permet d'identifier les tendances par jour (ex: augmentation des événements du samedi)
 - Palette arc-en-ciel pour distinguer chaque jour
 
@@ -52,7 +53,7 @@ Trois nouvelles visualisations accessibles via le bouton "KPI Avancés" :
 | Fonction | Description |
 |----------|-------------|
 | `get_aggregated_stats(db_path, axis)` | Stats agrégées selon l'axe choisi |
-| `get_events_by_day_over_time(db_path)` | Évolution mensuelle par jour de semaine |
+| `get_events_by_day_over_time(db_path, granularity)` | Évolution par jour de semaine (mensuelle ou hebdomadaire) |
 | `get_top_lieux_evolution(db_path, top_n)` | Évolution temporelle des top N lieux |
 | `get_top_artistes_evolution(db_path, top_n)` | Évolution temporelle des top N artistes |
 | `get_extended_stats(db_path)` | Agrège toutes les données étendues |
