@@ -6,9 +6,14 @@ import sqlite3
 import json
 from pathlib import Path
 from typing import List, Dict, Any
+from datetime import datetime
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+# Mapping des noms de jours français
+JOURS_SEMAINE = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche']
 
 
 def get_quality_data(db_path: str) -> Dict[str, Any]:
@@ -264,7 +269,351 @@ def get_stats_data(db_path: str) -> List[Dict[str, Any]]:
     return data
 
 
-def generate_html(data: List[Dict[str, Any]], output_path: str, quality_data: Dict[str, Any] = None) -> str:
+def get_aggregated_stats(db_path: str, axis: str = 'numero_bidul') -> Dict[str, Any]:
+    """
+    Récupère les statistiques agrégées selon l'axe choisi.
+
+    Args:
+        db_path: Chemin vers la base de données
+        axis: Axe d'agrégation ('numero_bidul', 'mois', 'semaine', 'jour')
+
+    Returns:
+        Dict avec labels et données par série
+    """
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+
+    result = {'labels': [], 'events': [], 'local': [], 'regional': [], 'content': []}
+
+    if axis == 'numero_bidul':
+        # Agrégation par numéro de bidul (existant)
+        cur.execute("""
+            SELECT
+                b.numero,
+                COUNT(DISTINCT e.id) as nb_evenements,
+                COUNT(DISTINCT CASE WHEN e.is_regional = 0 OR e.is_regional IS NULL THEN e.id END) as nb_local,
+                COUNT(DISTINCT CASE WHEN e.is_regional = 1 THEN e.id END) as nb_regional,
+                COALESCE(COUNT(CASE WHEN ce.artiste IS NOT NULL OR ce.nom_spectacle IS NOT NULL THEN 1 END), 0) as nb_contenus
+            FROM bidul b
+            LEFT JOIN evenement e ON e.bidul_numero = b.numero
+            LEFT JOIN contenu_evenement ce ON ce.evenement_id = e.id
+            GROUP BY b.numero
+            ORDER BY b.numero
+        """)
+        for row in cur.fetchall():
+            result['labels'].append(str(row[0]))
+            result['events'].append(row[1])
+            result['local'].append(row[2])
+            result['regional'].append(row[3])
+            result['content'].append(row[4])
+
+    elif axis == 'mois':
+        # Agrégation par mois calendaire (YYYY-MM)
+        cur.execute("""
+            SELECT
+                strftime('%Y-%m', e.date_evenement) as mois,
+                COUNT(DISTINCT e.id) as nb_evenements,
+                COUNT(DISTINCT CASE WHEN e.is_regional = 0 OR e.is_regional IS NULL THEN e.id END) as nb_local,
+                COUNT(DISTINCT CASE WHEN e.is_regional = 1 THEN e.id END) as nb_regional,
+                COALESCE(COUNT(CASE WHEN ce.artiste IS NOT NULL OR ce.nom_spectacle IS NOT NULL THEN 1 END), 0) as nb_contenus
+            FROM evenement e
+            LEFT JOIN contenu_evenement ce ON ce.evenement_id = e.id
+            WHERE e.date_evenement IS NOT NULL
+            GROUP BY mois
+            ORDER BY mois
+        """)
+        for row in cur.fetchall():
+            if row[0]:
+                result['labels'].append(row[0])
+                result['events'].append(row[1])
+                result['local'].append(row[2])
+                result['regional'].append(row[3])
+                result['content'].append(row[4])
+
+    elif axis == 'semaine':
+        # Agrégation par semaine ISO (YYYY-WXX)
+        cur.execute("""
+            SELECT
+                strftime('%Y-W%W', e.date_evenement) as semaine,
+                COUNT(DISTINCT e.id) as nb_evenements,
+                COUNT(DISTINCT CASE WHEN e.is_regional = 0 OR e.is_regional IS NULL THEN e.id END) as nb_local,
+                COUNT(DISTINCT CASE WHEN e.is_regional = 1 THEN e.id END) as nb_regional,
+                COALESCE(COUNT(CASE WHEN ce.artiste IS NOT NULL OR ce.nom_spectacle IS NOT NULL THEN 1 END), 0) as nb_contenus
+            FROM evenement e
+            LEFT JOIN contenu_evenement ce ON ce.evenement_id = e.id
+            WHERE e.date_evenement IS NOT NULL
+            GROUP BY semaine
+            ORDER BY semaine
+        """)
+        for row in cur.fetchall():
+            if row[0]:
+                result['labels'].append(row[0])
+                result['events'].append(row[1])
+                result['local'].append(row[2])
+                result['regional'].append(row[3])
+                result['content'].append(row[4])
+
+    elif axis == 'jour':
+        # Agrégation par jour de la semaine (0=lundi, 6=dimanche)
+        cur.execute("""
+            SELECT
+                CAST(strftime('%w', e.date_evenement) AS INTEGER) as dow,
+                COUNT(DISTINCT e.id) as nb_evenements,
+                COUNT(DISTINCT CASE WHEN e.is_regional = 0 OR e.is_regional IS NULL THEN e.id END) as nb_local,
+                COUNT(DISTINCT CASE WHEN e.is_regional = 1 THEN e.id END) as nb_regional,
+                COALESCE(COUNT(CASE WHEN ce.artiste IS NOT NULL OR ce.nom_spectacle IS NOT NULL THEN 1 END), 0) as nb_contenus
+            FROM evenement e
+            LEFT JOIN contenu_evenement ce ON ce.evenement_id = e.id
+            WHERE e.date_evenement IS NOT NULL
+            GROUP BY dow
+            ORDER BY dow
+        """)
+        # SQLite %w: 0=dimanche, 1=lundi, ..., 6=samedi
+        # On veut: 0=lundi, ..., 6=dimanche
+        rows = list(cur.fetchall())
+        # Réorganiser: dimanche (0) -> 6, lundi (1) -> 0, etc.
+        day_data = {(row[0] - 1) % 7 if row[0] > 0 else 6: row for row in rows}
+        for i in range(7):
+            result['labels'].append(JOURS_SEMAINE[i])
+            if i in day_data:
+                row = day_data[i]
+                result['events'].append(row[1])
+                result['local'].append(row[2])
+                result['regional'].append(row[3])
+                result['content'].append(row[4])
+            else:
+                result['events'].append(0)
+                result['local'].append(0)
+                result['regional'].append(0)
+                result['content'].append(0)
+
+    conn.close()
+    return result
+
+
+def get_events_by_day_over_time(db_path: str, granularity: str = 'monthly') -> Dict[str, Any]:
+    """
+    Récupère l'évolution du nombre d'événements par jour de la semaine dans le temps.
+
+    Args:
+        db_path: Chemin vers la base de données
+        granularity: 'monthly' pour agrégation mensuelle, 'weekly' pour hebdomadaire
+
+    Returns:
+        Dict avec:
+        - labels: liste des périodes (YYYY-MM ou YYYY-WXX)
+        - datasets: dict {jour: [valeurs par période]}
+    """
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+
+    if granularity == 'weekly':
+        # Récupérer toutes les semaines
+        cur.execute("""
+            SELECT DISTINCT strftime('%Y-W%W', date_evenement) as semaine
+            FROM evenement
+            WHERE date_evenement IS NOT NULL
+            ORDER BY semaine
+        """)
+        all_periods = [row[0] for row in cur.fetchall() if row[0]]
+        period_format = '%Y-W%W'
+    else:
+        # Récupérer tous les mois
+        cur.execute("""
+            SELECT DISTINCT strftime('%Y-%m', date_evenement) as mois
+            FROM evenement
+            WHERE date_evenement IS NOT NULL
+            ORDER BY mois
+        """)
+        all_periods = [row[0] for row in cur.fetchall() if row[0]]
+        period_format = '%Y-%m'
+
+    # Pour chaque jour de la semaine, récupérer le nombre d'événements par période
+    # SQLite %w: 0=dimanche, 1=lundi, ..., 6=samedi
+    datasets = {jour: [] for jour in JOURS_SEMAINE}
+
+    for period in all_periods:
+        cur.execute(f"""
+            SELECT
+                CAST(strftime('%w', date_evenement) AS INTEGER) as dow,
+                COUNT(*) as nb
+            FROM evenement
+            WHERE strftime('{period_format}', date_evenement) = ?
+            GROUP BY dow
+        """, (period,))
+        counts = {row[0]: row[1] for row in cur.fetchall()}
+
+        # Convertir SQLite dow (0=dim) vers notre format (0=lun)
+        for sqlite_dow in range(7):
+            # 0(dim)->6, 1(lun)->0, 2(mar)->1, etc.
+            our_dow = (sqlite_dow - 1) % 7 if sqlite_dow > 0 else 6
+            jour_name = JOURS_SEMAINE[our_dow]
+            datasets[jour_name].append(counts.get(sqlite_dow, 0))
+
+    conn.close()
+    return {'labels': all_periods, 'datasets': datasets}
+
+
+def get_top_lieux_evolution(db_path: str, top_n: int = 10, granularity: str = 'monthly') -> Dict[str, Any]:
+    """
+    Récupère l'évolution temporelle des top N lieux.
+
+    Args:
+        db_path: Chemin vers la base de données
+        top_n: Nombre de lieux à inclure
+        granularity: 'monthly' pour mensuel, 'yearly' pour annuel
+
+    Returns:
+        Dict avec:
+        - labels: liste des périodes (YYYY-MM ou YYYY)
+        - datasets: dict {lieu: [valeurs par période]}
+    """
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+
+    # Identifier les top N lieux
+    cur.execute("""
+        SELECT COALESCE(lr.nom, e.lieu_raw) as lieu, COUNT(*) as nb
+        FROM evenement e
+        LEFT JOIN lieu_ref lr ON lr.id = e.lieu_ref_id
+        WHERE e.lieu_raw IS NOT NULL AND e.lieu_raw != ''
+        GROUP BY lieu
+        ORDER BY nb DESC
+        LIMIT ?
+    """, (top_n,))
+    top_lieux = [row[0] for row in cur.fetchall() if row[0]]
+
+    # Récupérer toutes les périodes
+    if granularity == 'yearly':
+        period_format = '%Y'
+        cur.execute("""
+            SELECT DISTINCT strftime('%Y', date_evenement) as periode
+            FROM evenement
+            WHERE date_evenement IS NOT NULL
+            ORDER BY periode
+        """)
+    else:
+        period_format = '%Y-%m'
+        cur.execute("""
+            SELECT DISTINCT strftime('%Y-%m', date_evenement) as periode
+            FROM evenement
+            WHERE date_evenement IS NOT NULL
+            ORDER BY periode
+        """)
+    all_periods = [row[0] for row in cur.fetchall() if row[0]]
+
+    datasets = {lieu: [] for lieu in top_lieux}
+
+    for period in all_periods:
+        cur.execute(f"""
+            SELECT COALESCE(lr.nom, e.lieu_raw) as lieu, COUNT(*) as nb
+            FROM evenement e
+            LEFT JOIN lieu_ref lr ON lr.id = e.lieu_ref_id
+            WHERE strftime('{period_format}', e.date_evenement) = ?
+              AND e.lieu_raw IS NOT NULL AND e.lieu_raw != ''
+            GROUP BY lieu
+        """, (period,))
+        counts = {row[0]: row[1] for row in cur.fetchall()}
+
+        for lieu in top_lieux:
+            datasets[lieu].append(counts.get(lieu, 0))
+
+    conn.close()
+    return {'labels': all_periods, 'datasets': datasets, 'top_lieux': top_lieux}
+
+
+def get_top_artistes_evolution(db_path: str, top_n: int = 10, granularity: str = 'monthly') -> Dict[str, Any]:
+    """
+    Récupère l'évolution temporelle des top N artistes.
+
+    Args:
+        db_path: Chemin vers la base de données
+        top_n: Nombre d'artistes à inclure
+        granularity: 'monthly' pour mensuel, 'yearly' pour annuel
+
+    Returns:
+        Dict avec:
+        - labels: liste des périodes (YYYY-MM ou YYYY)
+        - datasets: dict {artiste: [valeurs par période]}
+    """
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+
+    # Identifier les top N artistes
+    cur.execute("""
+        SELECT COALESCE(ar.nom, ce.artiste) as artiste_nom, COUNT(*) as nb
+        FROM contenu_evenement ce
+        LEFT JOIN artiste_ref ar ON ar.id = ce.artiste_ref_id
+        WHERE ce.artiste IS NOT NULL AND ce.artiste != ''
+        GROUP BY artiste_nom
+        ORDER BY nb DESC
+        LIMIT ?
+    """, (top_n,))
+    top_artistes = [row[0] for row in cur.fetchall() if row[0]]
+
+    # Récupérer toutes les périodes
+    if granularity == 'yearly':
+        period_format = '%Y'
+        cur.execute("""
+            SELECT DISTINCT strftime('%Y', e.date_evenement) as periode
+            FROM evenement e
+            WHERE e.date_evenement IS NOT NULL
+            ORDER BY periode
+        """)
+    else:
+        period_format = '%Y-%m'
+        cur.execute("""
+            SELECT DISTINCT strftime('%Y-%m', e.date_evenement) as periode
+            FROM evenement e
+            WHERE e.date_evenement IS NOT NULL
+            ORDER BY periode
+        """)
+    all_periods = [row[0] for row in cur.fetchall() if row[0]]
+
+    datasets = {artiste: [] for artiste in top_artistes}
+
+    for period in all_periods:
+        cur.execute(f"""
+            SELECT COALESCE(ar.nom, ce.artiste) as artiste_nom, COUNT(*) as nb
+            FROM contenu_evenement ce
+            JOIN evenement e ON e.id = ce.evenement_id
+            LEFT JOIN artiste_ref ar ON ar.id = ce.artiste_ref_id
+            WHERE strftime('{period_format}', e.date_evenement) = ?
+              AND ce.artiste IS NOT NULL AND ce.artiste != ''
+            GROUP BY artiste_nom
+        """, (period,))
+        counts = {row[0]: row[1] for row in cur.fetchall()}
+
+        for artiste in top_artistes:
+            datasets[artiste].append(counts.get(artiste, 0))
+
+    conn.close()
+    return {'labels': all_periods, 'datasets': datasets, 'top_artistes': top_artistes}
+
+
+def get_extended_stats(db_path: str) -> Dict[str, Any]:
+    """
+    Récupère toutes les statistiques étendues pour le dashboard.
+
+    Returns:
+        Dict avec toutes les données pré-calculées pour les différents axes et KPIs
+    """
+    return {
+        'by_bidul': get_aggregated_stats(db_path, 'numero_bidul'),
+        'by_mois': get_aggregated_stats(db_path, 'mois'),
+        'by_semaine': get_aggregated_stats(db_path, 'semaine'),
+        'by_jour': get_aggregated_stats(db_path, 'jour'),
+        'events_by_day_monthly': get_events_by_day_over_time(db_path, 'monthly'),
+        'events_by_day_weekly': get_events_by_day_over_time(db_path, 'weekly'),
+        'top_lieux_monthly': get_top_lieux_evolution(db_path, granularity='monthly'),
+        'top_lieux_yearly': get_top_lieux_evolution(db_path, granularity='yearly'),
+        'top_artistes_monthly': get_top_artistes_evolution(db_path, granularity='monthly'),
+        'top_artistes_yearly': get_top_artistes_evolution(db_path, granularity='yearly'),
+    }
+
+
+def generate_html(data: List[Dict[str, Any]], output_path: str, quality_data: Dict[str, Any] = None,
+                  extended_stats: Dict[str, Any] = None) -> str:
     """
     Génère le fichier HTML avec le dashboard.
 
@@ -272,14 +621,17 @@ def generate_html(data: List[Dict[str, Any]], output_path: str, quality_data: Di
         data: Données des stats par Bidul
         output_path: Chemin du fichier à créer
         quality_data: Données de qualité (optionnel)
+        extended_stats: Données étendues pour les nouvelles visualisations (optionnel)
 
     Returns:
         Chemin absolu du fichier créé
     """
     data_json = json.dumps(data)
     quality_json = json.dumps(quality_data or {})
+    extended_json = json.dumps(extended_stats or {})
     html_content = HTML_TEMPLATE.replace('__DATA_PLACEHOLDER__', data_json)
     html_content = html_content.replace('__QUALITY_PLACEHOLDER__', quality_json)
+    html_content = html_content.replace('__EXTENDED_PLACEHOLDER__', extended_json)
 
     output_file = Path(output_path)
     output_file.parent.mkdir(parents=True, exist_ok=True)
@@ -306,6 +658,13 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
         }
         h1 { text-align: center; margin-bottom: 10px; font-size: 1.5rem; }
         h2 { text-align: center; margin: 20px 0 15px; font-size: 1.2rem; color: #9ca3af; }
+        h3.section-title {
+            font-size: 1rem;
+            color: #9ca3af;
+            margin: 25px 0 15px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #374151;
+        }
 
         .stats {
             display: flex;
@@ -351,6 +710,54 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
         .btn:hover { background: #4b5563; }
         .btn.active { background: #4f46e5; }
         .btn.purple.active { background: #7c3aed; }
+        .btn.teal.active { background: #0d9488; }
+
+        /* Axis selector */
+        .axis-selector {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .axis-selector label {
+            color: #9ca3af;
+            font-size: 0.85rem;
+        }
+        .axis-selector select {
+            background: #374151;
+            border: 1px solid #4b5563;
+            color: #f3f4f6;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
+        .axis-selector select:focus {
+            outline: none;
+            border-color: #6366f1;
+        }
+
+        /* Collapsible sections */
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            padding: 10px 15px;
+            background: #1f2937;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+        .section-header:hover { background: #374151; }
+        .section-header h3 { margin: 0; font-size: 0.95rem; }
+        .section-header .toggle-icon {
+            font-size: 1.2rem;
+            transition: transform 0.3s;
+        }
+        .section-header.collapsed .toggle-icon { transform: rotate(-90deg); }
+        .section-content { margin-bottom: 20px; }
+        .section-content.hidden { display: none; }
 
         .legend {
             display: flex;
@@ -543,6 +950,17 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
         </div>
     </div>
 
+    <!-- Axis selector -->
+    <div class="axis-selector">
+        <label for="axisSelect">Axe horizontal:</label>
+        <select id="axisSelect" onchange="changeAxis(this.value)">
+            <option value="numero_bidul">Numero Bidul</option>
+            <option value="mois">Mois (YYYY-MM)</option>
+            <option value="semaine">Semaine (YYYY-WXX)</option>
+            <option value="jour">Jour de la semaine</option>
+        </select>
+    </div>
+
     <div class="controls">
         <button class="btn active" onclick="setView('both')">Tous</button>
         <button class="btn" onclick="setView('events')">Evenements</button>
@@ -550,6 +968,7 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
         <button class="btn" onclick="setView('regional')">Regionaux</button>
         <button class="btn" onclick="setView('content')">Contenus</button>
         <button class="btn purple" id="qualityBtn" onclick="toggleQuality()">Qualite</button>
+        <button class="btn teal" id="kpiBtn" onclick="toggleKPI()">KPI Avances</button>
     </div>
 
     <div class="legend">
@@ -568,6 +987,63 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
     <!-- Evolution chart -->
     <div class="evolution-container" id="evolutionContainer" style="display:none">
         <canvas id="evolutionChart"></canvas>
+    </div>
+
+    <!-- Advanced KPI section -->
+    <div id="kpiSection" style="display:none">
+        <!-- Events by day of week over time -->
+        <div class="section-header" onclick="toggleSection('dayOfWeek')">
+            <h3 style="color:#14b8a6">Evolution par jour de la semaine</h3>
+            <span class="toggle-icon">&#9660;</span>
+        </div>
+        <div class="section-content" id="dayOfWeekContent">
+            <div class="axis-selector" style="margin-bottom:10px">
+                <label for="dowGranularity">Granularite:</label>
+                <select id="dowGranularity" onchange="changeDowGranularity(this.value)">
+                    <option value="monthly">Mensuelle</option>
+                    <option value="weekly">Hebdomadaire</option>
+                </select>
+            </div>
+            <div class="chart-container" style="height:350px">
+                <canvas id="dayOfWeekChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Top 10 lieux evolution -->
+        <div class="section-header" onclick="toggleSection('topLieux')">
+            <h3 style="color:#f97316">Top 10 Lieux - Evolution</h3>
+            <span class="toggle-icon">&#9660;</span>
+        </div>
+        <div class="section-content" id="topLieuxContent">
+            <div class="axis-selector" style="margin-bottom:10px">
+                <label for="lieuxGranularity">Granularite:</label>
+                <select id="lieuxGranularity" onchange="changeLieuxGranularity(this.value)">
+                    <option value="monthly">Mensuelle</option>
+                    <option value="yearly">Annuelle</option>
+                </select>
+            </div>
+            <div class="chart-container" style="height:350px">
+                <canvas id="topLieuxChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Top 10 artistes evolution -->
+        <div class="section-header" onclick="toggleSection('topArtistes')">
+            <h3 style="color:#06b6d4">Top 10 Artistes - Evolution</h3>
+            <span class="toggle-icon">&#9660;</span>
+        </div>
+        <div class="section-content" id="topArtistesContent">
+            <div class="axis-selector" style="margin-bottom:10px">
+                <label for="artistesGranularity">Granularite:</label>
+                <select id="artistesGranularity" onchange="changeArtistesGranularity(this.value)">
+                    <option value="monthly">Mensuelle</option>
+                    <option value="yearly">Annuelle</option>
+                </select>
+            </div>
+            <div class="chart-container" style="height:350px">
+                <canvas id="topArtistesChart"></canvas>
+            </div>
+        </div>
     </div>
 
     <div class="details">
@@ -602,13 +1078,15 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
     </div>
 
     <div class="footer">
-        Genere par Bidul Indexer v1.8 - <span id="genDate"></span>
+        Genere par Bidul Indexer v1.15 - <span id="genDate"></span>
     </div>
 
     <script>
         const data = __DATA_PLACEHOLDER__;
         const quality = __QUALITY_PLACEHOLDER__;
+        const extended = __EXTENDED_PLACEHOLDER__;
         const hasQuality = quality && Object.keys(quality).length > 0;
+        const hasExtended = extended && Object.keys(extended).length > 0;
 
         // Calculs
         const existing = data.filter(d => !d.missing);
@@ -964,6 +1442,361 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
             document.getElementById('lieuxBox').style.display = qualityVisible ? 'block' : 'none';
             document.getElementById('artistesBox').style.display = qualityVisible ? 'block' : 'none';
             document.getElementById('stylesBox').style.display = qualityVisible ? 'block' : 'none';
+        }
+
+        // =====================================================
+        // NOUVELLES FONCTIONNALITES v1.15
+        // =====================================================
+
+        // Colors for days of week
+        const dayColors = [
+            '#ef4444', // lundi - red
+            '#f97316', // mardi - orange
+            '#eab308', // mercredi - yellow
+            '#22c55e', // jeudi - green
+            '#06b6d4', // vendredi - cyan
+            '#8b5cf6', // samedi - purple
+            '#ec4899'  // dimanche - pink
+        ];
+
+        // Colors for top lieux (orange scale)
+        const lieuxColors = [
+            '#ea580c', '#f97316', '#fb923c', '#fdba74', '#fed7aa',
+            '#c2410c', '#9a3412', '#7c2d12', '#d97706', '#b45309'
+        ];
+
+        // Colors for top artistes (cyan scale)
+        const artistesColors = [
+            '#0891b2', '#06b6d4', '#22d3ee', '#67e8f9', '#a5f3fc',
+            '#0e7490', '#155e75', '#164e63', '#14b8a6', '#0d9488'
+        ];
+
+        // Change main chart axis
+        function changeAxis(axis) {
+            if (!hasExtended) return;
+
+            let newData;
+            switch(axis) {
+                case 'numero_bidul': newData = extended.by_bidul; break;
+                case 'mois': newData = extended.by_mois; break;
+                case 'semaine': newData = extended.by_semaine; break;
+                case 'jour': newData = extended.by_jour; break;
+                default: newData = extended.by_bidul;
+            }
+
+            // Update labels
+            chart.data.labels = newData.labels;
+
+            // Update datasets
+            chart.data.datasets[0].data = newData.local;
+            chart.data.datasets[1].data = newData.regional;
+            chart.data.datasets[2].data = newData.content;
+
+            // Update colors for the new axis
+            const len = newData.labels.length;
+            chart.data.datasets[0].backgroundColor = Array(len).fill('#06b6d4');
+            chart.data.datasets[1].backgroundColor = Array(len).fill('#a78bfa');
+            chart.data.datasets[2].backgroundColor = Array(len).fill('#f59e0b');
+
+            // Update x-axis tick callback
+            if (axis === 'numero_bidul') {
+                chart.options.scales.x.ticks.callback = (val, idx) => idx % 10 === 0 ? newData.labels[idx] : '';
+            } else if (axis === 'semaine') {
+                chart.options.scales.x.ticks.callback = (val, idx) => idx % 4 === 0 ? newData.labels[idx] : '';
+            } else {
+                chart.options.scales.x.ticks.callback = (val, idx) => newData.labels[idx];
+            }
+
+            chart.update();
+        }
+
+        // Toggle KPI section
+        let kpiVisible = false;
+        let kpiChartsInitialized = false;
+        let dayOfWeekChart = null;
+        let topLieuxChart = null;
+        let topArtistesChart = null;
+
+        function toggleKPI() {
+            kpiVisible = !kpiVisible;
+            const btn = document.getElementById('kpiBtn');
+            btn.classList.toggle('active', kpiVisible);
+
+            document.getElementById('kpiSection').style.display = kpiVisible ? 'block' : 'none';
+
+            // Initialize charts on first show
+            if (kpiVisible && !kpiChartsInitialized && hasExtended) {
+                initKPICharts();
+                kpiChartsInitialized = true;
+            }
+        }
+
+        // Toggle collapsible section
+        function toggleSection(sectionName) {
+            const content = document.getElementById(sectionName + 'Content');
+            const header = content.previousElementSibling;
+            content.classList.toggle('hidden');
+            header.classList.toggle('collapsed');
+        }
+
+        // Initialize KPI charts
+        // Current granularity for day of week chart
+        let currentDowGranularity = 'monthly';
+
+        // Change day of week chart granularity
+        function changeDowGranularity(granularity) {
+            currentDowGranularity = granularity;
+            if (!dayOfWeekChart || !hasExtended) return;
+
+            const dowData = granularity === 'weekly' ? extended.events_by_day_weekly : extended.events_by_day_monthly;
+            if (!dowData || !dowData.labels) return;
+
+            const jours = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'];
+
+            // Update labels
+            dayOfWeekChart.data.labels = dowData.labels;
+
+            // Update each dataset
+            jours.forEach((jour, i) => {
+                dayOfWeekChart.data.datasets[i].data = dowData.datasets[jour] || [];
+            });
+
+            // Update title
+            const titleText = granularity === 'weekly'
+                ? 'Nombre d\\'evenements par jour de la semaine (evolution hebdomadaire)'
+                : 'Nombre d\\'evenements par jour de la semaine (evolution mensuelle)';
+            dayOfWeekChart.options.plugins.title.text = titleText;
+
+            // Update x-axis tick callback based on data density
+            const tickInterval = granularity === 'weekly' ? 12 : 6;
+            dayOfWeekChart.options.scales.x.ticks.callback = (val, idx) => idx % tickInterval === 0 ? dowData.labels[idx] : '';
+
+            dayOfWeekChart.update();
+        }
+
+        function initKPICharts() {
+            // 1. Events by day of week over time
+            if (extended.events_by_day_monthly && extended.events_by_day_monthly.labels.length > 0) {
+                const dowData = extended.events_by_day_monthly;
+                const jours = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'];
+                const dowDatasets = jours.map((jour, i) => ({
+                    label: jour.charAt(0).toUpperCase() + jour.slice(1),
+                    data: dowData.datasets[jour] || [],
+                    borderColor: dayColors[i],
+                    backgroundColor: dayColors[i] + '20',
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    tension: 0.3,
+                    fill: false
+                }));
+
+                dayOfWeekChart = new Chart(document.getElementById('dayOfWeekChart').getContext('2d'), {
+                    type: 'line',
+                    data: {
+                        labels: dowData.labels,
+                        datasets: dowDatasets
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
+                        plugins: {
+                            legend: {
+                                display: true,
+                                position: 'top',
+                                labels: { color: '#9ca3af', boxWidth: 12, padding: 10 }
+                            },
+                            title: {
+                                display: true,
+                                text: 'Nombre d\\'evenements par jour de la semaine (evolution mensuelle)',
+                                color: '#9ca3af'
+                            }
+                        },
+                        scales: {
+                            x: {
+                                ticks: {
+                                    color: '#9ca3af',
+                                    maxRotation: 45,
+                                    callback: (val, idx) => idx % 6 === 0 ? dowData.labels[idx] : ''
+                                },
+                                grid: { display: false }
+                            },
+                            y: {
+                                ticks: { color: '#9ca3af' },
+                                grid: { color: '#374151' }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // 2. Top 10 lieux evolution
+            if (extended.top_lieux_monthly && extended.top_lieux_monthly.labels.length > 0) {
+                const lieuxData = extended.top_lieux_monthly;
+                const lieuxDatasets = lieuxData.top_lieux.map((lieu, i) => ({
+                    label: lieu.length > 25 ? lieu.substring(0, 22) + '...' : lieu,
+                    data: lieuxData.datasets[lieu] || [],
+                    borderColor: lieuxColors[i % lieuxColors.length],
+                    backgroundColor: lieuxColors[i % lieuxColors.length] + '20',
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    tension: 0.3,
+                    fill: false
+                }));
+
+                topLieuxChart = new Chart(document.getElementById('topLieuxChart').getContext('2d'), {
+                    type: 'line',
+                    data: {
+                        labels: lieuxData.labels,
+                        datasets: lieuxDatasets
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
+                        plugins: {
+                            legend: {
+                                display: true,
+                                position: 'right',
+                                labels: { color: '#9ca3af', boxWidth: 12, padding: 5, font: { size: 10 } }
+                            },
+                            title: {
+                                display: true,
+                                text: 'Top 10 lieux - evolution mensuelle',
+                                color: '#9ca3af'
+                            }
+                        },
+                        scales: {
+                            x: {
+                                ticks: {
+                                    color: '#9ca3af',
+                                    maxRotation: 45,
+                                    callback: (val, idx) => idx % 6 === 0 ? lieuxData.labels[idx] : ''
+                                },
+                                grid: { display: false }
+                            },
+                            y: {
+                                ticks: { color: '#9ca3af' },
+                                grid: { color: '#374151' }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // 3. Top 10 artistes evolution
+            if (extended.top_artistes_monthly && extended.top_artistes_monthly.labels.length > 0) {
+                const artistesData = extended.top_artistes_monthly;
+                const artistesDatasets = artistesData.top_artistes.map((artiste, i) => ({
+                    label: artiste.length > 25 ? artiste.substring(0, 22) + '...' : artiste,
+                    data: artistesData.datasets[artiste] || [],
+                    borderColor: artistesColors[i % artistesColors.length],
+                    backgroundColor: artistesColors[i % artistesColors.length] + '20',
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    tension: 0.3,
+                    fill: false
+                }));
+
+                topArtistesChart = new Chart(document.getElementById('topArtistesChart').getContext('2d'), {
+                    type: 'line',
+                    data: {
+                        labels: artistesData.labels,
+                        datasets: artistesDatasets
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
+                        plugins: {
+                            legend: {
+                                display: true,
+                                position: 'right',
+                                labels: { color: '#9ca3af', boxWidth: 12, padding: 5, font: { size: 10 } }
+                            },
+                            title: {
+                                display: true,
+                                text: 'Top 10 artistes - evolution mensuelle',
+                                color: '#9ca3af'
+                            }
+                        },
+                        scales: {
+                            x: {
+                                ticks: {
+                                    color: '#9ca3af',
+                                    maxRotation: 45,
+                                    callback: (val, idx) => idx % 6 === 0 ? artistesData.labels[idx] : ''
+                                },
+                                grid: { display: false }
+                            },
+                            y: {
+                                ticks: { color: '#9ca3af' },
+                                grid: { color: '#374151' }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        // Change top lieux chart granularity
+        let currentLieuxGranularity = 'monthly';
+        function changeLieuxGranularity(granularity) {
+            currentLieuxGranularity = granularity;
+            if (!topLieuxChart || !hasExtended) return;
+
+            const lieuxData = granularity === 'yearly' ? extended.top_lieux_yearly : extended.top_lieux_monthly;
+            if (!lieuxData || !lieuxData.labels) return;
+
+            // Update labels
+            topLieuxChart.data.labels = lieuxData.labels;
+
+            // Update each dataset
+            lieuxData.top_lieux.forEach((lieu, i) => {
+                topLieuxChart.data.datasets[i].data = lieuxData.datasets[lieu] || [];
+            });
+
+            // Update title
+            const titleText = granularity === 'yearly'
+                ? 'Top 10 lieux - evolution annuelle'
+                : 'Top 10 lieux - evolution mensuelle';
+            topLieuxChart.options.plugins.title.text = titleText;
+
+            // Update x-axis tick callback based on data density
+            const tickInterval = granularity === 'yearly' ? 1 : 6;
+            topLieuxChart.options.scales.x.ticks.callback = (val, idx) => idx % tickInterval === 0 ? lieuxData.labels[idx] : '';
+
+            topLieuxChart.update();
+        }
+
+        // Change top artistes chart granularity
+        let currentArtistesGranularity = 'monthly';
+        function changeArtistesGranularity(granularity) {
+            currentArtistesGranularity = granularity;
+            if (!topArtistesChart || !hasExtended) return;
+
+            const artistesData = granularity === 'yearly' ? extended.top_artistes_yearly : extended.top_artistes_monthly;
+            if (!artistesData || !artistesData.labels) return;
+
+            // Update labels
+            topArtistesChart.data.labels = artistesData.labels;
+
+            // Update each dataset
+            artistesData.top_artistes.forEach((artiste, i) => {
+                topArtistesChart.data.datasets[i].data = artistesData.datasets[artiste] || [];
+            });
+
+            // Update title
+            const titleText = granularity === 'yearly'
+                ? 'Top 10 artistes - evolution annuelle'
+                : 'Top 10 artistes - evolution mensuelle';
+            topArtistesChart.options.plugins.title.text = titleText;
+
+            // Update x-axis tick callback based on data density
+            const tickInterval = granularity === 'yearly' ? 1 : 6;
+            topArtistesChart.options.scales.x.ticks.callback = (val, idx) => idx % tickInterval === 0 ? artistesData.labels[idx] : '';
+
+            topArtistesChart.update();
         }
     </script>
 </body>

@@ -10,7 +10,8 @@
   * #125
     * 125 elements dans pdf. seulement 83 dans db
   * revoir #292
-  * revoir #234 (skipper p3)
+  * revoir #294 (peu d'evneements)
+  * revoir #123, 125, 157 (pic de baisse de qualité)
   * raw_text	nom_spectacle
   <b>"A</b><b>Hfa de Yambolé"</b> <i>(conte dès 12 ans)</i>, S.Signoret, Mulsanne, 15h, 3.5/9.5 €	A</b><b>Hfa de Yambolé
 
