@@ -263,7 +263,7 @@ numero,type,date_format,pages,ocr_mode,p1_sections,p1_orientation,p1_orientation
 231,texte,par bloc,,sections,,,,1,S1 S2 S3 S4,,,1,,
 232,scan,par bloc,1 2,sections,S3 S4,,,1,S1 S2 S3 S4,,,1,,
 233,scan,par bloc,1 2,sections,S3 S4,,,1,S1 S2 S3 S4,,,1,,
-234,texte,par bloc,,sections,,,,1,S1 S2 S3 S4,,,1,,
+234,scan,par bloc,2,sections,,,,1,S1 S2 S3 S4,,,1,,
 235,texte,par bloc,,sections,,,,1,S1 S2 S3 S4,,,1,,
 236,texte,par bloc,,sections,,,,1,S1 S2 S3 S4,,,1,,
 237,texte,par bloc,,sections,,,,1,S1 S2 S3 S4,,,1,,
