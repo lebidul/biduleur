@@ -48,6 +48,36 @@ select raw_text from bidul where numero = 12;
 
 -- ORDER BY e.date_evenement, e.heure, c.ordre;
 
+-- Teriaki
+
+SELECT
+    e.id,
+	e.bidul_numero,
+    e.raw_text,
+    e.nom,
+	e.genre_evenement,
+    e.date_evenement,
+    e.heure,
+	e.lieu_raw,
+	lr.nom,
+	e.ville_raw,
+	vr.nom,
+    e.tarif_raw,
+    c.nom_spectacle,
+	c.artiste,
+	ar.nom,
+    c.style
+FROM evenement e
+LEFT JOIN lieu_ref lr ON e.lieu_ref_id = lr.id
+LEFT JOIN ville_ref vr ON e.ville_ref_id = vr.id
+LEFT JOIN contenu_evenement c ON e.id = c.evenement_id
+LEFT JOIN artiste_ref ar ON c.artiste_ref_id = ar.id
+WHERE
+-- e.bidul_numero = 292
+-- and raw_text like '%ronsard%'
+raw_text like '%teriaki%'
+ORDER BY bidul_numero,e.date_evenement,e.raw_text,e.heure;
+
 -- Événements d'une date précise avec détails complets (normalisés)
 SELECT
     e.id,
