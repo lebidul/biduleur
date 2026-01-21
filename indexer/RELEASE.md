@@ -1,3 +1,71 @@
+# Release Notes - Indexer v1.15
+
+## Vue d'ensemble
+
+Version avec amélioration majeure du dashboard HTML interactif : sélecteur d'axe horizontal pour les graphiques, et 3 nouvelles sections de KPI avancés (évolution par jour de la semaine, top 10 lieux, top 10 artistes).
+
+## Nouveautés v1.15
+
+### Sélecteur d'axe horizontal
+
+Le graphique principal peut maintenant afficher les données selon différents axes :
+
+| Axe | Description |
+|-----|-------------|
+| **Numero Bidul** | Par numéro de bidul (défaut) |
+| **Mois (YYYY-MM)** | Agrégation par mois calendaire |
+| **Semaine (YYYY-WXX)** | Agrégation par semaine ISO |
+| **Jour de la semaine** | Agrégation par jour (lundi-dimanche) |
+
+Les courbes existantes (événements locaux, régionaux, contenus) s'adaptent automatiquement à l'axe choisi.
+
+### Nouvelles sections KPI Avancés
+
+Trois nouvelles visualisations accessibles via le bouton "KPI Avancés" :
+
+#### 1. Évolution par jour de la semaine
+- 7 courbes (lundi à dimanche) montrant l'évolution mensuelle
+- Permet d'identifier les tendances par jour (ex: augmentation des événements du samedi)
+- Palette arc-en-ciel pour distinguer chaque jour
+
+#### 2. Top 10 Lieux - Évolution temporelle
+- 10 courbes représentant les lieux avec le plus d'événements
+- Évolution mensuelle de l'activité par lieu
+- Utilise les noms normalisés quand disponibles
+- Palette orange
+
+#### 3. Top 10 Artistes - Évolution temporelle
+- 10 courbes représentant les artistes les plus programmés
+- Évolution mensuelle des apparitions
+- Utilise les noms normalisés quand disponibles
+- Palette cyan
+
+### Améliorations techniques
+
+- **Lazy loading** : Les graphiques KPI sont initialisés uniquement au premier affichage
+- **Sections masquables** : Chaque section KPI peut être repliée individuellement
+- **Données pré-calculées** : Toutes les agrégations sont calculées côté Python pour des performances optimales
+- **Labels tronqués** : Les noms de lieux/artistes trop longs sont automatiquement abrégés
+
+### Nouvelles fonctions Python
+
+| Fonction | Description |
+|----------|-------------|
+| `get_aggregated_stats(db_path, axis)` | Stats agrégées selon l'axe choisi |
+| `get_events_by_day_over_time(db_path)` | Évolution mensuelle par jour de semaine |
+| `get_top_lieux_evolution(db_path, top_n)` | Évolution temporelle des top N lieux |
+| `get_top_artistes_evolution(db_path, top_n)` | Évolution temporelle des top N artistes |
+| `get_extended_stats(db_path)` | Agrège toutes les données étendues |
+
+### Utilisation
+
+```bash
+# Générer le dashboard avec les nouvelles fonctionnalités
+python cli.py stats --html stats/bidul_stats.html
+```
+
+---
+
 # Release Notes - Indexer v1.14
 
 ## Vue d'ensemble
