@@ -454,14 +454,19 @@ def get_events_by_day_over_time(db_path: str, granularity: str = 'monthly') -> D
     return {'labels': all_periods, 'datasets': datasets}
 
 
-def get_top_lieux_evolution(db_path: str, top_n: int = 10) -> Dict[str, Any]:
+def get_top_lieux_evolution(db_path: str, top_n: int = 10, granularity: str = 'monthly') -> Dict[str, Any]:
     """
     Récupère l'évolution temporelle des top N lieux.
 
+    Args:
+        db_path: Chemin vers la base de données
+        top_n: Nombre de lieux à inclure
+        granularity: 'monthly' pour mensuel, 'yearly' pour annuel
+
     Returns:
         Dict avec:
-        - labels: liste des mois (YYYY-MM)
-        - datasets: dict {lieu: [valeurs par mois]}
+        - labels: liste des périodes (YYYY-MM ou YYYY)
+        - datasets: dict {lieu: [valeurs par période]}
     """
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
@@ -478,43 +483,58 @@ def get_top_lieux_evolution(db_path: str, top_n: int = 10) -> Dict[str, Any]:
     """, (top_n,))
     top_lieux = [row[0] for row in cur.fetchall() if row[0]]
 
-    # Récupérer tous les mois
-    cur.execute("""
-        SELECT DISTINCT strftime('%Y-%m', date_evenement) as mois
-        FROM evenement
-        WHERE date_evenement IS NOT NULL
-        ORDER BY mois
-    """)
-    all_months = [row[0] for row in cur.fetchall() if row[0]]
+    # Récupérer toutes les périodes
+    if granularity == 'yearly':
+        period_format = '%Y'
+        cur.execute("""
+            SELECT DISTINCT strftime('%Y', date_evenement) as periode
+            FROM evenement
+            WHERE date_evenement IS NOT NULL
+            ORDER BY periode
+        """)
+    else:
+        period_format = '%Y-%m'
+        cur.execute("""
+            SELECT DISTINCT strftime('%Y-%m', date_evenement) as periode
+            FROM evenement
+            WHERE date_evenement IS NOT NULL
+            ORDER BY periode
+        """)
+    all_periods = [row[0] for row in cur.fetchall() if row[0]]
 
     datasets = {lieu: [] for lieu in top_lieux}
 
-    for month in all_months:
-        cur.execute("""
+    for period in all_periods:
+        cur.execute(f"""
             SELECT COALESCE(lr.nom, e.lieu_raw) as lieu, COUNT(*) as nb
             FROM evenement e
             LEFT JOIN lieu_ref lr ON lr.id = e.lieu_ref_id
-            WHERE strftime('%Y-%m', e.date_evenement) = ?
+            WHERE strftime('{period_format}', e.date_evenement) = ?
               AND e.lieu_raw IS NOT NULL AND e.lieu_raw != ''
             GROUP BY lieu
-        """, (month,))
+        """, (period,))
         counts = {row[0]: row[1] for row in cur.fetchall()}
 
         for lieu in top_lieux:
             datasets[lieu].append(counts.get(lieu, 0))
 
     conn.close()
-    return {'labels': all_months, 'datasets': datasets, 'top_lieux': top_lieux}
+    return {'labels': all_periods, 'datasets': datasets, 'top_lieux': top_lieux}
 
 
-def get_top_artistes_evolution(db_path: str, top_n: int = 10) -> Dict[str, Any]:
+def get_top_artistes_evolution(db_path: str, top_n: int = 10, granularity: str = 'monthly') -> Dict[str, Any]:
     """
     Récupère l'évolution temporelle des top N artistes.
 
+    Args:
+        db_path: Chemin vers la base de données
+        top_n: Nombre d'artistes à inclure
+        granularity: 'monthly' pour mensuel, 'yearly' pour annuel
+
     Returns:
         Dict avec:
-        - labels: liste des mois (YYYY-MM)
-        - datasets: dict {artiste: [valeurs par mois]}
+        - labels: liste des périodes (YYYY-MM ou YYYY)
+        - datasets: dict {artiste: [valeurs par période]}
     """
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
@@ -531,34 +551,44 @@ def get_top_artistes_evolution(db_path: str, top_n: int = 10) -> Dict[str, Any]:
     """, (top_n,))
     top_artistes = [row[0] for row in cur.fetchall() if row[0]]
 
-    # Récupérer tous les mois
-    cur.execute("""
-        SELECT DISTINCT strftime('%Y-%m', e.date_evenement) as mois
-        FROM evenement e
-        WHERE e.date_evenement IS NOT NULL
-        ORDER BY mois
-    """)
-    all_months = [row[0] for row in cur.fetchall() if row[0]]
+    # Récupérer toutes les périodes
+    if granularity == 'yearly':
+        period_format = '%Y'
+        cur.execute("""
+            SELECT DISTINCT strftime('%Y', e.date_evenement) as periode
+            FROM evenement e
+            WHERE e.date_evenement IS NOT NULL
+            ORDER BY periode
+        """)
+    else:
+        period_format = '%Y-%m'
+        cur.execute("""
+            SELECT DISTINCT strftime('%Y-%m', e.date_evenement) as periode
+            FROM evenement e
+            WHERE e.date_evenement IS NOT NULL
+            ORDER BY periode
+        """)
+    all_periods = [row[0] for row in cur.fetchall() if row[0]]
 
     datasets = {artiste: [] for artiste in top_artistes}
 
-    for month in all_months:
-        cur.execute("""
+    for period in all_periods:
+        cur.execute(f"""
             SELECT COALESCE(ar.nom, ce.artiste) as artiste_nom, COUNT(*) as nb
             FROM contenu_evenement ce
             JOIN evenement e ON e.id = ce.evenement_id
             LEFT JOIN artiste_ref ar ON ar.id = ce.artiste_ref_id
-            WHERE strftime('%Y-%m', e.date_evenement) = ?
+            WHERE strftime('{period_format}', e.date_evenement) = ?
               AND ce.artiste IS NOT NULL AND ce.artiste != ''
             GROUP BY artiste_nom
-        """, (month,))
+        """, (period,))
         counts = {row[0]: row[1] for row in cur.fetchall()}
 
         for artiste in top_artistes:
             datasets[artiste].append(counts.get(artiste, 0))
 
     conn.close()
-    return {'labels': all_months, 'datasets': datasets, 'top_artistes': top_artistes}
+    return {'labels': all_periods, 'datasets': datasets, 'top_artistes': top_artistes}
 
 
 def get_extended_stats(db_path: str) -> Dict[str, Any]:
@@ -575,8 +605,10 @@ def get_extended_stats(db_path: str) -> Dict[str, Any]:
         'by_jour': get_aggregated_stats(db_path, 'jour'),
         'events_by_day_monthly': get_events_by_day_over_time(db_path, 'monthly'),
         'events_by_day_weekly': get_events_by_day_over_time(db_path, 'weekly'),
-        'top_lieux_evolution': get_top_lieux_evolution(db_path),
-        'top_artistes_evolution': get_top_artistes_evolution(db_path),
+        'top_lieux_monthly': get_top_lieux_evolution(db_path, granularity='monthly'),
+        'top_lieux_yearly': get_top_lieux_evolution(db_path, granularity='yearly'),
+        'top_artistes_monthly': get_top_artistes_evolution(db_path, granularity='monthly'),
+        'top_artistes_yearly': get_top_artistes_evolution(db_path, granularity='yearly'),
     }
 
 
@@ -983,6 +1015,13 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
             <span class="toggle-icon">&#9660;</span>
         </div>
         <div class="section-content" id="topLieuxContent">
+            <div class="axis-selector" style="margin-bottom:10px">
+                <label for="lieuxGranularity">Granularite:</label>
+                <select id="lieuxGranularity" onchange="changeLieuxGranularity(this.value)">
+                    <option value="monthly">Mensuelle</option>
+                    <option value="yearly">Annuelle</option>
+                </select>
+            </div>
             <div class="chart-container" style="height:350px">
                 <canvas id="topLieuxChart"></canvas>
             </div>
@@ -994,6 +1033,13 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
             <span class="toggle-icon">&#9660;</span>
         </div>
         <div class="section-content" id="topArtistesContent">
+            <div class="axis-selector" style="margin-bottom:10px">
+                <label for="artistesGranularity">Granularite:</label>
+                <select id="artistesGranularity" onchange="changeArtistesGranularity(this.value)">
+                    <option value="monthly">Mensuelle</option>
+                    <option value="yearly">Annuelle</option>
+                </select>
+            </div>
             <div class="chart-container" style="height:350px">
                 <canvas id="topArtistesChart"></canvas>
             </div>
@@ -1585,8 +1631,8 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
             }
 
             // 2. Top 10 lieux evolution
-            if (extended.top_lieux_evolution && extended.top_lieux_evolution.labels.length > 0) {
-                const lieuxData = extended.top_lieux_evolution;
+            if (extended.top_lieux_monthly && extended.top_lieux_monthly.labels.length > 0) {
+                const lieuxData = extended.top_lieux_monthly;
                 const lieuxDatasets = lieuxData.top_lieux.map((lieu, i) => ({
                     label: lieu.length > 25 ? lieu.substring(0, 22) + '...' : lieu,
                     data: lieuxData.datasets[lieu] || [],
@@ -1639,8 +1685,8 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
             }
 
             // 3. Top 10 artistes evolution
-            if (extended.top_artistes_evolution && extended.top_artistes_evolution.labels.length > 0) {
-                const artistesData = extended.top_artistes_evolution;
+            if (extended.top_artistes_monthly && extended.top_artistes_monthly.labels.length > 0) {
+                const artistesData = extended.top_artistes_monthly;
                 const artistesDatasets = artistesData.top_artistes.map((artiste, i) => ({
                     label: artiste.length > 25 ? artiste.substring(0, 22) + '...' : artiste,
                     data: artistesData.datasets[artiste] || [],
@@ -1691,6 +1737,66 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
                     }
                 });
             }
+        }
+
+        // Change top lieux chart granularity
+        let currentLieuxGranularity = 'monthly';
+        function changeLieuxGranularity(granularity) {
+            currentLieuxGranularity = granularity;
+            if (!topLieuxChart || !hasExtended) return;
+
+            const lieuxData = granularity === 'yearly' ? extended.top_lieux_yearly : extended.top_lieux_monthly;
+            if (!lieuxData || !lieuxData.labels) return;
+
+            // Update labels
+            topLieuxChart.data.labels = lieuxData.labels;
+
+            // Update each dataset
+            lieuxData.top_lieux.forEach((lieu, i) => {
+                topLieuxChart.data.datasets[i].data = lieuxData.datasets[lieu] || [];
+            });
+
+            // Update title
+            const titleText = granularity === 'yearly'
+                ? 'Top 10 lieux - evolution annuelle'
+                : 'Top 10 lieux - evolution mensuelle';
+            topLieuxChart.options.plugins.title.text = titleText;
+
+            // Update x-axis tick callback based on data density
+            const tickInterval = granularity === 'yearly' ? 1 : 6;
+            topLieuxChart.options.scales.x.ticks.callback = (val, idx) => idx % tickInterval === 0 ? lieuxData.labels[idx] : '';
+
+            topLieuxChart.update();
+        }
+
+        // Change top artistes chart granularity
+        let currentArtistesGranularity = 'monthly';
+        function changeArtistesGranularity(granularity) {
+            currentArtistesGranularity = granularity;
+            if (!topArtistesChart || !hasExtended) return;
+
+            const artistesData = granularity === 'yearly' ? extended.top_artistes_yearly : extended.top_artistes_monthly;
+            if (!artistesData || !artistesData.labels) return;
+
+            // Update labels
+            topArtistesChart.data.labels = artistesData.labels;
+
+            // Update each dataset
+            artistesData.top_artistes.forEach((artiste, i) => {
+                topArtistesChart.data.datasets[i].data = artistesData.datasets[artiste] || [];
+            });
+
+            // Update title
+            const titleText = granularity === 'yearly'
+                ? 'Top 10 artistes - evolution annuelle'
+                : 'Top 10 artistes - evolution mensuelle';
+            topArtistesChart.options.plugins.title.text = titleText;
+
+            // Update x-axis tick callback based on data density
+            const tickInterval = granularity === 'yearly' ? 1 : 6;
+            topArtistesChart.options.scales.x.ticks.callback = (val, idx) => idx % tickInterval === 0 ? artistesData.labels[idx] : '';
+
+            topArtistesChart.update();
         }
     </script>
 </body>

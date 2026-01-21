@@ -31,13 +31,13 @@ Trois nouvelles visualisations accessibles via le bouton "KPI Avancés" :
 
 #### 2. Top 10 Lieux - Évolution temporelle
 - 10 courbes représentant les lieux avec le plus d'événements
-- Évolution mensuelle de l'activité par lieu
+- **Sélecteur de granularité** : vue mensuelle (YYYY-MM) ou annuelle (YYYY)
 - Utilise les noms normalisés quand disponibles
 - Palette orange
 
 #### 3. Top 10 Artistes - Évolution temporelle
 - 10 courbes représentant les artistes les plus programmés
-- Évolution mensuelle des apparitions
+- **Sélecteur de granularité** : vue mensuelle (YYYY-MM) ou annuelle (YYYY)
 - Utilise les noms normalisés quand disponibles
 - Palette cyan
 
@@ -54,8 +54,8 @@ Trois nouvelles visualisations accessibles via le bouton "KPI Avancés" :
 |----------|-------------|
 | `get_aggregated_stats(db_path, axis)` | Stats agrégées selon l'axe choisi |
 | `get_events_by_day_over_time(db_path, granularity)` | Évolution par jour de semaine (mensuelle ou hebdomadaire) |
-| `get_top_lieux_evolution(db_path, top_n)` | Évolution temporelle des top N lieux |
-| `get_top_artistes_evolution(db_path, top_n)` | Évolution temporelle des top N artistes |
+| `get_top_lieux_evolution(db_path, top_n, granularity)` | Évolution des top N lieux (mensuelle ou annuelle) |
+| `get_top_artistes_evolution(db_path, top_n, granularity)` | Évolution des top N artistes (mensuelle ou annuelle) |
 | `get_extended_stats(db_path)` | Agrège toutes les données étendues |
 
 ### Utilisation
