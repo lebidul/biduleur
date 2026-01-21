@@ -29,3 +29,5 @@
 * accélerer populate (peut-être avec moins d'info logged)
 * code object oriented
 * centraliser patterns
+* ajouter coordonnées à la table lieux
+* * stats. mettre possibilité d'avoir comme option l'axe x en tant que date
