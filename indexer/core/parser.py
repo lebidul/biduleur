@@ -2617,9 +2617,10 @@ def extract_before_lieu(text: str, lieu_start: int) -> dict:
     # Ex: ">> BONOME TETARD (chanson à texte)" ou "> OCT IBOR.K (rock)"
     starts_with_arrow = re.match(r'^>+\s*', before)
 
-    # Nettoyer les symboles décoratifs au début (✪, •, ★, ⚫, →, >, etc.)
+    # Nettoyer les symboles décoratifs au début (✪, •, ★, ⚫, →, >, ☐, etc.)
     # Inclut aussi les caractères Unicode Private Use Area (\ue000-\uf8ff) qui sont des puces OCR
-    before = re.sub(r'^[✪★☆●○◆◇■□▲△▼▽♦♠♣♥•·⚫⚪→➔➜➤>\-–—\ue000-\uf8ff\s]+', '', before).strip()
+    # Et les ballot box (☐☑☒) et check marks (✓✗✘)
+    before = re.sub(r'^[✪★☆●○◆◇■□▲△▼▽♦♠♣♥•·⚫⚪→➔➜➤>\-–—☐☑☒✓✗✘\ue000-\uf8ff\s]+', '', before).strip()
 
     result = {
         'spectacles': [],
@@ -5316,8 +5317,8 @@ class EventParser:
             # Nettoyer les balises HTML du nom d'événement
             # Ex: "<b>Les Affranchis</b>" → "Les Affranchis"
             nom_evenement = strip_formatting_tags(nom_evenement).strip()
-            # Supprimer les puces OCR au début (caractères Unicode Private Use Area)
-            nom_evenement = re.sub(r'^[\ue000-\uf8ff\s]+', '', nom_evenement)
+            # Supprimer les puces OCR au début (caractères Unicode Private Use Area et ballot box)
+            nom_evenement = re.sub(r'^[☐☑☒✓✗✘\ue000-\uf8ff\s]+', '', nom_evenement)
 
             # Valider que c'est bien un nom d'événement (pas juste un artiste)
             # Un nom d'événement contient souvent: festival, soirée, #, ou un genre entre ()

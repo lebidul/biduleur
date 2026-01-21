@@ -1495,6 +1495,33 @@ class TestEventParserDoubleSlashCleaning:
         assert "<b>ARTISTE1</b>" in reste
 
 
+class TestBallotBoxCleaning:
+    """Tests pour le nettoyage des caractères ballot box (☐☑☒)."""
+
+    def test_extract_before_lieu_removes_ballot_box(self):
+        """Test suppression du caractère ☐ (ballot box)."""
+        text = "☐ CORTEX CONCERT // BRACCO (noise), L'Austral, 20h30"
+        lieu_start = text.find("L'Austral")
+        result = extract_before_lieu(text, lieu_start)
+        assert result['nom_evenement'] == "CORTEX CONCERT"
+        assert result['artistes'][0]['nom'] == "BRACCO"
+
+    def test_extract_before_lieu_removes_checked_ballot_box(self):
+        """Test suppression du caractère ☑ (checked ballot box)."""
+        text = "☑ Festival X // ARTISTE, Lieu"
+        lieu_start = text.find("Lieu")
+        result = extract_before_lieu(text, lieu_start)
+        assert result['nom_evenement'] == "Festival X"
+
+    def test_parser_removes_ballot_box(self):
+        """Test que le parser EventParser supprime les ballot box des noms d'événements."""
+        parser = EventParser(bidul_mois=6, bidul_annee=2018)
+        # Utiliser un nom avec "festival" pour qu'il soit reconnu comme nom d'événement
+        text = "☐ Festival Cortex #1 // BRACCO (noise), Lieu"
+        nom, reste = parser._extract_double_slash_pattern(text)
+        assert nom == "Festival Cortex #1"
+
+
 class TestExtractEventNameQuotedWithColon:
     """Tests pour l'extraction de noms entre guillemets suivis de ':'."""
 
