@@ -860,6 +860,10 @@ def is_named_event(text: str) -> bool:
         r'^[«""„]?[Cc]arte\s+[Bb]lanche\s+[àa]',
         r'^[«""„]?(?:\d+[°e]?\s+)?[Ff]estival\s+',  # Festival, 8° festival, 3e Festival
         r'^[«""„]?FESTI(?:VAL)?\s+',  # FESTI BOUAILLE, FESTIVAL X
+        # "Before Festival X" - pré-soirées de festivals
+        # Ex: "Before Festival Teriaki : LA COLONIE..." → "Before Festival Teriaki"
+        # Note: ^\W* ignore les caractères non-alpha au début (bullets OCR comme \uf0b5)
+        r'^\W*Before\s+Festival\s+',
         r'^[«""„]?Nuit\s+\w+',  # Nuit Blanche, etc.
         r'^[«""„]?Scène\s+ouverte',  # Scène ouverte musicale, etc.
         r'^[«""„]?Open\s+mic',
@@ -874,6 +878,9 @@ def is_named_event(text: str) -> bool:
         r'^[«""„]?Les\s+(?:Rdv|Rendez-vous)\s+',
         # LES X ANS DE/DES/DU XXX (anniversaires)
         r'^[«""„]?LES\s+\d+\s+ANS\s+(?:DE|DES|DU|D\')\s*',
+        # Nom d'événement en MAJUSCULES suivi de ": Sous-titre #N"
+        # Ex: "LE MANS CITE CHANSON: Présélection Slam #1"
+        r'^[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s]+:\s*[^,]+#\s*\d+',
         # Nom d'événement en MAJUSCULES suivi de ":" puis artistes en gras
         # Ex: "SPRINGROCK : <b>AS YOU WANT</b>"
         r'^[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s\-]+\s*:\s*<b>',
@@ -901,11 +908,17 @@ def is_named_event(text: str) -> bool:
         # "Les Veillées" est un festival récurrent à Allonnes
         # Note: ^\W* ignore les caractères non-alpha au début (bullets OCR comme \uf0b5)
         r'^\W*Les\s+[Vv]eill[ée]es\b',
+        # Pattern: "Le Mans Fait son X" (festivals locaux)
+        # Ex: "Le Mans Fait son Cirque"
+        r'^Le\s+Mans\s+Fait\s+son\s+\w+',
         # Pattern: "Titre" avec ARTISTES - titre entre guillemets suivi de "avec"
         # Ex: '"Bal populaire dépoussiéré" avec DECIBAL RUTABAGA'
         # Note: Le titre peut être entre guillemets HTML <b>"Titre"</b> ou simplement "Titre"
         # Note: [«""„"\'"] inclut guillemets français «», typographiques "", et ASCII "
         r'^(?:<b>)?[«""„"\'"][^»"""\'"]+[»"""\'"]+(?:</b>)?\s+avec\s+',
+        # Pattern: "Titre" : ARTISTES - titre entre guillemets suivi de ":" puis artistes
+        # Ex: '"Raggamuffin fest #7" : <b>SPECTACULAR</b>'
+        r'^(?:<b>)?[«""„"\'"][^»"""\'"]+[»"""\'"]+(?:</b>)?\s*:\s*(?:<b>|[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ])',
     ]
 
     for pattern in named_event_patterns:
@@ -960,6 +973,10 @@ def extract_event_name(text: str) -> Optional[str]:
         r"^(FESTI(?:VAL)?\s+[A-Za-z\u00C0-\u017F\s']+(?:\s+\d{4})?)\s*-\s*(?:Samedi|Dimanche|Lundi|Mardi|Mercredi|Jeudi|Vendredi|Du\s+\d)",
         r"^(Festival\s+[A-Za-z\u00C0-\u017F\s']+?)\s*-\s*(?:Samedi|Dimanche|Lundi|Mardi|Mercredi|Jeudi|Vendredi|Du\s+\d)",
         r'^([Ff]estival\s+[^:,»"""\'\s]+(?:\s+[^:,»"""\'\s]+)*)(?:[»"""\']?\s+avec\s*:?\s*|\s*,|$)',
+        # "Before Festival X" - pré-soirées de festivals
+        # Ex: "Before Festival Teriaki : LA COLONIE..." → "Before Festival Teriaki"
+        # Note: ^\W* ignore les caractères non-alpha au début (bullets OCR comme \uf0b5)
+        r'^\W*(Before\s+Festival\s+[A-Za-zÀ-ÿ]+)(?:\s*:\s*|\s+)',
         r'^(Nuit\s+\w+)',
         r'^([Cc]arte\s+[Bb]lanche\s+[àa]\s+[^:,]+)',
         r'^(Scène\s+ouverte\s*\w*)',
@@ -982,6 +999,9 @@ def extract_event_name(text: str) -> Optional[str]:
         # Ex: "LES 20 ANS DES ARTS SERVICES" avec ... → "LES 20 ANS DES ARTS SERVICES"
         # Note: [^(»"""\'] exclut les guillemets pour éviter de les capturer dans le nom
         r'^(LES\s+\d+\s+ANS\s+(?:DE|DES|DU|D\')[^(»"""\'\s][^(»"""\']*)(?:\s*\([^)]+\))?[»"""\']?\s*(?:avec\s*:?\s*|,|$)',
+        # Nom d'événement en MAJUSCULES suivi de ": Sous-titre #N"
+        # Ex: "LE MANS CITE CHANSON: Présélection Slam #1" → "LE MANS CITE CHANSON: Présélection Slam #1"
+        r'^([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s]+:\s*[^,]+#\s*\d+)(?:\s*,|$)',
         # Nom d'événement en MAJUSCULES suivi de ":" puis artistes
         # Ex: "SPRINGROCK : <b>AS YOU WANT</b>" → "SPRINGROCK"
         r'^([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s\-]+?)\s*:\s*<b>',
@@ -1011,11 +1031,18 @@ def extract_event_name(text: str) -> Optional[str]:
         # Note: ^\W* ignore les caractères non-alpha au début (bullets OCR comme \uf0b5)
         # Note: ['\u2019] inclut apostrophe ASCII ' (U+0027) et typographique ' (U+2019)
         r"^\W*(Les\s+[Vv]eill[ée]es(?:\s+d['\u2019][A-ZÀ-Ÿa-zà-ÿ]+)?)",
+        # Pattern: "Le Mans Fait son X" (festivals locaux)
+        # Ex: "Le Mans Fait son Cirque" → "Le Mans Fait son Cirque"
+        r'^(Le\s+Mans\s+Fait\s+son\s+\w+)(?:\s*\(|,|$)',
         # Pattern: "Titre" avec ARTISTES - titre entre guillemets suivi de "avec"
         # Ex: '"Bal populaire dépoussiéré" avec DECIBAL RUTABAGA' → "Bal populaire dépoussiéré"
         # Capture le contenu entre guillemets (sans les guillemets)
         # Note: [«""„"\'"] inclut guillemets français «», typographiques "", et ASCII "
         r'^(?:<b>)?[«""„"\'"]([^»"""\'"]+)[»"""\'"]+(?:</b>)?\s+avec\s+',
+        # Pattern: "Titre" : ARTISTES - titre entre guillemets suivi de ":" puis artistes
+        # Ex: '"Raggamuffin fest #7" : <b>SPECTACULAR</b>' → "Raggamuffin fest #7"
+        # Capture le contenu entre guillemets (sans les guillemets)
+        r'^(?:<b>)?[«""„"\'"]([^»"""\'"]+)[»"""\'"]+(?:</b>)?\s*:\s*(?:<b>|[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ])',
     ]
 
     for pattern in patterns:
@@ -1379,6 +1406,16 @@ def split_bloc_fused_events(raw_text: str) -> list[str]:
         # Pattern 6: parenthèse fermante suivie de guillemets OCR << (double chevron)
         # Ex: "résa.) <<Pièce montée" -> split avant <<
         r'(\))\s+(?=<<[A-Za-zÀ-ÿ])',
+        # Pattern 7: Double espace suivi de "Festival/Le/La X //" (événements fusionnés)
+        # Ex: "plus d'infos sur le net  Le Son des Cuivres // ARTISTE"
+        # Ex: "38€ (2jours)  Festival Kikloche #13 // ..."
+        r'(\s)\s+(?=(?:Festival|Le\s+[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ]|La\s+[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ])[^/]*//)',
+        # Pattern 8: Double espace suivi de "Le Mans Fait son" (événement connu)
+        # Ex: "...  Le Mans Fait son Cirque"
+        r'(\s)\s+(?=Le\s+Mans\s+Fait\s+son\s)',
+        # Pattern 9: Double espace suivi de guillemet + balise bold = nouveau spectacle
+        # Ex: '...entrée libre  "<b>Drôles de Bêtes</b>"'
+        r'(\s)\s+(?="<b>)',
     ]
 
     # Appliquer les patterns successivement
@@ -2581,7 +2618,8 @@ def extract_before_lieu(text: str, lieu_start: int) -> dict:
     starts_with_arrow = re.match(r'^>+\s*', before)
 
     # Nettoyer les symboles décoratifs au début (✪, •, ★, ⚫, →, >, etc.)
-    before = re.sub(r'^[✪★☆●○◆◇■□▲△▼▽♦♠♣♥•·⚫⚪→➔➜➤>\-–—\s]+', '', before).strip()
+    # Inclut aussi les caractères Unicode Private Use Area (\ue000-\uf8ff) qui sont des puces OCR
+    before = re.sub(r'^[✪★☆●○◆◇■□▲△▼▽♦♠♣♥•·⚫⚪→➔➜➤>\-–—\ue000-\uf8ff\s]+', '', before).strip()
 
     result = {
         'spectacles': [],
@@ -2598,6 +2636,10 @@ def extract_before_lieu(text: str, lieu_start: int) -> dict:
     if double_slash_match:
         event_part = double_slash_match.group(1).strip()
         artistes_part = double_slash_match.group(2).strip()
+
+        # Nettoyer les balises HTML du nom d'événement
+        # Ex: "<b>Les Affranchis</b>" → "Les Affranchis"
+        event_part = strip_formatting_tags(event_part).strip()
 
         # Extraire le style s'il est entre parenthèses à la fin du nom
         # Ex: "Plein Champ #3 (festival d'arts urbains)" → nom="Plein Champ #3", style="festival d'arts urbains"
@@ -5271,6 +5313,12 @@ class EventParser:
             nom_evenement = match.group(1).strip()
             reste = match.group(2).strip()
 
+            # Nettoyer les balises HTML du nom d'événement
+            # Ex: "<b>Les Affranchis</b>" → "Les Affranchis"
+            nom_evenement = strip_formatting_tags(nom_evenement).strip()
+            # Supprimer les puces OCR au début (caractères Unicode Private Use Area)
+            nom_evenement = re.sub(r'^[\ue000-\uf8ff\s]+', '', nom_evenement)
+
             # Valider que c'est bien un nom d'événement (pas juste un artiste)
             # Un nom d'événement contient souvent: festival, soirée, #, ou un genre entre ()
             is_event_name = (
@@ -5282,6 +5330,60 @@ class EventParser:
                 return nom_evenement, reste
 
         return None, text
+
+    def _extract_spectacle_avec_pattern(self, text: str) -> tuple[Optional[str], list[ArtisteInfo], str]:
+        """
+        Extrait le pattern 'NOM_SPECTACLE avec <b>ARTISTES</b>'.
+
+        Ce pattern apparaît après un nom d'événement (ex: "Before Festival X : ").
+        Le spectacle est en MAJUSCULES (non entre guillemets), suivi de "avec"
+        puis les artistes dans des balises <b>.
+
+        Ex: "Before Festival Teriaki : LA COLONIE DE VACANCES avec <b>Marvin + ...</b>"
+        → spectacle="LA COLONIE DE VACANCES", artistes=[Marvin, ...]
+
+        Returns:
+            (spectacle, artistes, texte_restant)
+        """
+        # Pattern: après ":" ou au début, NOM EN MAJUSCULES avec <b>ARTISTES</b>
+        pattern = re.compile(
+            r'(?:^|:\s*)'                              # Début ou après ":"
+            r'([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s\']+)'  # Spectacle en MAJUSCULES
+            r'\s+avec\s+'                              # "avec"
+            r'(<b>[^<]+</b>(?:\s*<b>[^<]+</b>)*)',     # Artistes en <b>
+            re.IGNORECASE
+        )
+
+        match = pattern.search(text)
+        if match:
+            spectacle_nom = match.group(1).strip()
+            artistes_raw = match.group(2)
+
+            # Extraire les artistes depuis les balises <b>
+            artiste_names = re.findall(r'<b>([^<]+)</b>', artistes_raw)
+            artistes = []
+
+            for name in artiste_names:
+                # Séparer par + si plusieurs artistes dans une balise
+                for sub in re.split(r'\s*\+\s*', name.strip()):
+                    sub = sub.strip()
+                    if sub and len(sub) >= 2 and sub.lower() != '...':
+                        artistes.append(ArtisteInfo(
+                            nom=_normalize_artist_name(sub),
+                            genre=None,
+                            spectacle=spectacle_nom
+                        ))
+
+            # Garder ce qui précède le match (nom de l'événement)
+            # et ce qui suit (lieu, heure, prix)
+            text_before = text[:match.start()].strip()
+            text_after = text[match.end():].strip()
+            text_cleaned = f"{text_before} {text_after}".strip()
+            text_cleaned = re.sub(r'\s+', ' ', text_cleaned)
+
+            return spectacle_nom, artistes, text_cleaned
+
+        return None, [], text
 
     def _parse_event_with_date(self, text: str, date_str: Optional[str], event_date: Optional[date]) -> Optional[ParsedEvent]:
         """
@@ -5314,21 +5416,34 @@ class EventParser:
             event.date_str = date_str
             event.date_evenement = self._parse_date(date_str, line_number)
 
+        # Conserver le texte original pour l'extraction du nom
+        original_text_for_nom = text
+
         # 0a. Extraire le pattern // (Titre événement // ARTISTES)
         event_name_from_slash, text = self._extract_double_slash_pattern(text)
 
-        # 0b. Extraire le pattern "Spectacle" Artiste (genre)
+        # 0b. Extraire le pattern "NOM_SPECTACLE avec <b>ARTISTES</b>"
+        spectacle_avec, artistes_avec, text = self._extract_spectacle_avec_pattern(text)
+
+        # 0c. Extraire le pattern "Spectacle" Artiste (genre)
         pre_artistes, pre_spectacles, pre_genres, text = self._extract_spectacle_artiste_pattern(text)
 
         # 1. Spectacles restants
         spectacles_with_genre, text_cleaned = self._extract_spectacles_with_genre(text)
-        event.spectacles = pre_spectacles + [s['nom'] for s in spectacles_with_genre]
+        all_spectacles = []
+        if spectacle_avec:
+            all_spectacles.append(spectacle_avec)
+        all_spectacles.extend(pre_spectacles)
+        all_spectacles.extend([s['nom'] for s in spectacles_with_genre])
+        event.spectacles = all_spectacles
 
         spectacle_genres = pre_genres + [s['genre'] for s in spectacles_with_genre if s.get('genre')]
 
         # 2. Artistes
         artistes = self._extract_artistes(text_cleaned)
-        if pre_artistes:
+        if artistes_avec:
+            event.artistes = artistes_avec
+        elif pre_artistes:
             event.artistes = pre_artistes
         else:
             event.artistes = artistes
@@ -5351,10 +5466,12 @@ class EventParser:
         event.lieu_raw, event.ville_raw = self._extract_lieu_ville(text_for_lieu)
 
         # 7. Nom de l'événement
+        # Utiliser original_text_for_nom car les transformations précédentes
+        # peuvent avoir retiré le ":" nécessaire au pattern matching
         if event_name_from_slash:
             event.nom = event_name_from_slash
         else:
-            event.nom = self._extract_nom(text, event)
+            event.nom = self._extract_nom(original_text_for_nom, event)
 
         # 8. Type d'événement
         event.type_evenement = self._deduce_type(event)

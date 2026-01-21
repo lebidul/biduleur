@@ -1419,5 +1419,109 @@ class TestTruncatedDatePattern:
         assert date(2008, 1, 18) in dates
 
 
+class TestDoubleSlashEventNameCleaning:
+    """Tests pour le nettoyage des noms d'événements avec pattern //."""
+
+    def test_extract_before_lieu_removes_ocr_bullets(self):
+        """Test que les puces OCR Unicode sont supprimées du nom d'événement."""
+        # \uf0b3 est une puce OCR courante
+        text = "\uf0b3 Festidays // <b>SANS PRÉTENTION</b>, Conlie, 18h30"
+        result = extract_before_lieu(text, 50)
+        assert result['nom_evenement'] == "Festidays"
+
+    def test_extract_before_lieu_removes_uf055_bullet(self):
+        """Test que \uf055 (autre puce OCR) est supprimée."""
+        text = "\uf055 Festival Les Trolls // ARTISTES, Lieu"
+        result = extract_before_lieu(text, 40)
+        assert result['nom_evenement'] == "Festival Les Trolls"
+
+    def test_extract_before_lieu_removes_html_tags(self):
+        """Test que les balises HTML sont supprimées du nom d'événement."""
+        text = "<b>Les Affranchis</b> // concert <b>KING AMONG GIANTS</b>, La Flèche"
+        result = extract_before_lieu(text, 60)
+        assert result['nom_evenement'] == "Les Affranchis"
+
+    def test_extract_before_lieu_removes_bullet_and_html(self):
+        """Test combiné: puce OCR + balises HTML."""
+        text = "\uf0b5 <b>Festival Music</b> // <b>ARTISTE</b>, Lieu"
+        result = extract_before_lieu(text, 45)
+        assert result['nom_evenement'] == "Festival Music"
+
+    def test_extract_before_lieu_extracts_style(self):
+        """Test extraction du style entre parenthèses."""
+        text = "Plein Champ #3 (festival d'arts urbains) // <b>JULIEN</b>, Lieu"
+        result = extract_before_lieu(text, 55)
+        assert result['nom_evenement'] == "Plein Champ #3"
+        assert result['style_evenement'] == "festival d'arts urbains"
+
+    def test_extract_before_lieu_no_double_slash(self):
+        """Test sans pattern // - pas de nom d'événement extrait."""
+        text = "<b>ARTISTE</b> (rock), Lieu, 20h"
+        result = extract_before_lieu(text, 20)
+        assert result['nom_evenement'] is None
+
+
+class TestEventParserDoubleSlashCleaning:
+    """Tests pour _extract_double_slash_pattern avec nettoyage."""
+
+    def test_parser_removes_ocr_bullets(self):
+        """Test que le parser supprime les puces OCR du nom."""
+        parser = EventParser(bidul_mois=7, bidul_annee=2024)
+        text = "\uf0b3 Festidays // <b>ARTISTE</b>, Lieu, 20h"
+        nom, reste = parser._extract_double_slash_pattern(text)
+        assert nom == "Festidays"
+
+    def test_parser_removes_html_tags(self):
+        """Test que le parser supprime les balises HTML du nom."""
+        parser = EventParser(bidul_mois=7, bidul_annee=2024)
+        text = "<b>Les Affranchis</b> // concert, La Flèche"
+        nom, reste = parser._extract_double_slash_pattern(text)
+        assert nom == "Les Affranchis"
+
+    def test_parser_removes_multiple_pua_chars(self):
+        """Test avec plusieurs caractères Unicode Private Use Area."""
+        parser = EventParser(bidul_mois=7, bidul_annee=2024)
+        # Plusieurs caractères PUA différents
+        text = "\ue000\uf055 Festival X // ARTISTES"
+        nom, reste = parser._extract_double_slash_pattern(text)
+        assert nom == "Festival X"
+
+    def test_parser_preserves_content_after_slash(self):
+        """Test que le contenu après // est préservé."""
+        parser = EventParser(bidul_mois=7, bidul_annee=2024)
+        text = "Festival Y // <b>ARTISTE1</b> + <b>ARTISTE2</b>, Lieu"
+        nom, reste = parser._extract_double_slash_pattern(text)
+        assert nom == "Festival Y"
+        assert "<b>ARTISTE1</b>" in reste
+
+
+class TestExtractEventNameQuotedWithColon:
+    """Tests pour l'extraction de noms entre guillemets suivis de ':'."""
+
+    def test_quoted_name_with_colon(self):
+        """Test extraction de 'Raggamuffin fest #7' : ARTISTES."""
+        text = '"Raggamuffin fest #7" : <b>SPECTACULAR</b>'
+        assert is_named_event(text) is True
+        assert extract_event_name(text) == "Raggamuffin fest #7"
+
+    def test_quoted_name_with_colon_french_quotes(self):
+        """Test avec guillemets français « »."""
+        text = '«Mon Festival» : <b>ARTISTE</b>'
+        assert is_named_event(text) is True
+        assert extract_event_name(text) == "Mon Festival"
+
+    def test_before_festival_pattern(self):
+        """Test pattern 'Before Festival X :'."""
+        text = "Before Festival Teriaki : LA COLONIE DE VACANCES"
+        assert is_named_event(text) is True
+        assert extract_event_name(text) == "Before Festival Teriaki"
+
+    def test_before_festival_with_ocr_bullet(self):
+        """Test 'Before Festival' avec puce OCR au début."""
+        text = "\uf0b5 Before Festival Teriaki : LA COLONIE"
+        assert is_named_event(text) is True
+        assert extract_event_name(text) == "Before Festival Teriaki"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
