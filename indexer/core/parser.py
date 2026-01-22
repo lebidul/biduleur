@@ -1849,16 +1849,20 @@ def load_lieu_patterns(lieu_ref_list: list, db_path: str = None) -> list:
     except Exception:
         pass  # Si la table n'existe pas, on continue sans les alias
 
-    # Créer un index lieu_nom -> lieu_id
+    # Créer un index lieu_nom -> (lieu_id, lieu_ville)
     lieu_nom_to_id = {}
+    lieu_nom_to_ville = {}
     for lieu_tuple in lieu_ref_list:
         lieu_id = lieu_tuple[0]
         lieu_nom = lieu_tuple[1]
+        lieu_ville = lieu_tuple[2] if len(lieu_tuple) > 2 else 'Le Mans'
         lieu_nom_to_id[lieu_nom.lower()] = lieu_id
+        lieu_nom_to_ville[lieu_nom.lower()] = lieu_ville
 
     for lieu_tuple in lieu_ref_list:
         lieu_id = lieu_tuple[0]
         lieu_nom = lieu_tuple[1]
+        lieu_ville = lieu_tuple[2] if len(lieu_tuple) > 2 else 'Le Mans'
 
         # Pattern exact avec limites de mots
         # Normaliser les apostrophes pour matcher les deux types (' et ')
@@ -1866,6 +1870,7 @@ def load_lieu_patterns(lieu_ref_list: list, db_path: str = None) -> list:
         patterns.append({
             'id': lieu_id,
             'nom': lieu_nom,
+            'ville': lieu_ville,
             'pattern': re.compile(r'\b' + lieu_nom_pattern + r'\b', re.IGNORECASE),
             'length': len(lieu_nom)
         })
@@ -1879,6 +1884,7 @@ def load_lieu_patterns(lieu_ref_list: list, db_path: str = None) -> list:
             patterns.append({
                 'id': lieu_id,
                 'nom': lieu_nom,
+                'ville': lieu_ville,
                 'pattern': re.compile(r'(?<![a-zA-Z])\b' + re.escape(short1) + r'\b(?!\s*\()', re.IGNORECASE),
                 'length': len(short1)
             })
@@ -1887,6 +1893,7 @@ def load_lieu_patterns(lieu_ref_list: list, db_path: str = None) -> list:
             patterns.append({
                 'id': lieu_id,
                 'nom': lieu_nom,
+                'ville': lieu_ville,
                 'pattern': re.compile(r'(?<![a-zA-Z])\b' + re.escape(short2) + r'\b(?!\s*\()', re.IGNORECASE),
                 'length': len(short2)
             })
@@ -1896,6 +1903,7 @@ def load_lieu_patterns(lieu_ref_list: list, db_path: str = None) -> list:
             patterns.append({
                 'id': lieu_id,
                 'nom': lieu_nom,
+                'ville': lieu_ville,
                 'pattern': re.compile(r'(?<![a-zA-Z])\b' + re.escape(short) + r'\b(?!\s*\()', re.IGNORECASE),
                 'length': len(short)
             })
@@ -1907,6 +1915,7 @@ def load_lieu_patterns(lieu_ref_list: list, db_path: str = None) -> list:
             patterns.append({
                 'id': lieu_id,
                 'nom': lieu_nom,
+                'ville': lieu_ville,
                 'pattern': re.compile(r'\b' + re.escape(short) + r'\b', re.IGNORECASE),
                 'length': len(short)
             })
@@ -1917,6 +1926,7 @@ def load_lieu_patterns(lieu_ref_list: list, db_path: str = None) -> list:
             patterns.append({
                 'id': lieu_id,
                 'nom': lieu_nom,
+                'ville': lieu_ville,
                 'pattern': re.compile(r'(?<![a-zA-Z])\b' + re.escape(short) + r'\b(?!\s*\()', re.IGNORECASE),
                 'length': len(short)
             })
@@ -1927,6 +1937,7 @@ def load_lieu_patterns(lieu_ref_list: list, db_path: str = None) -> list:
             patterns.append({
                 'id': lieu_id,
                 'nom': lieu_nom,
+                'ville': lieu_ville,
                 'pattern': re.compile(r'(?<![a-zA-Z])\b' + re.escape(short) + r'\b(?!\s*\()', re.IGNORECASE),
                 'length': len(short)
             })
@@ -1946,8 +1957,9 @@ def load_lieu_patterns(lieu_ref_list: list, db_path: str = None) -> list:
     for lieu_tuple in lieu_ref_list:
         lieu_id = lieu_tuple[0]
         lieu_nom = lieu_tuple[1]
+        lieu_ville = lieu_tuple[2] if len(lieu_tuple) > 2 else 'Le Mans'
         norm_key = normalize_for_match(lieu_nom)
-        lieu_nom_normalized[norm_key] = (lieu_id, lieu_nom)
+        lieu_nom_normalized[norm_key] = (lieu_id, lieu_nom, lieu_ville)
 
     for alias_variante, alias_lieu_nom in aliases.items():
         # Trouver l'id du lieu correspondant avec matching normalisé
@@ -1955,17 +1967,18 @@ def load_lieu_patterns(lieu_ref_list: list, db_path: str = None) -> list:
         match_info = lieu_nom_normalized.get(norm_alias_lieu)
         if match_info is None:
             # Essayer un matching partiel
-            for norm_key, (lid, lnom) in lieu_nom_normalized.items():
+            for norm_key, (lid, lnom, lville) in lieu_nom_normalized.items():
                 if norm_alias_lieu in norm_key or norm_key in norm_alias_lieu:
-                    match_info = (lid, lnom)
+                    match_info = (lid, lnom, lville)
                     break
         if match_info is None:
             continue
-        alias_lieu_id, alias_lieu_nom_ref = match_info
+        alias_lieu_id, alias_lieu_nom_ref, alias_lieu_ville = match_info
         # Ajouter le pattern pour l'alias
         patterns.append({
             'id': alias_lieu_id,
             'nom': alias_lieu_nom_ref,  # Retourne le nom du lieu_ref
+            'ville': alias_lieu_ville,
             'pattern': re.compile(r'\b' + re.escape(alias_variante) + r'\b', re.IGNORECASE),
             'length': len(alias_variante)
         })
@@ -1988,7 +2001,8 @@ def find_lieu_in_text_v2(text: str, lieu_patterns: list) -> Optional[tuple]:
         lieu_patterns: Patterns préparés par load_lieu_patterns()
 
     Returns:
-        (lieu_nom, lieu_id, start_pos, end_pos) ou None
+        (lieu_nom, lieu_id, start_pos, end_pos, lieu_ville) ou None
+        Note: lieu_ville est la ville associée au lieu dans le référentiel
     """
     for pattern_info in lieu_patterns:
         match = pattern_info['pattern'].search(text)
@@ -2025,7 +2039,8 @@ def find_lieu_in_text_v2(text: str, lieu_patterns: list) -> Optional[tuple]:
                 pattern_info['nom'],
                 pattern_info['id'],
                 match.start(),
-                match.end()
+                match.end(),
+                pattern_info.get('ville', 'Le Mans')
             )
 
     return None
@@ -4145,7 +4160,7 @@ def parse_event_line_v2(
         # Vérifier si le lieu trouvé fait partie d'un nom d'événement
         # Ex: "Les Rdv Conservatoire" - "Conservatoire" ne doit pas être pris comme lieu
         if lieu_match:
-            lieu_nom, lieu_id, lieu_start, lieu_end = lieu_match
+            lieu_nom, lieu_id, lieu_start, lieu_end, lieu_ville_ref = lieu_match
             # Texte avant le lieu trouvé
             text_before_lieu = event_text[:lieu_start].strip()
 
@@ -4177,9 +4192,9 @@ def parse_event_line_v2(
                 remaining = event_text[lieu_end:]
                 next_lieu_match = find_lieu_in_text_v2(remaining, lieu_patterns)
                 if next_lieu_match:
-                    next_lieu_nom, next_lieu_id, next_start, next_end = next_lieu_match
+                    next_lieu_nom, next_lieu_id, next_start, next_end, next_lieu_ville = next_lieu_match
                     # Ajuster les positions
-                    lieu_match = (next_lieu_nom, next_lieu_id, lieu_end + next_start, lieu_end + next_end)
+                    lieu_match = (next_lieu_nom, next_lieu_id, lieu_end + next_start, lieu_end + next_end, next_lieu_ville)
                 else:
                     # Pas de lieu après - utiliser l'extraction heuristique
                     lieu_match = None
@@ -4187,7 +4202,7 @@ def parse_event_line_v2(
         # Vérifier si le lieu trouvé est en fait une ville (erreur du référentiel)
         # Exemple: "La Flèche" est dans lieu_ref mais c'est une ville
         if lieu_match:
-            lieu_nom, lieu_id, lieu_start, lieu_end = lieu_match
+            lieu_nom, lieu_id, lieu_start, lieu_end, lieu_ville_ref = lieu_match
 
             # Si le lieu trouvé correspond aussi à une ville, c'est probablement une erreur
             # du référentiel. Dans ce cas, on utilise l'extraction heuristique.
@@ -4202,7 +4217,7 @@ def parse_event_line_v2(
                 lieu_match = None
 
         if lieu_match:
-            lieu_nom, lieu_id, lieu_start, lieu_end = lieu_match
+            lieu_nom, lieu_id, lieu_start, lieu_end, lieu_ville_ref = lieu_match
 
             # Parser avant et après le lieu
             before_data = extract_before_lieu(event_text, lieu_start)
@@ -4217,8 +4232,19 @@ def parse_event_line_v2(
                     earliest = min(all_hours, key=lambda x: int(x[0]) * 60 + (int(x[1]) if x[1] else 0))
                     after_data['heure'] = f"{earliest[0]}h{earliest[1]}" if earliest[1] else f"{earliest[0]}h"
 
-            # Extraire la ville du texte complet
-            ville_id, ville_nom = extract_ville_from_text_v2(event_text, ville_ref_list)
+            # Utiliser la ville du référentiel du lieu si disponible, sinon extraire du texte
+            # Cela garantit que La Péniche Excelsior retourne Allonnes, pas Le Mans
+            if lieu_ville_ref and lieu_ville_ref != 'Le Mans':
+                # La ville du référentiel est prioritaire (ex: Allonnes pour La Péniche)
+                from core.normalizer import normalize_ville
+                ville_id, ville_nom = normalize_ville(lieu_ville_ref)
+            else:
+                # Fallback: extraire la ville du texte (peut être plus précis que Le Mans par défaut)
+                ville_id, ville_nom = extract_ville_from_text_v2(event_text, ville_ref_list)
+                # Si la ville extraite est Le Mans mais le lieu est hors du Mans, utiliser la ville du référentiel
+                if ville_nom == 'Le Mans' and lieu_ville_ref and lieu_ville_ref != 'Le Mans':
+                    from core.normalizer import normalize_ville
+                    ville_id, ville_nom = normalize_ville(lieu_ville_ref)
 
         else:
             # Lieu non trouvé dans le référentiel - utiliser extraction heuristique

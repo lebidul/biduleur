@@ -484,9 +484,10 @@ class TestFindLieuV2:
         patterns = load_lieu_patterns(lieu_ref)
         result = find_lieu_in_text_v2("Concert au Bar Le Barouf, 20h", patterns)
         assert result is not None
-        lieu_nom, lieu_id, start, end = result
+        lieu_nom, lieu_id, start, end, lieu_ville = result
         assert lieu_id == 1
         assert "Barouf" in lieu_nom
+        assert lieu_ville == "Le Mans"
 
     def test_find_case_insensitive(self):
         """Test recherche insensible à la casse."""
