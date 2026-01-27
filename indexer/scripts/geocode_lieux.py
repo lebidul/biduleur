@@ -2,7 +2,7 @@
 Script de géocodage des lieux du référentiel.
 
 Utilise Nominatim (OpenStreetMap) pour récupérer les coordonnées géographiques.
-Les résultats sont sauvegardés dans la base ET dans un fichier CSV externe.
+Les résultats sont sauvegardés dans la base ET dans corpus/lieu.csv.
 
 Usage:
     python scripts/geocode_lieux.py [--limit N] [--dry-run] [--force]
@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 # Chemins
 DB_PATH = Path(__file__).parent.parent / "database" / "bidul_archives.db"
-CSV_PATH = Path(__file__).parent.parent / "corpus" / "lieu_coordinates.csv"
+LIEU_CSV_PATH = Path(__file__).parent.parent / "corpus" / "lieu.csv"
 
 # Configuration Nominatim
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
@@ -193,8 +193,18 @@ def update_lieu_coordinates(
     ''', (result.latitude, result.longitude, result.source, result.precision, lieu_id))
 
 
-def export_to_csv(conn: sqlite3.Connection) -> None:
-    """Exporte tous les lieux avec coordonnées vers le CSV."""
+def export_to_lieu_csv(conn: sqlite3.Connection) -> None:
+    """Met à jour corpus/lieu.csv avec les coordonnées géographiques."""
+    # Lire le fichier existant pour préserver nom_normalise
+    existing = {}
+    if LIEU_CSV_PATH.exists():
+        with open(LIEU_CSV_PATH, 'r', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                key = (row['nom'], row.get('ville', 'Le Mans'))
+                existing[key] = row.get('nom_normalise', '')
+
+    # Récupérer les données depuis la base
     cursor = conn.cursor()
     cursor.execute('''
         SELECT nom, ville, latitude, longitude, geo_source, geo_precision
@@ -205,13 +215,24 @@ def export_to_csv(conn: sqlite3.Connection) -> None:
 
     rows = cursor.fetchall()
 
-    with open(CSV_PATH, 'w', encoding='utf-8', newline='') as f:
-        writer = csv.writer(f)
-        writer.writerow(['nom', 'ville', 'latitude', 'longitude', 'geo_source', 'geo_precision'])
-        for row in rows:
-            writer.writerow(row)
+    # Écrire le fichier avec toutes les colonnes
+    fieldnames = ['nom', 'ville', 'nom_normalise', 'latitude', 'longitude', 'geo_source', 'geo_precision']
+    with open(LIEU_CSV_PATH, 'w', encoding='utf-8', newline='') as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        for nom, ville, lat, lon, source, precision in rows:
+            key = (nom, ville or 'Le Mans')
+            writer.writerow({
+                'nom': nom,
+                'ville': ville or 'Le Mans',
+                'nom_normalise': existing.get(key, ''),
+                'latitude': lat if lat is not None else '',
+                'longitude': lon if lon is not None else '',
+                'geo_source': source or '',
+                'geo_precision': precision or ''
+            })
 
-    logger.info(f"Exporté {len(rows)} lieux vers {CSV_PATH}")
+    logger.info(f"Mis à jour {len(rows)} lieux dans {LIEU_CSV_PATH}")
 
 
 def main():
@@ -263,7 +284,7 @@ def main():
 
         if not args.dry_run:
             conn.commit()
-            export_to_csv(conn)
+            export_to_lieu_csv(conn)
 
         # Résumé
         print(f"\n=== RÉSUMÉ ===")

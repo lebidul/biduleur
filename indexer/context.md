@@ -63,7 +63,7 @@ contenu_evenement (source de vérité pour artistes/spectacles)
 
 **Note v1.14** : Système d'overrides pour corrections manuelles (mode sync). CSV représente l'état final souhaité. Synchronisation : UPDATE evenement + DELETE/INSERT contenu_evenement. Fichiers dans `corpus/overrides/`.
 
-**Note v1.15** : Ajout des coordonnées géographiques (latitude/longitude WGS84) dans `lieu_ref` pour compatibilité PostGIS. Script de géocodage via Nominatim (OpenStreetMap). Export CSV dans `corpus/lieu_coordinates.csv`.
+**Note v1.15** : Ajout des coordonnées géographiques (latitude/longitude WGS84) dans `lieu_ref` pour compatibilité PostGIS. Script de géocodage via Nominatim (OpenStreetMap). Coordonnées intégrées dans `corpus/lieu.csv`.
 
 ## Mapping Bidul <-> Date
 

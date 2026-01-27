@@ -514,12 +514,12 @@ La table `lieu_ref` contient les colonnes géographiques suivantes :
 - `geo_source` : Source des coordonnées (nominatim, google, manual)
 - `geo_precision` : Précision (exact, approximate, street, city)
 
-### Fichier CSV externe
+### Fichier CSV
 
-Les coordonnées sont également stockées dans `corpus/lieu_coordinates.csv` pour backup :
+Les coordonnées sont intégrées directement dans `corpus/lieu.csv` :
 ```csv
-nom,ville,latitude,longitude,geo_source,geo_precision
-Abbaye Royale de l'Epau,Le Mans,47.9876,0.2234,nominatim,exact
+nom,ville,nom_normalise,latitude,longitude,geo_source,geo_precision
+Abbaye Royale de l'Epau,Le Mans,abbayeroyaleepau,47.9876,0.2234,nominatim,exact
 ```
 
 ### Géocodage avec Nominatim
