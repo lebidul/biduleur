@@ -28,7 +28,12 @@ CREATE TABLE IF NOT EXISTS lieu_ref (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     nom TEXT UNIQUE NOT NULL,
     ville TEXT DEFAULT 'Le Mans',
-    actif BOOLEAN DEFAULT TRUE
+    actif BOOLEAN DEFAULT TRUE,
+    -- Coordonnées géographiques (compatibles PostGIS)
+    latitude REAL,                           -- WGS84 latitude (ex: 47.9960)
+    longitude REAL,                          -- WGS84 longitude (ex: 0.1906)
+    geo_source TEXT,                         -- Source des coordonnées (nominatim, google, manual)
+    geo_precision TEXT                       -- Précision (exact, street, city, approximate)
 );
 
 -- -----------------------------------------------------------------------------
