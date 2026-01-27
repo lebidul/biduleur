@@ -33,16 +33,18 @@ class BidulDB:
     - lieu_ref / ville_ref / artiste_ref: référentiels pour normalisation
     """
 
-    def __init__(self, db_path: Optional[Path] = None):
+    def __init__(self, db_path: Optional[Path] = None, apply_overrides: bool = True):
         """
         Initialise la connexion à la base.
 
         Args:
             db_path: Chemin vers la base SQLite (défaut: database/bidul_archives.db)
+            apply_overrides: Si True, applique les corrections manuelles après insertion
         """
         self.db_path = db_path or DEFAULT_DB_PATH
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._conn: Optional[sqlite3.Connection] = None
+        self._apply_overrides = apply_overrides
 
     def connect(self) -> sqlite3.Connection:
         """Ouvre la connexion."""
@@ -218,6 +220,11 @@ class BidulDB:
 
         # Insérer dans contenu_evenement (source de vérité pour artistes/spectacles)
         self._insert_contenu_evenement(conn, evenement_id, event.artistes, event.spectacles)
+
+        # Appliquer les overrides (corrections manuelles) si activés
+        if self._apply_overrides:
+            from .overrides import apply_overrides
+            apply_overrides(conn, evenement_id, bidul_numero, event.raw_text)
 
         conn.commit()
         return evenement_id
