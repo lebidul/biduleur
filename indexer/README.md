@@ -11,10 +11,12 @@ indexer/
 │   ├── extractor.py    # Extraction texte PDF (PyMuPDF)
 │   ├── parser.py       # Parsing événements (regex)
 │   ├── db.py           # Gestionnaire SQLite
-│   └── csv_importer.py # Import CSV (tapages)
+│   ├── csv_importer.py # Import CSV (tapages)
+│   └── overrides.py    # Corrections manuelles (v1.14)
 ├── corpus/             # Référentiels
 │   ├── lieu.csv        # 540 lieux connus
-│   └── ville.csv       # 123 villes
+│   ├── ville.csv       # 123 villes
+│   └── overrides/      # Corrections manuelles CSV
 ├── database/
 │   ├── schema_v2.sql   # Schéma SQLite
 │   └── bidul_archives.db  # Base de données (généré)

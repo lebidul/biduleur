@@ -427,3 +427,79 @@ numero,...,svg_template,notes
 6,...,default_paysage_2col.svg,Utilise template générique
 7,...,,Pas de template - calcul par défaut
 ```
+
+## Système d'overrides (corrections manuelles)
+
+### Concept
+
+Le système d'overrides permet d'appliquer des corrections manuelles aux événements après parsing. Le CSV représente l'état final souhaité (mode "sync").
+
+### Format CSV
+
+```csv
+bidul_numero,raw_text,nom,lieu_raw,ville_raw,tarif_raw,nom_spectacle,artiste,style
+23,"texte OCR original...",Association TERIAKI,,Bouloire,20F,,AR,
+23,"texte OCR original...",Association TERIAKI,,Bouloire,20F,,RSW,
+```
+
+- **Identification** : `(bidul_numero, raw_text)` identifie l'événement
+- **Valeur vide** = NULL en base
+- **Plusieurs lignes** pour un même événement = plusieurs artistes/contenus
+
+### Structure des fichiers
+
+```
+corpus/
+└── overrides/
+    ├── teriaki.csv     # Corrections Association TERIAKI
+    └── autre.csv       # Autres corrections
+```
+
+### Logique de synchronisation
+
+Pour chaque `(bidul_numero, raw_text)` unique :
+1. **UPDATE evenement** avec `nom`, `lieu_raw`, `ville_raw`, `tarif_raw`
+2. **DELETE** tous les `contenu_evenement` existants
+3. **INSERT** les nouveaux `contenu_evenement` depuis les lignes CSV
+
+### Commandes CLI
+
+```bash
+# Dry-run (simulation)
+python -m core.overrides corpus/overrides/teriaki.csv --dry-run -v
+
+# Appliquer les corrections
+python -m core.overrides corpus/overrides/teriaki.csv -v
+
+# Plusieurs fichiers
+for csv in corpus/overrides/*.csv; do
+    python -m core.overrides "$csv" -v
+done
+```
+
+### Application automatique
+
+Les overrides peuvent être appliqués automatiquement après parsing via `OverrideManager` :
+
+```python
+from core.overrides import apply_overrides
+
+event_id = db.insert_evenement(bidul_numero, event)
+apply_overrides(db.connect(), event_id, bidul_numero, event.raw_text)
+```
+
+### Création d'un fichier d'override
+
+1. Exporter les données actuelles via SQL :
+```sql
+SELECT e.bidul_numero, e.raw_text, e.nom, e.lieu_raw, e.ville_raw, e.tarif_raw,
+       c.nom_spectacle, c.artiste, c.style
+FROM evenement e
+LEFT JOIN contenu_evenement c ON c.evenement_id = e.id
+WHERE e.raw_text LIKE '%TERIAKI%'
+ORDER BY e.bidul_numero, e.id, c.ordre;
+```
+
+2. Corriger les valeurs dans le CSV
+3. Appliquer avec `--dry-run` pour vérifier
+4. Appliquer pour de vrai
