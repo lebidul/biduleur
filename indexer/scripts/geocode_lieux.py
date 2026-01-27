@@ -195,19 +195,25 @@ def update_lieu_coordinates(
 
 def export_to_lieu_csv(conn: sqlite3.Connection) -> None:
     """Met à jour corpus/lieu.csv avec les coordonnées géographiques."""
-    # Lire le fichier existant pour préserver nom_normalise
+    # Lire le fichier existant pour préserver nom_normalise et adresse
     existing = {}
     if LIEU_CSV_PATH.exists():
         with open(LIEU_CSV_PATH, 'r', encoding='utf-8') as f:
             reader = csv.DictReader(f)
             for row in reader:
                 key = (row['nom'], row.get('ville', 'Le Mans'))
-                existing[key] = row.get('nom_normalise', '')
+                existing[key] = {
+                    'nom_normalise': row.get('nom_normalise', ''),
+                    'adresse_numero': row.get('adresse_numero', ''),
+                    'adresse_voie': row.get('adresse_voie', ''),
+                    'code_postal': row.get('code_postal', ''),
+                }
 
     # Récupérer les données depuis la base
     cursor = conn.cursor()
     cursor.execute('''
-        SELECT nom, ville, latitude, longitude, geo_source, geo_precision
+        SELECT nom, ville, adresse_numero, adresse_voie, code_postal,
+               latitude, longitude, geo_source, geo_precision
         FROM lieu_ref
         WHERE actif = 1
         ORDER BY ville, nom
@@ -216,16 +222,21 @@ def export_to_lieu_csv(conn: sqlite3.Connection) -> None:
     rows = cursor.fetchall()
 
     # Écrire le fichier avec toutes les colonnes
-    fieldnames = ['nom', 'ville', 'nom_normalise', 'latitude', 'longitude', 'geo_source', 'geo_precision']
+    fieldnames = ['nom', 'ville', 'nom_normalise', 'adresse_numero', 'adresse_voie', 'code_postal',
+                  'latitude', 'longitude', 'geo_source', 'geo_precision']
     with open(LIEU_CSV_PATH, 'w', encoding='utf-8', newline='') as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
-        for nom, ville, lat, lon, source, precision in rows:
+        for nom, ville, addr_num, addr_voie, cp, lat, lon, source, precision in rows:
             key = (nom, ville or 'Le Mans')
+            ex = existing.get(key, {})
             writer.writerow({
                 'nom': nom,
                 'ville': ville or 'Le Mans',
-                'nom_normalise': existing.get(key, ''),
+                'nom_normalise': ex.get('nom_normalise', ''),
+                'adresse_numero': addr_num or ex.get('adresse_numero', ''),
+                'adresse_voie': addr_voie or ex.get('adresse_voie', ''),
+                'code_postal': cp or ex.get('code_postal', ''),
                 'latitude': lat if lat is not None else '',
                 'longitude': lon if lon is not None else '',
                 'geo_source': source or '',

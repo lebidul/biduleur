@@ -63,7 +63,7 @@ contenu_evenement (source de vérité pour artistes/spectacles)
 
 **Note v1.14** : Système d'overrides pour corrections manuelles (mode sync). CSV représente l'état final souhaité. Synchronisation : UPDATE evenement + DELETE/INSERT contenu_evenement. Fichiers dans `corpus/overrides/`.
 
-**Note v1.15** : Ajout des coordonnées géographiques (latitude/longitude WGS84) dans `lieu_ref` pour compatibilité PostGIS. Script de géocodage via Nominatim (OpenStreetMap). Coordonnées intégrées dans `corpus/lieu.csv`.
+**Note v1.15** : Ajout des coordonnées géographiques (latitude/longitude WGS84) et adresse postale (numero, voie, code_postal) dans `lieu_ref` pour compatibilité PostGIS. Script de géocodage via Nominatim (OpenStreetMap). Script de synchronisation `lieu.csv` → `lieu_ref`.
 
 ## Mapping Bidul <-> Date
 
@@ -134,6 +134,7 @@ python cli.py list --type scan       # Lister PDFs scannés
 | `core/stats_generator.py` | Dashboard HTML avec Chart.js + KPIs qualité (v1.8) |
 | `core/overrides.py` | Système d'overrides pour corrections manuelles (v1.14) |
 | `scripts/geocode_lieux.py` | Géocodage des lieux via Nominatim (v1.15) |
+| `scripts/sync_lieu_csv.py` | Synchronisation lieu.csv → lieu_ref (v1.15) |
 | `core/db.py` | Accès base SQLite |
 | `database/schema_v2.sql` | Schéma de la base |
 | `database/queries_analytiques.sql` | Requêtes SQL d'analyse |
