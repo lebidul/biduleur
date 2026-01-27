@@ -475,9 +475,81 @@ parser = EventParser(bidul_mois=7, bidul_annee=2011, date_format='inline')
 - **Lookbehind artiste** : Évite double extraction spectacle/artiste pour texte entre guillemets
 - **Position heuristique** : Correction du mapping position stripped → original text
 
+## Module Overrides (`core/overrides.py`)
+
+Système de corrections manuelles pour les événements mal parsés (v1.14).
+
+### Concept
+
+Le CSV représente l'**état final souhaité** (mode "sync"). Pas de colonnes `.expected` : les valeurs du CSV écrasent directement les valeurs en base.
+
+### Format CSV
+
+```csv
+bidul_numero,raw_text,nom,lieu_raw,ville_raw,tarif_raw,nom_spectacle,artiste,style
+23,"texte OCR...",Association TERIAKI,,Bouloire,20F,,AR,
+23,"texte OCR...",Association TERIAKI,,Bouloire,20F,,RSW,
+```
+
+- **Identification** : `(bidul_numero, raw_text)` identifie l'événement
+- **Valeur vide** = NULL en base
+- **Plusieurs lignes** = plusieurs artistes pour un même événement
+
+### Logique de synchronisation
+
+```python
+# Pour chaque (bidul_numero, raw_text) unique :
+# 1. UPDATE evenement avec nom, lieu_raw, ville_raw, tarif_raw
+conn.execute('''UPDATE evenement SET nom = ?, lieu_raw = ?, ville_raw = ?, tarif_raw = ? WHERE id = ?''', ...)
+
+# 2. DELETE tous les contenu_evenement existants
+conn.execute('DELETE FROM contenu_evenement WHERE evenement_id = ?', (evenement_id,))
+
+# 3. INSERT les nouveaux contenus depuis le CSV
+for contenu in entry.contenus:
+    conn.execute('''INSERT INTO contenu_evenement (evenement_id, nom_spectacle, artiste, style) VALUES (?, ?, ?, ?)''', ...)
+```
+
+### Classes principales
+
+```python
+@dataclass
+class OverrideEntry:
+    bidul_numero: int
+    raw_text: str
+    event_data: EventData      # nom, lieu_raw, ville_raw, tarif_raw
+    contenus: list[ContenuData]  # nom_spectacle, artiste, style
+
+class OverrideManager:
+    """Gestionnaire pour application automatique après parsing."""
+    def load_all(self, overrides_dir: Path) -> int
+    def apply_to_event(self, conn, evenement_id, bidul_numero, raw_text) -> bool
+```
+
+### Usage CLI
+
+```bash
+# Dry-run (simulation)
+python -m core.overrides corpus/overrides/teriaki.csv --dry-run -v
+
+# Appliquer les corrections
+python -m core.overrides corpus/overrides/teriaki.csv -v
+```
+
+### Usage programmatique
+
+```python
+from core.overrides import apply_overrides
+
+# Après insertion d'un événement
+event_id = db.insert_evenement(bidul_numero, event)
+apply_overrides(db.connect(), event_id, bidul_numero, event.raw_text)
+```
+
 ## Contribution
 
 1. Ajouter des lieux manquants dans `corpus/lieu.csv`
 2. Ajouter des alias artistes dans `corpus/artistes_aliases.json`
 3. Améliorer les patterns dans `parser.py` pour les cas limites
 4. Enrichir le benchmark avec de nouvelles références
+5. Ajouter des corrections manuelles dans `corpus/overrides/` (v1.14)

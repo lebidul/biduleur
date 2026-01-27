@@ -1,3 +1,44 @@
+# Release Notes - Indexer v1.16
+
+## Vue d'ensemble
+
+Version avec normalisation des données Teriaki : correction de l'association lieu-ville pour utiliser la ville du référentiel quand un lieu est trouvé. Cela corrige notamment La Péniche Excelsior (Allonnes au lieu de Le Mans).
+
+## Nouveautés v1.16
+
+### Correction lieu-ville
+
+Le parser utilise maintenant la ville du référentiel `lieu_ref` quand un lieu est trouvé dans le texte. Cela garantit que :
+- La Péniche Excelsior → Allonnes (et non Le Mans)
+- Les autres lieux hors du Mans retournent leur vraie ville
+
+### Enrichissement des référentiels
+
+#### Nouvelles villes (`ville.csv`)
+- Montbizot
+- Parigné-L'Évêque
+- Saint Michel de Chahaignes
+
+#### Nouveaux lieux (`lieu.csv`)
+- Salle du Foyer Loisirs de Parigné-L'Évêque
+- Square Montreuil (Bouloire)
+
+#### Nouveaux alias (`ville_alias.csv`)
+- St Michel de Chahaignes → Saint Michel de Chahaignes
+- Parigné-l'Evêque → Parigné-L'Évêque
+
+#### Nouveaux alias (`lieu_alias.csv`)
+- Parc Les Subsistances → Les Subsistances
+- Square Montreul → Square Montreuil
+
+### Modifications techniques
+
+- `load_lieu_patterns()` : inclut maintenant la ville dans les patterns
+- `find_lieu_in_text_v2()` : retourne un tuple de 5 éléments `(nom, id, start, end, ville)`
+- `parse_event_line_v2()` : utilise la ville du référentiel quand disponible
+
+---
+
 # Release Notes - Indexer v1.15
 
 ## Vue d'ensemble

@@ -469,6 +469,70 @@ python cli.py analyze-corrections
 
 ---
 
+## Corrections manuelles (overrides)
+
+Le systeme d'overrides permet d'appliquer des corrections manuelles aux evenements mal parses.
+
+### Concept
+
+Le CSV represente l'**etat final souhaite** (mode "sync"). Les valeurs du CSV ecrasent directement les valeurs en base.
+
+### Format CSV
+
+```csv
+bidul_numero,raw_text,nom,lieu_raw,ville_raw,tarif_raw,nom_spectacle,artiste,style
+23,"texte OCR original...",Association TERIAKI,,Bouloire,20F,,AR,
+23,"texte OCR original...",Association TERIAKI,,Bouloire,20F,,RSW,
+```
+
+- **Identification** : `(bidul_numero, raw_text)` identifie l'evenement
+- **Valeur vide** = NULL en base
+- **Plusieurs lignes** pour un meme evenement = plusieurs artistes
+
+### `overrides` - Appliquer des corrections
+
+```bash
+# Simulation (dry-run)
+python -m core.overrides corpus/overrides/teriaki.csv --dry-run -v
+
+# Appliquer les corrections
+python -m core.overrides corpus/overrides/teriaki.csv -v
+```
+
+Options:
+| Option | Description |
+|--------|-------------|
+| `--dry-run` | Affiche les modifications sans les appliquer |
+| `-v, --verbose` | Affichage detaille |
+| `--db PATH` | Chemin vers la base de donnees |
+
+### Creer un fichier d'override
+
+1. Exporter les donnees actuelles via SQL :
+```sql
+SELECT e.bidul_numero, e.raw_text, e.nom, e.lieu_raw, e.ville_raw, e.tarif_raw,
+       c.nom_spectacle, c.artiste, c.style
+FROM evenement e
+LEFT JOIN contenu_evenement c ON c.evenement_id = e.id
+WHERE e.raw_text LIKE '%MOTCLE%'
+ORDER BY e.bidul_numero, e.id, c.ordre;
+```
+
+2. Corriger les valeurs dans le CSV (nom, lieu_raw, ville_raw, tarif_raw, artistes)
+3. Appliquer avec `--dry-run` pour verifier
+4. Appliquer pour de vrai
+
+### Structure des fichiers
+
+```
+corpus/
+└── overrides/
+    ├── teriaki.csv     # Corrections Association TERIAKI
+    └── autre.csv       # Autres corrections
+```
+
+---
+
 ## Gestion du corpus (referentiels)
 
 ### `corpus-generate` - Generer les CSV de corpus
