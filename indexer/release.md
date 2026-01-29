@@ -1,3 +1,261 @@
+# Release Notes - Indexer v1.17
+
+## Vue d'ensemble
+
+Version avec carte interactive des événements dans le dashboard HTML : visualisation géographique des lieux avec heatmap, filtres temporels multi-niveaux (année/mois/semaine/jour) avec animation, et mode plein écran.
+
+## Nouveautés v1.17
+
+### Carte interactive des événements
+
+Nouvelle section "Carte des événements" dans le dashboard HTML avec visualisation géographique :
+
+| Fonctionnalité | Description |
+|----------------|-------------|
+| **Marqueurs** | Cercles proportionnels au nombre d'événements par lieu |
+| **Heatmap** | Visualisation thermique de la densité d'événements |
+| **Tooltips** | Popup au survol avec nom du lieu, ville et nombre d'événements |
+| **Fond de carte** | Tuiles CartoDB sombres (cohérent avec le thème du dashboard) |
+
+### Filtres temporels avec sliders
+
+Quatre niveaux de granularité temporelle avec sliders et boutons d'animation :
+
+| Filtre | Format | Animation |
+|--------|--------|-----------|
+| **Année** | YYYY | Défilement automatique des années |
+| **Mois** | YYYY-MM | Parcours mois par mois |
+| **Semaine** | Semaine N, YYYY | Navigation hebdomadaire |
+| **Jour** | JJ/MM/YYYY | Lecture jour par jour (limité aux 5 dernières années) |
+
+Chaque slider dispose d'un bouton ▶/⏸ pour lancer/arrêter l'animation automatique.
+
+### Mode plein écran
+
+Bouton ⛶ pour afficher la carte en plein écran :
+- Superposition CSS avec `position: fixed`
+- Fermeture via bouton ✕ ou touche Échap
+- Redimensionnement automatique de la carte
+
+### Données géographiques
+
+Nouvelles structures de données dans `get_geo_data()` :
+
+```python
+{
+    "lieux": [...],           # Tous les lieux avec coordonnées
+    "lieux_by_year": {...},   # Agrégation par année
+    "lieux_by_month": {...},  # Agrégation par mois
+    "lieux_by_week": {...},   # Agrégation par semaine
+    "lieux_by_day": {...},    # Agrégation par jour (5 dernières années)
+    "years": [...],           # Liste des années
+    "months": [...],          # Liste des mois
+    "weeks": [...],           # Liste des semaines
+    "days": [...],            # Liste des jours
+    "bounds": {...}           # Limites géographiques
+}
+```
+
+### Dépendances JavaScript (CDN)
+
+- **Leaflet 1.9.4** : Bibliothèque de cartographie
+- **Leaflet.heat 0.2.0** : Plugin heatmap
+
+### Utilisation
+
+```bash
+# Générer le dashboard avec la carte
+python cli.py stats --html stats/bidul_stats.html
+
+# La carte affiche ~498 lieux géocodés
+```
+
+### Notes techniques
+
+- Centre par défaut sur Le Mans (47.9960, 0.1906)
+- Zoom initial : 11
+- Tooltips visibles même en mode heatmap (layer séparé)
+- Palette de couleurs adaptative selon la densité
+
+---
+
+# Release Notes - Indexer v1.16
+
+## Vue d'ensemble
+
+Version avec normalisation des données Teriaki : correction de l'association lieu-ville pour utiliser la ville du référentiel quand un lieu est trouvé. Cela corrige notamment La Péniche Excelsior (Allonnes au lieu de Le Mans).
+
+## Nouveautés v1.16
+
+### Correction lieu-ville
+
+Le parser utilise maintenant la ville du référentiel `lieu_ref` quand un lieu est trouvé dans le texte. Cela garantit que :
+- La Péniche Excelsior → Allonnes (et non Le Mans)
+- Les autres lieux hors du Mans retournent leur vraie ville
+
+### Enrichissement des référentiels
+
+#### Nouvelles villes (`ville.csv`)
+- Montbizot
+- Parigné-L'Évêque
+- Saint Michel de Chahaignes
+
+#### Nouveaux lieux (`lieu.csv`)
+- Salle du Foyer Loisirs de Parigné-L'Évêque
+- Square Montreuil (Bouloire)
+
+#### Nouveaux alias (`ville_alias.csv`)
+- St Michel de Chahaignes → Saint Michel de Chahaignes
+- Parigné-l'Evêque → Parigné-L'Évêque
+
+#### Nouveaux alias (`lieu_alias.csv`)
+- Parc Les Subsistances → Les Subsistances
+- Square Montreul → Square Montreuil
+
+### Modifications techniques
+
+- `load_lieu_patterns()` : inclut maintenant la ville dans les patterns
+- `find_lieu_in_text_v2()` : retourne un tuple de 5 éléments `(nom, id, start, end, ville)`
+- `parse_event_line_v2()` : utilise la ville du référentiel quand disponible
+
+---
+
+# Release Notes - Indexer v1.15
+
+## Vue d'ensemble
+
+Version avec amélioration majeure du dashboard HTML interactif : sélecteur d'axe horizontal pour les graphiques, et 3 nouvelles sections de KPI avancés (évolution par jour de la semaine, top 10 lieux, top 10 artistes).
+
+## Nouveautés v1.15
+
+### Sélecteur d'axe horizontal
+
+Le graphique principal peut maintenant afficher les données selon différents axes :
+
+| Axe | Description |
+|-----|-------------|
+| **Numero Bidul** | Par numéro de bidul (défaut) |
+| **Mois (YYYY-MM)** | Agrégation par mois calendaire |
+| **Semaine (YYYY-WXX)** | Agrégation par semaine ISO |
+| **Jour de la semaine** | Agrégation par jour (lundi-dimanche) |
+
+Les courbes existantes (événements locaux, régionaux, contenus) s'adaptent automatiquement à l'axe choisi.
+
+### Nouvelles sections KPI Avancés
+
+Trois nouvelles visualisations accessibles via le bouton "KPI Avancés" :
+
+#### 1. Évolution par jour de la semaine
+- 7 courbes (lundi à dimanche) montrant l'évolution temporelle
+- **Sélecteur de granularité** : vue mensuelle (YYYY-MM) ou hebdomadaire (YYYY-WXX)
+- Permet d'identifier les tendances par jour (ex: augmentation des événements du samedi)
+- Palette arc-en-ciel pour distinguer chaque jour
+
+#### 2. Top 10 Lieux - Évolution temporelle
+- 10 courbes représentant les lieux avec le plus d'événements
+- **Sélecteur de granularité** : vue mensuelle (YYYY-MM) ou annuelle (YYYY)
+- Utilise les noms normalisés quand disponibles
+- Palette orange
+
+#### 3. Top 10 Artistes - Évolution temporelle
+- 10 courbes représentant les artistes les plus programmés
+- **Sélecteur de granularité** : vue mensuelle (YYYY-MM) ou annuelle (YYYY)
+- Utilise les noms normalisés quand disponibles
+- Palette cyan
+
+### Améliorations techniques
+
+- **Lazy loading** : Les graphiques KPI sont initialisés uniquement au premier affichage
+- **Sections masquables** : Chaque section KPI peut être repliée individuellement
+- **Données pré-calculées** : Toutes les agrégations sont calculées côté Python pour des performances optimales
+- **Labels tronqués** : Les noms de lieux/artistes trop longs sont automatiquement abrégés
+
+### Nouvelles fonctions Python
+
+| Fonction | Description |
+|----------|-------------|
+| `get_aggregated_stats(db_path, axis)` | Stats agrégées selon l'axe choisi |
+| `get_events_by_day_over_time(db_path, granularity)` | Évolution par jour de semaine (mensuelle ou hebdomadaire) |
+| `get_top_lieux_evolution(db_path, top_n, granularity)` | Évolution des top N lieux (mensuelle ou annuelle) |
+| `get_top_artistes_evolution(db_path, top_n, granularity)` | Évolution des top N artistes (mensuelle ou annuelle) |
+| `get_extended_stats(db_path)` | Agrège toutes les données étendues |
+
+### Utilisation
+
+```bash
+# Générer le dashboard avec les nouvelles fonctionnalités
+python cli.py stats --html stats/bidul_stats.html
+```
+
+---
+
+# Release Notes - Indexer v1.14
+
+## Vue d'ensemble
+
+Version avec amélioration majeure de la détection des sections de mois pour les biduls d'été (juillet couvrant juillet+août), nettoyage des puces OCR/ballot box, et correction des templates SVG avec coordonnées négatives.
+
+## Nouveautés v1.14
+
+### Détection des sections de mois pour biduls d'été
+
+Les 27 biduls de juillet contiennent les événements de juillet ET août dans un seul PDF. Le module `month_detector` détecte maintenant correctement les headers de mois pour attribuer les bonnes dates.
+
+**Numéros concernés** : 6, 16, 37, 48, 59, 70, 81, 92, 103, 114, 125, 136, 147, 158, 180, 191, 202, 213, 224, 235, 246, 256, 260, 271, 282, 293, 303
+
+**Patterns supportés** :
+| Pattern | Exemple |
+|---------|---------|
+| Majuscules | `JUILLET`, `AOÛT`, `SEPTEMBRE` |
+| Title Case | `Juillet`, `Août` |
+| Avec préfixe | `En juillet :`, `En août :` |
+| Ranges | `Du 1er au 31 juillet` |
+| Composés | `FIN JUILLET`, `DÉBUT AOÛT` |
+| HTML | `<bi>Juillet </bi>` |
+| OCR tronqué | `AO`, `AQUT` |
+
+**Exemple bidul 256** : 71 événements juillet + 46 événements août correctement attribués.
+
+### Nettoyage des puces OCR et ballot box
+
+Les caractères de puces OCR sont maintenant nettoyés des noms d'événements :
+- **Unicode Private Use Area** (`\ue000-\uf8ff`) : puces OCR spéciales
+- **Ballot box** (`☐☑☒✓✗✘`) : caractères de case à cocher (U+2610 à U+2718)
+
+**Exemple** : `☐ CORTEX CONCERT // BRACCO` → nom = `CORTEX CONCERT`
+
+### Correction des templates SVG avec coordonnées négatives
+
+Les templates SVG générés par Inkscape peuvent avoir de petites coordonnées négatives (ex: `x=-0.021481548`). Ces valeurs sont maintenant automatiquement corrigées à 0.
+
+**Biduls corrigés** : 234, 256
+
+### Tests ajoutés
+
+- **25 nouveaux tests** dans `tests/test_month_detector.py` :
+  - `TestStripHtmlTags` : 4 tests
+  - `TestDetectMonthSections` : 12 tests (formats simples, HTML, OCR)
+  - `TestGetMonthForLine` : 4 tests
+  - `TestGetMonthForPosition` : 2 tests
+  - `TestIsSummerBidul` : 3 tests
+
+- **3 nouveaux tests** dans `tests/test_parser.py` pour le nettoyage ballot box
+
+### Benchmarks
+
+| Bidul | Score v1.13 | Score v1.14 |
+|-------|-------------|-------------|
+| 184 | 95.7% | 95.6% |
+| 190 | N/A | 91.8% |
+| 256 | N/A | 117 événements (71 juil + 46 août) |
+
+### Tests
+
+- 238 tests unitaires passent
+- Module `month_detector` entièrement couvert
+
+---
+
 # Release Notes - Indexer v1.13
 
 ## Vue d'ensemble
@@ -40,6 +298,97 @@ Nouveaux alias dans `lieu_alias.csv` pour les formats OCR abrégés :
 
 - 122 tests unitaires passent
 - Benchmark 184 : 95.7%
+
+---
+
+# Release Notes - Indexer v1.12
+
+## Vue d'ensemble
+
+Version avec système de templates SVG pour définir les zones d'extraction OCR avec précision. Permet de personnaliser les zones d'extraction par bidul et de visualiser/éditer les zones dans Inkscape.
+
+## Nouveautés v1.12
+
+### Système de templates SVG
+
+Nouveau module `core/svg_template.py` pour gérer les zones d'extraction via fichiers SVG :
+
+| Classe | Description |
+|--------|-------------|
+| `ExtractionZone` | Zone rectangulaire avec page, section, colonne |
+| `SVGTemplate` | Collection de zones pour un bidul |
+| `SVGTemplateLoader` | Charge un template depuis un fichier SVG |
+| `SVGTemplateGenerator` | Génère un template depuis la config CSV |
+| `SVGTemplateManager` | Gestion centralisée avec cache |
+
+### Convention de nommage des zones SVG
+
+Les rectangles SVG utilisent des IDs structurés :
+- `p{page}-s{section}-col{colonne}` : Zone de colonne (ex: `p2-s1-col1`)
+- `p{page}-s{section}` : Zone de section entière
+- `p{page}-exclude` : Zone à exclure (logos, headers)
+
+### Priorité de chargement des templates
+
+1. **SVG personnalisé** : `corpus/templates/bidul_{numero}.svg`
+2. **Template générique** : Via colonne `svg_template` dans CSV
+3. **Calcul par défaut** : Sections A6 + colonnes calculées
+
+### Commandes CLI ajoutées
+
+```bash
+# Générer les templates SVG pour tous les scans
+python cli.py svg-generate --scans-only
+
+# Prévisualiser un template
+python cli.py svg-preview 132
+
+# Lister les templates disponibles
+python cli.py svg-list
+```
+
+### Templates générés
+
+82 templates SVG générés pour les biduls 1-82 (scans anciens) avec :
+- Zones d'extraction par section/colonne
+- Dimensions basées sur la résolution PDF (300 DPI)
+- Zones d'exclusion pour headers/logos
+
+### Intégration avec populate
+
+La commande `populate` utilise automatiquement les templates SVG si disponibles :
+```bash
+python cli.py populate --numero 5 --replace
+# Utilise corpus/templates/bidul_005.svg si présent
+```
+
+### Rotation par page
+
+Support de la rotation différenciée par page basée sur `orientation_pdf` vs `orientation_texte`.
+
+### Tests ajoutés
+
+- **24 tests** dans `tests/test_svg_template.py` :
+  - `TestExtractionZone` : 6 tests (création, validation, conversion)
+  - `TestSVGTemplate` : 6 tests (rotation, zones par page)
+  - `TestSVGTemplateLoader` : 4 tests (chargement, exclusions)
+  - `TestSVGTemplateGenerator` : 4 tests (génération portrait/paysage)
+  - `TestSVGTemplateManager` : 4 tests (cache, listing)
+
+### Benchmarks
+
+| Bidul | Score v1.11 | Score v1.12 |
+|-------|-------------|-------------|
+| 184 | 95.4% | 94.8% |
+| 190 | 91.2% | 91.2% |
+
+### Fichiers principaux
+
+| Fichier | Description |
+|---------|-------------|
+| `core/svg_template.py` | Module principal (936 lignes) |
+| `corpus/templates/` | Dossier des templates SVG |
+| `tests/test_svg_template.py` | Tests unitaires (448 lignes) |
 
 ---
 

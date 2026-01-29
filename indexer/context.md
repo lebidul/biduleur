@@ -65,6 +65,8 @@ contenu_evenement (source de vérité pour artistes/spectacles)
 
 **Note v1.15** : Ajout des coordonnées géographiques (latitude/longitude WGS84) et adresse postale (numero, voie, code_postal) dans `lieu_ref` pour compatibilité PostGIS. Script de géocodage via Nominatim (OpenStreetMap). Script de synchronisation `lieu.csv` → `lieu_ref`.
 
+**Note v1.17** : Carte interactive des événements dans le dashboard HTML (Leaflet.js + heatmap). Filtres temporels multi-niveaux (année/mois/semaine/jour) avec sliders et animation. Mode plein écran. ~498 lieux géocodés affichés.
+
 ## Mapping Bidul <-> Date
 
 Référence : **Bidul 280 = Mai 2023**
