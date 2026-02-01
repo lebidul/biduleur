@@ -79,9 +79,22 @@ PDFs disponibles: 131
 
 ```bash
 python cli.py stats
+
+# Dashboard HTML avec carte interactive (v1.17)
+python cli.py stats --html stats/bidul_stats.html
 ```
 
-Sortie:
+Le dashboard HTML inclut :
+- Graphiques interactifs (Chart.js)
+- KPIs de qualite
+- **Carte interactive des evenements** avec :
+  - Marqueurs proportionnels au nombre d'evenements
+  - Mode heatmap (visualisation thermique)
+  - Filtres temporels (annee/mois/semaine/jour) avec sliders
+  - Animation automatique des periodes
+  - Mode plein ecran
+
+Sortie (terminal):
 ```
 ==================================================
 STATISTIQUES BASE DE DONNEES

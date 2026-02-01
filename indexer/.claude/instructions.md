@@ -503,3 +503,65 @@ ORDER BY e.bidul_numero, e.id, c.ordre;
 2. Corriger les valeurs dans le CSV
 3. Appliquer avec `--dry-run` pour vérifier
 4. Appliquer pour de vrai
+
+## Coordonnées géographiques et adresses des lieux (v1.15)
+
+### Structure
+
+La table `lieu_ref` contient les colonnes suivantes :
+
+**Adresse postale :**
+- `adresse_numero` : Numéro de rue (ex: "12", "12 bis")
+- `adresse_voie` : Nom de la voie (ex: "rue de la Paix")
+- `code_postal` : Code postal (ex: "72000")
+
+**Coordonnées géographiques :**
+- `latitude` : Latitude WGS84 (ex: 47.9960)
+- `longitude` : Longitude WGS84 (ex: 0.1906)
+- `geo_source` : Source des coordonnées (nominatim, google, manual)
+- `geo_precision` : Précision (exact, approximate, street, city)
+
+### Fichier CSV
+
+Toutes les informations sont dans `corpus/lieu.csv` :
+```csv
+nom,ville,nom_normalise,adresse_numero,adresse_voie,code_postal,latitude,longitude,geo_source,geo_precision
+Abbaye Royale de l'Epau,Le Mans,abbayeroyaleepau,,,72000,47.9876,0.2234,nominatim,exact
+```
+
+### Géocodage avec Nominatim
+
+```bash
+# Géocoder tous les lieux sans coordonnées
+python scripts/geocode_lieux.py -v
+
+# Mode simulation
+python scripts/geocode_lieux.py --dry-run
+
+# Limiter le nombre de lieux (pour tests)
+python scripts/geocode_lieux.py --limit 10
+
+# Forcer le regéocodage de tous les lieux
+python scripts/geocode_lieux.py --force
+```
+
+### Synchronisation CSV → Base
+
+Après modification manuelle de `lieu.csv`, synchroniser vers la base :
+```bash
+# Simulation
+python scripts/sync_lieu_csv.py --dry-run
+
+# Appliquer
+python scripts/sync_lieu_csv.py -v
+```
+
+### Compatibilité PostGIS
+
+Pour importer dans PostGIS :
+```sql
+-- Créer la géométrie POINT depuis lat/lon
+ALTER TABLE lieu_ref ADD COLUMN geom geometry(Point, 4326);
+UPDATE lieu_ref SET geom = ST_SetSRID(ST_MakePoint(longitude, latitude), 4326)
+WHERE latitude IS NOT NULL AND longitude IS NOT NULL;
+```

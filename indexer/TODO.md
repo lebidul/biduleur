@@ -20,7 +20,18 @@
   * Sablé
   * Sargé
   * St Michel de Chahaignes -> St Michel-de-Chavaignes
-* refactor pour simplifier la logique et l'ajout de patterns
+* Lieux génériques à différencier:
+  * Salle Polyvalente
+  * Église
+  * Salle des fêtes
+  * Les Halles
+  * Médiathèque
+  * Salle communale
+  * Salle municipale
+* Lieux mal normalisés:
+  * ex. ```"Les duos célèbres" (soprano + ténor), Église notre dame du Pré, Le Mans, 17h, entrée libre``` -> lieu_re_id = 'Église notre dame'
+* overwrite:
+  * ```Samedi 11, 11h00, "Fête de la Saint Patrick", Mamers, Mamers``` (lieu_raw à corrriger)
 * ajouter html ou csv tapages manquants
 * colonne description dans table bidul (ex. bidul covid)
 * revoir avec grouping tous les lieux n'ayant pas de ref

@@ -591,6 +591,204 @@ def get_top_artistes_evolution(db_path: str, top_n: int = 10, granularity: str =
     return {'labels': all_periods, 'datasets': datasets, 'top_artistes': top_artistes}
 
 
+def get_geo_data(db_path: str) -> Dict[str, Any]:
+    """
+    Récupère les données géographiques pour la carte interactive.
+
+    Returns:
+        Dict avec:
+        - lieux: liste de {nom, ville, lat, lng, count}
+        - lieux_by_year: dict {année: liste de lieux}
+        - years: liste des années disponibles
+        - bounds: {min_lat, max_lat, min_lng, max_lng}
+    """
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+
+    result = {'lieux': [], 'lieux_by_year': {}, 'lieux_by_month': {}, 'lieux_by_week': {}, 'lieux_by_day': {}, 'years': [], 'months': [], 'weeks': [], 'days': [], 'bounds': None}
+
+    # Données agrégées par lieu (tous temps)
+    cur.execute("""
+        SELECT
+            lr.nom,
+            lr.ville,
+            lr.latitude,
+            lr.longitude,
+            COUNT(e.id) as event_count
+        FROM lieu_ref lr
+        INNER JOIN evenement e ON e.lieu_ref_id = lr.id
+        WHERE lr.latitude IS NOT NULL AND lr.longitude IS NOT NULL
+        GROUP BY lr.id
+        ORDER BY event_count DESC
+    """)
+
+    lats, lngs = [], []
+    for row in cur.fetchall():
+        result['lieux'].append({
+            'nom': row[0],
+            'ville': row[1] or 'Le Mans',
+            'lat': row[2],
+            'lng': row[3],
+            'count': row[4]
+        })
+        lats.append(row[2])
+        lngs.append(row[3])
+
+    # Calculer les bounds
+    if lats and lngs:
+        result['bounds'] = {
+            'min_lat': min(lats),
+            'max_lat': max(lats),
+            'min_lng': min(lngs),
+            'max_lng': max(lngs)
+        }
+
+    # Données par année (pour filtre temporel)
+    cur.execute("""
+        SELECT DISTINCT strftime('%Y', date_evenement) as year
+        FROM evenement
+        WHERE date_evenement IS NOT NULL
+        ORDER BY year
+    """)
+    result['years'] = [row[0] for row in cur.fetchall() if row[0]]
+
+    # Données agrégées par lieu et par année
+    cur.execute("""
+        SELECT
+            strftime('%Y', e.date_evenement) as year,
+            lr.nom,
+            lr.ville,
+            lr.latitude,
+            lr.longitude,
+            COUNT(e.id) as event_count
+        FROM lieu_ref lr
+        INNER JOIN evenement e ON e.lieu_ref_id = lr.id
+        WHERE lr.latitude IS NOT NULL
+          AND lr.longitude IS NOT NULL
+          AND e.date_evenement IS NOT NULL
+        GROUP BY year, lr.id
+        ORDER BY year, event_count DESC
+    """)
+
+    for row in cur.fetchall():
+        year = row[0]
+        if year not in result['lieux_by_year']:
+            result['lieux_by_year'][year] = []
+        result['lieux_by_year'][year].append({
+            'nom': row[1],
+            'ville': row[2] or 'Le Mans',
+            'lat': row[3],
+            'lng': row[4],
+            'count': row[5]
+        })
+
+    # Données agrégées par lieu et par mois (YYYY-MM)
+    cur.execute("""
+        SELECT
+            strftime('%Y-%m', e.date_evenement) as month,
+            lr.nom,
+            lr.ville,
+            lr.latitude,
+            lr.longitude,
+            COUNT(e.id) as event_count
+        FROM lieu_ref lr
+        INNER JOIN evenement e ON e.lieu_ref_id = lr.id
+        WHERE lr.latitude IS NOT NULL
+          AND lr.longitude IS NOT NULL
+          AND e.date_evenement IS NOT NULL
+        GROUP BY month, lr.id
+        ORDER BY month, event_count DESC
+    """)
+
+    for row in cur.fetchall():
+        month = row[0]
+        if month not in result['lieux_by_month']:
+            result['lieux_by_month'][month] = []
+        result['lieux_by_month'][month].append({
+            'nom': row[1],
+            'ville': row[2] or 'Le Mans',
+            'lat': row[3],
+            'lng': row[4],
+            'count': row[5]
+        })
+
+    # Liste des mois disponibles (triée)
+    result['months'] = sorted(result['lieux_by_month'].keys())
+
+    # Données agrégées par lieu et par semaine (YYYY-WNN)
+    cur.execute("""
+        SELECT
+            strftime('%Y-W%W', e.date_evenement) as week,
+            lr.nom,
+            lr.ville,
+            lr.latitude,
+            lr.longitude,
+            COUNT(e.id) as event_count
+        FROM lieu_ref lr
+        INNER JOIN evenement e ON e.lieu_ref_id = lr.id
+        WHERE lr.latitude IS NOT NULL
+          AND lr.longitude IS NOT NULL
+          AND e.date_evenement IS NOT NULL
+        GROUP BY week, lr.id
+        ORDER BY week, event_count DESC
+    """)
+
+    for row in cur.fetchall():
+        week = row[0]
+        if week and week not in result['lieux_by_week']:
+            result['lieux_by_week'][week] = []
+        if week:
+            result['lieux_by_week'][week].append({
+                'nom': row[1],
+                'ville': row[2] or 'Le Mans',
+                'lat': row[3],
+                'lng': row[4],
+                'count': row[5]
+            })
+
+    # Liste des semaines disponibles (triée)
+    result['weeks'] = sorted(result['lieux_by_week'].keys())
+
+    # Données agrégées par lieu et par jour (YYYY-MM-DD)
+    # Limité aux 5 dernières années pour éviter trop de données
+    cur.execute("""
+        SELECT
+            date(e.date_evenement) as day,
+            lr.nom,
+            lr.ville,
+            lr.latitude,
+            lr.longitude,
+            COUNT(e.id) as event_count
+        FROM lieu_ref lr
+        INNER JOIN evenement e ON e.lieu_ref_id = lr.id
+        WHERE lr.latitude IS NOT NULL
+          AND lr.longitude IS NOT NULL
+          AND e.date_evenement IS NOT NULL
+          AND e.date_evenement >= date('now', '-5 years')
+        GROUP BY day, lr.id
+        ORDER BY day, event_count DESC
+    """)
+
+    for row in cur.fetchall():
+        day = row[0]
+        if day and day not in result['lieux_by_day']:
+            result['lieux_by_day'][day] = []
+        if day:
+            result['lieux_by_day'][day].append({
+                'nom': row[1],
+                'ville': row[2] or 'Le Mans',
+                'lat': row[3],
+                'lng': row[4],
+                'count': row[5]
+            })
+
+    # Liste des jours disponibles (triée)
+    result['days'] = sorted(result['lieux_by_day'].keys())
+
+    conn.close()
+    return result
+
+
 def get_extended_stats(db_path: str) -> Dict[str, Any]:
     """
     Récupère toutes les statistiques étendues pour le dashboard.
@@ -609,6 +807,7 @@ def get_extended_stats(db_path: str) -> Dict[str, Any]:
         'top_lieux_yearly': get_top_lieux_evolution(db_path, granularity='yearly'),
         'top_artistes_monthly': get_top_artistes_evolution(db_path, granularity='monthly'),
         'top_artistes_yearly': get_top_artistes_evolution(db_path, granularity='yearly'),
+        'geo_data': get_geo_data(db_path),
     }
 
 
@@ -647,6 +846,9 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bidul Indexer - Statistiques</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -867,6 +1069,144 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
         .mono { font-family: monospace; }
 
         .footer { text-align: center; margin-top: 20px; color: #6b7280; font-size: 0.8rem; }
+
+        /* Map section */
+        .map-section {
+            background: #1f2937;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .map-container {
+            height: 700px;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        /* Fullscreen map mode */
+        .map-section.fullscreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 9999;
+            margin: 0;
+            border-radius: 0;
+            padding: 10px;
+            box-sizing: border-box;
+        }
+        .map-section.fullscreen .map-container {
+            height: calc(100vh - 70px);
+            border-radius: 0;
+        }
+        .map-section.fullscreen .map-controls {
+            background: #1f2937;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+        .btn-fullscreen {
+            background: #374151;
+            border: 1px solid #4b5563;
+            color: #f3f4f6;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .btn-fullscreen:hover {
+            background: #4b5563;
+        }
+        .map-tooltip {
+            background: #1f2937 !important;
+            border: 1px solid #374151 !important;
+            color: #f3f4f6 !important;
+            font-family: system-ui;
+            font-size: 13px;
+            font-weight: 500;
+            padding: 6px 10px !important;
+            border-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+            z-index: 1000 !important;
+        }
+        .leaflet-tooltip {
+            z-index: 1000 !important;
+        }
+        .map-tooltip::before {
+            border-top-color: #374151 !important;
+        }
+        .leaflet-tooltip-left.map-tooltip::before {
+            border-left-color: #374151 !important;
+        }
+        .leaflet-tooltip-right.map-tooltip::before {
+            border-right-color: #374151 !important;
+        }
+        .leaflet-popup-content-wrapper {
+            background: #1f2937;
+            color: #f3f4f6;
+            border-radius: 8px;
+        }
+        .leaflet-popup-tip {
+            background: #1f2937;
+        }
+        .leaflet-popup-close-button {
+            color: #9ca3af !important;
+        }
+        .map-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .time-filter {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .time-filter label {
+            color: #9ca3af;
+            font-size: 0.85rem;
+        }
+        .time-filter select {
+            background: #374151;
+            border: 1px solid #4b5563;
+            color: #f3f4f6;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
+        .map-stats {
+            display: flex;
+            gap: 15px;
+            font-size: 0.85rem;
+            color: #9ca3af;
+        }
+        .map-stats span {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .map-stats .count {
+            color: #22c55e;
+            font-weight: bold;
+        }
+        .leaflet-popup-content-wrapper {
+            background: #1f2937;
+            color: #f3f4f6;
+            border-radius: 8px;
+        }
+        .leaflet-popup-tip {
+            background: #1f2937;
+        }
+        .leaflet-popup-content {
+            margin: 10px 12px;
+        }
+        .leaflet-popup-content b {
+            color: #22c55e;
+        }
     </style>
 </head>
 <body>
@@ -987,6 +1327,63 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
     <!-- Evolution chart -->
     <div class="evolution-container" id="evolutionContainer" style="display:none">
         <canvas id="evolutionChart"></canvas>
+    </div>
+
+    <!-- Map section -->
+    <div class="section-header" onclick="toggleSection('map')">
+        <h3 style="color:#22c55e">Carte des evenements</h3>
+        <span class="toggle-icon">&#9660;</span>
+    </div>
+    <div class="section-content" id="mapContent">
+        <div class="map-section">
+            <div class="map-controls">
+                <div class="time-filter">
+                    <label>Filtre:</label>
+                    <select id="mapFilterType" onchange="changeMapFilterType(this.value)">
+                        <option value="all">Tout</option>
+                        <option value="year">Par année</option>
+                        <option value="month">Par mois</option>
+                        <option value="week">Par semaine</option>
+                        <option value="day">Par jour</option>
+                    </select>
+                    <div id="yearSliderContainer" style="display:none;flex:1;align-items:center;gap:10px">
+                        <input type="range" id="mapYearSlider" min="0" max="100" value="0"
+                               style="flex:1;accent-color:#22c55e" oninput="filterMapByYearSlider(this.value)">
+                        <span id="mapYearLabel" style="min-width:50px;color:#f3f4f6;font-weight:500">-</span>
+                        <button class="btn" id="btnPlayYear" onclick="toggleYearAnimation()" style="padding:4px 10px">▶</button>
+                    </div>
+                    <div id="monthSliderContainer" style="display:none;flex:1;align-items:center;gap:10px">
+                        <input type="range" id="mapMonthSlider" min="0" max="100" value="0"
+                               style="flex:1;accent-color:#8b5cf6" oninput="filterMapByMonth(this.value)">
+                        <span id="mapMonthLabel" style="min-width:80px;color:#f3f4f6;font-weight:500">-</span>
+                        <button class="btn" id="btnPlayMonth" onclick="toggleMonthAnimation()" style="padding:4px 10px">▶</button>
+                    </div>
+                    <div id="weekSliderContainer" style="display:none;flex:1;align-items:center;gap:10px">
+                        <input type="range" id="mapWeekSlider" min="0" max="100" value="0"
+                               style="flex:1;accent-color:#14b8a6" oninput="filterMapByWeek(this.value)">
+                        <span id="mapWeekLabel" style="min-width:100px;color:#f3f4f6;font-weight:500">-</span>
+                        <button class="btn" id="btnPlayWeek" onclick="toggleWeekAnimation()" style="padding:4px 10px">▶</button>
+                    </div>
+                    <div id="daySliderContainer" style="display:none;flex:1;align-items:center;gap:10px">
+                        <input type="range" id="mapDaySlider" min="0" max="100" value="0"
+                               style="flex:1;accent-color:#f59e0b" oninput="filterMapByDay(this.value)">
+                        <span id="mapDayLabel" style="min-width:100px;color:#f3f4f6;font-weight:500">-</span>
+                        <button class="btn" id="btnPlayDay" onclick="toggleDayAnimation()" style="padding:4px 10px">▶</button>
+                    </div>
+                </div>
+                <div class="controls" style="margin:0">
+                    <button class="btn active" id="btnMarkers" onclick="setMapView('markers')">Marqueurs</button>
+                    <button class="btn" id="btnHeat" onclick="setMapView('heat')">Heatmap</button>
+                    <button class="btn" id="btnBoth" onclick="setMapView('both')">Les deux</button>
+                </div>
+                <div class="map-stats">
+                    <span>Lieux: <span class="count" id="mapLieuxCount">-</span></span>
+                    <span>Evenements: <span class="count" id="mapEventsCount">-</span></span>
+                </div>
+                <button class="btn-fullscreen" id="btnFullscreen" onclick="toggleMapFullscreen()" title="Plein écran">⛶</button>
+            </div>
+            <div id="map" class="map-container"></div>
+        </div>
     </div>
 
     <!-- Advanced KPI section -->
@@ -1798,6 +2195,532 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
 
             topArtistesChart.update();
         }
+
+        // =====================================================
+        // MAP FUNCTIONALITY
+        // =====================================================
+
+        const geoData = hasExtended && extended.geo_data ? extended.geo_data : null;
+        let map = null;
+        let markersLayer = null;
+        let tooltipLayer = null;  // Invisible markers with tooltips (always visible)
+        let heatLayer = null;
+        let currentMapView = 'markers';
+        let currentMapData = null;
+
+        function initMap() {
+            if (!geoData || !geoData.lieux || geoData.lieux.length === 0) {
+                document.getElementById('mapContent').innerHTML = '<div class="map-section"><p style="text-align:center;color:#9ca3af;padding:40px">Aucune donnee geographique disponible</p></div>';
+                return;
+            }
+
+            // Center on Le Mans by default
+            const center = [47.9960, 0.1906];
+            map = L.map('map').setView(center, 11);
+
+            // Dark map tiles (CartoDB Dark Matter)
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+                subdomains: 'abcd',
+                maxZoom: 19
+            }).addTo(map);
+
+            // Markers layer (visible markers)
+            markersLayer = L.layerGroup().addTo(map);
+            // Tooltip layer (invisible markers for tooltips, always visible)
+            tooltipLayer = L.layerGroup().addTo(map);
+
+            // Initial map update
+            currentMapData = geoData.lieux;
+            updateMap(geoData.lieux);
+
+            // Fit to bounds if available
+            if (geoData.bounds) {
+                map.fitBounds([
+                    [geoData.bounds.min_lat, geoData.bounds.min_lng],
+                    [geoData.bounds.max_lat, geoData.bounds.max_lng]
+                ], { padding: [20, 20] });
+            }
+        }
+
+        function updateMap(data) {
+            if (!map) return;
+
+            currentMapData = data;
+
+            // Clear existing layers
+            markersLayer.clearLayers();
+            tooltipLayer.clearLayers();
+            if (heatLayer) {
+                map.removeLayer(heatLayer);
+                heatLayer = null;
+            }
+
+            if (!data || data.length === 0) {
+                document.getElementById('mapLieuxCount').textContent = '0';
+                document.getElementById('mapEventsCount').textContent = '0';
+                return;
+            }
+
+            // Prepare data
+            const heatPoints = [];
+            const maxCount = Math.max(...data.map(l => l.count));
+            let totalEvents = 0;
+
+            data.forEach(lieu => {
+                if (!lieu.lat || !lieu.lng) return;
+
+                totalEvents += lieu.count;
+
+                // Circle marker with popup and tooltip (visible)
+                const radius = Math.min(5 + (lieu.count / maxCount) * 15, 20);
+                const marker = L.circleMarker([lieu.lat, lieu.lng], {
+                    radius: radius,
+                    fillColor: getHeatColor(lieu.count, maxCount),
+                    fillOpacity: 0.8,
+                    stroke: true,
+                    color: '#fff',
+                    weight: 1
+                });
+                // Popup with details on click
+                marker.bindPopup(
+                    '<div style="font-family:system-ui;min-width:150px">' +
+                    '<b style="font-size:14px">' + lieu.nom + '</b><br>' +
+                    '<span style="color:#9ca3af">' + lieu.ville + '</span><br>' +
+                    '<span style="color:#f59e0b;font-weight:600">' + lieu.count + ' événement(s)</span>' +
+                    '</div>'
+                );
+                // Tooltip with name on hover
+                marker.bindTooltip(lieu.nom, {
+                    permanent: false,
+                    direction: 'top',
+                    className: 'map-tooltip'
+                });
+                markersLayer.addLayer(marker);
+
+                // Invisible marker for tooltip (always visible, even in heatmap mode)
+                const tooltipMarker = L.circleMarker([lieu.lat, lieu.lng], {
+                    radius: radius,
+                    fillOpacity: 0,
+                    stroke: false
+                });
+                tooltipMarker.bindPopup(
+                    '<div style="font-family:system-ui;min-width:150px">' +
+                    '<b style="font-size:14px">' + lieu.nom + '</b><br>' +
+                    '<span style="color:#9ca3af">' + lieu.ville + '</span><br>' +
+                    '<span style="color:#f59e0b;font-weight:600">' + lieu.count + ' événement(s)</span>' +
+                    '</div>'
+                );
+                tooltipMarker.bindTooltip(lieu.nom, {
+                    permanent: false,
+                    direction: 'top',
+                    className: 'map-tooltip'
+                });
+                tooltipLayer.addLayer(tooltipMarker);
+
+                // Heatmap point (with intensity based on count)
+                heatPoints.push([lieu.lat, lieu.lng, lieu.count / maxCount]);
+            });
+
+            // Create heatmap layer
+            heatLayer = L.heatLayer(heatPoints, {
+                radius: 25,
+                blur: 15,
+                maxZoom: 15,
+                gradient: {
+                    0.2: '#22c55e',
+                    0.4: '#84cc16',
+                    0.6: '#f59e0b',
+                    0.8: '#ef4444',
+                    1.0: '#dc2626'
+                }
+            });
+
+            // Update stats
+            document.getElementById('mapLieuxCount').textContent = data.length;
+            document.getElementById('mapEventsCount').textContent = totalEvents.toLocaleString();
+
+            // Apply current view
+            applyMapView();
+        }
+
+        function getHeatColor(count, max) {
+            const ratio = count / max;
+            if (ratio > 0.7) return '#ef4444';
+            if (ratio > 0.4) return '#f59e0b';
+            if (ratio > 0.2) return '#22c55e';
+            return '#06b6d4';
+        }
+
+        function setMapView(view) {
+            currentMapView = view;
+
+            // Update button states
+            document.getElementById('btnMarkers').classList.toggle('active', view === 'markers');
+            document.getElementById('btnHeat').classList.toggle('active', view === 'heat');
+            document.getElementById('btnBoth').classList.toggle('active', view === 'both');
+
+            applyMapView();
+        }
+
+        function applyMapView() {
+            if (!map || !markersLayer || !heatLayer) return;
+
+            // tooltipLayer stays always visible for hover tooltips
+            if (!map.hasLayer(tooltipLayer)) tooltipLayer.addTo(map);
+
+            if (currentMapView === 'markers') {
+                if (!map.hasLayer(markersLayer)) markersLayer.addTo(map);
+                if (map.hasLayer(heatLayer)) map.removeLayer(heatLayer);
+            } else if (currentMapView === 'heat') {
+                if (map.hasLayer(markersLayer)) map.removeLayer(markersLayer);
+                if (!map.hasLayer(heatLayer)) heatLayer.addTo(map);
+            } else { // both
+                if (!map.hasLayer(markersLayer)) markersLayer.addTo(map);
+                if (!map.hasLayer(heatLayer)) heatLayer.addTo(map);
+            }
+        }
+
+        // Month slider variables
+        let monthAnimationInterval = null;
+        let isMonthAnimating = false;
+
+        function changeMapFilterType(type) {
+            const yearContainer = document.getElementById('yearSliderContainer');
+            const monthContainer = document.getElementById('monthSliderContainer');
+            const weekContainer = document.getElementById('weekSliderContainer');
+            const dayContainer = document.getElementById('daySliderContainer');
+
+            // Stop any running animations
+            if (isYearAnimating) toggleYearAnimation();
+            if (isMonthAnimating) toggleMonthAnimation();
+            if (isWeekAnimating) toggleWeekAnimation();
+            if (isDayAnimating) toggleDayAnimation();
+
+            // Hide all containers
+            yearContainer.style.display = 'none';
+            monthContainer.style.display = 'none';
+            weekContainer.style.display = 'none';
+            dayContainer.style.display = 'none';
+
+            if (type === 'all') {
+                updateMap(geoData.lieux);
+            } else if (type === 'year') {
+                yearContainer.style.display = 'flex';
+                initYearSlider();
+            } else if (type === 'month') {
+                monthContainer.style.display = 'flex';
+                initMonthSlider();
+            } else if (type === 'week') {
+                weekContainer.style.display = 'flex';
+                initWeekSlider();
+            } else if (type === 'day') {
+                dayContainer.style.display = 'flex';
+                initDaySlider();
+            }
+        }
+
+        // Year slider functions
+        let yearAnimationInterval = null;
+        let isYearAnimating = false;
+
+        function initYearSlider() {
+            if (!geoData || !geoData.years || geoData.years.length === 0) return;
+
+            const slider = document.getElementById('mapYearSlider');
+            slider.min = 0;
+            slider.max = geoData.years.length - 1;
+            slider.value = geoData.years.length - 1; // Start at most recent year
+
+            filterMapByYearSlider(slider.value);
+        }
+
+        function filterMapByYearSlider(index) {
+            if (!geoData || !geoData.years) return;
+
+            const year = geoData.years[index];
+            const label = document.getElementById('mapYearLabel');
+
+            if (year) {
+                label.textContent = year;
+
+                if (geoData.lieux_by_year && geoData.lieux_by_year[year]) {
+                    updateMap(geoData.lieux_by_year[year]);
+                } else {
+                    updateMap([]);
+                }
+            }
+        }
+
+        function toggleYearAnimation() {
+            const btn = document.getElementById('btnPlayYear');
+            const slider = document.getElementById('mapYearSlider');
+
+            if (isYearAnimating) {
+                clearInterval(yearAnimationInterval);
+                yearAnimationInterval = null;
+                isYearAnimating = false;
+                btn.textContent = '▶';
+            } else {
+                isYearAnimating = true;
+                btn.textContent = '⏸';
+
+                if (parseInt(slider.value) >= parseInt(slider.max)) {
+                    slider.value = 0;
+                }
+
+                yearAnimationInterval = setInterval(() => {
+                    const currentValue = parseInt(slider.value);
+                    if (currentValue < parseInt(slider.max)) {
+                        slider.value = currentValue + 1;
+                        filterMapByYearSlider(slider.value);
+                    } else {
+                        toggleYearAnimation();
+                    }
+                }, 1000); // 1s between each year
+            }
+        }
+
+        // Month slider functions
+        function initMonthSlider() {
+            if (!geoData || !geoData.months || geoData.months.length === 0) return;
+
+            const slider = document.getElementById('mapMonthSlider');
+            slider.min = 0;
+            slider.max = geoData.months.length - 1;
+            slider.value = geoData.months.length - 1; // Start at most recent month
+
+            filterMapByMonth(slider.value);
+        }
+
+        function filterMapByMonth(index) {
+            if (!geoData || !geoData.months) return;
+
+            const month = geoData.months[index];
+            const label = document.getElementById('mapMonthLabel');
+
+            if (month) {
+                // Format YYYY-MM to "Mois YYYY"
+                const [year, m] = month.split('-');
+                const monthNames = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin',
+                                   'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
+                label.textContent = `${monthNames[parseInt(m) - 1]} ${year}`;
+
+                if (geoData.lieux_by_month && geoData.lieux_by_month[month]) {
+                    updateMap(geoData.lieux_by_month[month]);
+                } else {
+                    updateMap([]);
+                }
+            }
+        }
+
+        function toggleMonthAnimation() {
+            const btn = document.getElementById('btnPlayMonth');
+            const slider = document.getElementById('mapMonthSlider');
+
+            if (isMonthAnimating) {
+                // Stop animation
+                clearInterval(monthAnimationInterval);
+                monthAnimationInterval = null;
+                isMonthAnimating = false;
+                btn.textContent = '▶';
+            } else {
+                // Start animation
+                isMonthAnimating = true;
+                btn.textContent = '⏸';
+
+                // If at the end, restart from beginning
+                if (parseInt(slider.value) >= parseInt(slider.max)) {
+                    slider.value = 0;
+                }
+
+                monthAnimationInterval = setInterval(() => {
+                    const currentValue = parseInt(slider.value);
+                    if (currentValue < parseInt(slider.max)) {
+                        slider.value = currentValue + 1;
+                        filterMapByMonth(slider.value);
+                    } else {
+                        // End of animation
+                        toggleMonthAnimation();
+                    }
+                }, 500); // 500ms between each month
+            }
+        }
+
+        // Week slider functions
+        let weekAnimationInterval = null;
+        let isWeekAnimating = false;
+
+        function initWeekSlider() {
+            if (!geoData || !geoData.weeks || geoData.weeks.length === 0) {
+                document.getElementById('mapWeekLabel').textContent = 'Pas de données';
+                return;
+            }
+
+            const slider = document.getElementById('mapWeekSlider');
+            slider.min = 0;
+            slider.max = geoData.weeks.length - 1;
+            slider.value = geoData.weeks.length - 1; // Start at most recent week
+
+            filterMapByWeek(slider.value);
+        }
+
+        function filterMapByWeek(index) {
+            if (!geoData || !geoData.weeks) return;
+
+            const week = geoData.weeks[index];
+            const label = document.getElementById('mapWeekLabel');
+
+            if (week) {
+                // Format YYYY-WNN to "Semaine NN, YYYY"
+                const [year, w] = week.split('-W');
+                label.textContent = `Sem. ${parseInt(w)}, ${year}`;
+
+                if (geoData.lieux_by_week && geoData.lieux_by_week[week]) {
+                    updateMap(geoData.lieux_by_week[week]);
+                } else {
+                    updateMap([]);
+                }
+            }
+        }
+
+        function toggleWeekAnimation() {
+            const btn = document.getElementById('btnPlayWeek');
+            const slider = document.getElementById('mapWeekSlider');
+
+            if (isWeekAnimating) {
+                clearInterval(weekAnimationInterval);
+                weekAnimationInterval = null;
+                isWeekAnimating = false;
+                btn.textContent = '▶';
+            } else {
+                isWeekAnimating = true;
+                btn.textContent = '⏸';
+
+                if (parseInt(slider.value) >= parseInt(slider.max)) {
+                    slider.value = 0;
+                }
+
+                weekAnimationInterval = setInterval(() => {
+                    const currentValue = parseInt(slider.value);
+                    if (currentValue < parseInt(slider.max)) {
+                        slider.value = currentValue + 1;
+                        filterMapByWeek(slider.value);
+                    } else {
+                        toggleWeekAnimation();
+                    }
+                }, 200); // 200ms between each week
+            }
+        }
+
+        // Day slider functions
+        let dayAnimationInterval = null;
+        let isDayAnimating = false;
+
+        function initDaySlider() {
+            if (!geoData || !geoData.days || geoData.days.length === 0) {
+                document.getElementById('mapDayLabel').textContent = 'Pas de données';
+                return;
+            }
+
+            const slider = document.getElementById('mapDaySlider');
+            slider.min = 0;
+            slider.max = geoData.days.length - 1;
+            slider.value = geoData.days.length - 1; // Start at most recent day
+
+            filterMapByDay(slider.value);
+        }
+
+        function filterMapByDay(index) {
+            if (!geoData || !geoData.days) return;
+
+            const day = geoData.days[index];
+            const label = document.getElementById('mapDayLabel');
+
+            if (day) {
+                // Format YYYY-MM-DD to "DD Mois YYYY"
+                const [year, m, d] = day.split('-');
+                const monthNames = ['jan', 'fév', 'mar', 'avr', 'mai', 'juin',
+                                   'juil', 'août', 'sep', 'oct', 'nov', 'déc'];
+                label.textContent = `${parseInt(d)} ${monthNames[parseInt(m) - 1]} ${year}`;
+
+                if (geoData.lieux_by_day && geoData.lieux_by_day[day]) {
+                    updateMap(geoData.lieux_by_day[day]);
+                } else {
+                    updateMap([]);
+                }
+            }
+        }
+
+        function toggleDayAnimation() {
+            const btn = document.getElementById('btnPlayDay');
+            const slider = document.getElementById('mapDaySlider');
+
+            if (isDayAnimating) {
+                clearInterval(dayAnimationInterval);
+                dayAnimationInterval = null;
+                isDayAnimating = false;
+                btn.textContent = '▶';
+            } else {
+                isDayAnimating = true;
+                btn.textContent = '⏸';
+
+                if (parseInt(slider.value) >= parseInt(slider.max)) {
+                    slider.value = 0;
+                }
+
+                dayAnimationInterval = setInterval(() => {
+                    const currentValue = parseInt(slider.value);
+                    if (currentValue < parseInt(slider.max)) {
+                        slider.value = currentValue + 1;
+                        filterMapByDay(slider.value);
+                    } else {
+                        toggleDayAnimation();
+                    }
+                }, 100); // 100ms between each day (fast animation)
+            }
+        }
+
+        // Fullscreen mode
+        let isMapFullscreen = false;
+
+        function toggleMapFullscreen() {
+            const mapSection = document.querySelector('.map-section');
+            const btn = document.getElementById('btnFullscreen');
+
+            isMapFullscreen = !isMapFullscreen;
+
+            if (isMapFullscreen) {
+                mapSection.classList.add('fullscreen');
+                btn.textContent = '✕';
+                btn.title = 'Quitter le plein écran';
+                document.body.style.overflow = 'hidden';
+            } else {
+                mapSection.classList.remove('fullscreen');
+                btn.textContent = '⛶';
+                btn.title = 'Plein écran';
+                document.body.style.overflow = '';
+            }
+
+            // Invalidate map size after transition
+            setTimeout(() => {
+                if (map) map.invalidateSize();
+            }, 100);
+        }
+
+        // ESC key to exit fullscreen
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && isMapFullscreen) {
+                toggleMapFullscreen();
+            }
+        });
+
+        // Initialize map on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            if (geoData) {
+                initMap();
+            }
+        });
     </script>
 </body>
 </html>'''

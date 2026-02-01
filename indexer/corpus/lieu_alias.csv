@@ -64,7 +64,7 @@ L'ÎlotCo,L'Îlot Co
 "L'IlôtCo, Lieu-dit Le Gué Perroux",L'Îlot Co
 L’Oasis,L'Oasis
 La Bertoche,Théâtre de la Bertoche
-La Brass'vie,Le Brass'vie
+Le Brass'vie,La Brass'vie
 bar Le Viking's,Le Viking's
 La Cité du Cique,La Cité du cirque
 La Peniche,La Péniche Excelsior
@@ -147,10 +147,10 @@ pub Le Terminus,Le Terminus
 Aux Vickings,Le Viking's
 Jardins des Plantes,Jardin des plantes
 Le Palais Le Mans,Le Palais
-"Kiosque Mosaic",Kiosque Mozaïc
-"Kiosque Mozalc",Kiosque Mozaïc
-"Kiosque Mosaïc",Kiosque Mozaïc
-"ESCAPADE Kiosque Mozaic",Kiosque Mozaïc
+Kiosque Mosaic,Kiosque Mozaïc
+Kiosque Mozalc,Kiosque Mozaïc
+Kiosque Mosaïc,Kiosque Mozaïc
+ESCAPADE Kiosque Mozaic,Kiosque Mozaïc
 bar Aux Viking's,Le Viking's
 La Halle-au-Blé,Théâtre de la Halle-au-Blé
 SJ.Carmet,Salle Jean Carmet
@@ -240,7 +240,7 @@ Musée de Musique de Dollon,Musée de la musique mécanique
 Moulinsart,Île de Moulinsart
 MJC J. Prévert,MJC Prévert
 Le Viking,Le Viking's
-Le Hangar des Artistes
+Le Hangar des Artistes,
 Caveau,Le Caveau
 Bar Le Caveau,Le Caveau
 Le Caveau Le Mans,Le Caveau
@@ -261,6 +261,7 @@ forum de la fnac,Forum FNAC
 Studio La Cie Marie Lenfant,Studio de la Cie Marie Lenfant
 Salle EVE,EVE - Scène universitaire
 Parc des Expos,Centre des expositions
+Parc Expo,Centre des expositions
 Médiat. Aragon,Médiathèque Louis Aragon
 Musée de Tessée,Musée de Tessé
 Mulligan’s,Le Mulligan
@@ -276,7 +277,7 @@ Cathédrale St Julien,athédrale Saint-Julien
 Le Barout,Le Barouf
 L'ltemm,Itemm
 Kiosque au Jardin des Plantes,Kiosque du jardin des Plantes
-L'Elephant Pub,L'Éléphant
+L'Éléphant,L'Elephant Pub
 EVE-Université du Maine,EVE - Scène universitaire
 Collégiale St Pierre,Collégiale Saint-Pierre-la-Cour
 Centre des expos,Centre des expositions
@@ -308,3 +309,16 @@ Scène du Val'Rhonne,Le Val'Rhonne
 Plaine Val'Rhonne,Plaine du Val'Rhonne
 Val Rhonne,Le Val'Rhonne
 Val'Rhonne,Le Val'Rhonne
+Chapiteau Mimulus,Cirque Mimulus
+Passerelle des Atlandites,Passerelle des Atlantides
+Église N.D. de Ste Croix,Église Notre-Dame-de-Sainte-Croix
+Stade Léon Bolet,Stade Léon Bollée
+L'Acthalia,Théâtre de l'Acthalia
+BSD,Brasserie Septante-Deux
+Bras. Septante Deux,Brasserie Septante-Deux
+Basserie Septante Deux,Brasserie Septante-Deux
+La Couture,Notre-Dame de la Couture
+Centre mus.Roussigny,Centre Musical International de Roussigny
+l'Athéna,Centre Culturel Athéna
+Espace Athena,Centre Culturel Athéna
+Salle du cloître,Salle du Cloître
