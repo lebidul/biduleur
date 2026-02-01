@@ -694,10 +694,16 @@ def reload_normalizers():
 # =============================================================================
 
 @lru_cache(maxsize=1)
-def load_lieu_index_with_aliases(db_path: str = None) -> dict[str, tuple[int, str]]:
+def load_lieu_index_with_aliases(db_path: str = None) -> dict[str, tuple[int, str, str]]:
     """
     Charge un index de matching pour les lieux (incluant les alias).
-    Retourne dict: {nom_lower_or_norm: (lieu_id, nom_canonique)}
+
+    Pour les lieux génériques (Salle des fêtes, Église, etc.), on utilise une clé
+    composite "(nom, ville)" pour distinguer les différentes instances.
+
+    Retourne dict: {clé: (lieu_id, nom_canonique, ville)}
+    où clé est soit "nom_lower" pour les lieux spécifiques,
+    soit "(nom_lower, ville_lower)" pour les lieux génériques.
     """
     import sqlite3
     path = db_path or str(DEFAULT_DB_PATH)
@@ -707,30 +713,49 @@ def load_lieu_index_with_aliases(db_path: str = None) -> dict[str, tuple[int, st
     index = {}
 
     # Charger lieu_ref (actifs uniquement)
-    cur.execute('SELECT id, nom FROM lieu_ref WHERE actif = 1')
-    for lieu_id, nom in cur.fetchall():
-        # Forme lowercase
-        index[nom.lower()] = (lieu_id, nom)
-        # Forme normalisée automatique
-        norm = normalize_for_matching(nom)
-        if norm:
-            index[norm] = (lieu_id, nom)
-        # Forme sans préfixes
-        stripped = normalize_for_matching(strip_prefixes(nom))
-        if stripped and stripped != norm:
-            index[stripped] = (lieu_id, nom)
+    cur.execute('SELECT id, nom, ville, is_generic FROM lieu_ref WHERE actif = 1')
+    for lieu_id, nom, ville, is_generic in cur.fetchall():
+        ville = ville or 'Le Mans'
+
+        if is_generic:
+            # Pour les lieux génériques, utiliser une clé composite (nom, ville)
+            composite_key = f"({nom.lower()}, {ville.lower()})"
+            index[composite_key] = (lieu_id, nom, ville)
+            # Forme normalisée composite
+            norm = normalize_for_matching(nom)
+            ville_norm = normalize_for_matching(ville)
+            if norm and ville_norm:
+                composite_norm = f"({norm}, {ville_norm})"
+                index[composite_norm] = (lieu_id, nom, ville)
+        else:
+            # Pour les lieux spécifiques, clé simple (comportement original)
+            index[nom.lower()] = (lieu_id, nom, ville)
+            # Forme normalisée automatique
+            norm = normalize_for_matching(nom)
+            if norm:
+                index[norm] = (lieu_id, nom, ville)
+            # Forme sans préfixes
+            stripped = normalize_for_matching(strip_prefixes(nom))
+            if stripped and stripped != norm:
+                index[stripped] = (lieu_id, nom, ville)
 
     # Charger lieu_alias -> pointer vers lieu_ref
     cur.execute('''
-        SELECT la.variante, lr.id, lr.nom
+        SELECT la.variante, lr.id, lr.nom, lr.ville, lr.is_generic
         FROM lieu_alias la
         JOIN lieu_ref lr ON la.lieu_nom = lr.nom AND lr.actif = 1
     ''')
-    for variante, lieu_id, nom_canonique in cur.fetchall():
-        index[variante.lower()] = (lieu_id, nom_canonique)
-        norm = normalize_for_matching(variante)
-        if norm:
-            index[norm] = (lieu_id, nom_canonique)
+    for variante, lieu_id, nom_canonique, ville, is_generic in cur.fetchall():
+        ville = ville or 'Le Mans'
+        if is_generic:
+            # Les alias pour lieux génériques utilisent aussi la clé composite
+            composite_key = f"({variante.lower()}, {ville.lower()})"
+            index[composite_key] = (lieu_id, nom_canonique, ville)
+        else:
+            index[variante.lower()] = (lieu_id, nom_canonique, ville)
+            norm = normalize_for_matching(variante)
+            if norm:
+                index[norm] = (lieu_id, nom_canonique, ville)
 
     conn.close()
     return index
@@ -773,32 +798,59 @@ def load_artiste_index_with_aliases(db_path: str = None) -> dict[str, tuple[int,
     return index
 
 
-def find_lieu_ref_id(lieu_raw: str, db_path: str = None) -> tuple[Optional[int], Optional[str]]:
+def find_lieu_ref_id(lieu_raw: str, db_path: str = None, ville_raw: str = None) -> tuple[Optional[int], Optional[str], Optional[str]]:
     """
     Trouve l'ID de lieu_ref pour un lieu brut (via matching avec aliases).
-    Retourne (lieu_ref_id, nom_canonique) ou (None, None) si non trouvé.
+
+    Pour les lieux génériques (Salle des fêtes, Église, etc.), la ville est utilisée
+    pour distinguer les différentes instances.
+
+    Args:
+        lieu_raw: Nom du lieu tel qu'extrait
+        db_path: Chemin vers la base de données
+        ville_raw: Nom de la ville (optionnel, utilisé pour les lieux génériques)
+
+    Returns:
+        (lieu_ref_id, nom_canonique, ville) ou (None, None, None) si non trouvé.
     """
     if not lieu_raw or not lieu_raw.strip():
-        return None, None
+        return None, None, None
 
     index = load_lieu_index_with_aliases(db_path)
 
-    # Match exact (case-insensitive)
-    key = lieu_raw.lower().strip()
-    if key in index:
-        return index[key]
+    lieu_lower = lieu_raw.lower().strip()
+    lieu_norm = normalize_for_matching(lieu_raw)
 
-    # Match par nom normalisé
-    norm = normalize_for_matching(lieu_raw)
-    if norm and norm in index:
-        return index[norm]
+    # 1. Si on a une ville, essayer d'abord le match composite (pour lieux génériques)
+    if ville_raw and ville_raw.strip():
+        ville_lower = ville_raw.lower().strip()
+        ville_norm = normalize_for_matching(ville_raw)
 
-    # Match sans préfixes
+        # Clé composite exacte
+        composite_key = f"({lieu_lower}, {ville_lower})"
+        if composite_key in index:
+            return index[composite_key]
+
+        # Clé composite normalisée
+        if lieu_norm and ville_norm:
+            composite_norm = f"({lieu_norm}, {ville_norm})"
+            if composite_norm in index:
+                return index[composite_norm]
+
+    # 2. Match exact (case-insensitive) - pour lieux spécifiques
+    if lieu_lower in index:
+        return index[lieu_lower]
+
+    # 3. Match par nom normalisé
+    if lieu_norm and lieu_norm in index:
+        return index[lieu_norm]
+
+    # 4. Match sans préfixes
     stripped = normalize_for_matching(strip_prefixes(lieu_raw))
     if stripped and stripped in index:
         return index[stripped]
 
-    return None, None
+    return None, None, None
 
 
 def find_artiste_ref_id(artiste_raw: str, db_path: str = None) -> tuple[Optional[int], Optional[str]]:
@@ -854,20 +906,27 @@ def load_ville_ref(db_path: str = None) -> dict[int, str]:
     return villes
 
 
-def normalize_lieu(lieu_raw: str, db_path: str = None) -> tuple[Optional[int], Optional[str]]:
+def normalize_lieu(lieu_raw: str, db_path: str = None, ville_raw: str = None) -> tuple[Optional[int], Optional[str], Optional[str]]:
     """
     Normalise un nom de lieu extrait vers le référentiel.
-    Retourne (lieu_ref_id, lieu_nom_normalise) ou (None, lieu_raw) si non trouvé.
+
+    Args:
+        lieu_raw: Nom du lieu tel qu'extrait
+        db_path: Chemin vers la base de données
+        ville_raw: Nom de la ville (optionnel, utilisé pour les lieux génériques)
+
+    Returns:
+        (lieu_ref_id, lieu_nom_normalise, ville) ou (None, lieu_raw, None) si non trouvé.
     """
     if not lieu_raw:
-        return None, None
+        return None, None, None
 
     # Utiliser la fonction avec index
-    lieu_id, nom = find_lieu_ref_id(lieu_raw, db_path)
+    lieu_id, nom, ville = find_lieu_ref_id(lieu_raw, db_path, ville_raw)
     if lieu_id:
-        return lieu_id, nom
+        return lieu_id, nom, ville
 
-    return None, lieu_raw
+    return None, lieu_raw, None
 
 
 def normalize_ville(ville_raw: str, db_path: str = None) -> tuple[Optional[int], str]:

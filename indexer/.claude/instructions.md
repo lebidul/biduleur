@@ -27,9 +27,9 @@ python cli.py populate --numero 184 --replace
 python benchmark/compare_bidul.py 184
 python benchmark/compare_bidul.py 190
 
-# Scores de référence v1.14:
-# - Bidul 184: 95.6%
-# - Bidul 190: 91.8%
+# Scores de référence v1.18:
+# - Bidul 184: 94.6%
+# - Bidul 190: 90.6%
 ```
 
 **ATTENTION**: `extract` ne filtre pas les artifacts et produit trop d'événements. Toujours utiliser `populate` pour les benchmarks.
@@ -564,4 +564,77 @@ Pour importer dans PostGIS :
 ALTER TABLE lieu_ref ADD COLUMN geom geometry(Point, 4326);
 UPDATE lieu_ref SET geom = ST_SetSRID(ST_MakePoint(longitude, latitude), 4326)
 WHERE latitude IS NOT NULL AND longitude IS NOT NULL;
+```
+
+## Lieux génériques (v1.18)
+
+### Concept
+
+Les lieux génériques (Salle des fêtes, Église, Médiathèque, etc.) peuvent exister dans plusieurs villes. La contrainte unique est passée de `UNIQUE(nom)` à `UNIQUE(nom, ville)`.
+
+### Patterns génériques
+
+Les noms suivants sont considérés comme génériques (case-insensitive) :
+- Salle des fêtes / Salle polyvalente / Salle municipale
+- Église / Halles / Mairie
+- Médiathèque / Bibliothèque
+- Gymnase / Stade
+- Foyer rural / Foyer des jeunes
+- Centre culturel / Espace culturel
+- Place de la mairie / Place de l'église
+
+### Fonctions modifiées
+
+Les fonctions de normalisation retournent maintenant 3 valeurs :
+
+```python
+# core/normalizer.py
+def find_lieu_ref_id(lieu_raw: str, db_path: str, ville_raw: str = None) -> tuple[Optional[int], Optional[str], Optional[str]]:
+    """Retourne (lieu_id, nom, ville)"""
+
+def normalize_lieu(lieu_raw: str, db_path: str = None, ville_raw: str = None) -> tuple[Optional[int], Optional[str], Optional[str]]:
+    """Retourne (lieu_id, nom, ville)"""
+```
+
+### Clé composite pour lieux génériques
+
+Pour les lieux génériques, la clé d'index est composite :
+```python
+# Format: "(nom, ville)" pour les génériques
+key = f"({nom.lower()}, {ville.lower()})"
+# Exemple: "(salle des fêtes, arnage)"
+```
+
+### Migration
+
+```bash
+# Prévisualisation
+python scripts/migrate_lieu_generic.py --dry-run
+
+# Appliquer la migration
+python scripts/migrate_lieu_generic.py --apply
+
+# Vérifier
+python scripts/migrate_lieu_generic.py --verify
+```
+
+### Vérification
+
+```python
+import sqlite3
+conn = sqlite3.connect('database/bidul_archives.db')
+cursor = conn.cursor()
+
+# Compter les lieux génériques
+cursor.execute('SELECT COUNT(*) FROM lieu_ref WHERE is_generic = 1')
+print(f"Lieux génériques: {cursor.fetchone()[0]}")
+
+# Lister les Salle des fêtes
+cursor.execute('''
+    SELECT nom, ville FROM lieu_ref
+    WHERE LOWER(nom) = 'salle des fêtes'
+    ORDER BY ville
+''')
+for row in cursor.fetchall():
+    print(f"  {row[0]} - {row[1]}")
 ```

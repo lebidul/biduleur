@@ -67,6 +67,8 @@ contenu_evenement (source de vérité pour artistes/spectacles)
 
 **Note v1.17** : Carte interactive des événements dans le dashboard HTML (Leaflet.js + heatmap). Filtres temporels multi-niveaux (année/mois/semaine/jour) avec sliders et animation. Mode plein écran. ~498 lieux géocodés affichés.
 
+**Note v1.18** : Support des lieux génériques (Salle des fêtes, Église, Médiathèque, etc.) avec clé composite `UNIQUE(nom, ville)`. Ces lieux peuvent exister dans plusieurs villes différentes (157 nouvelles entrées créées). Colonne `is_generic` ajoutée à `lieu_ref`. Fonctions `find_lieu_ref_id()` et `normalize_lieu()` retournent maintenant 3 valeurs `(lieu_id, nom, ville)`.
+
 ## Mapping Bidul <-> Date
 
 Référence : **Bidul 280 = Mai 2023**

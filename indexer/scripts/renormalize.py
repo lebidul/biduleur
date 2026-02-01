@@ -66,7 +66,11 @@ def reload_referentiels(conn: sqlite3.Connection):
 
 
 def renormalize_lieux(conn: sqlite3.Connection, dry_run: bool = False) -> dict:
-    """Re-normalise tous les lieux."""
+    """Re-normalise tous les lieux.
+
+    Utilise ville_raw pour le matching des lieux génériques
+    (Salle des fêtes, Église, etc.) qui peuvent exister dans plusieurs villes.
+    """
     cur = conn.cursor()
     db_path_str = str(DB_PATH)
 
@@ -74,9 +78,9 @@ def renormalize_lieux(conn: sqlite3.Connection, dry_run: bool = False) -> dict:
     cur.execute("SELECT COUNT(*) FROM evenement WHERE lieu_ref_id IS NOT NULL")
     before = cur.fetchone()[0]
 
-    # Récupérer tous les événements avec lieu_raw
+    # Récupérer tous les événements avec lieu_raw ET ville_raw
     cur.execute("""
-        SELECT id, lieu_raw FROM evenement
+        SELECT id, lieu_raw, ville_raw FROM evenement
         WHERE lieu_raw IS NOT NULL AND lieu_raw != ''
     """)
     events = cur.fetchall()
@@ -84,8 +88,9 @@ def renormalize_lieux(conn: sqlite3.Connection, dry_run: bool = False) -> dict:
     updated = 0
     newly_normalized = 0
 
-    for evt_id, lieu_raw in events:
-        lieu_id, _ = find_lieu_ref_id(lieu_raw, db_path_str)
+    for evt_id, lieu_raw, ville_raw in events:
+        # find_lieu_ref_id retourne (lieu_id, nom, ville)
+        lieu_id, _, _ = find_lieu_ref_id(lieu_raw, db_path_str, ville_raw)
         if lieu_id:
             # Vérifier si c'est une nouvelle normalisation
             cur.execute("SELECT lieu_ref_id FROM evenement WHERE id = ?", (evt_id,))
