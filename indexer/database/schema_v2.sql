@@ -26,9 +26,10 @@ CREATE TABLE IF NOT EXISTS bidul (
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS lieu_ref (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    nom TEXT UNIQUE NOT NULL,
+    nom TEXT NOT NULL,
     ville TEXT DEFAULT 'Le Mans',
     actif BOOLEAN DEFAULT TRUE,
+    is_generic BOOLEAN DEFAULT FALSE,        -- Lieu générique (Salle des fêtes, Église, etc.)
     -- Adresse postale
     adresse_numero TEXT,                     -- Numéro de rue (ex: "12", "12 bis")
     adresse_voie TEXT,                       -- Nom de la voie (ex: "rue de la Paix", "avenue Jean Jaurès")
@@ -38,7 +39,8 @@ CREATE TABLE IF NOT EXISTS lieu_ref (
     longitude REAL,                          -- WGS84 longitude (ex: 0.1906)
     geo_source TEXT,                         -- Source des coordonnées (nominatim, google, manual)
     geo_precision TEXT,                      -- Précision (exact, street, city, approximate)
-    nom_osm TEXT                             -- Nom retourné par OSM/Nominatim (pour normalisation)
+    nom_osm TEXT,                            -- Nom retourné par OSM/Nominatim (pour normalisation)
+    UNIQUE(nom, ville)                       -- Un lieu générique peut exister dans plusieurs villes
 );
 
 -- -----------------------------------------------------------------------------

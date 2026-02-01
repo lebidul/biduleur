@@ -181,7 +181,8 @@ class BidulDB:
         conn = self.connect()
 
         # Chercher les IDs de référence pour lieu et ville (matching fuzzy)
-        lieu_ref_id = self._find_lieu_ref(event.lieu_raw) if event.lieu_raw else None
+        # Passer ville_raw pour les lieux génériques (Salle des fêtes, Église, etc.)
+        lieu_ref_id = self._find_lieu_ref(event.lieu_raw, event.ville_raw) if event.lieu_raw else None
         ville_ref_id, ville_normalized = self._find_ville_ref(event.ville_raw)
 
         # Générer raw_text_clean (sans balises de formatage)
@@ -234,7 +235,7 @@ class BidulDB:
         conn = self.connect()
 
         # Chercher les IDs de référence pour lieu et ville (matching fuzzy)
-        lieu_ref_id = self._find_lieu_ref(event.get('lieu_raw')) if event.get('lieu_raw') else None
+        lieu_ref_id = self._find_lieu_ref(event.get('lieu_raw'), event.get('ville_raw')) if event.get('lieu_raw') else None
         ville_ref_id, ville_normalized = self._find_ville_ref(event.get('ville_raw'))
 
         # Générer raw_text_clean (sans balises de formatage)
@@ -642,10 +643,14 @@ class BidulDB:
         rows = conn.execute("SELECT id, nom FROM ville_ref").fetchall()
         return [(row['id'], row['nom']) for row in rows]
 
-    def _find_lieu_ref(self, lieu_raw: str) -> Optional[int]:
-        """Cherche un lieu dans le référentiel (matching avec aliases)."""
+    def _find_lieu_ref(self, lieu_raw: str, ville_raw: str = None) -> Optional[int]:
+        """Cherche un lieu dans le référentiel (matching avec aliases).
+
+        Pour les lieux génériques (Salle des fêtes, Église, etc.), la ville
+        est utilisée pour distinguer les différentes instances.
+        """
         from core.normalizer import find_lieu_ref_id
-        lieu_id, _ = find_lieu_ref_id(lieu_raw, str(self.db_path))
+        lieu_id, _, _ = find_lieu_ref_id(lieu_raw, str(self.db_path), ville_raw)
         return lieu_id
 
     def _find_artiste_ref(self, artiste_raw: str) -> Optional[int]:

@@ -1,3 +1,86 @@
+# Release Notes - Indexer v1.18
+
+## Vue d'ensemble
+
+Version avec support des lieux génériques (Salle des fêtes, Église, Médiathèque, etc.) : ces lieux peuvent maintenant exister dans plusieurs villes différentes grâce à une clé composite `UNIQUE(nom, ville)` au lieu de `UNIQUE(nom)`.
+
+## Nouveautés v1.18
+
+### Lieux génériques multi-villes
+
+Les lieux génériques comme "Salle des fêtes", "Église", "Médiathèque" peuvent maintenant exister dans plusieurs villes :
+
+| Lieu | Ville | Géocodage |
+|------|-------|-----------|
+| Salle des fêtes | Arnage | Coordonnées spécifiques |
+| Salle des fêtes | Mamers | Coordonnées spécifiques |
+| Salle des fêtes | Changé | Coordonnées spécifiques |
+| Église | Le Mans | Coordonnées spécifiques |
+| Église | Allonnes | Coordonnées spécifiques |
+
+### Patterns génériques supportés
+
+Les noms de lieux suivants sont considérés comme génériques :
+- Salle des fêtes / Salle polyvalente / Salle municipale
+- Église / Halles / Mairie
+- Médiathèque / Bibliothèque
+- Gymnase / Stade
+- Foyer rural / Foyer des jeunes
+- Centre culturel / Espace culturel
+- Place de la mairie / Place de l'église
+
+### Modifications techniques
+
+| Fichier | Modification |
+|---------|-------------|
+| `database/schema_v2.sql` | Contrainte `UNIQUE(nom, ville)` au lieu de `UNIQUE(nom)` |
+| `database/schema_v2.sql` | Nouvelle colonne `is_generic BOOLEAN DEFAULT FALSE` |
+| `core/normalizer.py` | `find_lieu_ref_id()` accepte `ville_raw` et retourne 3 valeurs `(lieu_id, nom, ville)` |
+| `core/normalizer.py` | `normalize_lieu()` retourne 3 valeurs |
+| `core/normalizer.py` | Clés composites pour lieux génériques : `(nom.lower(), ville.lower())` |
+| `core/parser.py` | Adapté pour unpacker 3 valeurs depuis `normalize_lieu()` |
+| `core/db.py` | `_find_lieu_ref()` passe maintenant `ville_raw` pour matching composite |
+| `scripts/renormalize.py` | Adapté pour unpacker 3 valeurs |
+
+### Migration
+
+Script de migration pour les bases existantes :
+
+```bash
+# Prévisualisation des changements
+python scripts/migrate_lieu_generic.py --dry-run
+
+# Appliquer la migration
+python scripts/migrate_lieu_generic.py --apply
+```
+
+La migration :
+1. Ajoute la colonne `is_generic` à `lieu_ref`
+2. Change la contrainte de `UNIQUE(nom)` à `UNIQUE(nom, ville)`
+3. Crée 157 nouvelles entrées pour les lieux génériques dans leurs différentes villes
+4. Met à jour 447 événements avec les nouvelles références
+
+### Géocodage
+
+Après migration, les nouveaux lieux génériques ont été géocodés :
+- 126 lieux avec coordonnées exactes
+- 76 lieux avec coordonnées au niveau ville
+- 0 échecs
+
+### Benchmarks
+
+| Bidul | Score v1.17 | Score v1.18 |
+|-------|-------------|-------------|
+| 184 | 94.6% | 94.6% |
+| 190 | 90.6% | 90.6% |
+
+### Tests
+
+- 238 tests unitaires passent
+- Référentiel : 647 lieux (dont 157 génériques), 126 villes
+
+---
+
 # Release Notes - Indexer v1.17
 
 ## Vue d'ensemble

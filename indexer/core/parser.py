@@ -5732,7 +5732,7 @@ class EventParser:
 
         # Vérifier si la zone artiste est en fait un lieu connu
         from core.normalizer import normalize_lieu
-        lieu_id, _ = normalize_lieu(artiste_zone.split(',')[0].strip())
+        lieu_id, _, _ = normalize_lieu(artiste_zone.split(',')[0].strip())
         if lieu_id is not None:
             return par_cie_artistes if par_cie_artistes else []
 
@@ -6053,7 +6053,7 @@ class EventParser:
         if parts:
             first_part = parts[0].strip()
             # Vérifier d'abord si c'est un lieu connu
-            lieu_id, _ = normalize_lieu(first_part)
+            lieu_id, _, _ = normalize_lieu(first_part)
             if lieu_id is not None:
                 start_idx = 0  # C'est un lieu, commencer à 0
             elif self.ARTISTE_PATTERN.match(first_part):
@@ -6157,7 +6157,7 @@ class EventParser:
                 continue
 
             # Vérifier si c'est un lieu connu
-            lieu_id, lieu_norm = normalize_lieu(candidate)
+            lieu_id, lieu_norm, _ = normalize_lieu(candidate)
             if lieu_id is not None:
                 if lieu is None:
                     lieu = candidate
