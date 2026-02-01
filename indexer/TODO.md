@@ -14,6 +14,9 @@
   * revoir #123, 125, 157 (pic de baisse de qualité)
   * raw_text	nom_spectacle
   <b>"A</b><b>Hfa de Yambolé"</b> <i>(conte dès 12 ans)</i>, S.Signoret, Mulsanne, 15h, 3.5/9.5 €	A</b><b>Hfa de Yambolé
+  * #197
+    * ```<b>CHARLY L TRIO</b> par l'Orga' La Source Booking, Les Dock's, Le Mans, 21h, TNC``` revoir orga et lieu_raw
+    * ```<b>"Soirée Electro/Drum'n'bass"</b> La Source Booking, Le Jardin Sarthois, Louplande, 21h, TNC``` revoir orga et lieu_raw
 
 * alias:
   * DAVE GOLITIN SOLO -> DAVE GOLITIN
