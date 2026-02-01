@@ -37,7 +37,8 @@ CREATE TABLE IF NOT EXISTS lieu_ref (
     latitude REAL,                           -- WGS84 latitude (ex: 47.9960)
     longitude REAL,                          -- WGS84 longitude (ex: 0.1906)
     geo_source TEXT,                         -- Source des coordonnées (nominatim, google, manual)
-    geo_precision TEXT                       -- Précision (exact, street, city, approximate)
+    geo_precision TEXT,                      -- Précision (exact, street, city, approximate)
+    nom_osm TEXT                             -- Nom retourné par OSM/Nominatim (pour normalisation)
 );
 
 -- -----------------------------------------------------------------------------

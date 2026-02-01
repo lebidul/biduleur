@@ -156,19 +156,38 @@ def import_lieux_to_db(conn, reset=True):
         cursor.execute("DELETE FROM lieu_alias")
         print("  (tables lieu_ref et lieu_alias vidées)")
 
-    # Importer lieu.csv -> lieu_ref
+    # Importer lieu.csv -> lieu_ref (avec toutes les colonnes géographiques)
     lieu_csv = CORPUS_DIR / 'lieu.csv'
     if lieu_csv.exists():
         with open(lieu_csv, 'r', encoding='utf-8') as f:
             reader = csv.DictReader(f)
             count = 0
             for row in reader:
+                # Convertir les coordonnées en float si présentes
+                lat = float(row['latitude']) if row.get('latitude') else None
+                lon = float(row['longitude']) if row.get('longitude') else None
+
                 cursor.execute("""
-                    INSERT OR REPLACE INTO lieu_ref (nom, ville, actif)
-                    VALUES (?, ?, 1)
-                """, (row['nom'], row.get('ville', '')))
+                    INSERT OR REPLACE INTO lieu_ref (
+                        nom, ville, actif,
+                        adresse_numero, adresse_voie, code_postal,
+                        latitude, longitude, geo_source, geo_precision, nom_osm
+                    )
+                    VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    row['nom'],
+                    row.get('ville', '') or 'Le Mans',
+                    row.get('adresse_numero') or None,
+                    row.get('adresse_voie') or None,
+                    row.get('code_postal') or None,
+                    lat,
+                    lon,
+                    row.get('geo_source') or None,
+                    row.get('geo_precision') or None,
+                    row.get('nom_osm') or None
+                ))
                 count += 1
-        print(f"+ Importé {count} lieux dans lieu_ref")
+        print(f"+ Importé {count} lieux dans lieu_ref (avec coordonnées)")
 
     # Importer lieu_alias.csv -> lieu_alias
     alias_csv = CORPUS_DIR / 'lieu_alias.csv'
@@ -275,19 +294,36 @@ def export_lieux_from_db(conn):
     """Exporte lieu_ref et lieu_alias vers les CSV."""
     cursor = conn.cursor()
 
-    # Exporter lieu_ref -> lieu.csv
-    cursor.execute("SELECT nom, ville FROM lieu_ref WHERE actif = 1 ORDER BY nom")
+    # Exporter lieu_ref -> lieu.csv (avec toutes les colonnes géographiques)
+    cursor.execute("""
+        SELECT nom, ville, adresse_numero, adresse_voie, code_postal,
+               latitude, longitude, geo_source, geo_precision, nom_osm
+        FROM lieu_ref WHERE actif = 1 ORDER BY ville, nom
+    """)
     rows = cursor.fetchall()
 
     with open(CORPUS_DIR / 'lieu.csv', 'w', encoding='utf-8', newline='') as f:
         writer = csv.writer(f)
-        writer.writerow(['nom', 'ville', 'nom_normalise'])
-        for nom, ville in rows:
+        writer.writerow(['nom', 'ville', 'nom_normalise', 'adresse_numero', 'adresse_voie',
+                         'code_postal', 'latitude', 'longitude', 'geo_source', 'geo_precision', 'nom_osm'])
+        for nom, ville, addr_num, addr_voie, cp, lat, lon, source, precision, nom_osm in rows:
             # Calculer nom_normalise
             norm = normalize_for_grouping(nom)
-            writer.writerow([nom, ville or '', norm])
+            writer.writerow([
+                nom,
+                ville or 'Le Mans',
+                norm,
+                addr_num or '',
+                addr_voie or '',
+                cp or '',
+                lat if lat is not None else '',
+                lon if lon is not None else '',
+                source or '',
+                precision or '',
+                nom_osm or ''
+            ])
 
-    print(f"+ Exporté {len(rows)} lieux vers lieu.csv")
+    print(f"+ Exporté {len(rows)} lieux vers lieu.csv (avec coordonnées)")
 
     # Exporter lieu_alias -> lieu_alias.csv
     cursor.execute("SELECT variante, lieu_nom FROM lieu_alias ORDER BY variante")
