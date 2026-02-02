@@ -1386,6 +1386,10 @@ def split_bloc_fused_events(raw_text: str) -> list[str]:
     # Liste des patterns de split (groupe capturant = ce qui précède le split)
     # Chaque pattern capture le "séparateur" qui reste avec l'événement précédent
     split_patterns = [
+        # Pattern 0: Ballot box (☐☑☒) comme séparateur d'événements
+        # Ex: '☐ "Spectacle1" ☐ "Spectacle2"' -> split sur chaque ☐
+        # Le ☐ est souvent un artefact OCR pour les bullets •
+        r'([^\u2610\u2611\u2612])\s*[\u2610\u2611\u2612]\s*(?="|\«|[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ])',
         # Pattern 1: prix (X€) suivi de MAJUSCULES, Soirée, Birdland, ou guillemet
         r'(\d+(?:[.,/]\d+)?[€E])\s+(?=[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ]{2,}|[Ss]oir[ée]es?\s|Birdland\s|[«"<])',
         # Pattern 1b: prix en Francs (XF ou X-YF) suivi de : puis MAJUSCULES (anciens biduls)

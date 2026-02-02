@@ -1012,6 +1012,16 @@ class TestSplitBlocFusedEvents:
         assert 'Soirée open mix' in parts[0]
         assert 'Birdland' in parts[1]
 
+    def test_split_on_ballot_box(self):
+        """Split sur ballot box ☐ séparant les événements (bidul 238)."""
+        text = '☐ "Spectacle1" (conte), Cie A, Lieu1, 15h ☐ "Spectacle2" (sp.), Cie B, Lieu2, 16h ☐ Spectacle3, Lieu3, 17h'
+        from core.parser import split_bloc_fused_events
+        parts = split_bloc_fused_events(text)
+        assert len(parts) == 3
+        assert 'Spectacle1' in parts[0]
+        assert 'Spectacle2' in parts[1]
+        assert 'Spectacle3' in parts[2]
+
     def test_split_on_parenthesis_then_double_chevron(self):
         """Split après parenthèse fermante suivie de << (guillemets OCR)."""
         text = 'Les Spectaculaires: Soirée PETITES FORMES (àpd 12ans): "Pitt" + "Ma foi" + "Bertha", Jean Carmet, Allonnes 19h, 15€ repas compris (sur résa.) <<Pièce montée" (th.), Espace Scélia Sargé, 20h30, 6/10€'
