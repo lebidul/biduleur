@@ -1551,5 +1551,144 @@ class TestExtractEventNameQuotedWithColon:
         assert extract_event_name(text) == "Before Festival Teriaki"
 
 
+class TestGenericLocations:
+    """Tests pour les lieux génériques (Salle des fêtes, Église, etc.)."""
+
+    def test_load_lieu_patterns_includes_is_generic(self):
+        """Test que load_lieu_patterns inclut le flag is_generic."""
+        # Créer une liste avec un lieu générique et un lieu normal
+        lieu_ref_list = [
+            (1, "Salle des fêtes", "Arnage", True),
+            (2, "L'Oasis", "Le Mans", False),
+        ]
+        patterns = load_lieu_patterns(lieu_ref_list)
+
+        # Vérifier que les patterns ont le flag is_generic
+        salle_pattern = next((p for p in patterns if p['nom'] == "Salle des fêtes"), None)
+        oasis_pattern = next((p for p in patterns if p['nom'] == "L'Oasis"), None)
+
+        assert salle_pattern is not None
+        assert salle_pattern['is_generic'] is True
+
+        assert oasis_pattern is not None
+        assert oasis_pattern['is_generic'] is False
+
+    def test_load_lieu_patterns_no_duplicates_for_generic(self):
+        """Test qu'on ne crée pas de doublons pour les lieux génériques."""
+        # Plusieurs entrées pour le même lieu générique dans différentes villes
+        lieu_ref_list = [
+            (1, "Salle des fêtes", "Arnage", True),
+            (2, "Salle des fêtes", "Mamers", True),
+            (3, "Salle des fêtes", "Changé", True),
+        ]
+        # Passer un db_path inexistant pour éviter de charger les alias de la vraie DB
+        patterns = load_lieu_patterns(lieu_ref_list, db_path="/nonexistent/path.db")
+
+        # Il ne doit y avoir qu'un seul pattern pour "Salle des fêtes"
+        salle_patterns = [p for p in patterns if p['nom'] == "Salle des fêtes"]
+        assert len(salle_patterns) == 1
+
+    def test_find_lieu_v2_generic_extracts_ville_de(self):
+        """Test que find_lieu_in_text_v2 extrait la ville pour les lieux génériques (pattern 'de')."""
+        # Pattern: "salle communale de Rouessé Vassé"
+        lieu_ref_list = [
+            (1, "Salle Communale", "Fillé", True),
+        ]
+        ville_ref_list = [
+            (1, "Rouessé-Vassé"),
+            (2, "Fillé"),
+        ]
+
+        patterns = load_lieu_patterns(lieu_ref_list)
+        text = "RADEK AZUL BAND, salle communale de Rouessé Vassé, 14h"
+
+        result = find_lieu_in_text_v2(text, patterns, ville_ref_list)
+
+        assert result is not None
+        lieu_nom, lieu_id, start, end, lieu_ville = result
+        assert lieu_nom == "Salle Communale"
+        assert lieu_ville == "Rouessé-Vassé"  # Extrait du texte, pas du référentiel
+
+    def test_find_lieu_v2_generic_extracts_ville_comma(self):
+        """Test que find_lieu_in_text_v2 extrait la ville pour les lieux génériques (pattern virgule)."""
+        # Pattern: "salle des fêtes, Mamers"
+        lieu_ref_list = [
+            (1, "Salle des fêtes", "Arnage", True),
+        ]
+        ville_ref_list = [
+            (1, "Mamers"),
+            (2, "Arnage"),
+        ]
+
+        patterns = load_lieu_patterns(lieu_ref_list)
+        text = "Concert rock, salle des fêtes, Mamers, 20h"
+
+        result = find_lieu_in_text_v2(text, patterns, ville_ref_list)
+
+        assert result is not None
+        lieu_nom, lieu_id, start, end, lieu_ville = result
+        assert lieu_nom == "Salle des fêtes"
+        assert lieu_ville == "Mamers"
+
+    def test_find_lieu_v2_generic_extracts_ville_parentheses(self):
+        """Test que find_lieu_in_text_v2 extrait la ville entre parenthèses."""
+        # Pattern: "salle communale (Maréçon)"
+        lieu_ref_list = [
+            (1, "Salle Communale", "Fillé", True),
+        ]
+        ville_ref_list = [
+            (1, "Maréçon"),
+            (2, "Fillé"),
+        ]
+
+        patterns = load_lieu_patterns(lieu_ref_list)
+        text = "Concert, salle communale (Maréçon), 20h"
+
+        result = find_lieu_in_text_v2(text, patterns, ville_ref_list)
+
+        assert result is not None
+        lieu_nom, lieu_id, start, end, lieu_ville = result
+        assert lieu_nom == "Salle Communale"
+        assert lieu_ville == "Maréçon"
+
+    def test_find_lieu_v2_non_generic_uses_referentiel_ville(self):
+        """Test que les lieux non-génériques utilisent la ville du référentiel."""
+        lieu_ref_list = [
+            (1, "L'Oasis", "Le Mans", False),
+        ]
+        ville_ref_list = [
+            (1, "Le Mans"),
+        ]
+
+        patterns = load_lieu_patterns(lieu_ref_list)
+        text = "Concert rock, L'Oasis, 20h"
+
+        result = find_lieu_in_text_v2(text, patterns, ville_ref_list)
+
+        assert result is not None
+        lieu_nom, lieu_id, start, end, lieu_ville = result
+        assert lieu_nom == "L'Oasis"
+        assert lieu_ville == "Le Mans"  # Du référentiel
+
+    def test_find_lieu_v2_generic_normalizes_ville_with_hyphen(self):
+        """Test que la ville est normalisée (espace → tiret) pour le matching."""
+        # "Rouessé Vassé" dans le texte doit matcher "Rouessé-Vassé" dans le référentiel
+        lieu_ref_list = [
+            (1, "Salle Communale", "Fillé", True),
+        ]
+        ville_ref_list = [
+            (1, "Rouessé-Vassé"),  # Avec tiret
+        ]
+
+        patterns = load_lieu_patterns(lieu_ref_list)
+        text = "Concert, salle communale de Rouessé Vassé, 14h"  # Avec espace
+
+        result = find_lieu_in_text_v2(text, patterns, ville_ref_list)
+
+        assert result is not None
+        lieu_nom, lieu_id, start, end, lieu_ville = result
+        assert lieu_ville == "Rouessé-Vassé"  # Retourne le nom canonique avec tiret
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

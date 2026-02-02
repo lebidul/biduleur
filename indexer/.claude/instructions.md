@@ -27,8 +27,8 @@ python cli.py populate --numero 184 --replace
 python benchmark/compare_bidul.py 184
 python benchmark/compare_bidul.py 190
 
-# Scores de référence v1.18:
-# - Bidul 184: 94.6%
+# Scores de référence v1.19:
+# - Bidul 184: 94.7%
 # - Bidul 190: 90.6%
 ```
 

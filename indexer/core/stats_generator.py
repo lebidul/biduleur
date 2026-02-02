@@ -610,6 +610,7 @@ def get_geo_data(db_path: str) -> Dict[str, Any]:
     # Données agrégées par lieu (tous temps)
     cur.execute("""
         SELECT
+            lr.id,
             lr.nom,
             lr.ville,
             lr.latitude,
@@ -622,17 +623,56 @@ def get_geo_data(db_path: str) -> Dict[str, Any]:
         ORDER BY event_count DESC
     """)
 
+    lieux_data = cur.fetchall()
+    lieu_ids = [row[0] for row in lieux_data]
+
+    # Récupérer TOUS les événements pour chaque lieu (pour filtrage dynamique)
+    events_by_lieu = {}
+    if lieu_ids:
+        placeholders = ','.join('?' * len(lieu_ids))
+        cur.execute(f"""
+            SELECT
+                e.lieu_ref_id,
+                e.date_evenement,
+                e.heure,
+                e.tarif_raw,
+                e.nom as event_nom,
+                GROUP_CONCAT(ce.artiste, ' + ') as artistes,
+                GROUP_CONCAT(ce.nom_spectacle, ' / ') as spectacles
+            FROM evenement e
+            LEFT JOIN contenu_evenement ce ON ce.evenement_id = e.id
+            WHERE e.lieu_ref_id IN ({placeholders})
+            GROUP BY e.id
+            ORDER BY e.lieu_ref_id, e.date_evenement DESC
+        """, lieu_ids)
+
+        for row in cur.fetchall():
+            lieu_id = row[0]
+            if lieu_id not in events_by_lieu:
+                events_by_lieu[lieu_id] = []
+            # Stocker tous les événements avec la date pour filtrage côté JS
+            events_by_lieu[lieu_id].append({
+                'date': row[1],
+                'heure': row[2],
+                'tarif': row[3],
+                'nom': row[4],
+                'artistes': row[5],
+                'spectacles': row[6]
+            })
+
     lats, lngs = [], []
-    for row in cur.fetchall():
+    for row in lieux_data:
+        lieu_id = row[0]
         result['lieux'].append({
-            'nom': row[0],
-            'ville': row[1] or 'Le Mans',
-            'lat': row[2],
-            'lng': row[3],
-            'count': row[4]
+            'nom': row[1],
+            'ville': row[2] or 'Le Mans',
+            'lat': row[3],
+            'lng': row[4],
+            'count': row[5],
+            'events': events_by_lieu.get(lieu_id, [])
         })
-        lats.append(row[2])
-        lngs.append(row[3])
+        lats.append(row[3])
+        lngs.append(row[4])
 
     # Calculer les bounds
     if lats and lngs:
@@ -2207,6 +2247,9 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
         let heatLayer = null;
         let currentMapView = 'markers';
         let currentMapData = null;
+        let allLieuxWithEvents = null;  // Store full lieu data with events
+        let currentFilterType = null;   // 'year', 'month', 'week', 'day' or null
+        let currentFilterValue = null;  // The selected filter value
 
         function initMap() {
             if (!geoData || !geoData.lieux || geoData.lieux.length === 0) {
@@ -2229,6 +2272,9 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
             markersLayer = L.layerGroup().addTo(map);
             // Tooltip layer (invisible markers for tooltips, always visible)
             tooltipLayer = L.layerGroup().addTo(map);
+
+            // Store full lieu data with events for popup filtering
+            allLieuxWithEvents = geoData.lieux;
 
             // Initial map update
             currentMapData = geoData.lieux;
@@ -2272,6 +2318,15 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
 
                 totalEvents += lieu.count;
 
+                // Find full lieu data with events (for popup)
+                let lieuWithEvents = lieu;
+                if (allLieuxWithEvents) {
+                    const fullLieu = allLieuxWithEvents.find(l => l.nom === lieu.nom && l.ville === lieu.ville);
+                    if (fullLieu) {
+                        lieuWithEvents = {...lieu, events: fullLieu.events};
+                    }
+                }
+
                 // Circle marker with popup and tooltip (visible)
                 const radius = Math.min(5 + (lieu.count / maxCount) * 15, 20);
                 const marker = L.circleMarker([lieu.lat, lieu.lng], {
@@ -2282,14 +2337,12 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
                     color: '#fff',
                     weight: 1
                 });
+
+                // Build popup content with event details (filtered by current time filter)
+                const popupContent = buildLieuPopup(lieuWithEvents, currentFilterType, currentFilterValue);
+
                 // Popup with details on click
-                marker.bindPopup(
-                    '<div style="font-family:system-ui;min-width:150px">' +
-                    '<b style="font-size:14px">' + lieu.nom + '</b><br>' +
-                    '<span style="color:#9ca3af">' + lieu.ville + '</span><br>' +
-                    '<span style="color:#f59e0b;font-weight:600">' + lieu.count + ' événement(s)</span>' +
-                    '</div>'
-                );
+                marker.bindPopup(popupContent, {maxWidth: 350, maxHeight: 400});
                 // Tooltip with name on hover
                 marker.bindTooltip(lieu.nom, {
                     permanent: false,
@@ -2304,13 +2357,7 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
                     fillOpacity: 0,
                     stroke: false
                 });
-                tooltipMarker.bindPopup(
-                    '<div style="font-family:system-ui;min-width:150px">' +
-                    '<b style="font-size:14px">' + lieu.nom + '</b><br>' +
-                    '<span style="color:#9ca3af">' + lieu.ville + '</span><br>' +
-                    '<span style="color:#f59e0b;font-weight:600">' + lieu.count + ' événement(s)</span>' +
-                    '</div>'
-                );
+                tooltipMarker.bindPopup(popupContent, {maxWidth: 350, maxHeight: 400});
                 tooltipMarker.bindTooltip(lieu.nom, {
                     permanent: false,
                     direction: 'top',
@@ -2318,8 +2365,10 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
                 });
                 tooltipLayer.addLayer(tooltipMarker);
 
-                // Heatmap point (with intensity based on count)
-                heatPoints.push([lieu.lat, lieu.lng, lieu.count / maxCount]);
+                // Heatmap point (with logarithmic intensity for better variation display)
+                // Log scale: log(count+1) / log(maxCount+1) spreads values more evenly
+                const logIntensity = Math.log(lieu.count + 1) / Math.log(maxCount + 1);
+                heatPoints.push([lieu.lat, lieu.lng, logIntensity]);
             });
 
             // Create heatmap layer
@@ -2327,7 +2376,9 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
                 radius: 25,
                 blur: 15,
                 maxZoom: 15,
+                max: 1.0,
                 gradient: {
+                    0.0: '#1e3a5f',
                     0.2: '#22c55e',
                     0.4: '#84cc16',
                     0.6: '#f59e0b',
@@ -2342,6 +2393,115 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
 
             // Apply current view
             applyMapView();
+        }
+
+        function buildLieuPopup(lieu, filterType, filterValue) {
+            // Filtrer les événements selon le filtre actif
+            let filteredEvents = lieu.events || [];
+            let filterLabel = 'Tous les événements';
+
+            if (filterType && filterValue && filteredEvents.length > 0) {
+                filteredEvents = filteredEvents.filter(function(evt) {
+                    if (!evt.date) return false;
+                    if (filterType === 'year') {
+                        return evt.date.substring(0, 4) === filterValue;
+                    } else if (filterType === 'month') {
+                        return evt.date.substring(0, 7) === filterValue;
+                    } else if (filterType === 'week') {
+                        // filterValue format: YYYY-WNN
+                        const evtDate = new Date(evt.date);
+                        const evtWeek = getWeekString(evtDate);
+                        return evtWeek === filterValue;
+                    } else if (filterType === 'day') {
+                        return evt.date === filterValue;
+                    }
+                    return true;
+                });
+
+                // Label du filtre
+                if (filterType === 'year') filterLabel = 'Année ' + filterValue;
+                else if (filterType === 'month') filterLabel = filterValue;
+                else if (filterType === 'week') filterLabel = 'Semaine ' + filterValue;
+                else if (filterType === 'day') filterLabel = filterValue;
+            }
+
+            // Limiter à 15 événements pour l'affichage
+            const displayEvents = filteredEvents.slice(0, 15);
+            const totalFiltered = filteredEvents.length;
+
+            let html = '<div style="font-family:system-ui;min-width:200px;max-width:320px">';
+            html += '<b style="font-size:14px;color:#f8fafc">' + escapeHtml(lieu.nom) + '</b><br>';
+            html += '<span style="color:#9ca3af">' + escapeHtml(lieu.ville) + '</span><br>';
+            html += '<span style="color:#f59e0b;font-weight:600">' + totalFiltered + ' événement(s)</span>';
+            if (filterType && filterValue) {
+                html += '<span style="color:#6b7280;font-size:11px"> (' + filterLabel + ')</span>';
+            }
+
+            if (displayEvents.length > 0) {
+                html += '<div style="margin-top:8px;border-top:1px solid #374151;padding-top:8px;max-height:280px;overflow-y:auto">';
+
+                displayEvents.forEach(function(evt) {
+                    html += '<div style="margin-bottom:8px;padding:6px;background:#1f2937;border-radius:4px;font-size:12px">';
+
+                    // Date et heure
+                    if (evt.date) {
+                        html += '<div style="color:#60a5fa;font-weight:500">';
+                        html += escapeHtml(evt.date);
+                        if (evt.heure) html += ' - ' + escapeHtml(evt.heure);
+                        html += '</div>';
+                    }
+
+                    // Nom de l'événement
+                    if (evt.nom) {
+                        html += '<div style="color:#fbbf24;font-style:italic">' + escapeHtml(evt.nom) + '</div>';
+                    }
+
+                    // Artistes
+                    if (evt.artistes) {
+                        html += '<div style="color:#f8fafc">' + escapeHtml(evt.artistes) + '</div>';
+                    }
+
+                    // Spectacles
+                    if (evt.spectacles) {
+                        html += '<div style="color:#a78bfa">« ' + escapeHtml(evt.spectacles) + ' »</div>';
+                    }
+
+                    // Tarif
+                    if (evt.tarif) {
+                        html += '<div style="color:#34d399;font-size:11px">' + escapeHtml(evt.tarif) + '</div>';
+                    }
+
+                    html += '</div>';
+                });
+
+                if (totalFiltered > 15) {
+                    html += '<div style="color:#6b7280;font-size:11px;text-align:center">... et ' + (totalFiltered - 15) + ' autres</div>';
+                }
+
+                html += '</div>';
+            } else if (filterType && filterValue) {
+                html += '<div style="margin-top:8px;color:#6b7280;font-size:12px;font-style:italic">Aucun événement pour cette période</div>';
+            }
+
+            html += '</div>';
+            return html;
+        }
+
+        function getWeekString(date) {
+            // Retourne YYYY-WNN format
+            const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+            const dayNum = d.getUTCDay() || 7;
+            d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+            const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+            const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+            return d.getUTCFullYear() + '-W' + String(weekNo).padStart(2, '0');
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         }
 
         function getHeatColor(count, max) {
@@ -2404,6 +2564,8 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
             dayContainer.style.display = 'none';
 
             if (type === 'all') {
+                currentFilterType = null;
+                currentFilterValue = null;
                 updateMap(geoData.lieux);
             } else if (type === 'year') {
                 yearContainer.style.display = 'flex';
@@ -2443,6 +2605,8 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
 
             if (year) {
                 label.textContent = year;
+                currentFilterType = 'year';
+                currentFilterValue = year;
 
                 if (geoData.lieux_by_year && geoData.lieux_by_year[year]) {
                     updateMap(geoData.lieux_by_year[year]);
@@ -2505,6 +2669,8 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
                 const monthNames = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin',
                                    'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
                 label.textContent = `${monthNames[parseInt(m) - 1]} ${year}`;
+                currentFilterType = 'month';
+                currentFilterValue = month;
 
                 if (geoData.lieux_by_month && geoData.lieux_by_month[month]) {
                     updateMap(geoData.lieux_by_month[month]);
@@ -2575,6 +2741,8 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
                 // Format YYYY-WNN to "Semaine NN, YYYY"
                 const [year, w] = week.split('-W');
                 label.textContent = `Sem. ${parseInt(w)}, ${year}`;
+                currentFilterType = 'week';
+                currentFilterValue = week;
 
                 if (geoData.lieux_by_week && geoData.lieux_by_week[week]) {
                     updateMap(geoData.lieux_by_week[week]);
@@ -2643,6 +2811,8 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
                 const monthNames = ['jan', 'fév', 'mar', 'avr', 'mai', 'juin',
                                    'juil', 'août', 'sep', 'oct', 'nov', 'déc'];
                 label.textContent = `${parseInt(d)} ${monthNames[parseInt(m) - 1]} ${year}`;
+                currentFilterType = 'day';
+                currentFilterValue = day;
 
                 if (geoData.lieux_by_day && geoData.lieux_by_day[day]) {
                     updateMap(geoData.lieux_by_day[day]);

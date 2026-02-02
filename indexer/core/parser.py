@@ -1824,8 +1824,12 @@ def load_lieu_patterns(lieu_ref_list: list, db_path: str = None) -> list:
     Trie par longueur décroissante pour matcher les plus longs d'abord.
     Inclut les alias de la table lieu_alias.
 
+    Pour les lieux génériques (is_generic=True), on ne crée qu'un seul pattern
+    (pas de doublons par ville) et on marque le pattern comme générique.
+    La ville sera extraite du texte lors du matching.
+
     Args:
-        lieu_ref_list: Liste de tuples (id, nom) ou (id, nom, ville)
+        lieu_ref_list: Liste de tuples (id, nom, ville) ou (id, nom, ville, is_generic)
         db_path: Chemin vers la base de données (optionnel)
 
     Returns:
@@ -1833,6 +1837,31 @@ def load_lieu_patterns(lieu_ref_list: list, db_path: str = None) -> list:
     """
     import sqlite3
     from pathlib import Path
+
+    def make_word_pattern(name: str) -> str:
+        """
+        Crée un pattern regex avec word boundaries intelligentes.
+
+        Gère les cas où le nom commence ou finit par des caractères non-word
+        (ex: "P.C.V." où \b ne fonctionne pas après le dernier point).
+        """
+        escaped = re.escape(name)
+
+        # Vérifier si le premier caractère est un word character
+        first_char = name[0] if name else ''
+        if first_char.isalnum() or first_char == '_':
+            prefix = r'\b'
+        else:
+            prefix = r'(?<![a-zA-Z0-9_])'
+
+        # Vérifier si le dernier caractère est un word character
+        last_char = name[-1] if name else ''
+        if last_char.isalnum() or last_char == '_':
+            suffix = r'\b'
+        else:
+            suffix = r'(?![a-zA-Z0-9_])'
+
+        return prefix + escaped + suffix
 
     patterns = []
 
@@ -1849,42 +1878,65 @@ def load_lieu_patterns(lieu_ref_list: list, db_path: str = None) -> list:
     except Exception:
         pass  # Si la table n'existe pas, on continue sans les alias
 
-    # Créer un index lieu_nom -> (lieu_id, lieu_ville)
+    # Créer un index lieu_nom -> (lieu_id, lieu_ville, is_generic)
     lieu_nom_to_id = {}
     lieu_nom_to_ville = {}
+    lieu_nom_to_generic = {}
     for lieu_tuple in lieu_ref_list:
         lieu_id = lieu_tuple[0]
         lieu_nom = lieu_tuple[1]
         lieu_ville = lieu_tuple[2] if len(lieu_tuple) > 2 else 'Le Mans'
+        is_generic = lieu_tuple[3] if len(lieu_tuple) > 3 else False
         lieu_nom_to_id[lieu_nom.lower()] = lieu_id
         lieu_nom_to_ville[lieu_nom.lower()] = lieu_ville
+        lieu_nom_to_generic[lieu_nom.lower()] = is_generic
+
+    # Pour les lieux génériques, on ne crée qu'un seul pattern (éviter doublons)
+    seen_generic_noms = set()
 
     for lieu_tuple in lieu_ref_list:
         lieu_id = lieu_tuple[0]
         lieu_nom = lieu_tuple[1]
         lieu_ville = lieu_tuple[2] if len(lieu_tuple) > 2 else 'Le Mans'
+        is_generic = lieu_tuple[3] if len(lieu_tuple) > 3 else False
 
-        # Pattern exact avec limites de mots
+        lieu_nom_lower = lieu_nom.lower()
+
+        # Pour les lieux génériques, ne créer qu'un seul pattern
+        if is_generic:
+            if lieu_nom_lower in seen_generic_noms:
+                continue  # Skip les doublons
+            seen_generic_noms.add(lieu_nom_lower)
+
+        # Pattern exact avec limites de mots intelligentes
         # Normaliser les apostrophes pour matcher les deux types (' et ')
         lieu_nom_pattern = re.escape(lieu_nom).replace(r"\'", r"['\u2019]").replace(r"\u2019", r"['\u2019]")
+
+        # Utiliser make_word_pattern pour les word boundaries, mais adapter pour les apostrophes
+        first_char = lieu_nom[0] if lieu_nom else ''
+        last_char = lieu_nom[-1] if lieu_nom else ''
+        prefix = r'\b' if (first_char.isalnum() or first_char == '_') else r'(?<![a-zA-Z0-9_])'
+        suffix = r'\b' if (last_char.isalnum() or last_char == '_') else r'(?![a-zA-Z0-9_])'
+
         patterns.append({
             'id': lieu_id,
             'nom': lieu_nom,
             'ville': lieu_ville,
-            'pattern': re.compile(r'\b' + lieu_nom_pattern + r'\b', re.IGNORECASE),
+            'is_generic': is_generic,
+            'pattern': re.compile(prefix + lieu_nom_pattern + suffix, re.IGNORECASE),
             'length': len(lieu_nom)
         })
 
-        lieu_nom_lower = lieu_nom.lower()
-
         # Variantes courtes pour les bars: "Bar Le Barouf" → "Le Barouf", "Barouf"
-        if lieu_nom_lower.startswith('bar le '):
+        # Note: les lieux génériques n'ont pas de variantes courtes
+        if not is_generic and lieu_nom_lower.startswith('bar le '):
             # Variante "Le Barouf" (sans "Bar")
             short1 = lieu_nom[4:]  # "Le Barouf"
             patterns.append({
                 'id': lieu_id,
                 'nom': lieu_nom,
                 'ville': lieu_ville,
+                'is_generic': False,
                 'pattern': re.compile(r'(?<![a-zA-Z])\b' + re.escape(short1) + r'\b(?!\s*\()', re.IGNORECASE),
                 'length': len(short1)
             })
@@ -1894,50 +1946,55 @@ def load_lieu_patterns(lieu_ref_list: list, db_path: str = None) -> list:
                 'id': lieu_id,
                 'nom': lieu_nom,
                 'ville': lieu_ville,
+                'is_generic': False,
                 'pattern': re.compile(r'(?<![a-zA-Z])\b' + re.escape(short2) + r'\b(?!\s*\()', re.IGNORECASE),
                 'length': len(short2)
             })
 
-        elif lieu_nom_lower.startswith('bar '):
+        elif not is_generic and lieu_nom_lower.startswith('bar '):
             short = lieu_nom[4:]  # sans "bar "
             patterns.append({
                 'id': lieu_id,
                 'nom': lieu_nom,
                 'ville': lieu_ville,
+                'is_generic': False,
                 'pattern': re.compile(r'(?<![a-zA-Z])\b' + re.escape(short) + r'\b(?!\s*\()', re.IGNORECASE),
                 'length': len(short)
             })
 
         # Variantes pour les lieux avec article: "L'Oasis" → "Oasis"
         # Gérer les deux types d'apostrophes (droite ' et typographique ')
-        if lieu_nom_lower.startswith("l'") or lieu_nom_lower.startswith("l'"):
+        if not is_generic and (lieu_nom_lower.startswith("l'") or lieu_nom_lower.startswith("l'")):
             short = lieu_nom[2:]  # "Oasis"
             patterns.append({
                 'id': lieu_id,
                 'nom': lieu_nom,
                 'ville': lieu_ville,
+                'is_generic': False,
                 'pattern': re.compile(r'\b' + re.escape(short) + r'\b', re.IGNORECASE),
                 'length': len(short)
             })
 
         # Variantes pour "Le XXX" → "XXX"
-        if lieu_nom_lower.startswith('le ') and not lieu_nom_lower.startswith('le mans'):
+        if not is_generic and lieu_nom_lower.startswith('le ') and not lieu_nom_lower.startswith('le mans'):
             short = lieu_nom[3:]
             patterns.append({
                 'id': lieu_id,
                 'nom': lieu_nom,
                 'ville': lieu_ville,
+                'is_generic': False,
                 'pattern': re.compile(r'(?<![a-zA-Z])\b' + re.escape(short) + r'\b(?!\s*\()', re.IGNORECASE),
                 'length': len(short)
             })
 
         # Variantes pour "La XXX" → "XXX"
-        if lieu_nom_lower.startswith('la '):
+        if not is_generic and lieu_nom_lower.startswith('la '):
             short = lieu_nom[3:]
             patterns.append({
                 'id': lieu_id,
                 'nom': lieu_nom,
                 'ville': lieu_ville,
+                'is_generic': False,
                 'pattern': re.compile(r'(?<![a-zA-Z])\b' + re.escape(short) + r'\b(?!\s*\()', re.IGNORECASE),
                 'length': len(short)
             })
@@ -1952,14 +2009,15 @@ def load_lieu_patterns(lieu_ref_list: list, db_path: str = None) -> list:
         # Retirer la ponctuation finale
         return s.lower().rstrip(')').strip()
 
-    # Créer un index normalisé
+    # Créer un index normalisé avec is_generic
     lieu_nom_normalized = {}
     for lieu_tuple in lieu_ref_list:
         lieu_id = lieu_tuple[0]
         lieu_nom = lieu_tuple[1]
         lieu_ville = lieu_tuple[2] if len(lieu_tuple) > 2 else 'Le Mans'
+        is_generic = lieu_tuple[3] if len(lieu_tuple) > 3 else False
         norm_key = normalize_for_match(lieu_nom)
-        lieu_nom_normalized[norm_key] = (lieu_id, lieu_nom, lieu_ville)
+        lieu_nom_normalized[norm_key] = (lieu_id, lieu_nom, lieu_ville, is_generic)
 
     for alias_variante, alias_lieu_nom in aliases.items():
         # Trouver l'id du lieu correspondant avec matching normalisé
@@ -1967,42 +2025,51 @@ def load_lieu_patterns(lieu_ref_list: list, db_path: str = None) -> list:
         match_info = lieu_nom_normalized.get(norm_alias_lieu)
         if match_info is None:
             # Essayer un matching partiel
-            for norm_key, (lid, lnom, lville) in lieu_nom_normalized.items():
+            for norm_key, (lid, lnom, lville, lgeneric) in lieu_nom_normalized.items():
                 if norm_alias_lieu in norm_key or norm_key in norm_alias_lieu:
-                    match_info = (lid, lnom, lville)
+                    match_info = (lid, lnom, lville, lgeneric)
                     break
         if match_info is None:
             continue
-        alias_lieu_id, alias_lieu_nom_ref, alias_lieu_ville = match_info
-        # Ajouter le pattern pour l'alias
+        alias_lieu_id, alias_lieu_nom_ref, alias_lieu_ville, alias_is_generic = match_info
+        # Ajouter le pattern pour l'alias (hérite du flag is_generic du lieu)
+        # Utiliser make_word_pattern pour gérer les noms avec caractères non-word (ex: "P.C.V.")
         patterns.append({
             'id': alias_lieu_id,
             'nom': alias_lieu_nom_ref,  # Retourne le nom du lieu_ref
             'ville': alias_lieu_ville,
-            'pattern': re.compile(r'\b' + re.escape(alias_variante) + r'\b', re.IGNORECASE),
+            'is_generic': alias_is_generic,
+            'pattern': re.compile(make_word_pattern(alias_variante), re.IGNORECASE),
             'length': len(alias_variante)
         })
 
-    # Trier par longueur décroissante (matcher les plus longs d'abord)
-    patterns.sort(key=lambda x: x['length'], reverse=True)
+    # Trier par: 1) lieux spécifiques avant génériques, 2) longueur décroissante
+    # Cela garantit que "L'Epidaure" (spécifique) sera testé avant "Centre Culturel" (générique)
+    # même si "Centre Culturel" est plus long
+    patterns.sort(key=lambda x: (x.get('is_generic', False), -x['length']))
 
     return patterns
 
 
-def find_lieu_in_text_v2(text: str, lieu_patterns: list) -> Optional[tuple]:
+def find_lieu_in_text_v2(text: str, lieu_patterns: list, ville_ref_list: list = None) -> Optional[tuple]:
     """
     Trouve le lieu dans le texte en utilisant les patterns préparés.
 
     Stratégie: matcher les patterns les plus longs en premier pour éviter
     les faux positifs (ex: "Le Barouf" avant "Barouf").
 
+    Pour les lieux génériques (Salle des fêtes, Église, etc.), la ville est
+    extraite du texte suivant le lieu (pattern "de {Ville}" ou ", {Ville}").
+
     Args:
         text: Texte à analyser
         lieu_patterns: Patterns préparés par load_lieu_patterns()
+        ville_ref_list: Liste des villes connues pour extraction (optionnel)
 
     Returns:
         (lieu_nom, lieu_id, start_pos, end_pos, lieu_ville) ou None
-        Note: lieu_ville est la ville associée au lieu dans le référentiel
+        Note: lieu_ville est extraite du texte pour les lieux génériques,
+              sinon c'est la ville du référentiel
     """
     for pattern_info in lieu_patterns:
         match = pattern_info['pattern'].search(text)
@@ -2035,13 +2102,109 @@ def find_lieu_in_text_v2(text: str, lieu_patterns: list) -> Optional[tuple]:
             if in_quotes:
                 continue
 
+            # Déterminer la ville
+            lieu_ville = pattern_info.get('ville', 'Le Mans')
+
+            # Pour les lieux génériques, extraire la ville du texte
+            if pattern_info.get('is_generic', False):
+                extracted_ville = _extract_ville_after_lieu(
+                    text, match.end(), ville_ref_list
+                )
+                if extracted_ville:
+                    lieu_ville = extracted_ville
+
             return (
                 pattern_info['nom'],
                 pattern_info['id'],
                 match.start(),
                 match.end(),
-                pattern_info.get('ville', 'Le Mans')
+                lieu_ville
             )
+
+    return None
+
+
+def _extract_ville_after_lieu(text: str, lieu_end_pos: int, ville_ref_list: list = None) -> Optional[str]:
+    """
+    Extrait la ville du texte après un lieu générique.
+
+    Patterns reconnus:
+    - "de {Ville}" : "salle communale de Rouessé Vassé"
+    - "d'{Ville}" : "salle d'Arnage"
+    - ", {Ville}" : "salle des fêtes, Mamers"
+    - "({Ville})" : "salle communale (Maréçon)"
+
+    Args:
+        text: Texte complet
+        lieu_end_pos: Position de fin du lieu dans le texte
+        ville_ref_list: Liste des villes connues [(id, nom), ...]
+
+    Returns:
+        Nom de la ville extraite ou None
+    """
+    # Prendre le texte après le lieu (max 50 caractères)
+    after_text = text[lieu_end_pos:lieu_end_pos + 50]
+
+    # Construire un dict pour le matching normalisé (espace/tiret interchangeables)
+    # et retourner le nom canonique de la ville
+    ville_normalized_map = {}  # normalized_key -> canonical_name
+    if ville_ref_list:
+        for ville_tuple in ville_ref_list:
+            ville_nom = ville_tuple[1] if len(ville_tuple) > 1 else ville_tuple[0]
+            # Normaliser: lowercase, remplacer tirets par espaces
+            normalized = ville_nom.lower().replace('-', ' ')
+            ville_normalized_map[normalized] = ville_nom
+
+    def match_ville(candidate: str) -> Optional[str]:
+        """Vérifie si le candidat correspond à une ville connue et retourne le nom canonique."""
+        if not ville_normalized_map:
+            # Pas de référentiel - accepter si assez long
+            return candidate if len(candidate) >= 3 else None
+        # Normaliser le candidat
+        normalized = candidate.lower().replace('-', ' ')
+        if normalized in ville_normalized_map:
+            return ville_normalized_map[normalized]
+        return None
+
+    # Pattern 1: "de {Ville}" ou "d'{Ville}"
+    # Ex: "salle communale de Rouessé Vassé, 14h"
+    pattern_de = re.compile(
+        r"^\s*d[e']?\s*([A-ZÀ-Ü][a-zà-ü]+(?:[\s\-][A-ZÀ-Ü]?[a-zà-ü]+)*)",
+        re.UNICODE
+    )
+    m = pattern_de.match(after_text)
+    if m:
+        candidate = m.group(1).strip()
+        matched = match_ville(candidate)
+        if matched:
+            return matched
+
+    # Pattern 2: ", {Ville}" avec une virgule
+    # Ex: "salle des fêtes, Mamers, 20h"
+    pattern_comma = re.compile(
+        r"^\s*,\s*([A-ZÀ-Ü][a-zà-ü]+(?:[\s\-][A-ZÀ-Ü]?[a-zà-ü]+)*)",
+        re.UNICODE
+    )
+    m = pattern_comma.match(after_text)
+    if m:
+        candidate = m.group(1).strip()
+        # Pour le pattern virgule, être plus strict: doit être une ville connue
+        matched = match_ville(candidate)
+        if matched and ville_normalized_map:  # Exiger une correspondance dans le référentiel
+            return matched
+
+    # Pattern 3: "({Ville})" entre parenthèses
+    # Ex: "salle communale (Maréçon)"
+    pattern_paren = re.compile(
+        r"^\s*\(\s*([A-ZÀ-Ü][a-zà-ü]+(?:[\s\-][A-ZÀ-Ü]?[a-zà-ü]+)*)\s*\)",
+        re.UNICODE
+    )
+    m = pattern_paren.match(after_text)
+    if m:
+        candidate = m.group(1).strip()
+        matched = match_ville(candidate)
+        if matched:
+            return matched
 
     return None
 
@@ -4154,8 +4317,8 @@ def parse_event_line_v2(
             # Pas de date dans le préfixe
             dates = [None]
 
-        # Trouver le lieu
-        lieu_match = find_lieu_in_text_v2(event_text, lieu_patterns)
+        # Trouver le lieu (passer ville_ref_list pour extraction des lieux génériques)
+        lieu_match = find_lieu_in_text_v2(event_text, lieu_patterns, ville_ref_list)
 
         # Vérifier si le lieu trouvé fait partie d'un nom d'événement
         # Ex: "Les Rdv Conservatoire" - "Conservatoire" ne doit pas être pris comme lieu
@@ -4190,7 +4353,7 @@ def parse_event_line_v2(
                 # Le lieu fait partie du nom d'événement - chercher le vrai lieu plus loin
                 # Chercher à partir de la position après le lieu actuel
                 remaining = event_text[lieu_end:]
-                next_lieu_match = find_lieu_in_text_v2(remaining, lieu_patterns)
+                next_lieu_match = find_lieu_in_text_v2(remaining, lieu_patterns, ville_ref_list)
                 if next_lieu_match:
                     next_lieu_nom, next_lieu_id, next_start, next_end, next_lieu_ville = next_lieu_match
                     # Ajuster les positions
