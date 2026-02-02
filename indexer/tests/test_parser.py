@@ -1653,6 +1653,106 @@ class TestSpectacleDeAuteurPattern:
         assert "Abeilles" in spectacles
 
 
+class TestSpectacleVirguleArtistePattern:
+    """Tests pour le pattern '"Spectacle" (style), Artiste' (bidul 219)."""
+
+    @pytest.fixture
+    def parser(self):
+        return EventParser(bidul_mois=3, bidul_annee=2018)
+
+    def test_spectacle_virgule_artiste_basic(self, parser):
+        """Test pattern basique: "Spectacle" (style), Artiste."""
+        text = '"L\'instant magique" (spectacle illusion), Greg Bagot, Lieu, 21h'
+        artistes, spectacles, genres, _ = parser._extract_spectacle_artiste_pattern(text)
+
+        assert len(spectacles) == 1
+        assert spectacles[0] == "L'instant magique"
+        assert len(genres) == 1
+        assert genres[0] == "spectacle illusion"
+        assert len(artistes) == 1
+        assert artistes[0].nom == "Greg Bagot"
+
+    def test_spectacle_virgule_artiste_with_html_tags(self, parser):
+        """Test avec balises HTML: <b>"Spectacle"</b> (<i>style</i>), Artiste."""
+        text = '<b>"L\'instant magique"</b> (<i>spectacle illusion</i>), Greg Bagot, Th. De l\'Acthalia, 21h'
+        artistes, spectacles, genres, _ = parser._extract_spectacle_artiste_pattern(text)
+
+        assert len(spectacles) == 1
+        assert spectacles[0] == "L'instant magique"
+        assert len(genres) == 1
+        assert genres[0] == "spectacle illusion"
+        assert len(artistes) == 1
+        assert artistes[0].nom == "Greg Bagot"
+
+    def test_spectacle_virgule_artiste_with_quote_before_tag(self, parser):
+        """Test avec guillemet avant la balise: "<b>Spectacle</b>" (style), Artiste."""
+        text = '"<b>L\'instant magique</b>" (<i>spectacle illusion</i>), Greg Bagot, Th. De l\'Acthalia, 21h'
+        artistes, spectacles, genres, _ = parser._extract_spectacle_artiste_pattern(text)
+
+        assert len(spectacles) == 1
+        assert spectacles[0] == "L'instant magique"
+        assert len(artistes) == 1
+        assert artistes[0].nom == "Greg Bagot"
+
+    def test_spectacle_virgule_artiste_guillemets_francais(self, parser):
+        """Test avec guillemets français «»."""
+        text = '«L\'instant magique» (spectacle illusion), Greg Bagot, Lieu'
+        artistes, spectacles, genres, _ = parser._extract_spectacle_artiste_pattern(text)
+
+        assert len(spectacles) == 1
+        assert spectacles[0] == "L'instant magique"
+
+    def test_spectacle_virgule_artiste_two_word_name(self, parser):
+        """Test avec prénom + nom."""
+        text = '"Spectacle" (magie), Jean Pierre Dupont, Lieu'
+        artistes, spectacles, genres, _ = parser._extract_spectacle_artiste_pattern(text)
+
+        assert len(artistes) == 1
+        assert "Jean Pierre Dupont" in artistes[0].nom or "Jean Pierre" in artistes[0].nom
+
+    def test_extract_before_lieu_spectacle_virgule_artiste(self):
+        """Test extract_before_lieu avec le pattern."""
+        text = '<b>"L\'instant magique"</b> (<i>spectacle illusion</i>), Greg Bagot, '
+        result = extract_before_lieu(text, len(text) - 2)
+
+        # Spectacle doit être extrait
+        spectacles = result.get('spectacles', [])
+        assert len(spectacles) >= 1
+        spectacle_noms = [s['nom'] if isinstance(s, dict) else s for s in spectacles]
+        assert any("instant magique" in n.lower() for n in spectacle_noms)
+
+        # Artiste doit être extrait
+        artistes = result.get('artistes', [])
+        assert len(artistes) >= 1
+        artiste_noms = [a['nom'] if isinstance(a, dict) else a.nom for a in artistes]
+        assert any("Greg Bagot" in n for n in artiste_noms)
+
+    def test_parse_event_full_flow(self, parser):
+        """Test parsing complet avec EventParser._parse_event."""
+        text = '<b>"L\'instant magique"</b> (<i>spectacle illusion</i>), Greg Bagot, Th. de l\'Acthalia, 21h, 12€'
+        event = parser._parse_event(text, 'Sa 10')
+
+        assert event is not None
+        # Spectacle
+        spectacle_lower = [s.lower() for s in event.spectacles]
+        assert any("instant magique" in s for s in spectacle_lower)
+        # Artiste
+        artiste_noms = [a.nom if hasattr(a, 'nom') else a['nom'] for a in event.artistes]
+        assert any("Greg Bagot" in n for n in artiste_noms)
+
+    def test_not_match_majuscule_artist(self, parser):
+        """Test que le pattern ne matche pas les artistes en MAJUSCULES."""
+        # Les MAJUSCULES sont pour les artistes musicaux, pas théâtre
+        text = '"Spectacle" (style), ARTISTE MAJUSCULE, Lieu'
+        artistes, spectacles, genres, _ = parser._extract_spectacle_artiste_pattern(text)
+
+        # Ne doit pas matcher car ARTISTE MAJUSCULE n'est pas Mixed Case
+        # Le spectacle peut être extrait par un autre pattern
+        if artistes:
+            # Si extrait, ne doit pas être "ARTISTE MAJUSCULE"
+            assert all("ARTISTE MAJUSCULE" not in a.nom for a in artistes)
+
+
 class TestGenericLocations:
     """Tests pour les lieux génériques (Salle des fêtes, Église, etc.)."""
 

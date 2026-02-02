@@ -638,3 +638,104 @@ cursor.execute('''
 for row in cursor.fetchall():
     print(f"  {row[0]} - {row[1]}")
 ```
+
+## Ajouter un pattern d'extraction d'artiste/spectacle
+
+### Contexte
+Le workflow `populate` utilise `parse_event_line_v2()` (fonction standalone) qui appelle `extract_before_lieu()` pour extraire les artistes/spectacles. La classe `EventParser._parse_event()` n'est PAS utilisée par `populate`.
+
+### Architecture du parsing (IMPORTANT)
+
+```
+CLI populate
+    └── parse_with_referentiel()
+        └── _parse_bloc_with_referentiel() ou _parse_inline_with_referentiel()
+            └── parse_event_line_v2()        ← fonction standalone
+                └── extract_before_lieu()    ← extraction artistes/spectacles
+```
+
+**Attention** : `EventParser._extract_spectacle_artiste_pattern()` est utilisé uniquement par `_parse_event()`, qui n'est PAS dans le flux `populate`.
+
+### Workflow pour ajouter un nouveau pattern
+
+1. **Identifier le texte problématique**
+   ```python
+   # Récupérer le raw_text depuis la base
+   SELECT raw_text FROM evenement WHERE bidul_numero = XXX AND raw_text LIKE '%pattern%'
+   ```
+
+2. **Tester le pattern regex isolément**
+   ```python
+   import re
+   text = '...'  # raw_text exact
+   pattern = re.compile(r'...')
+   match = pattern.search(text)
+   print(match.groups() if match else "No match")
+   ```
+
+3. **Ajouter le pattern dans `extract_before_lieu()`** (ligne ~2778)
+   - C'est la fonction clé pour le flux `populate`
+   - Chercher la section `if has_formatting_tags(before):` pour les patterns HTML
+   - Ajouter le pattern AVANT le parsing classique
+
+   ```python
+   # Dans extract_before_lieu(), après les autres patterns spéciaux:
+   mon_pattern = r'...'
+   mon_match = re.search(mon_pattern, before)
+   if mon_match:
+       artiste_nom = mon_match.group(X).strip()
+       if artiste_nom and len(artiste_nom) > 2:
+           if not any(a['nom'].lower() == artiste_nom.lower() for a in result['artistes']):
+               result['artistes'].append({'nom': artiste_nom, 'style': style, 'is_musical': False})
+   ```
+
+4. **Optionnel : ajouter aussi dans `_extract_spectacle_artiste_pattern()`** (ligne ~5487)
+   - Pour la cohérence avec `EventParser._parse_event()`
+   - Utile si d'autres flux utilisent cette méthode
+
+5. **Tester avec populate**
+   ```bash
+   python cli.py purge --numero XXX
+   python cli.py populate --numero XXX --replace --reparse
+
+   # Vérifier le résultat
+   python -c "
+   import sqlite3
+   conn = sqlite3.connect('database/bidul_archives.db')
+   cursor = conn.cursor()
+   cursor.execute('''
+       SELECT e.raw_text, c.artiste, c.nom_spectacle
+       FROM evenement e
+       JOIN contenu_evenement c ON c.evenement_id = e.id
+       WHERE e.bidul_numero = XXX AND e.raw_text LIKE '%pattern%'
+   ''')
+   for row in cursor.fetchall():
+       print(f'artiste: {row[1]}, spectacle: {row[2]}')
+   "
+   ```
+
+6. **Ajouter les tests unitaires** dans `tests/test_parser.py`
+   - Tester `extract_before_lieu()` directement
+   - Tester avec `EventParser._parse_event()` si pattern ajouté là aussi
+
+7. **Lancer les benchmarks**
+   ```bash
+   python cli.py purge --numero 184 && python cli.py populate --numero 184 --replace
+   python benchmark/compare_bidul.py 184  # Attendu: 94.7%
+   python benchmark/compare_bidul.py 190  # Attendu: 90.6%
+   ```
+
+### Patterns existants dans `extract_before_lieu()`
+
+| Pattern | Exemple | Ligne |
+|---------|---------|-------|
+| `"Spectacle" (style) de Auteur` | `"Venezuela" (théâtre) de Guy Helminger` | ~3106 |
+| `"Spectacle" (style), Artiste` | `"L'instant magique" (illusion), Greg Bagot` | ~3133 |
+| Artistes en `<b>gras</b>` | `<b>ARTISTE</b> (rock)` | via `extract_formatted_artistes_musicaux()` |
+| Spectacles en `<b>"guillemets"</b>` | `<b>"Titre"</b>` | via `extract_formatted_spectacles()` |
+
+### Erreur fréquente
+
+❌ **Ne pas modifier uniquement `_extract_spectacle_artiste_pattern()`** - cette méthode n'est pas appelée par `populate`.
+
+✅ **Toujours modifier `extract_before_lieu()`** pour que le pattern fonctionne avec `populate`.

@@ -1,3 +1,47 @@
+# Release Notes - Indexer v1.19
+
+## Vue d'ensemble
+
+Version avec amélioration de l'extraction des artistes pour les spectacles de théâtre/magie. Deux nouveaux patterns supportés pour extraire l'artiste associé à un spectacle.
+
+## Nouveautés v1.19
+
+### Nouveaux patterns d'extraction artiste/spectacle
+
+| Pattern | Exemple | Extraction |
+|---------|---------|------------|
+| `"Spectacle" (style) de Auteur` | `"Venezuela" (théâtre) de Guy Helminger` | spectacle + auteur ✓ |
+| `"Spectacle" (style), Artiste` | `"L'instant magique" (illusion), Greg Bagot` | spectacle + artiste ✓ |
+
+Ces patterns supportent les balises HTML (`<b>`, `<i>`) et les différents types de guillemets (`"`, `«`, `"`).
+
+### Modifications techniques
+
+| Fichier | Modification |
+|---------|-------------|
+| `core/parser.py` | Pattern `"Spectacle" (style) de Auteur` dans `extract_before_lieu()` (~ligne 3106) |
+| `core/parser.py` | Pattern `"Spectacle" (style), Artiste` dans `extract_before_lieu()` (~ligne 3133) |
+| `core/parser.py` | Mêmes patterns dans `_extract_spectacle_artiste_pattern()` pour cohérence |
+| `.claude/instructions.md` | Documentation du workflow pour ajouter des patterns |
+
+### Tests ajoutés
+
+- **9 tests** dans `TestSpectacleDeAuteurPattern` (bidul 208)
+- **8 tests** dans `TestSpectacleVirguleArtistePattern` (bidul 219)
+
+### Benchmarks
+
+| Bidul | Score v1.18 | Score v1.19 |
+|-------|-------------|-------------|
+| 184 | 94.7% | 94.7% |
+| 190 | 90.6% | 90.6% |
+
+### Tests
+
+- 179 tests unitaires passent
+
+---
+
 # Release Notes - Indexer v1.18
 
 ## Vue d'ensemble

@@ -3130,6 +3130,30 @@ def extract_before_lieu(text: str, lieu_start: int) -> dict:
                         s['style'] = spectacle_style
                         break
 
+        # Pattern "Spectacle" (style), Artiste - artiste après virgule (non gras)
+        # Ex: <b>"L'instant magique"</b> (<i>spectacle illusion</i>), Greg Bagot
+        # Ex: "L'instant magique" (spectacle illusion), Greg Bagot
+        # L'artiste est en Mixed Case (Prénom Nom), pas MAJUSCULES
+        spectacle_virgule_auteur_pattern = r'(?:<[bi]>)?[«""„]([^»""]+)[»""](?:</[bi]>)?\s*\(([^)]+)\),\s*([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][a-zàâäéèêëïîôùûüç]+(?:\s+[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ]?[a-zàâäéèêëïîôùûüç]+)*)(?:,|$)'
+        virgule_auteur_match = re.search(spectacle_virgule_auteur_pattern, before)
+        if virgule_auteur_match:
+            artiste_nom = virgule_auteur_match.group(3).strip()
+            spectacle_style_raw = virgule_auteur_match.group(2)
+            if artiste_nom and len(artiste_nom) > 2:
+                # Nettoyer le style des balises HTML
+                artiste_style = re.sub(r'</?[bi]>', '', spectacle_style_raw).strip() if spectacle_style_raw else None
+                # Éviter les doublons
+                if not any(a['nom'].lower() == artiste_nom.lower() for a in result['artistes']):
+                    result['artistes'].append({'nom': artiste_nom, 'style': artiste_style, 'is_musical': False})
+            # Mettre à jour le spectacle avec le style si trouvé sans style
+            spectacle_nom = re.sub(r'</?[bi]>', '', virgule_auteur_match.group(1)).strip()
+            if spectacle_style_raw:
+                spectacle_style = re.sub(r'</?[bi]>', '', spectacle_style_raw).strip()
+                for s in result['spectacles']:
+                    if s['nom'] == spectacle_nom and not s.get('style'):
+                        s['style'] = spectacle_style
+                        break
+
         # Pour les artistes de théâtre (non gras), on continue avec le parsing classique
         # sur le texte sans balises
         before_stripped = strip_formatting_tags(before)
@@ -5531,6 +5555,43 @@ class EventParser:
             ))
 
             text = text[:de_match.start()] + text[de_match.end():]
+            text = re.sub(r'\s+', ' ', text).strip()
+            return artistes, spectacles, genres, text
+
+        # Pattern 1b: "Spectacle" (style), Artiste (avec ou sans balises HTML)
+        # Ex: <b>"L'instant magique"</b> (<i>spectacle illusion</i>), Greg Bagot
+        # Ex: "L'instant magique" (spectacle illusion), Greg Bagot
+        # Note: L'artiste est en Mixed Case (Prénom Nom), pas MAJUSCULES
+        spectacle_virgule_pattern = re.compile(
+            r'(?:<[bi]>)?[«""„]([^»""]+)[»""](?:</[bi]>)?'  # Spectacle entre guillemets
+            r'\s*\(([^)]+)\)'  # Style entre parenthèses (obligatoire ici)
+            r',\s*'  # Virgule séparatrice
+            r'([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][a-zàâäéèêëïîôùûüç]+(?:\s+[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ]?[a-zàâäéèêëïîôùûüç]+)*)'  # Artiste Mixed Case (Prénom Nom)
+            r'(?:,|$)',  # Fin par virgule ou fin de texte
+            re.UNICODE
+        )
+
+        virgule_match = spectacle_virgule_pattern.search(text)
+        if virgule_match:
+            titre = re.sub(r'</?[bi]>', '', virgule_match.group(1)).strip()
+            style_raw = virgule_match.group(2)
+            artiste_nom = virgule_match.group(3).strip()
+
+            # Nettoyer le style des balises HTML
+            style = re.sub(r'</?[bi]>', '', style_raw).strip() if style_raw else None
+
+            spectacles.append(titre)
+            if style:
+                genres.append(style)
+
+            artistes.append(ArtisteInfo(
+                nom=_normalize_artist_name(artiste_nom),
+                genre=style,
+                spectacle=titre
+            ))
+
+            # Retirer le pattern matché mais garder la virgule finale pour le reste du parsing
+            text = text[:virgule_match.start()] + text[virgule_match.end()-1:]
             text = re.sub(r'\s+', ' ', text).strip()
             return artistes, spectacles, genres, text
 
