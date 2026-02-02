@@ -3923,6 +3923,10 @@ def extract_lieu_fallback(text: str, ville_ref_list: list) -> tuple[Optional[str
 
     # Patterns à ignorer
     heure_pattern = re.compile(r'\d{1,2}h\d{0,2}')
+    # Pattern pour détecter si "XXh" fait partie d'un nom de lieu (ex: "Circuit des 24h", "Bar des 4h")
+    # Dans ce cas, ce n'est pas une heure d'événement mais partie du nom
+    # Note: "des XXh" est typique d'un nom (Circuit des 24h), tandis que "de XXh" est typiquement une plage horaire
+    heure_in_lieu_name_pattern = re.compile(r'\bdes\s+\d{1,2}h\b', re.IGNORECASE)
     prix_pattern = re.compile(r'\d+[.,]?\d*\s*€|gratuit|libre|prix libre|participation libre', re.IGNORECASE)
     genre_pattern = re.compile(r'^\([^)]+\)$')
     # Spectacles entre guillemets (avec ou sans genre)
@@ -3975,13 +3979,17 @@ def extract_lieu_fallback(text: str, ville_ref_list: list) -> tuple[Optional[str
         # Ex: "Bar Le Palais de 19h à 21h" -> extraire "Bar Le Palais"
         # Ex: "Le Barouf 21h" -> extraire "Le Barouf"
         # Ex: "La Flèche dès 16h" -> extraire "La Flèche" comme ville
-        if heure_pattern.search(part) or prix_pattern.search(part):
+        # EXCEPTION: Si "XXh" fait partie d'un nom de lieu (ex: "Circuit des 24h"), ne pas traiter comme heure
+        has_heure = heure_pattern.search(part)
+        heure_is_lieu_name = has_heure and heure_in_lieu_name_pattern.search(part)
+
+        if (has_heure or prix_pattern.search(part)) and not heure_is_lieu_name:
             lieu_match = lieu_in_text_pattern.search(part)
             if lieu_match and lieu is None:
                 lieu = lieu_match.group(1).strip()
             # Si pas de match explicite, essayer d'extraire le texte avant l'heure
             # Pattern: "Lieu/Ville XXh" où Lieu commence par majuscule et n'est pas un artiste
-            elif heure_pattern.search(part):
+            elif has_heure:
                 # Extraire le texte avant l'heure (supporte "dès Xh", "de Xh", "Xh")
                 before_hour = re.split(r'\s*(?:dès|de|à)?\s*\d{1,2}h', part)[0].strip()
                 if before_hour and len(before_hour) >= 3:

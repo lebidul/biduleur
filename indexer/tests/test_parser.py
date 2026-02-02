@@ -806,6 +806,17 @@ Dimanche 21
         assert event.lieu_raw is not None
         assert "Éphémère" in event.lieu_raw
 
+    def test_lieu_with_24h_in_name(self, lieu_ref, ville_ref):
+        """Test que 'Circuit des 24h' est extrait complet (24h n'est pas une heure)."""
+        # Bidul 34 - le "24h" fait partie du nom du lieu, pas une heure d'événement
+        text = "COLD TURKEY (rock) et MOON MARTIN (rock), Circuit des 24h, Le Mans, (gratuit avec entree 24h) Tel: 02 43 78 16 03"
+        events = parse_event_line_v2(text, 6, 1997, lieu_ref, ville_ref)
+        assert len(events) == 1
+        event = events[0]
+        # Le lieu doit contenir "24h" complet
+        assert event['lieu_raw'] == 'Circuit des 24h'
+        assert event['ville_raw'] == 'Le Mans'
+
 
 class TestSplitOnDatesV2NoFalseSplit:
     """Tests pour éviter les faux splits sur 'de 18 mois', 'de 14 ans', etc."""
