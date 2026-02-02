@@ -3103,6 +3103,33 @@ def extract_before_lieu(text: str, lieu_start: int) -> dict:
         result['spectacles'].extend(extract_formatted_spectacles_unquoted(before))
         result['artistes'] = extract_formatted_artistes_musicaux(before)
 
+        # Pattern "Spectacle" (style) de Auteur - auteur d'un spectacle (non gras)
+        # Ex: <b>"Venezuela"</b> (<i>théâtre</i>) de Guy Helminger
+        # Ex: "Venezuela" (théâtre) de Guy Helminger
+        # L'auteur peut être en Mixed Case (Prénom Nom) ou MAJUSCULES
+        # Le pattern doit matcher sur before (avec balises) pour trouver le spectacle formaté
+        spectacle_de_auteur_pattern = r'(?:<[bi]>)?[«""„]([^»""]+)[»""](?:</[bi]>)?(?:\s*\(?<[bi]>)?(?:\s*\(([^)]+)\))?(?:</[bi]>\)?)?\s+de\s+([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-Za-zÀ-ÿ\-\&\']+(?:\s+[A-Za-zÀ-ÿ\-\&\']+)*)(?:\s*\(([^)]+)\))?'
+        de_auteur_match = re.search(spectacle_de_auteur_pattern, before)
+        if de_auteur_match:
+            # L'auteur n'est PAS en gras, donc c'est un artiste de théâtre
+            auteur_nom = de_auteur_match.group(3).strip()
+            auteur_style = de_auteur_match.group(4).strip() if de_auteur_match.group(4) else None
+            if auteur_nom and len(auteur_nom) > 2:
+                # Éviter les doublons
+                if not any(a['nom'].lower() == auteur_nom.lower() for a in result['artistes']):
+                    result['artistes'].append({'nom': auteur_nom, 'style': auteur_style, 'is_musical': False})
+            # Mettre à jour le spectacle avec le style si trouvé sans style
+            spectacle_nom = re.sub(r'</?[bi]>', '', de_auteur_match.group(1)).strip()
+            spectacle_style_raw = de_auteur_match.group(2)
+            if spectacle_style_raw:
+                # Nettoyer les balises HTML du style
+                spectacle_style = re.sub(r'</?[bi]>', '', spectacle_style_raw).strip()
+                # Chercher le spectacle existant et mettre à jour son style
+                for s in result['spectacles']:
+                    if s['nom'] == spectacle_nom and not s.get('style'):
+                        s['style'] = spectacle_style
+                        break
+
         # Pour les artistes de théâtre (non gras), on continue avec le parsing classique
         # sur le texte sans balises
         before_stripped = strip_formatting_tags(before)
@@ -3278,13 +3305,20 @@ def extract_before_lieu(text: str, lieu_start: int) -> dict:
     # 1. Extraire les spectacles entre guillemets ET le pattern "de ARTISTE (style)"
     # Pattern: "Spectacle" de ARTISTE (style) ou "Spectacle" (style) de ARTISTE
     # Ex: "Abeilles" de GILLES GRANOUILLET (travelling théâtre)
-    spectacle_de_pattern = r'[«""„]([^»""]+)[»""](?:\s*\(([^)]+)\))?\s+de\s+([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s\-\&\']+)(?:\s*\(([^)]+)\))?'
+    # Ex: "Venezuela" (théâtre) de Guy Helminger
+    # Ex: <b>"Venezuela"</b> (<i>théâtre</i>) de Guy Helminger
+    # Supporte les artistes en MAJUSCULES ou en Mixed Case (Prénom Nom)
+    # Note: le pattern s'arrête avant une virgule pour ne pas capturer le lieu
+    # Note: supporte les balises HTML <b>, <i> autour des guillemets et du style
+    spectacle_de_pattern = r'(?:<[bi]>)?[«""„]([^»""]+)[»""](?:</[bi]>)?(?:\s*\(?<[bi]>)?(?:\s*\(([^)]+)\))?(?:</[bi]>\)?)?\s+de\s+([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-Za-zÀ-ÿ\-\&\']+(?:\s+[A-Za-zÀ-ÿ\-\&\']+)*)(?:\s*\(([^)]+)\))?'
     de_match = re.search(spectacle_de_pattern, before)
     if de_match:
-        # Spectacle
+        # Spectacle - nettoyer les balises HTML du nom et du style
+        spectacle_nom = re.sub(r'</?[bi]>', '', de_match.group(1)).strip()
+        spectacle_style = re.sub(r'</?[bi]>', '', de_match.group(2)).strip() if de_match.group(2) else None
         result['spectacles'].append({
-            'nom': de_match.group(1).strip(),
-            'style': de_match.group(2).strip() if de_match.group(2) else None
+            'nom': spectacle_nom,
+            'style': spectacle_style
         })
         # Artiste avec style
         artiste_nom = de_match.group(3).strip()
@@ -5451,11 +5485,56 @@ class EventParser:
         return result
 
     def _extract_spectacle_artiste_pattern(self, text: str) -> tuple[list[ArtisteInfo], list[str], list[str], str]:
-        """Extrait le pattern 'Spectacle' Cie/Artiste (genre) AVANT le parsing standard."""
+        """Extrait le pattern 'Spectacle' Cie/Artiste (genre) AVANT le parsing standard.
+
+        Patterns supportés:
+        - "Spectacle" Artiste (genre) → spectacle + artiste avec genre
+        - "Spectacle" (style) de Auteur → spectacle avec style + auteur
+        - <b>"Spectacle"</b> (<i>style</i>) de Auteur → même chose avec balises HTML
+        """
         artistes = []
         spectacles = []
         genres = []
 
+        # Pattern 1: "Spectacle" (style) de Auteur (avec ou sans balises HTML)
+        # Ex: <b>"Venezuela"</b> (<i>théâtre</i>) de Guy Helminger
+        # Ex: "Venezuela" (théâtre) de Guy Helminger
+        spectacle_de_pattern = re.compile(
+            r'(?:<[bi]>)?[«""„]([^»""]+)[»""](?:</[bi]>)?'  # Spectacle entre guillemets (optionnellement en gras)
+            r'(?:\s*\(?<[bi]>)?'  # Optionnel: ouverture parenthèse ou italique
+            r'(?:\s*\(([^)]+)\))?'  # Style entre parenthèses (optionnel)
+            r'(?:</[bi]>\)?)?'  # Fermeture italique/parenthèse
+            r'\s+de\s+'  # "de"
+            r'([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-Za-zÀ-ÿ\-\&\']+(?:\s+[A-Za-zÀ-ÿ\-\&\']+)*)'  # Auteur (Prénom Nom ou MAJUSCULES)
+            r'(?:\s*\(([^)]+)\))?',  # Style de l'auteur (optionnel)
+            re.UNICODE
+        )
+
+        de_match = spectacle_de_pattern.search(text)
+        if de_match:
+            titre = re.sub(r'</?[bi]>', '', de_match.group(1)).strip()  # Nettoyer les balises
+            style_raw = de_match.group(2)
+            auteur = de_match.group(3).strip()
+            auteur_style = de_match.group(4).strip() if de_match.group(4) else None
+
+            # Nettoyer le style des balises HTML
+            style = re.sub(r'</?[bi]>', '', style_raw).strip() if style_raw else None
+
+            spectacles.append(titre)
+            if style:
+                genres.append(style)
+
+            artistes.append(ArtisteInfo(
+                nom=_normalize_artist_name(auteur),
+                genre=auteur_style or style,  # Style de l'auteur si présent, sinon celui du spectacle
+                spectacle=titre
+            ))
+
+            text = text[:de_match.start()] + text[de_match.end():]
+            text = re.sub(r'\s+', ' ', text).strip()
+            return artistes, spectacles, genres, text
+
+        # Pattern 2: "Spectacle" Artiste (genre) - pattern original
         pattern = re.compile(
             r'[""«]([^""»]+)[""»]\s+'
             r"([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s'\-/&]+?)"

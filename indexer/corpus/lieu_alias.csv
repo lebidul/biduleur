@@ -38,13 +38,17 @@ Cabaret Le Patis,Le Pâtis
 Camion-Théâtre promenade Newton,Promenade Newton
 Capitainerie,La Capitainerie
 Castelorienne,La Castélorienne
+La Casté,La Castélorienne
 Cathédrale St Julien,athédrale Saint-Julien
 Cathédrale du Mans,Cathédrale Saint-Julien
 Caveau,Le Caveau
+Centre Culturel Athena,Centre Culturel Athéna
 Centre Culturel Atlantis,Salle Atlantis
+Centre Culturel Bouloire,L'Epidaure
 Centre Culturel J. Le Theule,Scène Joël Le Theule
 Centre Culturel Joël Le Theule,Scène Joël Le Theule
 Centre Culturel du Val de Vray,Le Val de Vray
+Centre Culturel de St Saturnin,Le Val de Vray
 Centre J. Brel,MJC Jacques Brel
 Centre J. Le Theule,Scène Joël Le Theule
 Centre J.Le Theule,Scène Joël Le Theule
@@ -60,6 +64,10 @@ Centre cult. J.Le Theule,Scène Joël Le Theule
 Centre culturel J Le Theule,Scène Joël Le Theule
 Centre culturel J. Le Theule,Scène Joël Le Theule
 Centre culturel J.Le Theule,Scène Joël Le Theule
+Centre Culturel JLTheule,Scène Joël Le Theule
+Centre Culturel J.LeTheule,Scène Joël Le Theule
+Centre Culturel Sablé-sur-Sarthe,Scène Joël Le Theule
+Centre Culturel de Sablé,Scène Joël Le Theule
 Centre des Expos,Centre des expositions
 Centre des expo,Centre des expositions
 Centre des expos,Centre des expositions
@@ -83,6 +91,7 @@ Domaine de l’Épau,Abbaye Royale de l'Epau
 E. Salvador,Espace Henri Salvador
 ESCAPADE Kiosque Mozaic,Kiosque Mozaïc
 EVE-Université du Maine,EVE - Scène universitaire
+Eglise du Pré,Église notre dame du Pré
 Epicerie du Pré,Épicerie du Pré
 Esp. H. Salvador,Espace Henri Salvador
 Esp. Henri Salvador,Espace Henri Salvador
@@ -90,6 +99,8 @@ Esp. Salvador,Espace Henri Salvador
 Esp. culturel Henri Salvador,Espace Henri Salvador
 Esp.Salvador,Espace Henri Salvador
 Espace Athena,Centre Culturel Athéna
+Athéna,Centre Culturel Athéna
+Th. Acthalia,Théâtre de l'Acthalia
 Espace Faïence de Malicorne,Espace Faïence
 Espace Le Narais,Espace du Narais
 Espace Salvador,Espace Henri Salvador
@@ -178,6 +189,7 @@ Le Vaud’,Le Vaud'
 Le Viking,Le Viking's
 Le Washington DC,Washington DC
 "Le kiosque à musique, jardin des plantes",Kiosque du jardin des Plantes
+Le salon de la rue des sonnettes,Salon de la rue des 3 Sonnettes
 Les Cineatses,Les Cinéastes
 Les Hautes Métairies,Les Métairies
 Les Métairies,Les Métairies
@@ -211,7 +223,7 @@ Médiathèque L. Aragon,Médiathèque Louis Aragon
 P.C.V.,Le Passeport
 P.C.V. Le Mans,Le Passeport
 PCC,Palais des Congrès
-PCV,PCC
+PCV,Le Passeport
 PENICHE EXCELSIOR,La Peniche Excelsior
 Parc Expo,Centre des expositions
 Parc Gué de Maulny,Parc du Gué de Maulny
@@ -237,6 +249,7 @@ Quai des Arts,Le Quai des Arts
 Quinconce des Jacobins,Les Quinconces
 Quinconces des Jacobins,Les Quinconces
 R-Volt Club,R-Volt
+Rue des 3 Sonnettes,Salon de la rue des 3 Sonnettes
 S. Henri Salvador,Espace Henri Salvador
 S. Jean Carmet,Salle Jean Carmet
 S.Carmet,Salle Jean Carmet
@@ -322,6 +335,69 @@ théâtrede Chaoué,Théâtre de Chaoué
 Île Moulinsart,Île de Moulinsart
 Île aux Planches,L'île aux Planches
 Île aux planches,L'île aux Planches
-Le salon de la rue des sonnettes,Salon de la rue des 3 Sonnettes
-Rue des 3 Sonnettes,Salon de la rue des 3 Sonnettes
-Eglise du Pré,Église notre dame du Pré
+Théâtre Épidaure,L'Epidaure
+Saugonna,Espace Saugonna
+Acthalia,Théâtre de l'Acthalia
+L'Eden,Salle l'Eden
+Le St. Léo,La Cave à Bières
+Place pape-Carpenter,Place Marie Pape Carpentier
+Le Palaic,Le Palais
+Le Baouf,Le Barouf
+LeMackeson,Le Mackeson
+Le Brouf,Le Barouf
+Lc Borouf,Le Barouf
+Sun7 Bar,Sun 7 Bar
+Sun 7,Sun 7 Bar
+Bières É Chopes,Bières et Chopes
+Chopes et Compagnie,Chope et Compagnie
+Th. Halle au blé,Théâtre de la Halle-au-Blé
+Théâtre de la Halle aux Blés,Théâtre de la Halle-au-Blé
+Th. L'Acthalia,Théâtre de l'Acthalia
+Th. l'Éphémère,Théâtre de l'Éphémère
+Scène J. Le Theule,Scène Joël Le Theule
+P. des Congrès,Palais des Congrès
+Musée J.-C. Boulard,Musée Jean-Claude Boulard
+Médiath. Aragon,Médiathèque Louis Aragon
+MJC Jack Prévert,MJC Prévert
+E. Scélia,Espace Scélia
+E.C. Scélia,Espace Scélia
+Espace Scélia Sargé,Espace Scélia
+Jean. Carmet ,Salle Jean Carmet
+Carmet,Salle Jean Carmet
+L'Excelsior-Salle Jean Carmet,Salle Jean Carmet
+... l'Oasis,L'Oasis
+L'Eden,Salle l'Eden
+La Rotonde,Bar de la Rotonde
+bar Le Funky Toons,Funky Toons Café
+Th. 'écluse,Théâtre de l'Écluse
+Cave à bières St Leo,La Cave à Bières
+Cave à bières le St Léo,La Cave à Bières
+Cave à bières le St Leo,La Cave à Bières
+Cave Le St Léo,La Cave à Bières
+Cave à Bière de St. Léo,La Cave à Bières
+Cave à Bières le St. Léo,La Cave à Bières
+La Cave à Bières de St. Léo,La Cave à Bières
+Forum - Centre Expos,Centre des expositions
+Forum des Expositions,Centre des expositions
+Épicerie sur Zinc,L'Épicerie sur le Zinc
+Épicerie Zinc,L'Épicerie sur le Zinc
+L'Épicerie / Zinc,L'Épicerie sur le Zinc
+L'Épicerie / le Zinc,L'Épicerie sur le Zinc
+L'Épic. sur le Zinc,L'Épicerie sur le Zinc
+L'Epic sur le Zinc,L'Épicerie sur le Zinc
+L'Epic. sur le Zinc,L'Épicerie sur le Zinc
+Th. de l'Ephemere,Théâtre de l'Éphémère
+Th. de l'Éphémère,Théâtre de l'Éphémère
+Centre Expo du Mans,Centre des expositions
+Chapiteau le Plongeoir,Chapiteau du Plongeoir
+La Tente Site Robin des Bois,La Tente
+Parking aérien des Quinconces,Parking des Quinconces
+Gué de Maulny,Parc du Gué de Maulny
+Maison de quartier P. Guédou,Maison de quartier Pierre Guédou
+Passeport du CV,Le Passeport
+Salle J. Le Theule,Scène Joël Le Theule
+Salons du Théâtre de la Halle-au-Blé,Théâtre de la Halle-au-Blé
+Théâtre du Passeur Le Mans,Théâtre du Passeur
+Salle Chorus,Chorus
+École Philppeaux,École Philippeaux
+Le Hangar 43,Hangar Créalab
