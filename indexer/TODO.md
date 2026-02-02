@@ -10,29 +10,21 @@
   * #125
     * 125 elements dans pdf. seulement 83 dans db
   * revoir #292
-  * revoir #294 (peu d'evneements)
+  * revoir #294 (peu d'evenements)
   * revoir #123, 125, 157 (pic de baisse de qualité)
   * raw_text	nom_spectacle
   <b>"A</b><b>Hfa de Yambolé"</b> <i>(conte dès 12 ans)</i>, S.Signoret, Mulsanne, 15h, 3.5/9.5 €	A</b><b>Hfa de Yambolé
-  * #197
-    * ```<b>CHARLY L TRIO</b> par l'Orga' La Source Booking, Les Dock's, Le Mans, 21h, TNC``` revoir orga et lieu_raw
-    * ```<b>"Soirée Electro/Drum'n'bass"</b> La Source Booking, Le Jardin Sarthois, Louplande, 21h, TNC``` revoir orga et lieu_raw
-
+  * #12
+    * ```CONTE DE La Source au théâtre du Petit Seux, Coulaines 17h00, 30F par le Théâtre de l'Ephémère, Théâtre Paul Scarron LE MANS, Ma/Me/Ve/Sa à 20h30 et Je à 18h30 24 au 28: ELOÏSE ET PHILEMON par IUTOPIUM THEATRE, Le Mans, Salle des concerts 21h00,1 OF 19 et 20: IL ETAIT UNE FOIS``` mal splitté
+  * #256
+    * ```Scènes ouvertes (variété musique du monde) // MYLÈNE + MARINA VILLATEL + NANNA, Base de loisirs Mansigné (aux berges du lac), 21h30, 0€``` revoir ville
+* pas d'evenements geolocalisés à Mayet
+* revoir normalisation des églises. Ex. 'Église notre dame' sont toutes au mans
 * alias:
   * DAVE GOLITIN SOLO -> DAVE GOLITIN
   * Sablé
   * Sargé
   * St Michel de Chahaignes -> St Michel-de-Chavaignes
-* Lieux génériques à différencier:
-  * Salle Polyvalente
-  * Église
-  * Salle des fêtes
-  * Les Halles
-  * Médiathèque
-  * Salle communale
-  * Salle municipale
-* Lieux mal normalisés:
-  * ex. ```"Les duos célèbres" (soprano + ténor), Église notre dame du Pré, Le Mans, 17h, entrée libre``` -> lieu_re_id = 'Église notre dame'
 * overwrite:
   * ```Samedi 11, 11h00, "Fête de la Saint Patrick", Mamers, Mamers``` (lieu_raw à corrriger)
 * ajouter html ou csv tapages manquants
@@ -40,9 +32,7 @@
 * revoir avec grouping tous les lieux n'ayant pas de ref
 * stocker texte extrait dans table bidul pour csv
 * faire fichiers benchmark
-* ajouter d'autres KPI de la qualité du dataset à stats --html
 * accélerer populate (peut-être avec moins d'info logged)
 * code object oriented
 * centraliser patterns
-* ajouter coordonnées à la table lieux
-* * stats. mettre possibilité d'avoir comme option l'axe x en tant que date
+* skip reparse si bidul csv
