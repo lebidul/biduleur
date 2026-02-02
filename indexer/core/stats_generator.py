@@ -1552,11 +1552,17 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
         const top10 = [...existing].sort((a, b) => b.events - a.events).slice(0, 10);
 
         // Calcul du total cumulé (courbe d'évolution)
-        let cumulativeTotal = 0;
-        const cumulativeData = data.map(d => {
-            cumulativeTotal += d.events;
-            return cumulativeTotal;
-        });
+        // Fonction pour calculer le cumulatif à partir d'un array
+        function computeCumulative(arr) {
+            let total = 0;
+            return arr.map(v => {
+                total += v;
+                return total;
+            });
+        }
+
+        // Cumulatif initial basé sur les données par bidul
+        let cumulativeData = computeCumulative(data.map(d => d.events));
 
         // Mise a jour stats
         document.getElementById('totalEvents').textContent = eventsTotal.toLocaleString();
@@ -1739,21 +1745,23 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
                         titleColor: '#f3f4f6',
                         bodyColor: '#9ca3af',
                         callbacks: {
-                            title: (items) => `Bidul ${items[0].label}`,
+                            title: (items) => items[0].label,
                             label: (item) => {
-                                const d = data[item.dataIndex];
-                                if (d.missing) return 'PDF MANQUANT';
                                 if (item.dataset.label === 'Score Qualite') return `Qualite: ${item.raw}%`;
                                 if (item.dataset.label === 'Total cumule') return `Total cumule: ${item.raw.toLocaleString()}`;
                                 return `${item.dataset.label}: ${item.raw}`;
                             },
                             afterBody: (items) => {
-                                const d = data[items[0].dataIndex];
-                                if (d.missing || d.events === 0) return '';
                                 const idx = items[0].dataIndex;
+                                // Get local and regional values from their datasets
+                                const localVal = chart.data.datasets[0].data[idx] || 0;
+                                const regionalVal = chart.data.datasets[1].data[idx] || 0;
+                                const contentVal = chart.data.datasets[2].data[idx] || 0;
+                                const totalEvents = localVal + regionalVal;
+                                if (totalEvents === 0) return '';
                                 const lines = [];
-                                lines.push(`Total: ${d.events} (${d.events_local || 0} local + ${d.events_regional || 0} regional)`);
-                                lines.push(`Ratio: ${(d.content / d.events).toFixed(2)}`);
+                                lines.push(`Total: ${totalEvents} (${localVal} local + ${regionalVal} regional)`);
+                                if (contentVal > 0) lines.push(`Ratio: ${(contentVal / totalEvents).toFixed(2)}`);
                                 lines.push(`Cumul: ${cumulativeData[idx].toLocaleString()} evenements`);
                                 return lines;
                             }
@@ -1992,6 +2000,17 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
             chart.data.datasets[0].backgroundColor = Array(len).fill('#06b6d4');
             chart.data.datasets[1].backgroundColor = Array(len).fill('#a78bfa');
             chart.data.datasets[2].backgroundColor = Array(len).fill('#f59e0b');
+
+            // Recalculate cumulative data for the new axis
+            // Sum local + regional to get total events for cumulative
+            const eventsForCumul = newData.local.map((v, i) => v + (newData.regional[i] || 0));
+            cumulativeData = computeCumulative(eventsForCumul);
+
+            // Update cumulative dataset
+            const cumulativeIndex = chart.data.datasets.findIndex(ds => ds.label === 'Total cumule');
+            if (cumulativeIndex >= 0) {
+                chart.data.datasets[cumulativeIndex].data = cumulativeData;
+            }
 
             // Update x-axis tick callback
             if (axis === 'numero_bidul') {
