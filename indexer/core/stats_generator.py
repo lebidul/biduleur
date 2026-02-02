@@ -953,6 +953,7 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
         .btn.active { background: #4f46e5; }
         .btn.purple.active { background: #7c3aed; }
         .btn.teal.active { background: #0d9488; }
+        .btn.green.active { background: #059669; }
 
         /* Axis selector */
         .axis-selector {
@@ -1347,6 +1348,7 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
         <button class="btn" onclick="setView('local')">Locaux</button>
         <button class="btn" onclick="setView('regional')">Regionaux</button>
         <button class="btn" onclick="setView('content')">Contenus</button>
+        <button class="btn green active" id="cumulativeBtn" onclick="toggleCumulative()">Total cumule</button>
         <button class="btn purple" id="qualityBtn" onclick="toggleQuality()">Qualite</button>
         <button class="btn teal" id="kpiBtn" onclick="toggleKPI()">KPI Avances</button>
     </div>
@@ -1549,6 +1551,13 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
         // Top 10
         const top10 = [...existing].sort((a, b) => b.events - a.events).slice(0, 10);
 
+        // Calcul du total cumulé (courbe d'évolution)
+        let cumulativeTotal = 0;
+        const cumulativeData = data.map(d => {
+            cumulativeTotal += d.events;
+            return cumulativeTotal;
+        });
+
         // Mise a jour stats
         document.getElementById('totalEvents').textContent = eventsTotal.toLocaleString();
         document.getElementById('avgEvents').textContent = `moy: ${eventsAvg.toFixed(0)}`;
@@ -1696,6 +1705,20 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
             });
         }
 
+        // Add cumulative total dataset
+        datasets.push({
+            label: 'Total cumule',
+            data: cumulativeData,
+            type: 'line',
+            borderColor: '#10b981',
+            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+            borderWidth: 2,
+            pointRadius: 0,
+            fill: true,
+            yAxisID: 'y2',
+            hidden: false
+        });
+
         let chart = new Chart(ctx, {
             type: 'bar',
             data: {
@@ -1721,14 +1744,17 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
                                 const d = data[item.dataIndex];
                                 if (d.missing) return 'PDF MANQUANT';
                                 if (item.dataset.label === 'Score Qualite') return `Qualite: ${item.raw}%`;
+                                if (item.dataset.label === 'Total cumule') return `Total cumule: ${item.raw.toLocaleString()}`;
                                 return `${item.dataset.label}: ${item.raw}`;
                             },
                             afterBody: (items) => {
                                 const d = data[items[0].dataIndex];
                                 if (d.missing || d.events === 0) return '';
+                                const idx = items[0].dataIndex;
                                 const lines = [];
                                 lines.push(`Total: ${d.events} (${d.events_local || 0} local + ${d.events_regional || 0} regional)`);
                                 lines.push(`Ratio: ${(d.content / d.events).toFixed(2)}`);
+                                lines.push(`Cumul: ${cumulativeData[idx].toLocaleString()} evenements`);
                                 return lines;
                             }
                         }
@@ -1757,6 +1783,22 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
                         ticks: {
                             color: '#8b5cf6',
                             callback: v => v + '%'
+                        }
+                    },
+                    y2: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        min: 0,
+                        grid: { drawOnChartArea: false },
+                        ticks: {
+                            color: '#10b981',
+                            callback: v => v >= 1000 ? (v/1000).toFixed(0) + 'k' : v
+                        },
+                        title: {
+                            display: true,
+                            text: 'Total cumule',
+                            color: '#10b981'
                         }
                     }
                 }
@@ -1857,6 +1899,22 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
                     break;
             }
             chart.update();
+        }
+
+        // Toggle cumulative view
+        let cumulativeVisible = true;
+        function toggleCumulative() {
+            cumulativeVisible = !cumulativeVisible;
+            const btn = document.getElementById('cumulativeBtn');
+            btn.classList.toggle('active', cumulativeVisible);
+
+            // Find cumulative dataset (last one added)
+            const cumulativeIndex = chart.data.datasets.findIndex(ds => ds.label === 'Total cumule');
+            if (cumulativeIndex >= 0) {
+                chart.data.datasets[cumulativeIndex].hidden = !cumulativeVisible;
+                chart.options.scales.y2.display = cumulativeVisible;
+                chart.update();
+            }
         }
 
         // Toggle quality view
