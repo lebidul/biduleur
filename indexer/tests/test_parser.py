@@ -1072,6 +1072,16 @@ class TestExtractFormattedSpectacles:
         assert spectacles[0]['nom'] == "Métis'sages"
         assert spectacles[0]['style'] == "contes et légendes d'ailleurs"
 
+    def test_split_bold_tags_merged(self):
+        """Les balises <b> consécutives sont fusionnées (bidul 205)."""
+        from core.parser import extract_formatted_spectacles
+        # Le titre est coupé entre deux balises <b>
+        text = '<b>"A</b><b>Hfa de Yambolé"</b> <i>(conte dès 12 ans)</i>'
+        spectacles = extract_formatted_spectacles(text)
+        assert len(spectacles) == 1
+        assert spectacles[0]['nom'] == 'AHfa de Yambolé'
+        assert spectacles[0]['style'] == 'conte dès 12 ans'
+
 
 class TestSplitRegionalSection:
     """Tests pour la détection de la section régionale 'Et un peu plus loin...'."""

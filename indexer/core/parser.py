@@ -486,7 +486,8 @@ def extract_formatted_spectacles(text: str) -> list[dict]:
     """
     spectacles = []
 
-    # D'abord fusionner les <i> consécutifs (styles coupés par saut de ligne)
+    # D'abord fusionner les balises consécutives (artefacts OCR/PDF)
+    text = _merge_consecutive_bold_tags(text)
     text = _merge_consecutive_italic_tags(text)
 
     # Classes de guillemets (ouvrants et fermants)
@@ -640,12 +641,15 @@ def _merge_consecutive_bold_tags(text: str) -> str:
     """
     Fusionne les balises <b> consécutives séparées par des espaces/retours.
 
-    Exemple:
+    Exemples:
     "<b>LES MOYENS </b> <b>DU BORD </b>" → "<b>LES MOYENS DU BORD </b>"
+    "<b>"A</b><b>Hfa"</b>" → "<b>"AHfa"</b>" (sans espace si adjacentes)
     """
     # Pattern: </b> suivi d'espaces/retours puis <b>
-    # On remplace par un seul espace (les espaces internes seront normalisés après)
-    merged = re.sub(r'\s*</b>\s*<b>\s*', ' ', text)
+    # Si directement adjacents (</b><b>), fusionner sans espace
+    # Sinon, remplacer par un seul espace
+    merged = re.sub(r'</b><b>', '', text)  # D'abord les adjacents directs
+    merged = re.sub(r'</b>\s+<b>', ' ', merged)  # Puis ceux avec espaces
     return merged
 
 
