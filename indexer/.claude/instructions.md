@@ -27,9 +27,9 @@ python cli.py populate --numero 184 --replace
 python benchmark/compare_bidul.py 184
 python benchmark/compare_bidul.py 190
 
-# Scores de référence v1.19:
-# - Bidul 184: 94.7%
-# - Bidul 190: 90.6%
+# Scores de référence v1.20:
+# - Bidul 184: 94.6%
+# - Bidul 190: 91.5%
 ```
 
 **ATTENTION**: `extract` ne filtre pas les artifacts et produit trop d'événements. Toujours utiliser `populate` pour les benchmarks.
@@ -721,8 +721,8 @@ CLI populate
 7. **Lancer les benchmarks**
    ```bash
    python cli.py purge --numero 184 && python cli.py populate --numero 184 --replace
-   python benchmark/compare_bidul.py 184  # Attendu: 94.7%
-   python benchmark/compare_bidul.py 190  # Attendu: 90.6%
+   python benchmark/compare_bidul.py 184  # Attendu: 94.6%
+   python benchmark/compare_bidul.py 190  # Attendu: 91.5%
    ```
 
 ### Patterns existants dans `extract_before_lieu()`
@@ -731,8 +731,20 @@ CLI populate
 |---------|---------|-------|
 | `"Spectacle" (style) de Auteur` | `"Venezuela" (théâtre) de Guy Helminger` | ~3106 |
 | `"Spectacle" (style), Artiste` | `"L'instant magique" (illusion), Greg Bagot` | ~3133 |
+| `<<Spectacle" de Auteur` | `<<Pichol" de Claude Bonadonna` (guillemet OCR) | ~3121 |
+| Auteur avec initiales | `de C. Liscano`, `de J.-P. Dupont` | ~3121 |
 | Artistes en `<b>gras</b>` | `<b>ARTISTE</b> (rock)` | via `extract_formatted_artistes_musicaux()` |
 | Spectacles en `<b>"guillemets"</b>` | `<b>"Titre"</b>` | via `extract_formatted_spectacles()` |
+
+### Validation du lieu - cas particuliers
+
+| Cas | Exemple | Comportement |
+|-----|---------|--------------|
+| Lieu après `!` ou `.` | `Soirée X ! Le Passeport` | Lieu valide (séparateur) |
+| Lieu commençant par article | `JEREMY Le La Ré Do` | Lieu valide (Le/La/L') |
+| `de Prénom Nom` | `de Claude Bonadonna` | Ignoré (pattern auteur) |
+| `(style)Lieu` collé | `(Th)Th. du passeur` | Lieu extrait |
+| Ville du lieu hors référentiel | `Foyer Rural, Crosmières` | Ville du lieu gardée |
 
 ### Erreur fréquente
 
