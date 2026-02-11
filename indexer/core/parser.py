@@ -3114,9 +3114,11 @@ def extract_before_lieu(text: str, lieu_start: int) -> dict:
         # Pattern "Spectacle" (style) de Auteur - auteur d'un spectacle (non gras)
         # Ex: <b>"Venezuela"</b> (<i>théâtre</i>) de Guy Helminger
         # Ex: "Venezuela" (théâtre) de Guy Helminger
-        # L'auteur peut être en Mixed Case (Prénom Nom) ou MAJUSCULES
+        # Ex: "Ma famille" (théâtre), de C. Liscano (initiales, virgule après style)
+        # L'auteur peut être en Mixed Case (Prénom Nom) ou MAJUSCULES ou avec initiales (C. Nom)
         # Le pattern doit matcher sur before (avec balises) pour trouver le spectacle formaté
-        spectacle_de_auteur_pattern = r'(?:<[bi]>)?[«""„]([^»""]+)[»""](?:</[bi]>)?(?:\s*\(?<[bi]>)?(?:\s*\(([^)]+)\))?(?:</[bi]>\)?)?\s+de\s+([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-Za-zÀ-ÿ\-\&\']+(?:\s+[A-Za-zÀ-ÿ\-\&\']+)*)(?:\s*\(([^)]+)\))?'
+        # Note: virgule optionnelle après le style (avant "de")
+        spectacle_de_auteur_pattern = r'(?:<[bi]>)?[«""„]([^»""]+)[»""](?:</[bi]>)?(?:\s*\(?<[bi]>)?(?:\s*\(([^)]+)\))?(?:</[bi]>\)?)?,?\s+de\s+((?:[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ]\.[\s\-]?)*[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-Za-zÀ-ÿ\-\&\']+(?:\s+[A-Za-zÀ-ÿ\-\&\']+)*)(?:\s*\(([^)]+)\))?'
         de_auteur_match = re.search(spectacle_de_auteur_pattern, before)
         if de_auteur_match:
             # L'auteur n'est PAS en gras, donc c'est un artiste de théâtre
@@ -3339,10 +3341,12 @@ def extract_before_lieu(text: str, lieu_start: int) -> dict:
     # Ex: "Abeilles" de GILLES GRANOUILLET (travelling théâtre)
     # Ex: "Venezuela" (théâtre) de Guy Helminger
     # Ex: <b>"Venezuela"</b> (<i>théâtre</i>) de Guy Helminger
-    # Supporte les artistes en MAJUSCULES ou en Mixed Case (Prénom Nom)
+    # Ex: "Ma famille" (théâtre), de C. Liscano (initiales, virgule après style)
+    # Supporte les artistes en MAJUSCULES ou en Mixed Case (Prénom Nom) ou avec initiales (C. Nom)
     # Note: le pattern s'arrête avant une virgule pour ne pas capturer le lieu
     # Note: supporte les balises HTML <b>, <i> autour des guillemets et du style
-    spectacle_de_pattern = r'(?:<[bi]>)?[«""„]([^»""]+)[»""](?:</[bi]>)?(?:\s*\(?<[bi]>)?(?:\s*\(([^)]+)\))?(?:</[bi]>\)?)?\s+de\s+([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-Za-zÀ-ÿ\-\&\']+(?:\s+[A-Za-zÀ-ÿ\-\&\']+)*)(?:\s*\(([^)]+)\))?'
+    # Note: virgule optionnelle après le style (avant "de")
+    spectacle_de_pattern = r'(?:<[bi]>)?[«""„]([^»""]+)[»""](?:</[bi]>)?(?:\s*\(?<[bi]>)?(?:\s*\(([^)]+)\))?(?:</[bi]>\)?)?,?\s+de\s+((?:[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ]\.[\s\-]?)*[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-Za-zÀ-ÿ\-\&\']+(?:\s+[A-Za-zÀ-ÿ\-\&\']+)*)(?:\s*\(([^)]+)\))?'
     de_match = re.search(spectacle_de_pattern, before)
     if de_match:
         # Spectacle - nettoyer les balises HTML du nom et du style
