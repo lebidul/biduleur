@@ -3929,6 +3929,25 @@ def extract_lieu_fallback(text: str, ville_ref_list: list) -> tuple[Optional[str
 
     parts = smart_split(text_clean)
 
+    # Prétraitement: Extraire le lieu si collé au style (pas de virgule)
+    # Pattern: "(style)Lieu" ex: '(Th)Th. du passeur' -> extraire 'Th. du passeur' comme lieu
+    # Ce pattern est commun quand l'OCR ne met pas d'espace entre le style et le lieu
+    style_lieu_pattern = re.compile(r'\([^)]+\)([A-ZÀ-Ÿ][a-zA-ZÀ-ÿ\.\s]+?)$')
+    lieu_from_style_pattern = None
+    for i, part in enumerate(parts):
+        match = style_lieu_pattern.search(part)
+        if match:
+            candidate = match.group(1).strip()
+            # Vérifier que ce n'est pas un artiste en majuscules (ex: "(rock)ARTISTE")
+            # et que ça ressemble à un lieu (commence par Maj puis minuscules ou abréviation "Th.")
+            if candidate and not candidate.isupper():
+                # Vérifier les patterns typiques de lieux
+                if (candidate.startswith('Th.') or  # Th. = Théâtre
+                    re.match(r'^[A-ZÀ-Ÿ][a-zà-ÿ]+', candidate) or  # TitleCase
+                    re.match(r'^[A-ZÀ-Ÿ]\.\s*[a-zA-ZÀ-ÿ]', candidate)):  # Abréviation
+                    lieu_from_style_pattern = candidate
+                    break
+
     # Patterns à ignorer
     heure_pattern = re.compile(r'\d{1,2}h\d{0,2}')
     # Pattern pour détecter si "XXh" fait partie d'un nom de lieu (ex: "Circuit des 24h", "Bar des 4h")
@@ -4151,6 +4170,10 @@ def extract_lieu_fallback(text: str, ville_ref_list: list) -> tuple[Optional[str
                 if candidat.lower() not in ['foyer', 'rural', 'salle', 'centre', 'espace', 'mairie']:
                     villes_trouvees.append({'nom': candidat, 'is_lemans': False})
                     break
+
+    # Utiliser le lieu extrait du pattern (style)Lieu si pas de lieu trouvé autrement
+    if lieu is None and lieu_from_style_pattern:
+        lieu = lieu_from_style_pattern
 
     # Sélectionner la ville
     ville = None
@@ -4401,9 +4424,15 @@ def parse_event_line_v2(
             # Texte avant le lieu trouvé
             text_before_lieu = event_text[:lieu_start].strip()
 
-            # Ne PAS invalider le lieu s'il est précédé d'une virgule ou parenthèse fermante
+            # Ne PAS invalider le lieu s'il est précédé d'une virgule, parenthèse fermante, ou ponctuation forte
             # Ex: "MOULE FRIPES #5 // DJ Sets, Le Barouf" - la virgule indique que Le Barouf est le lieu
-            precedes_with_separator = text_before_lieu.endswith(',') or text_before_lieu.endswith(')')
+            # Ex: "Soirée Zombie ... ! Le Passeport" - le "!" indique une séparation
+            precedes_with_separator = (
+                text_before_lieu.endswith(',') or
+                text_before_lieu.endswith(')') or
+                text_before_lieu.endswith('!') or
+                text_before_lieu.endswith('.')
+            )
 
             # Ne PAS invalider le lieu si le texte avant contient une parenthèse ouvrante non fermée
             # Ex: "... SOUND (reggae/dancehal Le Bakoua" - parenthèse non fermée = style/genre, pas nom d'événement
@@ -4475,6 +4504,11 @@ def parse_event_line_v2(
                 # La ville du référentiel est prioritaire (ex: Allonnes pour La Péniche)
                 from core.normalizer import normalize_ville
                 ville_id, ville_nom = normalize_ville(lieu_ville_ref)
+                # Si normalize_ville retourne "Le Mans" par défaut mais la ville du lieu
+                # n'était pas "Le Mans", garder la ville originale (ex: Crosmières)
+                if ville_nom == 'Le Mans' and lieu_ville_ref.lower() != 'le mans':
+                    ville_nom = lieu_ville_ref
+                    ville_id = None  # Pas d'ID car pas dans le référentiel
             else:
                 # Fallback: extraire la ville du texte (peut être plus précis que Le Mans par défaut)
                 ville_id, ville_nom = extract_ville_from_text_v2(event_text, ville_ref_list)
@@ -6948,6 +6982,18 @@ class EventParser:
 
             for event_text in event_texts:
                 if len(event_text.strip()) < 10:
+                    continue
+
+                # Filtrer les artifacts de mois (ex: "novembre (suite)", "AOUT", "fin juillet")
+                # Ce sont des indicateurs de section, pas des événements
+                month_artifact_pattern = re.compile(
+                    r'^(?:(?:fin|début|debut|mi)\s+)?'
+                    r'(?:janvier|février|fevrier|mars|avril|mai|juin|juillet|août|aout|'
+                    r'septembre|octobre|novembre|décembre|decembre)'
+                    r'(?:\s*\(suite\))?$',
+                    re.IGNORECASE
+                )
+                if month_artifact_pattern.match(event_text.strip()):
                     continue
 
                 # Séparer les événements fusionnés (ex: "ARTISTE1, lieu, 5€ ARTISTE2, lieu, 3€")

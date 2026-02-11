@@ -1923,5 +1923,55 @@ class TestGenericLocations:
         assert lieu_ville == "Rouessé-Vassé"  # Retourne le nom canonique avec tiret
 
 
+class TestBidul183SpecificCases:
+    """Tests pour les cas spécifiques du bidul 183."""
+
+    def test_ville_from_lieu_referentiel_not_in_ville_ref(self):
+        """Test que la ville du lieu est utilisée même si pas dans ville_ref (Crosmières)."""
+        lieu_ref_list = [
+            (161668, "Foyer Rural", "Crosmières", False),
+        ]
+        ville_ref_list = [
+            (1, "Le Mans"),
+        ]
+
+        events = parse_event_line_v2(
+            "Festival des Mots d'Hiver, Foyer Rural, Crosmières, 15h",
+            1, 2005, lieu_ref_list, ville_ref_list
+        )
+
+        assert len(events) == 1
+        assert events[0]['lieu_raw'] == "Foyer Rural"
+        assert events[0]['ville_raw'] == "Crosmières"
+
+    def test_lieu_extracted_from_style_pattern(self):
+        """Test extraction du lieu collé au style: (Th)Th. du passeur."""
+        lieu_ref_list = []
+        ville_ref_list = []
+
+        events = parse_event_line_v2(
+            '"La colonie pénitentiaire" (Th)Th. du passeur, 20h30,10/12€',
+            1, 2005, lieu_ref_list, ville_ref_list
+        )
+
+        assert len(events) == 1
+        assert events[0]['lieu_raw'] == "Th. du passeur"
+
+    def test_lieu_after_exclamation_mark(self):
+        """Test extraction du lieu après '!' (Le Passeport)."""
+        lieu_ref_list = [
+            (161799, "Le Passeport", "Le Mans", False),
+        ]
+        ville_ref_list = [
+            (1, "Le Mans"),
+        ]
+
+        text = 'Soirée Zombie organisé par l\'asso "105db": ARTISTE ! Le Passeport'
+        events = parse_event_line_v2(text, 1, 2005, lieu_ref_list, ville_ref_list)
+
+        assert len(events) == 1
+        assert events[0]['lieu_raw'] == "Le Passeport"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
