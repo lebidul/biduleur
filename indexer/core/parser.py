@@ -3115,10 +3115,12 @@ def extract_before_lieu(text: str, lieu_start: int) -> dict:
         # Ex: <b>"Venezuela"</b> (<i>théâtre</i>) de Guy Helminger
         # Ex: "Venezuela" (théâtre) de Guy Helminger
         # Ex: "Ma famille" (théâtre), de C. Liscano (initiales, virgule après style)
+        # Ex: <<Pichol" (spectacle humour), de Claude Bonadonna (<< = guillemet OCR)
         # L'auteur peut être en Mixed Case (Prénom Nom) ou MAJUSCULES ou avec initiales (C. Nom)
         # Le pattern doit matcher sur before (avec balises) pour trouver le spectacle formaté
         # Note: virgule optionnelle après le style (avant "de")
-        spectacle_de_auteur_pattern = r'(?:<[bi]>)?[«""„]([^»""]+)[»""](?:</[bi]>)?(?:\s*\(?<[bi]>)?(?:\s*\(([^)]+)\))?(?:</[bi]>\)?)?,?\s+de\s+((?:[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ]\.[\s\-]?)*[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-Za-zÀ-ÿ\-\&\']+(?:\s+[A-Za-zÀ-ÿ\-\&\']+)*)(?:\s*\(([^)]+)\))?'
+        # Note: << est un guillemet ouvrant OCR courant
+        spectacle_de_auteur_pattern = r'(?:<[bi]>)?(?:<<|[«""„])([^»""]+)[»""](?:</[bi]>)?(?:\s*\(?<[bi]>)?(?:\s*\(([^)]+)\))?(?:</[bi]>\)?)?,?\s+de\s+((?:[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ]\.[\s\-]?)*[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-Za-zÀ-ÿ\-\&\']+(?:\s+[A-Za-zÀ-ÿ\-\&\']+)*)(?:\s*\(([^)]+)\))?'
         de_auteur_match = re.search(spectacle_de_auteur_pattern, before)
         if de_auteur_match:
             # L'auteur n'est PAS en gras, donc c'est un artiste de théâtre
@@ -3342,11 +3344,13 @@ def extract_before_lieu(text: str, lieu_start: int) -> dict:
     # Ex: "Venezuela" (théâtre) de Guy Helminger
     # Ex: <b>"Venezuela"</b> (<i>théâtre</i>) de Guy Helminger
     # Ex: "Ma famille" (théâtre), de C. Liscano (initiales, virgule après style)
+    # Ex: <<Pichol" (spectacle humour), de Claude Bonadonna (<< = guillemet OCR)
     # Supporte les artistes en MAJUSCULES ou en Mixed Case (Prénom Nom) ou avec initiales (C. Nom)
     # Note: le pattern s'arrête avant une virgule pour ne pas capturer le lieu
     # Note: supporte les balises HTML <b>, <i> autour des guillemets et du style
     # Note: virgule optionnelle après le style (avant "de")
-    spectacle_de_pattern = r'(?:<[bi]>)?[«""„]([^»""]+)[»""](?:</[bi]>)?(?:\s*\(?<[bi]>)?(?:\s*\(([^)]+)\))?(?:</[bi]>\)?)?,?\s+de\s+((?:[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ]\.[\s\-]?)*[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-Za-zÀ-ÿ\-\&\']+(?:\s+[A-Za-zÀ-ÿ\-\&\']+)*)(?:\s*\(([^)]+)\))?'
+    # Note: << est un guillemet ouvrant OCR courant
+    spectacle_de_pattern = r'(?:<[bi]>)?(?:<<|[«""„])([^»""]+)[»""](?:</[bi]>)?(?:\s*\(?<[bi]>)?(?:\s*\(([^)]+)\))?(?:</[bi]>\)?)?,?\s+de\s+((?:[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ]\.[\s\-]?)*[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-Za-zÀ-ÿ\-\&\']+(?:\s+[A-Za-zÀ-ÿ\-\&\']+)*)(?:\s*\(([^)]+)\))?'
     de_match = re.search(spectacle_de_pattern, before)
     if de_match:
         # Spectacle - nettoyer les balises HTML du nom et du style
@@ -4053,6 +4057,11 @@ def extract_lieu_fallback(text: str, ville_ref_list: list) -> tuple[Optional[str
 
         # Ignorer "par Cie X"
         if part.lower().startswith('par '):
+            continue
+
+        # Ignorer "de Prénom Nom" (pattern d'auteur de spectacle)
+        # Ex: "de Claude Bonadonna", "de C. Liscano"
+        if re.match(r'^de\s+(?:[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ]\.?\s*)+[A-Za-zÀ-ÿ\-]+', part, re.IGNORECASE):
             continue
 
         # Ignorer les spectacles entre guillemets
@@ -5581,8 +5590,9 @@ class EventParser:
         # Pattern 1: "Spectacle" (style) de Auteur (avec ou sans balises HTML)
         # Ex: <b>"Venezuela"</b> (<i>théâtre</i>) de Guy Helminger
         # Ex: "Venezuela" (théâtre) de Guy Helminger
+        # Ex: <<Pichol" (spectacle humour), de Claude Bonadonna (<< = guillemet OCR)
         spectacle_de_pattern = re.compile(
-            r'(?:<[bi]>)?[«""„]([^»""]+)[»""](?:</[bi]>)?'  # Spectacle entre guillemets (optionnellement en gras)
+            r'(?:<[bi]>)?(?:<<|[«""„])([^»""]+)[»""](?:</[bi]>)?'  # Spectacle entre guillemets (optionnellement en gras, << = OCR)
             r'(?:\s*\(?<[bi]>)?'  # Optionnel: ouverture parenthèse ou italique
             r'(?:\s*\(([^)]+)\))?'  # Style entre parenthèses (optionnel)
             r'(?:</[bi]>\)?)?'  # Fermeture italique/parenthèse
