@@ -4453,10 +4453,14 @@ def parse_event_line_v2(
             )
             precedes_with_lieu_keyword = bool(explicit_lieu_keywords.search(text_before_lieu))
 
+            # Ne PAS invalider le lieu s'il commence par un article défini (Le/La/L')
+            # Ex: "et JEREMY Le La Ré Do" - "Le La Ré Do" commence par "Le" = lieu
+            lieu_starts_with_article = bool(re.match(r'^[Ll][eaEA]?\s|^[Ll]\'', lieu_nom))
+
             # Si le texte avant + lieu forme un pattern d'événement nommé ET pas de séparateur
-            # ET pas de mot-clé de lieu ET pas de parenthèse non fermée, invalider le lieu
+            # ET pas de mot-clé de lieu ET pas de parenthèse non fermée ET lieu ne commence pas par article, invalider le lieu
             text_including_lieu = event_text[:lieu_end].strip()
-            if not precedes_with_separator and not precedes_with_lieu_keyword and not has_unclosed_paren and (is_named_event(text_including_lieu) or is_named_event(text_before_lieu + " " + lieu_nom)):
+            if not precedes_with_separator and not precedes_with_lieu_keyword and not has_unclosed_paren and not lieu_starts_with_article and (is_named_event(text_including_lieu) or is_named_event(text_before_lieu + " " + lieu_nom)):
                 # Le lieu fait partie du nom d'événement - chercher le vrai lieu plus loin
                 # Chercher à partir de la position après le lieu actuel
                 remaining = event_text[lieu_end:]
