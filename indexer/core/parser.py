@@ -878,6 +878,9 @@ def is_named_event(text: str) -> bool:
         r'^[«""„]?Apéro\s+concert',  # Apéro concert avec ARTISTE
         # Ciné Pride, Ciné XXX (festivals de cinéma)
         r'^[«""„]?Cin[ée]\s+\w+',
+        # Spectacle chanson, Spectacle musical, etc. (types d'événements)
+        r'^[«""„]?Spectacle\s+(?:chanson|musical|danse|jeune\s+public|enfants?|th[éeè][aâ]tre|humour|cirque)',
+        r'^[«""„]?Concert\s+(?:rock|jazz|classique|pop|folk|metal)',
         # Les Rdv XXX, Les Rendez-vous XXX (événements récurrents)
         r'^[«""„]?Les\s+(?:Rdv|Rendez-vous)\s+',
         # LES X ANS DE/DES/DU XXX (anniversaires)
@@ -995,6 +998,11 @@ def extract_event_name(text: str) -> Optional[str]:
         # Ciné Pride, Ciné XXX (festivals de cinéma) - avec style entre parenthèses
         # Ex: "Ciné Pride du Mans" (festival de cinéma LGBT) avec: ... → "Ciné Pride du Mans"
         r'^(Cin[ée]\s+[^(]+?)(?:\s*\([^)]+\))?\s*(?:avec\s*:?\s*|,|$)',
+        # Spectacle chanson, Spectacle musical, etc. (types d'événements)
+        # Ex: "Spectacle chanson, \" La guitare à Discorde \"" → "Spectacle chanson"
+        # Ex: "Spectacle musical, de et avec Pierre BAROUH" → "Spectacle musical"
+        r'^(Spectacle\s+(?:chanson|musical|danse|jeune\s+public|enfants?|th[éeè][aâ]tre|humour|cirque))(?:\s*,|$)',
+        r'^(Concert\s+(?:rock|jazz|classique|pop|folk|metal))(?:\s*,|$)',
         # Les Rdv XXX, Les Rendez-vous XXX (événements récurrents)
         # Ex: "Les Rdv Conservatoire Trio Pablo Musik" → "Les Rdv Conservatoire"
         # L'événement se termine avant le nom de groupe/artiste (Title Case ou MAJUSCULES)
@@ -3685,9 +3693,10 @@ def extract_before_lieu(text: str, lieu_start: int) -> dict:
             result['artistes'].append({'nom': 'Guests', 'style': None})
 
     # 7. Pattern artiste simple en MAJUSCULES avec style
+    # Supporte aussi les noms commençant par un chiffre: "8 POUCES", "3 ACCORDS"
     if not result['artistes'] and not result['spectacles']:
-        # Ex: "MENDELSON (poème rock)" ou "ZAZ (chanson française)"
-        artist_match = re.match(r'^([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][^\(\)]{1,40}?)\s*(?:\(([^)]+)\))?\s*$', remaining)
+        # Ex: "MENDELSON (poème rock)" ou "ZAZ (chanson française)" ou "8 POUCES (jazz manouche)"
+        artist_match = re.match(r'^((?:\d+\s*)?[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][^\(\)]{1,40}?)\s*(?:\(([^)]+)\))?\s*$', remaining)
         if artist_match:
             nom = artist_match.group(1).strip()
             style = artist_match.group(2).strip() if artist_match.group(2) else None
@@ -3889,6 +3898,17 @@ def extract_lieu_fallback(text: str, ville_ref_list: list) -> tuple[Optional[str
     # Retirer les balises de formatage
     text_clean = strip_formatting_tags(text)
 
+    # Prétraitement: Extraire la ville avec pattern "A Ville" ou "À Ville"
+    # Ex: "* A Savigny-sur-Braye, au Parc des Loisirs" -> ville = "Savigny-sur-Braye"
+    ville_a_pattern = re.compile(
+        r'[*\.\s][AÀ]\s+([A-ZÀ-Ÿ][a-zA-ZÀ-ÿ\-]+(?:[\s\-](?:sur|en|lès|les|le|la|du|de|l\')[a-zA-ZÀ-ÿ\-]+)*)',
+        re.IGNORECASE
+    )
+    ville_from_a_pattern = None
+    a_match = ville_a_pattern.search(text_clean)
+    if a_match:
+        ville_from_a_pattern = a_match.group(1).strip()
+
     # Split par virgule en préservant les guillemets
     # Ex: '"Stimulant, amer" (th), Lieu' -> ['"Stimulant, amer" (th)', 'Lieu']
     def smart_split(text: str) -> list:
@@ -4002,6 +4022,15 @@ def extract_lieu_fallback(text: str, ville_ref_list: list) -> tuple[Optional[str
         re.IGNORECASE
     )
 
+    # Pattern pour types d'événements (Spectacle chanson, Spectacle musical, etc.)
+    # Ce ne sont PAS des lieux mais des descriptions de type d'événement
+    event_type_pattern = re.compile(
+        r'^(?:spectacle\s+(?:chanson|musical|danse|jeune\s+public|enfants?|th[éeè][aâ]tre|humour|cirque)|'
+        r'concert\s+(?:rock|jazz|classique|pop|folk|metal)|'
+        r'soirée\s+(?:dansante|cabaret|jazz|th[éeè]me))\b',
+        re.IGNORECASE
+    )
+
     lieu = None
     lieu_candidats_generiques = []  # Candidats non-explicites
     villes_trouvees = []
@@ -4104,6 +4133,11 @@ def extract_lieu_fallback(text: str, ville_ref_list: list) -> tuple[Optional[str
                 lieu = lieu_match.group(1).strip()
             continue
 
+        # Ignorer les types d'événements (Spectacle chanson, Spectacle musical, etc.)
+        # Ce ne sont pas des lieux mais des descriptions du type d'événement
+        if event_type_pattern.match(part):
+            continue
+
         # Ignorer les fragments de parenthèses (genre coupé comme "dès 6 ans)")
         if fragment_pattern.match(part):
             continue
@@ -4196,6 +4230,10 @@ def extract_lieu_fallback(text: str, ville_ref_list: list) -> tuple[Optional[str
             ville = non_lemans[0]['nom']
         else:
             ville = villes_trouvees[0]['nom']
+
+    # Utiliser la ville extraite du pattern "A Ville" si pas d'autre ville trouvée
+    if ville is None and ville_from_a_pattern:
+        ville = ville_from_a_pattern
 
     return lieu, ville
 
