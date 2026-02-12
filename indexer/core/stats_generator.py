@@ -663,16 +663,26 @@ def get_geo_data(db_path: str) -> Dict[str, Any]:
     lats, lngs = [], []
     for row in lieux_data:
         lieu_id = row[0]
+        lat, lng = row[3], row[4]
+
+        # Valider les coordonnées (filtrer les valeurs aberrantes)
+        # La Sarthe est entre lat 47-49 et lng -1 à 2
+        if lat is None or lng is None:
+            continue
+        if not (-90 <= lat <= 90) or not (-180 <= lng <= 180):
+            # Coordonnées invalides, ignorer ce lieu
+            continue
+
         result['lieux'].append({
             'nom': row[1],
             'ville': row[2] or 'Le Mans',
-            'lat': row[3],
-            'lng': row[4],
+            'lat': lat,
+            'lng': lng,
             'count': row[5],
             'events': events_by_lieu.get(lieu_id, [])
         })
-        lats.append(row[3])
-        lngs.append(row[4])
+        lats.append(lat)
+        lngs.append(lng)
 
     # Calculer les bounds
     if lats and lngs:
@@ -712,13 +722,17 @@ def get_geo_data(db_path: str) -> Dict[str, Any]:
 
     for row in cur.fetchall():
         year = row[0]
+        lat, lng = row[3], row[4]
+        # Valider les coordonnées
+        if lat is None or lng is None or not (-90 <= lat <= 90) or not (-180 <= lng <= 180):
+            continue
         if year not in result['lieux_by_year']:
             result['lieux_by_year'][year] = []
         result['lieux_by_year'][year].append({
             'nom': row[1],
             'ville': row[2] or 'Le Mans',
-            'lat': row[3],
-            'lng': row[4],
+            'lat': lat,
+            'lng': lng,
             'count': row[5]
         })
 
@@ -742,13 +756,17 @@ def get_geo_data(db_path: str) -> Dict[str, Any]:
 
     for row in cur.fetchall():
         month = row[0]
+        lat, lng = row[3], row[4]
+        # Valider les coordonnées
+        if lat is None or lng is None or not (-90 <= lat <= 90) or not (-180 <= lng <= 180):
+            continue
         if month not in result['lieux_by_month']:
             result['lieux_by_month'][month] = []
         result['lieux_by_month'][month].append({
             'nom': row[1],
             'ville': row[2] or 'Le Mans',
-            'lat': row[3],
-            'lng': row[4],
+            'lat': lat,
+            'lng': lng,
             'count': row[5]
         })
 
@@ -775,14 +793,18 @@ def get_geo_data(db_path: str) -> Dict[str, Any]:
 
     for row in cur.fetchall():
         week = row[0]
+        lat, lng = row[3], row[4]
+        # Valider les coordonnées
+        if lat is None or lng is None or not (-90 <= lat <= 90) or not (-180 <= lng <= 180):
+            continue
         if week and week not in result['lieux_by_week']:
             result['lieux_by_week'][week] = []
         if week:
             result['lieux_by_week'][week].append({
                 'nom': row[1],
                 'ville': row[2] or 'Le Mans',
-                'lat': row[3],
-                'lng': row[4],
+                'lat': lat,
+                'lng': lng,
                 'count': row[5]
             })
 
@@ -811,14 +833,18 @@ def get_geo_data(db_path: str) -> Dict[str, Any]:
 
     for row in cur.fetchall():
         day = row[0]
+        lat, lng = row[3], row[4]
+        # Valider les coordonnées
+        if lat is None or lng is None or not (-90 <= lat <= 90) or not (-180 <= lng <= 180):
+            continue
         if day and day not in result['lieux_by_day']:
             result['lieux_by_day'][day] = []
         if day:
             result['lieux_by_day'][day].append({
                 'nom': row[1],
                 'ville': row[2] or 'Le Mans',
-                'lat': row[3],
-                'lng': row[4],
+                'lat': lat,
+                'lng': lng,
                 'count': row[5]
             })
 
