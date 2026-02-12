@@ -28,6 +28,132 @@ logger = logging.getLogger(__name__)
 
 
 # =============================================================================
+# CACHE DES NOMS DE LIEUX CONNUS (pour éviter les faux positifs dans is_noise_text)
+# =============================================================================
+
+# Cache module-level des noms de lieux (chargé à la demande)
+_known_lieu_names: set[str] | None = None
+
+
+def _load_known_lieu_names() -> set[str]:
+    """
+    Charge les noms de lieux connus depuis la base de données et les fichiers CSV.
+    Utilisé pour éviter de considérer les noms de lieux comme du bruit.
+    """
+    global _known_lieu_names
+
+    if _known_lieu_names is not None:
+        return _known_lieu_names
+
+    _known_lieu_names = set()
+
+    # Charger depuis la base de données si disponible
+    try:
+        import sqlite3
+        from pathlib import Path
+
+        db_path = Path(__file__).parent.parent / 'database' / 'bidul_archives.db'
+        if db_path.exists():
+            conn = sqlite3.connect(str(db_path))
+            cursor = conn.cursor()
+
+            # Lieux de référence
+            cursor.execute('SELECT nom FROM lieu_ref')
+            for row in cursor.fetchall():
+                if row[0]:
+                    _known_lieu_names.add(row[0].lower())
+
+            # Villes de référence
+            cursor.execute('SELECT nom FROM ville_ref')
+            for row in cursor.fetchall():
+                if row[0]:
+                    _known_lieu_names.add(row[0].lower())
+
+            # Alias de lieux
+            try:
+                cursor.execute('SELECT alias FROM lieu_alias')
+                for row in cursor.fetchall():
+                    if row[0]:
+                        _known_lieu_names.add(row[0].lower())
+            except sqlite3.OperationalError:
+                pass  # Table n'existe pas encore
+
+            conn.close()
+            logger.debug(f"Chargé {len(_known_lieu_names)} noms de lieux connus")
+    except Exception as e:
+        logger.warning(f"Impossible de charger les lieux depuis la DB: {e}")
+
+    # Charger depuis les fichiers CSV si disponibles
+    try:
+        from pathlib import Path
+        import csv
+
+        corpus_dir = Path(__file__).parent.parent / 'corpus'
+
+        # lieu_ref.csv
+        lieu_csv = corpus_dir / 'lieu_ref.csv'
+        if lieu_csv.exists():
+            with open(lieu_csv, 'r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if 'nom' in row and row['nom']:
+                        _known_lieu_names.add(row['nom'].lower())
+
+        # lieu_alias.csv
+        alias_csv = corpus_dir / 'lieu_alias.csv'
+        if alias_csv.exists():
+            with open(alias_csv, 'r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if 'alias' in row and row['alias']:
+                        _known_lieu_names.add(row['alias'].lower())
+                    if 'canonical' in row and row['canonical']:
+                        _known_lieu_names.add(row['canonical'].lower())
+    except Exception as e:
+        logger.warning(f"Impossible de charger les lieux depuis les CSV: {e}")
+
+    return _known_lieu_names
+
+
+def _is_known_lieu_name(text: str) -> bool:
+    """
+    Vérifie si le texte correspond à un nom de lieu connu.
+
+    Args:
+        text: Texte à vérifier (ex: "l'Espal", "L'Epidaure")
+
+    Returns:
+        True si c'est un nom de lieu connu
+    """
+    known_names = _load_known_lieu_names()
+
+    # Normaliser le texte
+    text_clean = text.strip().lower()
+    # Enlever l'article initial
+    text_clean = re.sub(r"^l[''e]?\s*", "", text_clean)
+    text_clean = re.sub(r"^le\s+", "", text_clean)
+    text_clean = re.sub(r"^la\s+", "", text_clean)
+    text_clean = re.sub(r"^les\s+", "", text_clean)
+
+    # Vérifier directement
+    if text_clean in known_names:
+        return True
+
+    # Vérifier avec des variantes
+    for name in known_names:
+        # Normaliser aussi le nom connu
+        name_clean = re.sub(r"^l[''e]?\s*", "", name)
+        name_clean = re.sub(r"^le\s+", "", name_clean)
+        name_clean = re.sub(r"^la\s+", "", name_clean)
+        name_clean = re.sub(r"^les\s+", "", name_clean)
+
+        if text_clean == name_clean:
+            return True
+
+    return False
+
+
+# =============================================================================
 # GESTION DES MOIS EXPLICITES (pour événements hors mois du bidul)
 # =============================================================================
 
@@ -239,6 +365,14 @@ def is_noise_text(text: str) -> bool:
     # Ignorer la ponctuation initiale (., :, etc.)
     text_content = re.sub(r'^[.\s:;,!?-]+', '', text_stripped)
 
+    # IMPORTANT: Vérifier d'abord si c'est un nom de lieu connu
+    # Extraire le premier "mot" (peut être "l'Espal", "L'Epidaure", etc.)
+    first_word_match = re.match(r"^(l[''e]?\s*[A-ZÀ-Ÿa-zà-ÿ\-]+|[A-ZÀ-Ÿ][a-zà-ÿ\-]+(?:\s+[a-zà-ÿ]+)?)", text_content)
+    if first_word_match:
+        first_word = first_word_match.group(1)
+        if _is_known_lieu_name(first_word):
+            return False  # C'est un nom de lieu connu, pas du bruit
+
     # Patterns de bruit évident
     noise_patterns = [
         r'^LEZARTUALITE',
@@ -272,7 +406,8 @@ def is_noise_text(text: str) -> bool:
         r'^C\'est\b',
         r'^J\'admire',
         r'^On\s+(?:joue|fait|veut)',
-        r'^L\'[A-Z]',  # L'Invasion, L'Affirmation, etc.
+        # L'Invasion, L'Affirmation, etc. - mais PAS les noms de lieux (l'Espal, l'Oasis, l'Entracte, l'Epidaure, etc.)
+        r'^L\'(?!Espal|Oasis|Entracte|Entr\'?acte|Embarcad[èe]re|[ÉE]toile|[ÉE]crin|Espace|[ÉE]picerie|[ÉE]chapp[ée]e|[ÉE]pidaure|[ÉE]cluse|[ÉE]cume|[ÉE]glantine|[ÉE]peron)[A-Z][a-z]{5,}',
         r'^Malgré\b',
         r'^En effet\b',
         r'^Ainsi\b',
