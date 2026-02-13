@@ -54,10 +54,28 @@ grep "^175" corpus/biduls.description.csv
 | `split_on_dates_v2()` | Découpe sur dates inline (Lu 02, Ma 03...) |
 | `split_bloc_fused_events()` | Sépare événements fusionnés (prix€ + MAJUSCULES) |
 | `parse_event_line_v2()` | Parse une ligne d'événement |
+| `extract_header_lieu()` | Extrait le lieu depuis un en-tête de bloc (v1.21) |
 | `_parse_inline_with_referentiel()` | Format inline avec référentiels (Je 02: ARTISTE, Lieu) |
 | `_parse_bloc_with_referentiel()` | Format bloc avec référentiels (dates en en-têtes) |
 | `_parse_inline_inherited_date()` | Format inline_inherited avec référentiels (biduls 1-16) |
 | `_parse_inline_inherited_format()` | Format inline_inherited sans référentiels (pour `parse()`) |
+
+### Propagation du lieu d'en-tête (v1.21)
+
+Certains blocs ont un en-tête avec le lieu suivi d'événements sans lieu :
+
+```
+Au Palais, café-concert, Le Mans, à 22h
+Ve 05: Concert Jazz avec Pascal MAFFEÏ
+Ve 12: Soirée Ambiance avec DJ FRED
+```
+
+La fonction `extract_header_lieu()` détecte ces patterns :
+- `Au X, Ville` → lieu="Le X" (conversion Au→Le)
+- `Nom Ville - tél...` → lieu="Nom", ville="Ville"
+- `Le/La X, Ville` → lieu="Le/La X", ville="Ville"
+
+Le lieu est propagé via `current_block_lieu_*` aux événements sans `lieu_raw`.
 
 **Note importante**: Le format `inline_inherited` a deux implémentations:
 - `_parse_inline_inherited_date()` : utilisé par `parse_with_referentiel()`

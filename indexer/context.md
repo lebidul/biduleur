@@ -71,6 +71,8 @@ contenu_evenement (source de vérité pour artistes/spectacles)
 
 **Note v1.19** : Nouveaux patterns d'extraction artiste pour spectacles : `"Spectacle" (style) de Auteur` et `"Spectacle" (style), Artiste`. Patterns ajoutés dans `extract_before_lieu()` (utilisé par `populate`). Documentation du workflow d'ajout de patterns dans `.claude/instructions.md`.
 
+**Note v1.21** : Propagation automatique du lieu d'en-tête aux événements (fix bidul 71). Fonction `extract_header_lieu()` détecte les patterns "Au Palais", "MJC Prévert Le Mans", etc. Détection dynamique mid-text. Dashboard stats : sélecteur d'échelle heatmap (log, sqrt, linear) avec racine carrée par défaut pour meilleur contraste visuel.
+
 ## Mapping Bidul <-> Date
 
 Référence : **Bidul 280 = Mai 2023**
