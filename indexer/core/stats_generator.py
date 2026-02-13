@@ -1443,6 +1443,12 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
                     <button class="btn active" id="btnMarkers" onclick="setMapView('markers')">Marqueurs</button>
                     <button class="btn" id="btnHeat" onclick="setMapView('heat')">Heatmap</button>
                     <button class="btn" id="btnBoth" onclick="setMapView('both')">Les deux</button>
+                    <span style="margin-left:15px;color:#9ca3af;font-size:12px">Echelle:</span>
+                    <select id="heatmapScaleSelect" onchange="setHeatmapScale(this.value)" style="background:#374151;color:#f3f4f6;border:1px solid #4b5563;border-radius:4px;padding:4px 8px;font-size:12px">
+                        <option value="log">Logarithmique</option>
+                        <option value="sqrt" selected>Racine carree</option>
+                        <option value="linear">Lineaire</option>
+                    </select>
                 </div>
                 <div class="map-stats">
                     <span>Lieux: <span class="count" id="mapLieuxCount">-</span></span>
@@ -2353,6 +2359,7 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
         let allLieuxWithEvents = null;  // Store full lieu data with events
         let currentFilterType = null;   // 'year', 'month', 'week', 'day' or null
         let currentFilterValue = null;  // The selected filter value
+        let currentHeatmapScale = 'sqrt'; // 'log', 'sqrt' or 'linear'
 
         function initMap() {
             if (!geoData || !geoData.lieux || geoData.lieux.length === 0) {
@@ -2468,10 +2475,20 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
                 });
                 tooltipLayer.addLayer(tooltipMarker);
 
-                // Heatmap point (with logarithmic intensity for better variation display)
-                // Log scale: log(count+1) / log(maxCount+1) spreads values more evenly
-                const logIntensity = Math.log(lieu.count + 1) / Math.log(maxCount + 1);
-                heatPoints.push([lieu.lat, lieu.lng, logIntensity]);
+                // Heatmap point intensity depends on selected scale
+                let intensity;
+                if (currentHeatmapScale === 'log') {
+                    // Log scale: log(count+1) / log(maxCount+1) - compresses high values
+                    intensity = Math.log(lieu.count + 1) / Math.log(maxCount + 1);
+                } else if (currentHeatmapScale === 'sqrt') {
+                    // Square root scale: sqrt(count) / sqrt(maxCount) - best contrast
+                    // Expands differences between low/medium values while compressing extremes
+                    intensity = Math.sqrt(lieu.count) / Math.sqrt(maxCount);
+                } else {
+                    // Linear scale: direct proportion - high values dominate
+                    intensity = lieu.count / maxCount;
+                }
+                heatPoints.push([lieu.lat, lieu.lng, intensity]);
             });
 
             // Create heatmap layer
@@ -2624,6 +2641,14 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
             document.getElementById('btnBoth').classList.toggle('active', view === 'both');
 
             applyMapView();
+        }
+
+        function setHeatmapScale(scale) {
+            currentHeatmapScale = scale;
+            // Rebuild heatmap with new scale
+            if (currentMapData) {
+                updateMap(currentMapData);
+            }
         }
 
         function applyMapView() {

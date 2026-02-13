@@ -4011,6 +4011,118 @@ def find_lieu_position_heuristic(text: str) -> Optional[int]:
     return None
 
 
+def extract_header_lieu(
+    header_text: str,
+    lieu_ref_list: list,
+    ville_ref_list: list
+) -> tuple[Optional[str], Optional[str], Optional[str]]:
+    """
+    Extrait le lieu depuis un en-tête de bloc d'événements.
+
+    Certains blocs d'événements ont un en-tête qui contient le lieu,
+    suivi de plusieurs événements datés sans lieu répété.
+
+    Patterns reconnus:
+    - "Au Palais, café-concert, Le Mans, ..." → lieu="Le Palais"
+    - "MJC Prévert Le Mans - tél ..." → lieu="MJC Prévert"
+    - "Le Passeport, Le Mans, ..." → lieu="Le Passeport"
+    - "Théâtre de Chaoué Allonnes - tél ..." → lieu="Théâtre de Chaoué"
+
+    Args:
+        header_text: Texte de l'en-tête (avant la première date)
+        lieu_ref_list: Liste des lieux de référence [(id, nom, ville), ...]
+        ville_ref_list: Liste des villes de référence [(id, nom), ...]
+
+    Returns:
+        (lieu_id, lieu_nom, ville_nom) ou (None, None, None) si pas trouvé
+    """
+    if not header_text or len(header_text.strip()) < 5:
+        return None, None, None
+
+    header = header_text.strip()
+
+    # Liste des villes connues pour les patterns
+    villes_connues = ['Le Mans', 'Allonnes', 'La Flèche', 'Sablé', 'Mamers',
+                      'La Ferté-Bernard', 'Saint-Calais', 'Château-du-Loir']
+    villes_pattern = '|'.join(re.escape(v) for v in villes_connues)
+
+    # Pattern 1: "Au NomLieu" ou "A NomLieu"
+    # Ex: "Au Palais, café-concert, Le Mans" → "Palais" → normalize → "Le Palais"
+    pattern_au = re.compile(
+        rf'^[AÀ]u?\s+([A-ZÀ-Ÿ][a-zA-ZÀ-ÿ\'\-\s]+?)(?:\s*,|\s+(?:{villes_pattern}))',
+        re.IGNORECASE
+    )
+    m = pattern_au.match(header)
+    if m:
+        lieu_candidate = m.group(1).strip()
+        # Normaliser "Au Palais" → "Le Palais"
+        if not lieu_candidate.lower().startswith(('le ', 'la ', "l'")):
+            # Essayer avec "Le " devant
+            lieu_with_article = f"Le {lieu_candidate}"
+            # Chercher dans le référentiel
+            for lieu_tuple in lieu_ref_list:
+                lieu_id, lieu_nom = lieu_tuple[0], lieu_tuple[1]
+                lieu_ville = lieu_tuple[2] if len(lieu_tuple) > 2 else None
+                if lieu_nom.lower() == lieu_with_article.lower():
+                    return lieu_id, lieu_nom, lieu_ville
+            # Sinon garder le nom tel quel
+            lieu_candidate = lieu_with_article
+
+        # Chercher dans le référentiel
+        for lieu_tuple in lieu_ref_list:
+            lieu_id, lieu_nom = lieu_tuple[0], lieu_tuple[1]
+            lieu_ville = lieu_tuple[2] if len(lieu_tuple) > 2 else None
+            if lieu_nom.lower() == lieu_candidate.lower():
+                return lieu_id, lieu_nom, lieu_ville
+
+        # Pas trouvé dans le référentiel, retourner le nom brut
+        return None, lieu_candidate, None
+
+    # Pattern 2: "NomLieu Ville" (lieu suivi directement de ville sans virgule)
+    # Ex: "MJC Prévert Le Mans - tél ..." → "MJC Prévert"
+    pattern_lieu_ville = re.compile(
+        rf'^([A-ZÀ-Ÿ][a-zA-ZÀ-ÿ\'\-\s]+?)\s+({villes_pattern})\b',
+        re.IGNORECASE
+    )
+    m = pattern_lieu_ville.match(header)
+    if m:
+        lieu_candidate = m.group(1).strip()
+        ville_from_header = m.group(2).strip()
+
+        # Chercher dans le référentiel
+        for lieu_tuple in lieu_ref_list:
+            lieu_id, lieu_nom = lieu_tuple[0], lieu_tuple[1]
+            lieu_ville = lieu_tuple[2] if len(lieu_tuple) > 2 else None
+            if lieu_nom.lower() == lieu_candidate.lower():
+                return lieu_id, lieu_nom, lieu_ville or ville_from_header
+
+        # Pas trouvé dans le référentiel, retourner le nom brut
+        return None, lieu_candidate, ville_from_header
+
+    # Pattern 3: "Le/La NomLieu, Ville" (article + lieu + virgule + ville)
+    # Ex: "Le Passeport, Le Mans, 22h" → "Le Passeport"
+    pattern_article_lieu = re.compile(
+        rf'^((?:Le|La|L\')\s*[A-ZÀ-Ÿ][a-zA-ZÀ-ÿ\'\-\s]+?)\s*,\s*({villes_pattern})',
+        re.IGNORECASE
+    )
+    m = pattern_article_lieu.match(header)
+    if m:
+        lieu_candidate = m.group(1).strip()
+        ville_from_header = m.group(2).strip()
+
+        # Chercher dans le référentiel
+        for lieu_tuple in lieu_ref_list:
+            lieu_id, lieu_nom = lieu_tuple[0], lieu_tuple[1]
+            lieu_ville = lieu_tuple[2] if len(lieu_tuple) > 2 else None
+            if lieu_nom.lower() == lieu_candidate.lower():
+                return lieu_id, lieu_nom, lieu_ville or ville_from_header
+
+        # Pas trouvé dans le référentiel, retourner le nom brut
+        return None, lieu_candidate, ville_from_header
+
+    return None, None, None
+
+
 def extract_lieu_fallback(text: str, ville_ref_list: list) -> tuple[Optional[str], Optional[str]]:
     """
     Extrait le lieu et la ville du texte quand le lieu n'est pas dans le référentiel.
@@ -7260,9 +7372,42 @@ class EventParser:
         month_sections = self._month_sections
         bidul_mois = self.bidul_mois
 
+        # =================================================================
+        # DÉTECTION DE L'EN-TÊTE DE LIEU
+        # =================================================================
+        # Certains blocs ont un en-tête avec le lieu, suivi d'événements
+        # datés sans lieu répété. Ex:
+        #   "Au Palais, café-concert, Le Mans, à 22h
+        #    Ve 05: Concert Jazz avec Pascal MAFFEÏ..."
+        # On extrait le lieu de l'en-tête pour le propager aux événements.
+        header_lieu_id = None
+        header_lieu_nom = None
+        header_ville_nom = None
+
+        # Trouver les lignes avant la première date
+        lines = text.split('\n')
+        header_lines = []
+        for line in lines:
+            line_stripped = line.strip()
+            if not line_stripped:
+                continue
+            # Si la ligne matche une date, on arrête
+            if self.INLINE_DATE_PATTERN.match(line_stripped):
+                break
+            header_lines.append(line_stripped)
+
+        # Si on a des lignes d'en-tête, essayer d'extraire le lieu
+        if header_lines:
+            header_text = ' '.join(header_lines)
+            header_lieu_id, header_lieu_nom, header_ville_nom = extract_header_lieu(
+                header_text, lieu_ref_list, ville_ref_list
+            )
+            if header_lieu_nom:
+                logger.debug(f"En-tête de lieu détecté: {header_lieu_nom} ({header_ville_nom})")
+
         def process_event(event_text: str, date_str: str, line_number: int = None):
             """Traite un événement avec une date (potentiellement composée)."""
-            nonlocal events, seen_signatures
+            nonlocal events, seen_signatures, current_block_lieu_id, current_block_lieu_nom, current_block_ville_nom
 
             # Déterminer le mois contextuel pour les Biduls d'été
             mois = bidul_mois or 1
@@ -7298,6 +7443,17 @@ class EventParser:
                 )
 
                 for parsed in parsed_events:
+                    # =============================================================
+                    # PROPAGATION DU LIEU DE L'EN-TÊTE / BLOC COURANT
+                    # =============================================================
+                    # Si l'événement n'a pas de lieu mais qu'on a détecté un lieu
+                    # dans l'en-tête ou dynamiquement dans le bloc courant, on le propage
+                    if not parsed.get('lieu_raw') and current_block_lieu_nom:
+                        parsed['lieu_raw'] = current_block_lieu_nom
+                        parsed['lieu_ref_id'] = current_block_lieu_id
+                        if not parsed.get('ville_raw') and current_block_ville_nom:
+                            parsed['ville_raw'] = current_block_ville_nom
+
                     # Si parse_event_line_v2 a déjà extrait une date (via split mid-text),
                     # utiliser cette date au lieu de la date du préfixe
                     if parsed.get('date_evenement'):
@@ -7330,6 +7486,10 @@ class EventParser:
         current_event_lines = []
         current_date = None
         current_line_number = None  # Support juillet/août
+        previous_non_date_line = None  # Pour détecter les en-têtes de lieu
+        current_block_lieu_id = header_lieu_id  # Lieu du bloc courant
+        current_block_lieu_nom = header_lieu_nom
+        current_block_ville_nom = header_ville_nom
 
         for line_idx, line in enumerate(lines):
             line = line.strip()
@@ -7338,6 +7498,21 @@ class EventParser:
 
             match = self.INLINE_DATE_PATTERN.match(line)
             if match:
+                # =============================================================
+                # DÉTECTION DYNAMIQUE DES EN-TÊTES DE LIEU
+                # =============================================================
+                # Si la ligne précédente (non-date) ressemble à un en-tête de lieu,
+                # mettre à jour le lieu du bloc courant
+                if previous_non_date_line:
+                    test_lieu_id, test_lieu_nom, test_ville = extract_header_lieu(
+                        previous_non_date_line, lieu_ref_list, ville_ref_list
+                    )
+                    if test_lieu_nom:
+                        current_block_lieu_id = test_lieu_id
+                        current_block_lieu_nom = test_lieu_nom
+                        current_block_ville_nom = test_ville
+                        logger.debug(f"En-tête de lieu dynamique: {current_block_lieu_nom} ({current_block_ville_nom})")
+
                 # Traiter l'événement précédent
                 if current_event_lines and current_date:
                     event_text = ' '.join(current_event_lines)
@@ -7347,9 +7522,33 @@ class EventParser:
                 current_date = match.group(1).strip()
                 current_event_lines = [match.group(2).strip()]
                 current_line_number = line_idx  # Mémoriser le numéro de ligne
+                previous_non_date_line = None  # Reset après une date
             else:
-                if current_event_lines:
+                # Vérifier si cette ligne est un en-tête de lieu
+                # AVANT de l'ajouter à l'événement en cours
+                test_lieu_id, test_lieu_nom, test_ville = extract_header_lieu(
+                    line, lieu_ref_list, ville_ref_list
+                )
+                if test_lieu_nom:
+                    # C'est un en-tête de lieu - traiter l'événement précédent
+                    # et mémoriser ce lieu pour les prochains événements
+                    if current_event_lines and current_date:
+                        event_text = ' '.join(current_event_lines)
+                        process_event(event_text, current_date, current_line_number)
+                        current_event_lines = []
+                        current_date = None
+
+                    # Mettre à jour le lieu du bloc courant
+                    current_block_lieu_id = test_lieu_id
+                    current_block_lieu_nom = test_lieu_nom
+                    current_block_ville_nom = test_ville
+                    logger.debug(f"En-tête de lieu mid-text: {current_block_lieu_nom} ({current_block_ville_nom})")
+                    previous_non_date_line = line
+                elif current_event_lines:
                     current_event_lines.append(line)
+                else:
+                    # Mémoriser cette ligne (potentiel en-tête de lieu)
+                    previous_non_date_line = line
 
         # Traiter le dernier événement
         if current_event_lines and current_date:
