@@ -370,8 +370,8 @@ L'extraction suit ce workflow :
 ### Colonnes principales
 | Colonne | Valeurs | Description |
 |---------|---------|-------------|
-| `numero` | 1-305 | Numéro du bidul |
-| `type` | scan, texte | Type de PDF |
+| `numero` | 1-310 | Numéro du bidul |
+| `type` | scan, texte, csv, xlsx | Type de source pour `populate` |
 | `date_format` | inline, par bloc, inline_inherited, mixte | Format de parsing des dates |
 | `pages` | 1, 2, 3, 1-2 | Pages à extraire (override) |
 | `ocr_mode` | classic, sections, auto | Mode OCR |
@@ -379,6 +379,23 @@ L'extraction suit ce workflow :
 | `p1_orientation` | portrait, paysage | Orientation du texte page 1 |
 | `p1_orientation_pdf` | portrait, paysage | Orientation du PDF page 1 (défaut = p1_orientation) |
 | `p1_colonnes` | 1, 2 | Colonnes par section page 1 |
+| `source_file` | nom(s) fichier(s) | Fichier(s) source CSV/XLSX (séparés par `\|` pour multi-fichiers) |
+
+### Types de source (`type`)
+Le champ `type` détermine la méthode d'extraction utilisée par `populate` :
+- **scan** : OCR du PDF (Google Cloud Vision ou PaddleOCR)
+- **texte** : Extraction texte natif du PDF (PyMuPDF)
+- **csv** : Import depuis fichier CSV (défini par `source_file`)
+- **xlsx** : Import depuis fichier XLSX (défini par `source_file`)
+
+**Comportement de `populate` :**
+- Si `type=csv` ou `type=xlsx` : utilise le fichier source défini par `source_file`
+- Si `type=scan` : utilise l'OCR (avec templates SVG si disponibles dans `corpus/templates/`)
+- Si `type=texte` : extrait le texte natif du PDF
+
+**Options de filtrage :**
+- `--csv-only` : traite uniquement les biduls de type `csv` ou `xlsx`
+- `--pdf-only` : traite uniquement les biduls de type `scan` ou `texte`
 
 ### Format inline_inherited (biduls 1-16)
 Format hybride où la date apparaît seulement sur la première ligne d'un jour :
@@ -582,6 +599,91 @@ Pour importer dans PostGIS :
 ALTER TABLE lieu_ref ADD COLUMN geom geometry(Point, 4326);
 UPDATE lieu_ref SET geom = ST_SetSRID(ST_MakePoint(longitude, latitude), 4326)
 WHERE latitude IS NOT NULL AND longitude IS NOT NULL;
+```
+
+## Import/Export CSV/XLSX (v1.21)
+
+### Fichiers sources CSV/XLSX
+
+La colonne `source_file` dans `biduls.description.csv` définit les fichiers sources pour chaque bidul :
+
+**Formats supportés :**
+- **CSV 2022** (biduls 265-275) : `tapage_biduleur_janvier_2022.csv`
+- **CSV 2023+** (biduls 276-291) : `202301_tapage_biduleur_janvier_2023.csv`
+- **XLSX 2025+** (biduls 306-310) : `202510_tapage_biduleur_Octobre_2025.xlsx`
+
+**Multi-fichiers pour biduls d'été :**
+Les biduls de juillet couvrent juillet ET août. Utiliser `|` comme séparateur :
+```
+source_file: tapage_biduleur_juillet_2022.csv|tapage_biduleur_aout_2022.csv
+```
+
+### Fonctions d'import (`core/csv_importer.py`)
+
+| Fonction | Usage |
+|----------|-------|
+| `get_source_files_from_config()` | Récupère la liste des fichiers depuis `biduls.description.csv` |
+| `import_xlsx()` | Importe un fichier XLSX (format 2025+) |
+| `import_bidul_from_source()` | Importe depuis un ou plusieurs fichiers CSV/XLSX |
+| `find_source_files()` | Trouve les fichiers sources pour un bidul |
+| `normalize_xlsx_column()` | Normalise un nom de colonne XLSX |
+| `find_xlsx_column()` | Trouve une colonne par patterns |
+
+### Mapping des colonnes XLSX
+
+Le format XLSX 2025+ utilise des noms de colonnes avec newlines et espaces :
+```python
+XLSX_COLUMN_PATTERNS = {
+    'festival': ['FESTOCHE', 'EVENEMENT'],
+    'style_festival': ['STYLE', 'FESTOCHE', 'EVENEMENT'],
+    'date': ['DATE'],
+    'horaire': ['HEURE'],
+    'lieu': ['LIEU'],
+    'ville': ['VILLE'],
+    'prix': ['PRIX'],
+    'genre': ['GENRE 1'],
+    'spectacle1': ['NOM SPECTACLE 1'],
+    'artiste1': ['COMPAGNIE 1', 'GROUPE 1', 'ARTISTE 1'],
+    'style1': ['STYLE', 'SPECTACLE 1', 'CONCERT 1'],
+    # ... répété pour 2, 3, 4
+}
+```
+
+### Export avec clause WHERE (`core/csv_exporter.py`)
+
+| Fonction | Usage |
+|----------|-------|
+| `export_events()` | Exporte les événements avec WHERE personnalisable |
+| `export_bidul()` | Exporte un bidul spécifique |
+| `export_range()` | Exporte une plage de biduls |
+
+**Commande CLI :**
+```bash
+# Export par numéro
+python cli.py export --numero 280 --output export_280.csv
+
+# Export d'une plage
+python cli.py export --range 280-285 --output exports/
+
+# Export avec filtre WHERE personnalisé
+python cli.py export --where "date_evenement >= '2023-01-01'" --output 2023_events.csv
+python cli.py export --where "ville_raw = 'Le Mans'" --output lemans_events.csv
+
+# Export XLSX
+python cli.py export --numero 306 --format xlsx --output export_306.xlsx
+```
+
+**Requête SQL générée :**
+```sql
+SELECT e.bidul_numero, e.date_evenement, e.heure as horaire,
+       e.lieu_raw as lieu, e.ville_raw as ville, e.tarif_raw as prix,
+       e.nom as festival, e.genre_evenement as style_festival,
+       e.type_evenement as genre,
+       c.nom_spectacle, c.artiste, c.style, c.ordre
+FROM evenement e
+LEFT JOIN contenu_evenement c ON c.evenement_id = e.id
+WHERE {where_clause}
+ORDER BY e.bidul_numero, e.date_evenement, e.id, c.ordre
 ```
 
 ## Lieux génériques (v1.18)

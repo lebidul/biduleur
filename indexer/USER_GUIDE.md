@@ -1103,6 +1103,121 @@ Les villes non presentes dans le referentiel sont maintenant preservees dans `vi
 
 ---
 
+## Import/Export CSV/XLSX (v1.21)
+
+### Import de fichiers sources
+
+Le système peut importer les événements depuis des fichiers CSV ou XLSX.
+
+#### Types de source dans biduls.description.csv
+
+La colonne `type` définit la méthode d'extraction pour chaque bidul :
+
+| Type | Description | Usage |
+|------|-------------|-------|
+| `scan` | OCR du PDF scanné | Biduls 1-177 (scans historiques) |
+| `texte` | Extraction texte natif du PDF | Biduls 178-264 |
+| `csv` | Import depuis fichier CSV | Biduls 265-291 (si fichier source disponible) |
+| `xlsx` | Import depuis fichier XLSX | Biduls 306-310 (format 2025+) |
+
+**Comportement de `populate` :**
+- Si `type=csv` ou `type=xlsx` : utilise le fichier `source_file`
+- Si `type=scan` : utilise l'OCR (avec templates SVG si disponibles)
+- Si `type=texte` : extrait le texte natif du PDF
+
+**Options de filtrage :**
+- `--csv-only` : traite uniquement les biduls de type `csv` ou `xlsx`
+- `--pdf-only` : traite uniquement les biduls de type `scan` ou `texte`
+
+```bash
+# Import normal : utilise le type configuré
+python cli.py populate --numero 280
+
+# Traiter uniquement les biduls CSV/XLSX
+python cli.py populate --csv-only
+
+# Traiter uniquement les biduls PDF (scan ou texte)
+python cli.py populate --pdf-only
+```
+
+#### Formats CSV/XLSX supportés
+
+| Période | Format | Exemple |
+|---------|--------|---------|
+| 2022 | CSV format 2022 | `tapage_biduleur_janvier_2022.csv` |
+| 2023-2024 | CSV format 2023 | `202301_tapage_biduleur_janvier_2023.csv` |
+| 2025+ | XLSX | `202510_tapage_biduleur_Octobre_2025.xlsx` |
+
+#### Configuration des sources
+
+Les fichiers sources sont configurés dans `corpus/biduls.description.csv` via la colonne `source_file`.
+
+**Multi-fichiers (biduls d'été) :**
+Les biduls de juillet couvrent juillet ET août. Utiliser `|` comme séparateur :
+```csv
+271,csv,inline,...,tapage_biduleur_juillet_2022.csv|tapage_biduleur_aout_2022.csv,
+```
+
+### `export` - Exporter des événements
+
+Exporte les événements de la base vers un fichier CSV ou XLSX.
+
+```bash
+# Export par numéro de bidul
+python cli.py export --numero 280 --output export_280.csv
+
+# Export d'une plage de biduls
+python cli.py export --range 280-285 --output exports/
+
+# Export avec filtre SQL personnalisé (clause WHERE)
+python cli.py export --where "date_evenement >= '2023-01-01'" --output 2023_events.csv
+
+# Filtrer par ville
+python cli.py export --where "ville_raw = 'Le Mans'" --output lemans_events.csv
+
+# Filtrer par lieu (avec LIKE)
+python cli.py export --where "lieu_raw LIKE '%Fonderie%'" --output fonderie.csv
+
+# Export au format XLSX
+python cli.py export --numero 306 --format xlsx --output export_306.xlsx
+```
+
+Options:
+| Option | Description |
+|--------|-------------|
+| `--numero N` | Exporter uniquement le Bidul N |
+| `--range N-M` | Exporter les Biduls de N à M |
+| `--where CLAUSE` | Clause SQL WHERE personnalisée |
+| `--output PATH` | Fichier ou dossier de sortie |
+| `--format` | Format de sortie: `csv` (défaut) ou `xlsx` |
+
+**Exemples de clauses WHERE :**
+```bash
+# Par date
+--where "date_evenement >= '2023-01-01' AND date_evenement < '2024-01-01'"
+
+# Par ville
+--where "ville_raw = 'La Flèche'"
+
+# Par type d'événement
+--where "type_evenement = 'concert'"
+
+# Combinaison
+--where "bidul_numero >= 280 AND ville_raw = 'Le Mans'"
+```
+
+**Colonnes exportées :**
+```
+bidul_numero, date_evenement, horaire, lieu, ville, prix,
+festival, style_festival, genre,
+spectacle1, artiste1, style1,
+spectacle2, artiste2, style2,
+spectacle3, artiste3, style3,
+spectacle4, artiste4, style4
+```
+
+---
+
 ## Normalisation automatique (v1.5)
 
 Le systeme de normalisation applique automatiquement des regles de matching intelligent:

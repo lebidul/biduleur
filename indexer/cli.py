@@ -39,15 +39,15 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from indexer.core.extractor import TextExtractor, extract_bidul_info, detect_pdf_type
 from indexer.core.parser import EventParser
 from indexer.core.db import BidulDB
-from indexer.core.csv_importer import find_csv_for_bidul as find_csv_files, import_bidul_from_csv
-from indexer.core.ocr import ScanExtractor, load_bidul_config, is_scan_from_csv
+from indexer.core.csv_importer import find_source_files as find_csv_files, import_bidul_from_source as import_bidul_from_csv
+from indexer.core.ocr import ScanExtractor, load_bidul_config, is_scan_from_csv, get_bidul_type
 from indexer.core.ocr_postprocess import OCRPostProcessor
 from indexer.core.regional_filter import detect_regional
 from indexer.core.artifact_filter import detect_artifact, is_bidul_sans_evenements
 
 # Configuration
 ARCHIVES_DIR = Path(__file__).parent / "archives"
-TAPAGES_DIR = Path(__file__).parent.parent / "biduleur" / "tapages" / "toBeConverted"
+TAPAGES_DIR = Path(__file__).parent / "corpus"  # Fichiers sources CSV/XLSX
 LOG_FORMAT = "%(asctime)s [%(levelname)s] %(message)s"
 
 # Mapping mois français -> numéro
@@ -860,23 +860,46 @@ def cmd_populate(args):
             skipped += 1
             continue
 
-        # Chercher les CSV pour ce Bidul
-        csv_paths = find_csv_files(numero, mois, annee, TAPAGES_DIR)
+        # Déterminer le type de source depuis biduls.description.csv
+        # Types possibles: 'scan', 'texte', 'csv', 'xlsx'
+        bidul_type = get_bidul_type(numero)
 
         source = None
         events = []
         full_text = None  # Pour stocker le texte brut extrait (PDF/scan)
 
-        # Priorité au CSV si disponible et non --pdf-only
-        if csv_paths and not args.pdf_only:
-            events = import_bidul_from_csv(numero, csv_paths, annee, mois)
-            source = 'csv'
-            # Pas de raw_text pour les imports CSV (données déjà structurées)
-            csv_biduls += 1
-            total_from_csv += len(events)
+        # Filtrage par type selon les options --csv-only et --pdf-only
+        # --csv-only : traite uniquement les types 'csv' et 'xlsx'
+        # --pdf-only : traite uniquement les types 'scan' et 'texte'
+        if args.csv_only and bidul_type not in ('csv', 'xlsx'):
+            if args.verbose:
+                print(f"[{numero}] Ignoré (type={bidul_type}, --csv-only actif)")
+            skipped += 1
+            continue
 
-        # Sinon extraction PDF (sauf --csv-only)
-        elif not args.csv_only:
+        if args.pdf_only and bidul_type not in ('scan', 'texte', None):
+            if args.verbose:
+                print(f"[{numero}] Ignoré (type={bidul_type}, --pdf-only actif)")
+            skipped += 1
+            continue
+
+        # Type CSV ou XLSX: import depuis fichier source
+        if bidul_type in ('csv', 'xlsx'):
+            csv_paths = find_csv_files(numero, mois, annee, TAPAGES_DIR)
+            if csv_paths:
+                events = import_bidul_from_csv(numero, csv_paths, annee, mois)
+                source = bidul_type  # 'csv' ou 'xlsx'
+                # Pas de raw_text pour les imports CSV/XLSX (données déjà structurées)
+                csv_biduls += 1
+                total_from_csv += len(events)
+            else:
+                print(f"[{numero}] Fichier source {bidul_type} non trouvé")
+                skipped += 1
+                continue
+
+        # Type scan ou texte: extraction depuis PDF
+        if bidul_type in ('scan', 'texte', None) and source is None:
+            # Extraction PDF
             result = extractor.extract(str(pdf_path))
 
             if result.error and result.is_native:
@@ -885,11 +908,12 @@ def cmd_populate(args):
                 continue
 
             # Déterminer si c'est un scan:
-            # 1. D'abord vérifier le CSV biduls.description.csv (source de vérité)
+            # 1. D'abord vérifier le type dans biduls.description.csv
             # 2. Sinon, utiliser la détection avancée (fonts, images, texte)
-            csv_is_scan = is_scan_from_csv(numero)
-            if csv_is_scan is not None:
-                is_scan = csv_is_scan
+            if bidul_type == 'scan':
+                is_scan = True
+            elif bidul_type == 'texte':
+                is_scan = False
             else:
                 # Fallback: détection avancée basée sur structure du PDF
                 is_scan, detection_details = detect_pdf_type(str(pdf_path))
@@ -1075,6 +1099,53 @@ def cmd_populate(args):
         print(f"Événements régionaux exclus: {regional_excluded}")
     if regional_included > 0:
         print(f"Événements régionaux inclus: {regional_included}")
+
+    return 0
+
+
+def cmd_export(args):
+    """Exporte les événements vers CSV/XLSX."""
+    from indexer.core.csv_exporter import export_events, export_bidul, export_range
+    from indexer.core.db import DEFAULT_DB_PATH
+
+    output_path = Path(args.output)
+    output_format = args.format
+
+    if args.numero:
+        # Export d'un seul bidul
+        count = export_bidul(
+            DEFAULT_DB_PATH,
+            args.numero,
+            output_path,
+            output_format
+        )
+        print(f"Exporté {count} événements vers {output_path}")
+
+    elif args.range:
+        # Export d'une plage
+        start, end = map(int, args.range.split('-'))
+        count = export_range(
+            DEFAULT_DB_PATH,
+            start,
+            end,
+            output_path,  # C'est un dossier dans ce cas
+            output_format
+        )
+        print(f"Exporté {count} événements vers {output_path}/")
+
+    elif args.where:
+        # Export avec clause WHERE personnalisée
+        count = export_events(
+            DEFAULT_DB_PATH,
+            output_path,
+            where_clause=args.where,
+            output_format=output_format
+        )
+        print(f"Exporté {count} événements vers {output_path}")
+
+    else:
+        print("Erreur: Spécifiez --numero, --range ou --where")
+        return 1
 
     return 0
 
@@ -2464,6 +2535,15 @@ Maintenance (normalisation v2):
     p_populate.add_argument('--include-artifacts', action='store_true',
                            help='Inclure les faux événements (texte court, infos/annonces, sans contenu)')
 
+    # export
+    p_export = subparsers.add_parser('export', help='Exporte les événements vers CSV/XLSX')
+    p_export.add_argument('--numero', '-n', type=int, help='Numéro du Bidul')
+    p_export.add_argument('--range', '-r', help='Plage de numéros (ex: 280-290)')
+    p_export.add_argument('--where', '-w', help='Clause WHERE SQL (ex: "ville_raw = \'Le Mans\'")')
+    p_export.add_argument('--output', '-o', required=True, help='Fichier de sortie ou dossier')
+    p_export.add_argument('--format', '-f', choices=['csv', 'xlsx'], default='csv',
+                         help='Format de sortie (défaut: csv)')
+
     # purge
     p_purge = subparsers.add_parser('purge', help='Supprime les événements de la base')
     p_purge.add_argument('--all', '-a', action='store_true', help='Supprimer tous les événements')
@@ -2676,6 +2756,7 @@ Maintenance (normalisation v2):
         'stats': cmd_stats,
         'list': cmd_list,
         'populate': cmd_populate,
+        'export': cmd_export,
         'purge': cmd_purge,
         'migrate': cmd_migrate,
         'triage': cmd_triage,

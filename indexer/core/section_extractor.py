@@ -136,6 +136,7 @@ class BidulSectionConfig:
     page2: Optional[PageSectionConfig] = None
     pages_override: list[int] = field(default_factory=list)
     svg_template: str = ''  # Nom du fichier template SVG (v1.12+)
+    source_file: str = ''  # Fichier(s) CSV/XLSX source (v1.22+)
 
     @classmethod
     def from_csv_row(cls, row: dict) -> Optional['BidulSectionConfig']:
@@ -172,6 +173,9 @@ class BidulSectionConfig:
         # Template SVG (v1.12+)
         svg_template = (row.get('svg_template') or '').strip()
 
+        # Source CSV/XLSX (v1.22+)
+        source_file = (row.get('source_file') or '').strip()
+
         return cls(
             numero=numero,
             type_source=type_source,
@@ -180,6 +184,7 @@ class BidulSectionConfig:
             page2=PageSectionConfig.from_csv_row(row, 2),
             pages_override=pages_override,
             svg_template=svg_template,
+            source_file=source_file,
         )
 
     def is_scan(self) -> bool:

@@ -1,8 +1,13 @@
 """
-Import des événements depuis les CSV de tapages.
+Import des événements depuis les CSV/XLSX de tapages.
 
-Les CSV sont la source de vérité pour les événements récents (2022+).
+Les CSV/XLSX sont la source de vérité pour les événements récents (2022+).
 Ils ont une confidence de 1.0 car saisis manuellement.
+
+Formats supportés:
+- CSV 2022: tapage_biduleur_janvier_2022.csv
+- CSV 2023+: 202301_tapage_biduleur_janvier_2023.csv
+- XLSX 2025+: 202510_tapage_biduleur_Octobre_2025.xlsx (nouveau format avec colonnes différentes)
 """
 
 import csv
@@ -13,6 +18,10 @@ from pathlib import Path
 from typing import Optional
 
 logger = logging.getLogger(__name__)
+
+# Chemin vers le fichier de configuration des biduls
+CORPUS_DIR = Path(__file__).parent.parent / 'corpus'
+BIDULS_DESCRIPTION_CSV = CORPUS_DIR / 'biduls.description.csv'
 
 # Mapping genre CSV -> type événement
 CSV_GENRE_MAP = {
@@ -28,6 +37,272 @@ MOIS_FR = {
     'mai': 5, 'juin': 6, 'juillet': 7, 'aout': 8, 'août': 8,
     'septembre': 9, 'octobre': 10, 'novembre': 11, 'decembre': 12, 'décembre': 12
 }
+
+# Mapping des colonnes XLSX 2025+ vers format interne
+# Les noms de colonnes dans le XLSX peuvent contenir des newlines et espaces
+XLSX_COLUMN_PATTERNS = {
+    'festival': ['festoche', 'evenement'],
+    'style_festival': ['style', 'festoche', 'evenement'],
+    'date': ['date'],
+    'horaire': ['heure'],
+    'lieu': ['lieu'],
+    'ville': ['ville'],
+    'prix': ['prix'],
+    'genre': ['genre'],
+}
+
+
+def get_source_files_from_config(bidul_numero: int) -> list[str]:
+    """
+    Récupère la liste des fichiers sources depuis biduls.description.csv.
+
+    Args:
+        bidul_numero: Numéro du Bidul
+
+    Returns:
+        Liste des noms de fichiers (peut être vide si non défini)
+    """
+    if not BIDULS_DESCRIPTION_CSV.exists():
+        return []
+
+    # Lire le CSV de configuration
+    try:
+        with open(BIDULS_DESCRIPTION_CSV, 'r', encoding='utf-8-sig') as f:
+            reader = csv.DictReader(
+                (row for row in f if not row.startswith('#') and not row.startswith('"#'))
+            )
+            for row in reader:
+                try:
+                    num = int(row.get('numero', 0))
+                except (ValueError, TypeError):
+                    continue
+
+                if num == bidul_numero:
+                    source_file = (row.get('source_file') or '').strip()
+                    if source_file:
+                        # Multi-fichiers séparés par |
+                        return [f.strip() for f in source_file.split('|') if f.strip()]
+                    return []
+    except Exception as e:
+        logger.debug(f"Erreur lecture biduls.description.csv: {e}")
+
+    return []
+
+
+def normalize_xlsx_column(col_name: str) -> str:
+    """
+    Normalise un nom de colonne XLSX pour matching.
+
+    Enlève les newlines, normalise les espaces, met en minuscules.
+    """
+    # Remplacer newlines par espaces
+    normalized = col_name.replace('\n', ' ').replace('\r', ' ')
+    # Réduire les espaces multiples
+    normalized = ' '.join(normalized.split())
+    # Minuscules
+    return normalized.lower().strip()
+
+
+def find_xlsx_column(df_columns: list[str], patterns: list[str]) -> Optional[str]:
+    """
+    Trouve une colonne dans le DataFrame par patterns.
+
+    Args:
+        df_columns: Liste des noms de colonnes du DataFrame
+        patterns: Liste de mots-clés à chercher (tous doivent être présents)
+
+    Returns:
+        Nom de la colonne originale ou None
+    """
+    for col in df_columns:
+        normalized = normalize_xlsx_column(col)
+        if all(p.lower() in normalized for p in patterns):
+            return col
+    return None
+
+
+def import_xlsx(xlsx_path: Path, bidul_numero: int,
+                annee: int, mois: int) -> list[dict]:
+    """
+    Importe un fichier XLSX (format 2025+) et retourne liste d'événements.
+
+    Args:
+        xlsx_path: Chemin vers le fichier XLSX
+        bidul_numero: Numéro du Bidul
+        annee: Année du Bidul
+        mois: Mois du Bidul
+
+    Returns:
+        Liste de dictionnaires représentant les événements
+    """
+    try:
+        import pandas as pd
+    except ImportError:
+        logger.error("pandas requis pour les fichiers XLSX: pip install pandas openpyxl")
+        return []
+
+    events = []
+
+    try:
+        df = pd.read_excel(xlsx_path)
+    except Exception as e:
+        logger.error(f"Erreur lecture XLSX {xlsx_path}: {e}")
+        return []
+
+    # Mapper les colonnes
+    columns = list(df.columns)
+    col_map = {}
+
+    # Colonnes de base
+    col_map['date'] = find_xlsx_column(columns, ['date']) or 'DATE'
+    col_map['horaire'] = find_xlsx_column(columns, ['heure']) or 'HEURE'
+    col_map['lieu'] = find_xlsx_column(columns, ['lieu']) or 'LIEU'
+    col_map['ville'] = find_xlsx_column(columns, ['ville']) or 'VILLE'
+    col_map['prix'] = find_xlsx_column(columns, ['prix']) or 'PRIX'
+    col_map['festival'] = find_xlsx_column(columns, ['festoche', 'evenement'])
+    col_map['style_festival'] = find_xlsx_column(columns, ['style', 'festoche'])
+    col_map['genre'] = find_xlsx_column(columns, ['genre', '1']) or find_xlsx_column(columns, ['genre'])
+
+    # Colonnes artistes/spectacles (1-4)
+    for i in range(1, 5):
+        col_map[f'spectacle{i}'] = find_xlsx_column(columns, ['nom', 'spectacle', str(i)])
+        col_map[f'artiste{i}'] = (
+            find_xlsx_column(columns, ['compagnie', str(i)]) or
+            find_xlsx_column(columns, ['groupe', str(i)]) or
+            find_xlsx_column(columns, ['artiste', str(i)])
+        )
+        col_map[f'style{i}'] = find_xlsx_column(columns, ['style', str(i)])
+
+    logger.debug(f"XLSX column mapping: {col_map}")
+
+    for _, row in df.iterrows():
+        # Fonction helper pour récupérer valeur d'une colonne mappée
+        def get_val(key: str, default: str = '') -> str:
+            col = col_map.get(key)
+            if col and col in row.index:
+                val = row[col]
+                if pd.notna(val):
+                    return str(val).strip()
+            return default
+
+        # Parser les artistes
+        artistes = []
+        spectacles = []
+        genres = []
+
+        for i in range(1, 5):
+            spec = get_val(f'spectacle{i}')
+            art = get_val(f'artiste{i}')
+            style = get_val(f'style{i}')
+
+            if art:
+                artistes.append({
+                    "nom": art,
+                    "genre": style or None,
+                    "spectacle": spec or None
+                })
+            if spec and spec not in spectacles:
+                spectacles.append(spec)
+            if style and style not in genres:
+                genres.append(style)
+
+        # Prix
+        prix_min, prix_max, gratuit, tarif_raw = parse_price(get_val('prix'))
+
+        # Date
+        date_text = get_val('date')
+        date_evenement = parse_date(date_text, annee, mois)
+
+        # Ville par défaut
+        ville = get_val('ville') or 'Le Mans'
+
+        # Nom (festival)
+        nom = get_val('festival') or None
+
+        # Genre événement
+        genre_evenement = get_val('style_festival') or None
+
+        # Type événement
+        genre_raw = get_val('genre').lower()
+        type_evt = CSV_GENRE_MAP.get(genre_raw, genre_raw if genre_raw else None)
+
+        # Construire raw_text
+        raw_parts = [date_text, get_val('horaire')]
+        if artistes:
+            artiste_names = [a['nom'] for a in artistes if a.get('nom')]
+            raw_parts.append(' + '.join(artiste_names))
+        if spectacles:
+            raw_parts.append(', '.join(f'"{s}"' for s in spectacles))
+        raw_parts.extend([get_val('lieu'), ville, get_val('prix')])
+        raw_text = ', '.join(p for p in raw_parts if p)
+
+        # Ignorer les lignes vides
+        if not raw_text or not any([artistes, spectacles, nom]):
+            continue
+
+        event = {
+            'bidul_numero': bidul_numero,
+            'raw_text': raw_text,
+            'nom': nom,
+            'date_evenement': date_evenement,
+            'heure': get_val('horaire') or None,
+            'lieu_raw': get_val('lieu') or None,
+            'ville_raw': ville,
+            'artistes': json.dumps(artistes, ensure_ascii=False) if artistes else None,
+            'spectacles': json.dumps(spectacles, ensure_ascii=False) if spectacles else None,
+            'genres_raw': json.dumps(genres, ensure_ascii=False) if genres else None,
+            'genre_evenement': genre_evenement,
+            'type_evenement': type_evt,
+            'tarif_raw': tarif_raw,
+            'prix_min': prix_min,
+            'prix_max': prix_max,
+            'gratuit': gratuit,
+            'confidence': 1.0,
+            'source': 'xlsx'
+        }
+        events.append(event)
+
+    logger.info(f"Importé {len(events)} événements depuis {xlsx_path.name}")
+    return events
+
+
+def find_source_files(bidul_numero: int, mois: int, annee: int,
+                      csv_dir: Path) -> list[Path]:
+    """
+    Trouve tous les fichiers sources (CSV ou XLSX) pour un Bidul.
+
+    Priorité:
+    1. Fichiers définis dans biduls.description.csv (colonne source_file)
+    2. Fallback sur la détection automatique par nom
+
+    Args:
+        bidul_numero: Numéro du Bidul
+        mois: Mois du Bidul
+        annee: Année du Bidul
+        csv_dir: Répertoire contenant les fichiers sources
+
+    Returns:
+        Liste des chemins trouvés (CSV ou XLSX)
+    """
+    if not csv_dir.exists():
+        return []
+
+    # 1. Chercher dans la config source_file
+    source_files = get_source_files_from_config(bidul_numero)
+    if source_files:
+        found_paths = []
+        for filename in source_files:
+            # Chercher le fichier dans csv_dir (corpus)
+            path = csv_dir / filename
+            if path.exists():
+                found_paths.append(path)
+            else:
+                logger.warning(f"Fichier source non trouvé: {path}")
+        if found_paths:
+            return found_paths
+
+    # 2. Fallback: détection automatique par nom (CSV uniquement)
+    return find_csv_for_bidul(bidul_numero, mois, annee, csv_dir)
 
 
 def parse_csv_filename(filename: str) -> tuple[Optional[int], Optional[int]]:
@@ -352,14 +627,14 @@ def dedupe_events(events: list[dict]) -> list[dict]:
     return list(seen.values())
 
 
-def import_bidul_from_csv(bidul_numero: int, csv_paths: list[Path],
-                          annee: int, mois: int) -> list[dict]:
+def import_bidul_from_source(bidul_numero: int, source_paths: list[Path],
+                              annee: int, mois: int) -> list[dict]:
     """
-    Importe les événements depuis un ou plusieurs CSV.
+    Importe les événements depuis un ou plusieurs fichiers sources (CSV ou XLSX).
 
     Args:
         bidul_numero: Numéro du Bidul
-        csv_paths: Liste des fichiers CSV
+        source_paths: Liste des fichiers sources (CSV ou XLSX)
         annee: Année du Bidul
         mois: Mois du Bidul
 
@@ -367,8 +642,11 @@ def import_bidul_from_csv(bidul_numero: int, csv_paths: list[Path],
         Liste des événements dédoublonnés
     """
     all_events = []
-    for path in csv_paths:
-        events = import_csv(path, bidul_numero, annee, mois)
+    for path in source_paths:
+        if path.suffix.lower() == '.xlsx':
+            events = import_xlsx(path, bidul_numero, annee, mois)
+        else:
+            events = import_csv(path, bidul_numero, annee, mois)
         all_events.extend(events)
 
     deduped = dedupe_events(all_events)
@@ -376,3 +654,12 @@ def import_bidul_from_csv(bidul_numero: int, csv_paths: list[Path],
                 f"{len(deduped)} après déduplication")
 
     return deduped
+
+
+# Alias pour compatibilité avec le code existant
+def import_bidul_from_csv(bidul_numero: int, csv_paths: list[Path],
+                          annee: int, mois: int) -> list[dict]:
+    """
+    Alias de import_bidul_from_source pour compatibilité.
+    """
+    return import_bidul_from_source(bidul_numero, csv_paths, annee, mois)

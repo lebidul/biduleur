@@ -53,6 +53,9 @@ class ScanConfig:
     # Template SVG (v1.12+)
     svg_template: str = ''  # Nom du fichier template SVG dans corpus/templates/
 
+    # Source CSV/XLSX (v1.22+)
+    source_file: str = ''  # Fichier(s) CSV/XLSX source (séparés par |)
+
     @classmethod
     def from_csv_row(cls, row: dict) -> Optional['ScanConfig']:
         """Crée une config depuis une ligne du CSV biduls.description.csv.
@@ -133,6 +136,9 @@ class ScanConfig:
             # Template SVG (v1.12+)
             svg_template = (row.get('svg_template') or '').strip()
 
+            # Source CSV/XLSX (v1.22+)
+            source_file = (row.get('source_file') or '').strip()
+
             return cls(
                 numero=numero,
                 type_source=type_source,
@@ -147,6 +153,7 @@ class ScanConfig:
                 page2_colonnes=p2_colonnes,
                 date_par_evenement=date_format == 'inline',  # Compatibilité
                 svg_template=svg_template,
+                source_file=source_file,
             )
         except (ValueError, KeyError) as e:
             logger.debug(f"Erreur parsing config row: {e}")
@@ -273,12 +280,12 @@ def load_bidul_config(numero: int, csv_path: str = None) -> Optional[ScanConfig]
     return loader.get_config(numero) or loader.get_nearest_config(numero)
 
 
-def is_scan_from_csv(numero: int) -> Optional[bool]:
+def get_bidul_type(numero: int) -> Optional[str]:
     """
-    Vérifie si un Bidul est un scan selon le fichier biduls.description.csv.
+    Récupère le type de source d'un Bidul depuis biduls.description.csv.
 
     Returns:
-        True si scan, False si texte, None si non trouvé dans le CSV
+        'scan', 'texte', 'csv', 'xlsx' ou None si non trouvé
     """
     csv_path = Path(__file__).parent.parent / 'corpus' / 'biduls.description.csv'
     if not csv_path.exists():
@@ -311,10 +318,8 @@ def is_scan_from_csv(numero: int) -> Optional[bool]:
                     if row_numero == numero:
                         # Nouveau format: 'type', ancien: 'scan/texte'
                         type_source = row.get('type', row.get('scan/texte', '')).strip().lower()
-                        if type_source == 'scan':
-                            return True
-                        elif type_source == 'texte':
-                            return False
+                        if type_source in ('scan', 'texte', 'csv', 'xlsx'):
+                            return type_source
                         return None
             return None  # Numéro non trouvé
         except UnicodeDecodeError:
@@ -322,6 +327,21 @@ def is_scan_from_csv(numero: int) -> Optional[bool]:
         except Exception:
             continue
 
+    return None
+
+
+def is_scan_from_csv(numero: int) -> Optional[bool]:
+    """
+    Vérifie si un Bidul est un scan selon le fichier biduls.description.csv.
+
+    Returns:
+        True si scan, False si texte/csv/xlsx, None si non trouvé dans le CSV
+    """
+    bidul_type = get_bidul_type(numero)
+    if bidul_type == 'scan':
+        return True
+    elif bidul_type in ('texte', 'csv', 'xlsx'):
+        return False
     return None
 
 
