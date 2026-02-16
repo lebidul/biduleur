@@ -1,4 +1,6 @@
 import os
+import re
+from datetime import datetime
 from typing import List, Dict, Optional, Any
 
 import pandas as pd
@@ -27,6 +29,16 @@ _CURRENCY_COL_CANDIDATES = ("DEVISE", "CURRENCY", "MONNAIE")
 
 # Nom de la colonne optionnelle pour désactiver des lignes
 INACTIF_COLUMN = "INACTIF"
+
+# Mapping mois français
+MOIS_FR = {
+    1: 'janvier', 2: 'février', 3: 'mars', 4: 'avril',
+    5: 'mai', 6: 'juin', 7: 'juillet', 8: 'août',
+    9: 'septembre', 10: 'octobre', 11: 'novembre', 12: 'décembre'
+}
+
+# Jours de la semaine complets
+JOURS_SEMAINE = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche']
 
 REQUIRED_COLUMNS = [
     DATE, HORAIRE, FESTIVAL, STYLE_FESTIVAL, VILLE, LIEU, PRIX,
@@ -174,6 +186,58 @@ def _filter_inactive_rows(df: pd.DataFrame) -> pd.DataFrame:
 
 
 # -----------------------------
+# Parsing des dates
+# -----------------------------
+
+def _parse_date(date_str: Any) -> tuple[str, str]:
+    """
+    Parse une date et retourne (sort_key, display_date).
+
+    Formats supportés:
+    - ISO: "2014-08-31" -> ("2014-08-31", "Dimanche 31 août 2014")
+    - Jour + numéro: "Samedi 3" -> ("03", "Samedi 3")
+    - Jour + numéro + mois: "Lun 03 février" -> ("03", "Lun 03 février")
+
+    Returns:
+        (sort_key, display_date)
+        - sort_key: clé de tri (date ISO complète ou jour paddé)
+        - display_date: date formatée pour affichage
+    """
+    if not date_str or not isinstance(date_str, str):
+        return ('', str(date_str) if date_str else '')
+
+    date_str = str(date_str).strip()
+
+    # Format ISO: 2014-08-31 ou 2014/08/31
+    iso_match = re.match(r'^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$', date_str)
+    if iso_match:
+        year, month, day = int(iso_match.group(1)), int(iso_match.group(2)), int(iso_match.group(3))
+        try:
+            dt = datetime(year, month, day)
+            jour_semaine = JOURS_SEMAINE[dt.weekday()]
+            mois_nom = MOIS_FR[month]
+            # Format complet avec année: "Dimanche 31 août 2014"
+            display = f"{jour_semaine} {day} {mois_nom} {year}"
+            # Clé de tri: date ISO pour tri chronologique
+            sort_key = f"{year:04d}-{month:02d}-{day:02d}"
+            return (sort_key, display)
+        except ValueError:
+            return ('', date_str)
+
+    # Format existant: "Samedi 3" ou "Sam 03 février"
+    parts = date_str.split()
+    if len(parts) >= 2:
+        try:
+            day = int(parts[1])
+            # Clé de tri: jour paddé (comportement existant)
+            return (str(day).zfill(2), date_str)
+        except ValueError:
+            pass
+
+    return ('', date_str)
+
+
+# -----------------------------
 # Lecture + tri
 # -----------------------------
 
@@ -235,13 +299,15 @@ def read_and_sort_file(filename: str) -> Optional[List[Dict]]:
         # Remplace NaN par None pour la suite
         df = df.where(pd.notnull(df), None)
 
-        # Extrait 'Day' (ex: "Lun 03 ..." -> "03")
-        df['Day'] = df[DATE].apply(lambda x: x.split()[1].zfill(2) if x else None)
+        # Parser les dates: extraire clé de tri + normaliser pour affichage
+        parsed = df[DATE].apply(_parse_date)
+        df['Day'] = parsed.apply(lambda x: x[0])  # Clé de tri (date ISO ou jour)
+        df[DATE] = parsed.apply(lambda x: x[1])   # Date formatée pour affichage
 
         # Tri personnalisé : 'En Bref' (COLONNE_INFO) passe à la fin
-        df['sort_key'] = df[DATE].apply(lambda x: 0 if x == COLONNE_INFO else 1)
-        df_sorted = df.sort_values(by=['sort_key', 'Day', GENRE1, HORAIRE])
-        df_sorted = df_sorted.drop(columns=['sort_key'])
+        df['info_last'] = df[DATE].apply(lambda x: 0 if x == COLONNE_INFO else 1)
+        df_sorted = df.sort_values(by=['info_last', 'Day', GENRE1, HORAIRE])
+        df_sorted = df_sorted.drop(columns=['info_last'])
 
         return df_sorted.to_dict('records')
     except ValueError:
