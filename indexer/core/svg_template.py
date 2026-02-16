@@ -75,8 +75,18 @@ class ExtractionZone:
         """Validation des valeurs."""
         if self.width <= 0 or self.height <= 0:
             raise ValueError(f"Zone {self.id}: width et height doivent être > 0")
-        if self.x < 0 or self.y < 0:
-            raise ValueError(f"Zone {self.id}: x et y doivent être >= 0")
+        # Tolérance pour les erreurs d'arrondi dans les éditeurs SVG (ex: x=-0.26)
+        # On ramène les valeurs légèrement négatives à 0
+        if self.x < 0:
+            if self.x > -1:
+                object.__setattr__(self, 'x', 0.0)
+            else:
+                raise ValueError(f"Zone {self.id}: x doit être >= 0 (valeur: {self.x})")
+        if self.y < 0:
+            if self.y > -1:
+                object.__setattr__(self, 'y', 0.0)
+            else:
+                raise ValueError(f"Zone {self.id}: y doit être >= 0 (valeur: {self.y})")
 
     def to_bbox(self) -> tuple[int, int, int, int]:
         """

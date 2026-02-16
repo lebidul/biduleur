@@ -24,7 +24,11 @@ def clean_pdf_text(text: str) -> str:
     # 3. Normaliser les espaces multiples
     text = re.sub(r'\s+', ' ', text)
 
-    # 4. Trim
+    # 4. Normaliser les heures avec espace: "22 h" → "22h", "22 h 30" → "22h30"
+    # Pattern: chiffres + espace(s) + h/H + optionnel espace(s) + optionnel minutes
+    text = re.sub(r'(\d{1,2})\s+([hH])\s*(\d{0,2})', r'\1\2\3', text)
+
+    # 5. Trim
     text = text.strip()
 
     return text

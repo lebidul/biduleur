@@ -28,6 +28,7 @@ GENERIC_PATTERNS = [
     "salle des fetes",
     "salle polyvalente",
     "salle municipale",
+    "salle communale",
     "église",
     "eglise",
     "halles",

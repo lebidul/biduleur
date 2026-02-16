@@ -1,30 +1,114 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<svg viewBox="0 0 1653 2338" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-  <metadata>
-    <bidul numero="17" orientation_pdf="portrait" orientation_texte="portrait"/>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   viewBox="0 0 1653 2338"
+   version="1.1"
+   id="svg5"
+   sodipodi:docname="bidul_018.svg"
+   inkscape:version="1.4.3 (0d15f75, 2025-12-25)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs5" />
+  <sodipodi:namedview
+     id="namedview5"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="0.31437126"
+     inkscape:cx="825.45714"
+     inkscape:cy="1169"
+     inkscape:window-width="1920"
+     inkscape:window-height="974"
+     inkscape:window-x="5149"
+     inkscape:window-y="514"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg5" />
+  <metadata
+     id="metadata1">
+    <bidul
+       numero="17"
+       orientation_pdf="portrait"
+       orientation_texte="portrait" />
   </metadata>
-
   <!-- Page 1 -->
-  <g id="page-1">
-    <g id="p1-s1">
-      <rect id="p1-s1" x="0" y="0" width="859" height="1215" fill="none" stroke="green" stroke-width="2" data-order="1"/>
+  <g
+     id="page-1"
+     style="display:none">
+    <g
+       id="g1">
+      <rect
+         id="p1-s1"
+         x="0"
+         y="0"
+         width="859"
+         height="1215"
+         fill="none"
+         stroke="#008000"
+         stroke-width="2"
+         data-order="1" />
     </g>
   </g>
-
   <!-- Page 2 -->
-  <g id="page-2">
-    <g id="p2-s1">
-      <rect id="p2-s1" x="0" y="0" width="859" height="1215" fill="none" stroke="green" stroke-width="2" data-order="2"/>
+  <g
+     id="page-2"
+     style="display:none">
+    <g
+       id="g2">
+      <rect
+         id="p2-s1"
+         x="0"
+         y="0"
+         width="859"
+         height="1215"
+         fill="none"
+         stroke="#008000"
+         stroke-width="2"
+         data-order="2" />
     </g>
-    <g id="p2-s2">
-      <rect id="p2-s2" x="793" y="0" width="860" height="1215" fill="none" stroke="green" stroke-width="2" data-order="3"/>
+    <g
+       id="g3">
+      <rect
+         id="p2-s2"
+         x="793"
+         y="0"
+         width="860"
+         height="1215"
+         fill="none"
+         stroke="#008000"
+         stroke-width="2"
+         data-order="3" />
     </g>
-    <g id="p2-s3">
-      <rect id="p2-s3" x="0" y="1123" width="859" height="1215" fill="none" stroke="green" stroke-width="2" data-order="4"/>
+    <g
+       id="g4">
+      <rect
+         id="p2-s3"
+         x="0"
+         y="1123"
+         width="859"
+         height="1215"
+         fill="none"
+         stroke="#008000"
+         stroke-width="2"
+         data-order="4" />
     </g>
-    <g id="p2-s4">
-      <rect id="p2-s4" x="793" y="1123" width="860" height="1215" fill="none" stroke="green" stroke-width="2" data-order="5"/>
+    <g
+       id="g5">
+      <rect
+         id="p2-s4"
+         x="793"
+         y="1123"
+         width="860"
+         height="1215"
+         fill="none"
+         stroke="#008000"
+         stroke-width="2"
+         data-order="5" />
     </g>
   </g>
-
 </svg>

@@ -1,647 +1,714 @@
-nom,ville,nom_normalise,adresse_numero,adresse_voie,code_postal,latitude,longitude,geo_source,geo_precision,nom_osm
-14 hameau de verze,Saint-Rémy-du-Val,14hameauverze,14,Hameau de Verze,72600,48.351913808477,0.220231769062038,manuel,exact,
-8 rue de Cyrus,Le Mans,8ruecyrus,8,Rue de Cyrus,72000,48.0051346,0.2134966,nominatim,exact,8
-Abbaye,Le Mans,abbaye,,Place Aristide Briand,72000,48.0017911,0.200267,nominatim,exact,Abbaye Saint-Pierre de la Couture
-Abbaye Royale de l'Epau,Le Mans,abbayeroyaleepau,,Rue de l'Estérel,72530,47.9912478,0.2423797,nominatim,exact,Abbaye Royale de l'Épau
-Antarès,Le Mans,antares,,Rue Juan Manuel Fangio,72100,47.9561565,0.226224,nominatim,exact,Antarès
-Archives Musicales du Mans,Le Mans,archivesmusicalesmans,,,72000,47.9859416762294,0.20994415132415,nominatim,exact,8
-Arrêt saint Martin,Le Mans,arretsaintmartin,,,72000,47.985727104451,0.209514976111933,nominatim,exact,Maison d'arrêt de Laval
-Au coeur des artistes,Le Mans,coeurartistes,17,Rue Gambetta,72000,48.0048597,0.1942828,nominatim,exact,Au cœur des artistes
-Auberge,Le Mans,auberge,72,Cour Saint-Victeur,72000,48.0071003,0.1906492,nominatim,exact,Auberge de la Fontaine
-Aux 3 Brasseurs,Le Mans,3brasseurs,,Rue Jean de Vignolles,72650,48.0467553,0.1720127,nominatim,approximate,3 Brasseurs
-Baccara La Sirène,Le Mans,baccarasirene,2,Rue Marchande,72000,48.006312764925,0.198720747621314,manuel,exact,Au Baccara
-Bar à Z’Arts,La Flèche,barz’arts,,Place de l'Hôtel de Ville,72200,47.7285228,0.5734835,nominatim,approximate,Café des Arts
-Bar de la Rotonde,Le Mans,barrotonde,,Giratoire de la Rotonde,72100,47.9573643,0.1986721,nominatim,approximate,Giratoire de la Rotonde
-Bar des sports,Le Mans,barsports,,Rue Principale,72380,48.1495581,0.1322235,nominatim,exact,Bar des sports
-Bar l'Olivier,Le Mans,barolivier,,Place George Washington,72000,47.9959093,0.2029105,nominatim,exact,L'Olivier
-Bars et restaurants,Le Mans,barsetrestaurants,,,72000,48.0073849,0.1967849,nominatim,city,Le Mans
-Base de loisirs,Lavaré,baseloisirs,,,,48.0539923,0.6525776,nominatim,exact,Base de Loisirs Lavaré
-Bât. H rue Maurice Ravel,Allonnes,bathruemauriceravel,,Rue Maurice Ravel,72700,47.9699605939392,0.161753205988298,manuel,exact,
-Bateau Lavoir Café,Le Mans,bateaulavoircafe,105 bis,Grande Rue,72000,48.0068763637071,0.195675227987493,nominatim,approximate,Le Bateau-lavoir
-Beaux-Arts,Le Mans,beauxarts,,Place des Thermes,72000,48.0063067,0.1961357,nominatim,exact,École supérieure des beaux-arts
-Bibliotheque,Savigné-l'Évêque,bibliotheque,,,,48.0773296,0.2962126,nominatim,city,Savigné-l'Évêque
-Bibliothèque,Bouloire,bibliotheque,,,,47.9724995,0.5524301,nominatim,city,Bouloire
-Bibliothèque,Château-du-Loir,bibliotheque,,,,47.6965942,0.4159617,nominatim,exact,Bibliothèque-ludothèque
-bibliothèque,La Chapelle-Saint-Aubin,bibliotheque,,,,48.0341335,0.1600629,nominatim,city,La Chapelle-Saint-Aubin
-bibliothèque,La Flèche,bibliotheque,,,,47.742358,0.0569718,nominatim,exact,Bibliothèque
-Bibliothèque,La Guierche,bibliotheque,,,,48.1132085,0.1943092,nominatim,city,La Guierche
-Bibliothèque,Le Mans,bibliotheque,,,,48.0247785,0.3324378,nominatim,exact,Bibliothèque
-Bibliothèque,Moncé en Belin,bibliotheque,,,,47.8941045,0.2038619,nominatim,city,Moncé-en-Belin
-Bibliothèque,Saint-Calais,bibliotheque,,,,47.9206266,0.7430906,nominatim,exact,Musée-Bibliothèque
-Bibliothèque,Saint-Georges-le-Gaultier,bibliotheque,,,,48.2968771,-0.1061149,nominatim,city,Saint-Georges-le-Gaultier
-Bibliothèque,Sainte-Jamme-sur-Sarthe,bibliotheque,,,,48.1415274,0.1654889,nominatim,exact,Bibliothèque municipale
-Bibliothèque,Savigné-l'Évêque,bibliotheque,,,,48.0773296,0.2962126,nominatim,city,Savigné-l'Évêque
-Bibliothèque universitaire,Le Mans,bibliothequeuniversitaire,,Boulevard Paul d'Estournelles de Constant,72000,48.0160219,0.1605519,nominatim,exact,Bibliothèque universitaire
-Bières et Chopes,Le Mans,bieresetchopes,,Ligne droite des Hunaudières,72100,47.9529814,0.2291927,nominatim,exact,Bières et Chopes
-Bistro Broc Café,Le Mans,bistrobroccafe,,Boulevard des Ravalières,72560,47.9773437,0.2716957,nominatim,exact,Bistro Broc Café
-Bld Winston Churchill,Le Mans,bldwinstonchurchill,,Boulevard Winston Churchill,72000,48.0073849,0.1967849,manuel,exact,
-Blue Zinc,Le Mans,bluezinc,45,Avenue de la Libération,72000,48.0058613,0.1890035,nominatim,exact,Blue Zinc
-Boire du Bon,Le Mans,boirebon,,Rue du Monnet,72190,48.0378706,0.1880358,nominatim,exact,Boire du Bon
-Bords de l'Huisne,Le Mans,bordshuisne,,Boulevard Winston Churchill,72100,47.9907146,0.2199553,nominatim,exact,Bords de l'Huisne
-Brasserie Mage Malte,Mamers,brasseriemagemalte,109,Rue Charles Granger,72600,48.3561295160324,0.36801919128359,manuel,exact,
-Brasserie Septante-Deux,Le Mans,brasserieseptantedeux,21,Rue du Docteur Leroy,72000,48.0024693727632,0.196207617341453,manuel,exact,
-Café associatif,Le Mans,cafeassociatif,4,Avenue Gréco,72100,47.9744219,0.2142349,nominatim,approximate,Centre associatif
-Café des Arts,La Chartre-sur-le-Loir,cafearts,5,Place de la Liberté,72340,47.7285228,0.5734835,nominatim,exact,Café des Arts
-Café des Brasseurs,Le Mans,cafebrasseurs,,,,48.0467553,0.1720127,nominatim,approximate,3 Brasseurs
-Café Folk,Le Mans,cafefolk,9,Rue du Cornet,72000,48.0049184,0.1953471,nominatim,exact,Cafe Folk
-Café théatre Éolienne,Arnage,cafetheatreeolienne,,,72230,47.9370691716989,0.185093001101646,nominatim,exact,
-Camion-théâtre,Le Mans,camiontheatre,,,,48.0073849,0.1967849,nominatim,city,Le Mans
-Campus de l'université,Le Mans,campusuniversite,,,,48.0171041,0.1626348,nominatim,approximate,Campus de l'Université du Mans
-Carré Plantagenêt,Le Mans,carreplantagenet,2,Rue Claude Blondeau,72000,48.0071116,0.1981579,nominatim,exact,Musée Jean-Claude-Boulard / Carré Plantagenêt
-Casa Minga,Le Mans,casaminga,,Rue Nationale,72000,48.0005414,0.1985619,nominatim,exact,Casa Minga
-Cathédrale Saint-Julien,Le Mans,cathedralesaintjulien,,Place Saint-Michel,72000,48.0093011,0.198797,nominatim,exact,Cathédrale Saint-Julien
-Cave municipale,Le Mans,cavemunicipale,,,72000,48.0073849,0.1967849,nominatim,city,Le Mans
-Caveau 105,Le Mans,caveau105,105,Grande Rue,72000,48.0069264239123,0.195060557811651,nominatim,exact,
-Centre Cial les Jacobins,Le Mans,centrecialjacobins,13,Rue Claude Blondeau,72000,48.0069312661394,0.199314678456944,manuel,exact,Centre commercial Les Jacobins
-Centre Culturel,Le Mans,centreculturel,,,,48.0078156,0.2007998,nominatim,exact,Centre culturel « Les Quinconces - L'Espal »
-Centre culturel,Le Mans,centreculturel,,,,48.0078156,0.2007998,nominatim,exact,Centre culturel « Les Quinconces - L'Espal »
-Centre culturel,Saint-Calais,centreculturel,,,,49.5769337,2.9963639,nominatim,exact,Centre Culturel
-Centre Culturel,Vaas,centreculturel,,,,47.6678665,0.3100938,nominatim,approximate,Espace Culturel
-Centre Culturel Athéna,La Ferté-Bernard,centreculturelathena,,Av. du Général de Gaulle,72400,48.1830183374201,0.650172345269328,manuel,exact,
-"Centre de transfert de technologie, 20 rue de Thalès de Milet",Le Mans,centretransferttechnologie20ruethalesmilet,,,,48.0188601,0.1599316,nominatim,approximate,Centre de Transfert de Technologie
-Centre des Etangs-Chauds,Le Mans,centreetangschauds,,Chemin des Étangs Chauds,72100,47.9785994,0.2425382,nominatim,approximate,Chemin des Étangs Chauds
-Centre des expositions,Le Mans,centreexpositions,,Giratoire de l'Oasis,72100,47.9607676,0.2004644,nominatim,exact,Oasis - Centre des Expositions
-Centre équestre,Le Mans,centreequestre,,Chemin Rural des Métairies,72700,47.9606038,0.1673345,nominatim,exact,Centre Équestre
-Centre hospitalier,Le Mans,centrehospitalier,,Avenue Rubillard,72000,48.0154142,0.1777417,nominatim,exact,Centre hospitalier du Mans
-Centre Musical International de Roussigny,Saint-Ulphace,centremusicalinternationalroussigny,,,72320,48.1648892676544,0.845048028049695,manuel,exact,Centre Musical International de Roussigny
-Centre Social Mazagran,Le Mans,centresocialmazagran,,,,47.9712089,0.2128648,nominatim,approximate,Centre social des quartiers sud
-Centre St Christophe,La Chapelle-Saint-Aubin,centrestchristophe,,Chemin de Beauchene,72650,48.039266,0.1519688,nominatim,exact,Centre Saint-Christophe
-Centre Ville,Le Mans,centreville,,,,48.0017357,0.2030617,nominatim,exact,Parking Zenpark Le Mans - Centre-Ville - Préfecture
-Chapelle de l'Oratoire,Le Mans,chapelleoratoire,,Rue Montesquieu,72000,48.0103371,0.2005372,nominatim,exact,Chapelle de l'Oratoire
-Chapelle Sainte Cécile,Le Mans,chapellesaintececile,,,,48.1195362,0.1812042,nominatim,approximate,Rue de la Chapelle Sainte-Anne
-Chapêlmêle,Alençon,chapelmele,,,61000,48.4377527,0.0704145,nominatim,exact,La Chapêlmèle
-Chapiteau,Le Mans,chapiteau,6,Boulevard Winston Churchill,72100,47.9865185,0.2127646,nominatim,exact,Le châpiteau
-Chapiteau bleu promenade Newton,Le Mans,chapiteaubleupromenadenewton,,Promenade Newton,72000,47.9874026929278,0.219866163054687,manuel,exact,
-Chapiteau bulle promenade Newton,Le Mans,chapiteaubullepromenadenewton,,Promenade Newton,72000,47.9873525018594,0.219941287567278,manuel,exact,
-Chapiteau du parc de Casablanca,Le Mans,chapiteauparccasablanca,,Rue de Casablanca,72000,48.0151797810582,0.230821110746493,manuel,exact,
-Chapiteau promenade Newton,Le Mans,chapiteaupromenadenewton,,Promenade Newton,72000,47.9873525018594,0.219941287567278,manuel,exact,
-"Chapiteau, parc de l'Epine",Le Mans,chapiteauparcepine,,Allée de Cannes,72000,48.0180809360434,0.178740280161252,manuel,exact,
-Château de Courtanvaux,Bessé-sur-Braye,chateaucourtanvaux,,,72310,47.8441875,0.7355992,nominatim,exact,Château de Courtanvaux
-Château de la Forêterie,Le Mans,chateauforeterie,,Chemin des Métairies,72700,47.9619338,0.1716336,nominatim,exact,Château de la Forêterie
-Chez Marcelle,Le Mans,chezmarcelle,,Rue des Ponts Neufs,72000,48.0065772,0.1981638,nominatim,exact,Chez Marcelle
-Chope et Compagnie,Le Mans,chopeetcompagnie,3,Rue des Petites Marniéres,72650,48.0467565,0.1703818,nominatim,exact,Chope et Compagnie
-Chope et Compagnie Le Mans Nord,Le Mans,chopeetcompagniemansnord,,,,47.9801752,0.1960748,nominatim,approximate,Chope & Compagnie
-Chope et Compagnie Le Mans Sud,Le Mans,chopeetcompagniemanssud,,,,47.9801752,0.1960748,nominatim,approximate,Chope & Compagnie
-Chorus,Le Mans,chorus,,Place de la République,72700,47.9594561624342,0.164559261228405,nominatim,exact,Scène de jazz + chorus
-CHS,Allonnes,chs,20,Av. du 19 Mars 1962,49650,47.2833177,0.054068,manuel,exact,
-Cinéma le Français,Le Mans,cinemafrancais,,Rue Gambetta,72000,48.005512517726,0.193236059320388,manuel,exact,
-Cinéma Le Kid,La Flèche,cinemakid,,,,47.6992923,-0.0758035,nominatim,exact,Cinéma le Kid
-Cinéma le Royal,Le Mans,cinemaroyal,,Avenue Félix Géneslay,72100,47.9687504,0.2040136,nominatim,exact,Le Royal
-Cinéma Rex,Mamers,cinemarex,2,Rue de la Gare,72600,48.3473279430055,0.364700949432122,nominatim,exact,Cinema Rex
-Circuit Bugatti,Le Mans,circuitbugatti,,Allée du Château du Houx,72100,47.9571572,0.2161411,nominatim,exact,Circuit Bugatti
-Circuit des 24 heures,Le Mans,circuit24heures,,Passerelle Dunlop,72100,47.9578006,0.2125049,nominatim,exact,Circuit des 24 Heures du Mans
-Cirque Mimulus,Fresnay-sur-Sarthe,cirquemimulus,,Place de la Gare,72130,48.2814645674503,0.0298359224983774,manuel,exact,
-Cité du cirque & promenade Newton,Le Mans,citecirqueetpromenadenewton,,,,47.9860917,0.2120548,nominatim,approximate,Le Plongeoir - Cité du Cirque
-Cité Plantagenêt,Le Mans,citeplantagenet,20,Rue des Chanoines,72000,48.008836,0.1971929,nominatim,exact,Cité Plantagenêt
-Club La Suite 72,Le Mans,clubsuite72,123,Avenue de la Libération,72000,48.0040684860758,0.186919540225561,manuel,exact,Discothèque La Suite
-Collégiale Saint-Pierre-la-Cour,Le Mans,collegialesaintpierrecour,,,,48.0070847,0.1968794,nominatim,exact,Collégiale Saint-Pierre-la-Cour
-Comédie Le Mans,Le Mans,comediemans,37,Rue nationale,72000,48.0000923818496,0.200038757851003,manuel,exact,
-Comissariat,Le Mans,comissariat,,,72000,48.0073849,0.1967849,nominatim,city,Le Mans
-Comité des fêtes,Le Mans,comitefetes,,Cour des Érables,72100,47.9789319,0.2315588,nominatim,exact,Association du Comité des Fêtes des Bruyères
-Complexe Atlantis,Saint-Cosme-en-Vairais,complexeatlantis,,,,48.2739193,0.4598296,nominatim,exact,Complexe culturel Atlantis
-Conservatoire,Le Mans,conservatoire,,Escalier de la Pierre de Tucé,72000,48.008326,0.1960978,nominatim,exact,"Conservatoire à rayonnement départemental de musique, d'art dramatique et de danse du Mans"
-CPFI,Le Mans,cpfi,11,Rue des Frères Gréban,72000,48.0055169,0.1892603,nominatim,exact,Centre du Patrimoine de la Facture Instrumentale
-Cri-Cri Plage,Solesmes,cricriplage,,,,47.8512165,-0.3070613,nominatim,exact,Cri-Cri Plage
-CTTM,Le Mans,cttm,20,Rue Thalès de Milet,72000,48.0189217,0.15926,nominatim,exact,CTTM
-Derrière le complexe R. Garnier,Allonnes,derrierecomplexergarnier,13,Avenue Charles de Gaulle,72700,47.9727682076964,0.159647541953421,manuel,exact,
-Domaine de la Gandonnière,Champgenéteux,domainegandonniere,,,,48.2812966,-0.4001172,nominatim,exact,Le Domaine
-Domaine du Gasseau,Saint-Léonard-des-Bois,domainegasseau,,,,48.3598847,-0.0769569,nominatim,exact,Domaine du Gasseau
-Dôme Sonore,Le Mans,domesonore,,,72000,48.0073849,0.1967849,nominatim,city,Le Mans
-École Camille Claudel,Le Mans,ecolecamilleclaudel,17,Rue d'Helsinki,72000,48.0191993,0.2118961,nominatim,exact,École élémentaire Camille Claudel
-École de l'Épau,Le Mans,ecoleepau,,,,47.9869475,0.2799148,nominatim,exact,École élémentaire de l'Épau
-École de musique de Saint Saturnin,Le Mans,ecolemusiquesaintsaturnin,,,,48.0148983,0.1543145,nominatim,approximate,Institut technologique européen des métiers de la musique
-École Garnier-Pagès,Le Mans,ecolegarnierpages,,Rue Garnier Pagès,72000,47.9940853,0.1747873,nominatim,exact,École élémentaire Garnier-Pages
-École Jean Mermoz,Le Mans,ecolejeanmermoz,,Rue du Capitaine Ferber,72100,47.9677189,0.2048675,nominatim,exact,École élémentaire Jean Mermoz
-École Maternelle des Maillets,Le Mans,ecolematernellemaillets,35B,Rue des Fontenelles,72000,48.0175484,0.2137524,nominatim,exact,École maternelle des Maillets
-École Philippeaux,Le Mans,ecolephilippeaux,,Rue de Préau,72100,47.987632,0.2074972,nominatim,exact,École élémentaire Pierre Philippeaux
-École Philppeaux,Le Mans,ecolephilppeaux,180,Avenue Jean Jaurès,72000,47.9876925397636,0.206593164178552,manuel,exact,École Pierre Philippeaux
-École primaire Montaigu,Le Mans,ecoleprimairemontaigu,,,,48.008821,0.0697157,nominatim,approximate,École primaire
-École Supérieure d'Art et de Design,Le Mans,ecolesuperieureartetdesign,,,,48.0189593,0.1576816,nominatim,approximate,École nationale supérieure d'ingénieurs du Mans
-Eglise,Brette-les-Pins,eglise,,,,47.9131644,0.3381217,nominatim,exact,Église Saint-Martin
-Eglise,Champagné,eglise,,,,49.5107952,5.8062169,nominatim,exact,Eglise (St Charles)
-Eglise,La Bazoge,eglise,,,,48.0993272,0.1552981,nominatim,exact,Rue de l'Église
-Eglise,Montval-sur-Loir,eglise,,,,47.6939067,0.4187247,nominatim,exact,Église Saint-Guingalois
-Église,Arnage,eglise,,,,47.9307246,0.18456,nominatim,exact,Place de l'Église
-Église,Bonnétable,eglise,,,,48.1744415,0.4291123,nominatim,exact,Église
-Église,Brette-les-Pins,eglise,,,,47.9131644,0.3381217,nominatim,exact,Église Saint-Martin
-Église,Changé,eglise,,,,47.9875117,0.2820787,nominatim,exact,Église
-Église,Chantenay-Villedieu,eglise,,,,47.939198,-0.1644061,nominatim,exact,Église Saint-Georges
-Église,Connerré,eglise,,,,48.0597754,0.4932309,nominatim,exact,Rue de l'Église
-Église,Coulaines,eglise,,,,48.0238354,0.2048118,nominatim,exact,Église Saint-Nicolas
-Église,Courceboeufs,eglise,,,,48.1367056,0.2867853,nominatim,exact,Église
-Église,Courcival,eglise,,,,48.2292186,0.3962813,nominatim,exact,Église Saint-Brice
-Église,Dollon,eglise,,,,48.0387007,0.5868168,nominatim,exact,Place de l'Église
-Église,Fercé-sur-Sarthe,eglise,,,,47.90155,-0.0308953,nominatim,exact,Place de l'Église
-Église,La Ferté-Bernard,eglise,,,,48.1861915,0.6531759,nominatim,exact,Église Notre-Dame des Marais
-Église,La Flèche,eglise,,,,47.8385562,-0.3301195,nominatim,exact,Église
-Église,La Suze-sur-Sarthe,eglise,,,,47.8896601,0.0274651,nominatim,exact,Église
-Église,Lavaré,eglise,,,,48.053914,0.6456325,nominatim,exact,Église Saint-Pierre
-Église,Le Mans,eglise,,,,47.8297945,0.2728886,nominatim,exact,Église
-Église,Mamers,eglise,,,,48.1744415,0.4291123,nominatim,exact,Église
-Église,Montval-sur-Loir,eglise,,,,47.6939067,0.4187247,nominatim,exact,Église Saint-Guingalois
-Église,Mulsanne,eglise,,,,47.9056557,0.2496594,nominatim,exact,Rue de l'Église
-Église,Poillé-sur-Vègre,eglise,,,,47.919614,-0.2651708,nominatim,exact,Impasse de l'Église
-Église,Rouessé-Vassé,eglise,,,,48.1593255,-0.1993965,nominatim,exact,Place de l'Église
-Église,Saint Pierre des Ormes,eglise,,,,48.3064828,0.4219807,nominatim,exact,Église Saint-Pierre
-Église,Saint Saturnin,eglise,,,,45.6600608,3.0934693,nominatim,exact,Église Notre-Dame
-Église,Saint-Mars-la-Brière,eglise,,,,48.0290708,0.3712418,nominatim,exact,Place de l'Église
-Église,Saint-Vincent-des-Prés,eglise,,,,48.2960981,0.3854327,nominatim,exact,Église Saint-Viventien
-Église,Savigné-l'Évêque,eglise,,,,48.0772719,0.2969996,nominatim,exact,Place de l'Église
-Église,Sillé le Guillaume,eglise,,,,48.184581,-0.1265121,nominatim,exact,Église Notre-Dame de L'Assomption
-Église,Tresson,eglise,,,,47.903532,0.575016,nominatim,exact,Église Saint-Martin
-Église,Vancé,eglise,,,,47.831845,0.6468686,nominatim,exact,Église Saint-Martin
-Église,Volnay,eglise,,,,47.9326369,0.4680528,nominatim,exact,Église
-Église,Yvré-l'Évêque,eglise,,,,48.0136832,0.2717178,nominatim,exact,Église Saint-Germain
-Église d'Arnage,Le Mans,eglisearnage,,Place de l'Église,72230,47.9307271,0.1845488,nominatim,exact,Place de l'Église
-Église de Bonnétable,Bonnétable,eglisebonnetable,,,72110,48.1744415,0.4291123,nominatim,exact,Église
-Eglise de Chevillé,Chevillé,eglisecheville,,Place du Café,72350,47.9482853,-0.2235765,nominatim,exact,Église Notre-Dame
-Église de René,René,egliserene,,,,48.2786879,0.2216477,nominatim,exact,Place de l'Église
-Église notre dame du Pré,Le Mans,eglisepre,,Pl. du Pré,72000,48.0098221770522,0.192896161643124,manuel,exact,
-Église notre dame,Le Mans,eglisenotredame,,,,48.0996625,0.1561271,nominatim,exact,Église Notre-Dame
-Église Notre-Dame-de-Sainte-Croix,Le Mans,eglisenotredamesaintecroix,,Rue Notre-Dame,72000,48.0035936,0.210094,nominatim,exact,Église Notre-Dame-de-Sainte-Croix
-Église Saint Gilles,Le Mans,eglisesaintgilles,,Place de l'Église,72230,47.9309595,0.1845872,nominatim,exact,Église Saint-Gilles
-Eglise Saint Guingalois,Montval-sur-Loir,eglisesaintguingalois,,ue Gendron,72500,47.6939280934186,0.419252656812547,nominatim,exact,
-Église Saint Nicolas,Le Mans,eglisesaintnicolas,,Rue du Général de Gaulle,72190,48.0238354,0.2048118,nominatim,exact,Église Saint-Nicolas
-Eglise St Nicolas,Le Mans,eglisestnicolas,,Rue du Général de Gaulle,72190,48.0238354,0.2048118,nominatim,exact,Église Saint-Nicolas
-Église St. Aldric,Le Mans,eglisestaldric,,Rue d'Isaac,72000,48.0124568,0.2128698,nominatim,exact,Église Saint-Aldric
-EHPAD La reposance,Le Mans,ehpadreposance,4,Rue de l'Épau,72100,47.9939112,0.2220044,nominatim,exact,Ehpad La Reposance
-Entre la place des Jacobins et la place de la République,Le Mans,entreplacejacobinsetplacerepublique,,,72000,48.0073849,0.1967849,nominatim,city,Le Mans
-Épicerie du Pré,Le Mans,epiceriepre,31,Rue du Pré,72000,48.0108167561469,0.194687488953741,manuel,exact,
-EPSM de la Sarthe,Allonnes,epsmsarthe,,Avenue du 19 Mars 1962,72700,47.9592411,0.162224,nominatim,exact,EPSM de la Sarthe
-ESAD TALM,Le Mans,esadtalm,28,Avenue de Rostov-sur-le-Don,72000,48.0062577493514,0.197063242921156,manuel,exact,
-Espace bis 18 rue St Martin,Le Mans,espacebis18ruestmartin,18,Rue Saint-Martin,72000,48.005421,0.1970424,nominatim,exact,L'espace Bis de la librairie Bulle
-Espace Culturel,La Bazoge,espaceculturel,,,,48.0989559,0.1544523,nominatim,city,La Bazoge
-Espace culturel L'Orée du Bois,Le Mans,espacecultureloreebois,,Chemin de Beauchene,72650,48.039266,0.1519688,nominatim,exact,Centre Saint-Christophe
-Espace des Rivauderies,Le Mans,espacerivauderies,,,72000,48.0073849,0.1967849,nominatim,city,Le Mans
-Espace du Narais,Le Mans,espacenarais,5,Rue du Petit Narais,72250,47.9314014,0.4153457,nominatim,approximate,Rue du Petit Narais
-Espace Faïence,Malicorne,espacefaience,,Rue Victor Hugo,72270,47.813164,-0.0833893,nominatim,exact,Malicorne Espace Faïence
-Espace Henri Salvador,Le Mans,espacehenrisalvador,2,Place Jean-Claude Boulard,72190,48.0250891,0.2056839,nominatim,exact,Espace culturel Henri Salvador
-Espace Madeleine Marie,Sablé-sur-Sarthe,espacemadeleinemarie,25,Rue Saint-Denis,72300,47.8392553552903,-0.338714697293879,manuel,exact,
-Espace Ronsard,Le Mans,espaceronsard,,Escalier des Ponts Neufs,72000,48.0070847,0.1970721,nominatim,approximate,Jardin Pierre de Ronsard
-Espace Saugonna,Mamers,espacesaugonna,2,Rue de la Gare,72600,48.3473279431225,0.364690218345867,manuel,exact,Saugonna
-Espace Scélia,Le Mans,espacescelia,,Rue Didier Pironi,72190,48.0357033,0.2408021,nominatim,exact,Espace culturel Scelia
-Espace Vègre et Champagne,Brûlon,espacevegreetchampagne,12,Route de Viré,72350,47.9729951575024,-0.237909585917734,manuel,exact,Salle Espace Vègre et Champagne
-Esplanade de la Maison des Arts,Le Mans,esplanademaisonarts,,,72000,48.0073849,0.1967849,nominatim,city,Le Mans
-Esplanade du Bicentenaire,Le Mans,esplanadebicentenaire,,Esplanade du Bicentenaire,72000,48.007151,0.1943517,nominatim,exact,Esplanade du Bicentenaire
-Esplanade Nelson Mandela,Le Mans,esplanadenelsonmandela,,Rue George Sand,72530,48.0149098,0.2697582,nominatim,exact,Esplanade Nelson Mandela
-"Esprit Barbara, café solidaire",Le Mans,espritbarbaracafesolidaire,,,,48.0020479,0.1959769,nominatim,approximate,L’esprit de Barbara
-EVE - Scène universitaire,Le Mans,evesceneuniversitaire,,Avenue René Laennec,72000,48.0177064,0.1610047,nominatim,exact,EVE - scène universitaire
-Ferme des Grues Rouges,Saint Saturnin,fermegruesrouges,,,72650,47.9367012395356,0.36101149503084,manuel,exact,
-FIAA Le Mans,Le Mans,fiaamans,1,Rue Gambetta,72000,48.0037566762954,0.195545433660306,manuel,exact,Centre d'art FIAA
-Forum FNAC,Le Mans,forumfnac,13,Rue Claude Blondeau,72000,48.0063437867387,0.19983044900463,manuel,exact,
-Foyer Rural,Crosmières,foyerrural,,,,47.7454115,-0.1516105,nominatim,exact,Foyer rural
-Foyer rural,Crosmières,foyerrural,,,,47.7454115,-0.1516105,nominatim,exact,Foyer rural
-Foyer rural,Thorigné sur Dué,foyerrural,,,,48.0373658,0.5338283,nominatim,city,Thorigné-sur-Dué
-Funky Toons Café,Le Mans,funkytoonscafe,,,,48.0073849,0.1967849,nominatim,city,Le Mans
-Galerie Auchan,La Chapelle-Saint-Aubin,galerieauchan,,ZAC du Moulin aux Moines,72650,48.0427746052529,0.175364573612406,manuel,exact,Aushopping Le Mans
-Gare TGV,Le Mans,garetgv,,,72000,47.9958120683416,0.192637473458077,manuel,exact,
-Gite d'Asnières,Chahaignes,giteasnieres,,,72340,47.7349692,0.5343635,nominatim,exact,Gite d'Asnieres
-Grape Bar,Le Mans,grapebar,2,Rue du Ah Ah,72000,48.0073312428497,0.192394915053604,manuel,exact,
-Guinguette,Allonnes,guinguette,,,72700,47.969283,0.1578819,nominatim,city,Allonnes
-Guinguette de la Gèmerie,Arnage,guinguettegemerie,,Rue de la Gemerie,72230,47.9426148887396,0.179810407812562,manuel,exact,
-gymnase,Bouloire,gymnase,,,,47.9724995,0.5524301,nominatim,city,Bouloire
-Gymnase,Montfort-le-Gesnois,gymnase,,,,48.049078,0.403157,nominatim,city,Montfort-le-Gesnois
-gymnase,Yvré-l'Évêque,gymnase,,,,48.0168337,0.271732,nominatim,exact,Gymnase Halle de Brou
-Gymnase A. Fournier,Le Mans,gymnasefournier,,,,47.9867742,0.2151102,nominatim,approximate,Gymnase Alain Fournier
-Gymnase André Malraux,Allonnes,gymnaseandremalraux,,Rue de Beau Soleil,72700,47.9555768,0.167663,nominatim,exact,Gymnase André Malraux
-Hall d'Antarès,Le Mans,hallantares,2,Av. Antarès,72000,47.9562131028902,0.227167897861847,manuel,exact,
-Halles,Beaumont-sur-Sarthe,halles,,,,48.2253475,0.130943,nominatim,exact,Halles
-Halles,Château-du-Loir,halles,,,,47.6933321,0.4196319,nominatim,exact,Rue des Halles
-Halles,La Ferté-Bernard,halles,,,,48.1851826,0.6539269,nominatim,exact,Halles Denis Béalet
-Halles,Le Mans,halles,,Rue Barbier,72000,48.0038201,0.1940761,nominatim,exact,Courboulay
-Halles,Mamers,halles,,,,48.278967,0.2224094,nominatim,exact,Halles
-Hangar Créalab,Le Mans,hangarcrealab,,Rue d'Alger,72000,48.0017769,0.1931164,nominatim,exact,Hangar Crealab
-HangArt,Coulans-sur-Gée,hangart,,Route Départementale 357,72550,48.0179024,0.0083108,nominatim,exact,Hangart
-Hops Store,Saint-Saturnin,hopsstore,12,Rue des Petites Marnières,72650,48.0474175744427,0.171065926702909,manuel,exact,
-Ibis hotel du centre,Le Mans,ibishotelcentre,,,,47.9814707,0.2192038,nominatim,approximate,Ibis
-Il était une fois...,Le Mans,iletaitunefois,,,,48.0073849,0.1967849,nominatim,city,Le Mans
-Île aux Planches (pont de fer),Le Mans,ileplanchespontfer,,,,47.9987015,0.1877337,nominatim,approximate,Île aux Planches
-Île de Moulinsart,Fillé,ilemoulinsart,,Rue du Canal,72210,47.8958010345319,0.127146778286207,manuel,exact,
-Ile promenade Newton,Le Mans,ilepromenadenewton,,,72000,47.9875392010773,0.220445541477132,manuel,exact,
-Itemm,Le Mans,itemm,71,Avenue Olivier Messiaen,72000,48.0146366,0.1548242,nominatim,exact,ITEMM
-Jardin des plantes,Le Mans,jardinplantes,,Rue de l'Éventail,72000,48.0054267,0.2096007,nominatim,exact,Jardin des plantes
-Jardin Potager,Le Mans,jardinpotager,,Impasse Villa de Tessé,72000,48.0102505,0.2043398,nominatim,exact,Potager
-Jardins de la cathédrale,Le Mans,jardinscathedrale,,Avenue de Paderborn,72000,48.0092028,0.1996199,nominatim,exact,Futur jardin de la cathédrale
-Jardins des Plantes,Saumur,jardinsplantes,,,,47.2856311,-0.1297576,nominatim,exact,Voyage des Plantes
-Jim & Jump,Le Mans,jimetjump,3,Rue Louis Harel de la Noë,72000,48.0163852,0.1509024,nominatim,exact,Jim & Jump
-Kiosque du jardin des Plantes,Le Mans,kiosquejardinplantes,,Jardin des Plantes,72000,48.0074415405949,0.209507622489775,manuel,exact,
-Kiosque Mozaïc,Le Mans,kiosquemozaic,,Square des Ursulines,72000,48.005366651575,0.199450099101888,manuel,exact,
-L.n.c,Le Mans,nc,,,,48.0073849,0.1967849,nominatim,city,Le Mans
-L'Alambik MJC Ronceray,Le Mans,alambikmjcronceray,47,Bd de la Fresnellerie,72000,47.9701537555194,0.209919645895686,manuel,exact,
-L'Arena,Coulaines,arena,1,Rue de Champ Fleuri,72190,48.0288016211013,0.200095769050923,manuel,exact,
-L'Austral,Le Mans,austral,4,Place du 117e Régiment d'Infanterie,72000,48.011083,0.1819342,nominatim,exact,L'austral
-L'Ebauche,Jupilles,ebauche,,,,47.7914398,0.4126408,nominatim,exact,L'Ébauche
-L'Echappée,Le Mans,echappee,,Rue Célestin Freinet,72470,48.0237557,0.3320482,nominatim,exact,L'Échappée
-L'Elephant Pub,Le Mans,elephantpub,25,Rue d’Alger,72000,48.0021596962741,0.194898589736851,manuel,exact,
-L'Entracte,La Flèche,entracte,40 ter,Rue Carnot,72200,47.6997136572458,-0.0748285143514468,nominatim,exact,L'entracte
-L'Envol,Le Mans,envol,,Pont du Greffier,72000,48.0011703,0.1896027,nominatim,exact,L'Envol
-L'Éolienne,Arnage,eolienne,,Allée du Bord de Sarthe,72230,47.9366712,0.1841403,nominatim,exact,Espace culturel l'Éolienne
-L'Épicerie sur le Zinc,Le Mans,epiceriesurzinc,45,Avenue de la Libération,72000,48.0058613,0.1890035,nominatim,exact,
-L'Epidaure,Le Mans,epidaure,,,,48.093081,0.2387978,nominatim,approximate,Epidaure 72
-L'Escale,Le Mans,escale,,Rue des Fougères,72470,48.0083739,0.3314157,nominatim,exact,L'escale
-L'Espal,Le Mans,espal,,Rue de l'Estérel,72100,47.9952547,0.2330647,nominatim,exact,L'Espal
-L'Étable,Jauzé,etable,,,,48.2099964,0.3906852,nominatim,exact,Clos de L'Etable
-L'Étoile du Nord,Le Mans,etoilenord,10,Rue du Nord,72000,48.005816713509,0.211466275309596,manuel,exact,
-L'Herberie,Coulaines,herberie,,Rue de la Baule,72190,48.0235536,0.2007431,nominatim,exact,L'herberie
-L'île aux Planches,Le Mans,ileplanches,,,,47.9987015,0.1877337,nominatim,approximate,Île aux Planches
-L'Îlot Co,Saint-Georges-du-Bois,ilotco,1030,Rue de Souligné,72700,47.9720997458965,0.0870452647623998,nominatim,approximate,L'îlot de biodiversité de Marigny Le Lozon
-L'Instinct,Le Mans,instinct,,Rue de Beaugé,72000,48.0129506,0.1498796,nominatim,exact,Restaurant À l'instinct
-L'Inventaire,Le Mans,inventaire,97,Grande Rue,72000,48.0075104366032,0.197169415525743,manuel,exact,
-L'Oasis,Le Mans,oasis,,Rue Jean Navarre,72100,47.9597745,0.2022957,nominatim,exact,L'Oasis
-L'Olivier,Le Mans,olivier,,Place George Washington,72000,47.9959093,0.2029105,nominatim,exact,L'Olivier
-L'Orée du bois,Le Mans,oreebois,,Chemin de Beauchene,72650,48.039266,0.1519688,nominatim,exact,Centre Saint-Christophe
-L'Union Jack,Le Mans,unionjack,32,Rue du Docteur Leroy,72000,48.0022931266323,0.196217713981494,manuel,exact,
-L'Utopitre,Le Mans,utopitre,6,Bd Paul d'Estournelles de Constant,72000,48.0161888851772,0.163662994171129,manuel,exact,
-La bonne pioche,Marçon,bonnepioche,21,Pl. de l'Église,72340,47.7102818211005,0.510986892304681,manuel,exact,
-La Brass'vie,Le Mans,brassvie,3,Pl. André Ricordeau,72000,47.7905903412156,0.413523640180809,manuel,exact,
-La Bulle,Le Mans,bulle,,Rue de l'Hôtel de Ville,72230,47.9265284,0.189545,nominatim,exact,Salle des fêtes La Bulle
-La Capitainerie,Le Mans,capitainerie,101,Quai Amiral Lalande,72000,48.0018482961361,0.190041474075708,nominatim,exact,La Capitainerie
-La Capsule,Le Mans,capsule,137,Av. de la Libération,72000,48.0036287701513,0.186657054251506,manuel,exact,
-La Casa,Le Mans,casa,40 ter,Rue des Maillets,72000,48.0122052256265,0.205743229000637,manuel,exact,
-La Castélorienne,Montval-sur-Loir,castelorienne,,,,47.6882764,0.4148908,nominatim,exact,La Castélorienne
-La Chaperie,Guécélard,chaperie,3,Route aux Lièvres,72230,47.8926560618961,0.147014512696427,manuel,exact,
-La Chicane,Le Mans,chicane,72019,Chemin des Courses,72100,47.9470049,0.2086523,nominatim,approximate,Chicane Ford
-La Citadelle des Anges,Teloché,citadelleanges,,La Roche,72220,47.8813145319757,0.277542365327285,manuel,exact,
-La Cité du cirque,Le Mans,citecirque,,Boulevard Winston Churchill,72100,47.9860917,0.2120548,nominatim,approximate,Le Plongeoir - Cité du Cirque
-La flambée,Le Mans,flambee,28,Rue des Ponts Neufs,72000,48.0068282,0.1977053,nominatim,exact,La Flambée
-La Fonderie,Le Mans,fonderie,,Rue Saint-Pavin des Champs,72000,48.0069461,0.1886115,nominatim,exact,La Fonderie
-La Fosse jouanette,Saint-Pierre-du-Lorouër,fossejouanette,,,72150,47.8005453920473,0.509158588052552,manuel,exact,
-La grange Dimeresse,Évron,grangedimeresse,,,,48.1579797,-0.4016596,nominatim,exact,Ruelle de la Grange Dîmeresse
-La guinguette des Tanneries,Le Mans,guinguettetanneries,,Quai Louis Blanc,72000,48.0080212,0.1936012,nominatim,approximate,Guinguette des tanneries
-La Halte Mancelle,Le Mans,haltemancelle,6,Rue Jeanne d'Arc,72000,48.0019968,0.2095558,nominatim,exact,La Halte Mancelle
-La Longère,Le Mans,longere,,Chemin de L'Ebrarderie,72380,48.1188496,0.1892209,nominatim,exact,La Longère
-La Maison Café,Le Mans,maisoncafe,5,Rue Victor Bonhommet,72000,48.0049746296569,0.196387527596196,manuel,exact,
-La Passerelle,Connerré,passerelle,40 ter,Av. Carnot,72160,48.0610257172619,0.492237441684012,manuel,exact,
-La Péniche Excelsior,Allonnes,penicheexcelsior,,,72700,47.9754699332366,0.160959827932411,manuel,exact,La Péniche Excelsior
-La pince à vélo,Le Mans,pincevelo,,Rue du 8 Mai,72220,47.8890194,0.268298,nominatim,exact,La Pince à Vélo
-La Piraterie,Le Mans,piraterie,90,Quai Amiral Lalande,72000,48.003204303879,0.190237979280285,manuel,exact,
-La Pléiade,Bessé-sur-Braye,pleiade,,,72310,47.8328641979251,0.753517362429581,nominatim,exact,La Pléiade
-La Ruche,Le Mans,ruche,,Avenue Rubillard,72000,48.0134129,0.1752376,nominatim,exact,La Ruche (Nouvel internat du CH du Mans)
-La Sandwicherie,Le Mans,sandwicherie,17,Rue du Cornet,72000,48.0053437408641,0.195903113206214,manuel,exact,
-La Saynète,Le Mans,saynete,,,,48.0073849,0.1967849,nominatim,city,Le Mans
-La Sirène,Le Mans,sirene,15,Rue Claude Blondeau,72000,48.0064957,0.1987274,nominatim,exact,La Sirène
-La Source,Le Mans,source,7,Rue Pasteur,72000,48.0056332614617,0.192730118785285,manuel,exact,
-La Visitation,Le Mans,visitation,11,Rue Barbier,72000,48.0037179,0.1936164,nominatim,exact,La Visitation
-Lac de la Monnerie,La Flèche,lacmonnerie,,,72200,47.6977483798362,-0.0496326804238963,manuel,exact,
-Le 108,Le Mans,108,,,,48.0073849,0.1967849,nominatim,exact,Le Mans
-Le Bacchus,La Ferté-Bernard,bacchus,3,Rue Robert Garnier,72400,48.1868769834014,0.65486473951596,manuel,exact,
-Le Backstage,Le Mans,backstage,32,Rue du Docteur Leroy,72000,48.0022931266323,0.196217713981494,manuel,exact,
-Le Bakoua,Le Mans,bakoua,,Rue de la Galère,72000,48.0056916292848,0.194710410194579,manuel,exact,
-Le Barouf,Le Mans,barouf,8,Rue Victor Bonhommet,72000,48.0050459,0.1965375,nominatim,exact,Le Barouf
-Le bourg,Le Mans,bourg,,Chemin du Petit Large,72000,47.98301,0.161243,nominatim,exact,Le Bourg
-Le Box Café,Le Mans,boxcafe,13,Pl. de l'Éperon,72000,48.0052277887577,0.194922596017709,manuel,exact,
-Le Café Crème,Le Mans,cafecreme,2,Rue de la Barillerie,72000,48.0064323,0.1983416,nominatim,approximate,Café Crème
-Le Café de la Gare,Le Mans,cafegare,,Rue d'Eichthal,72000,47.9998962,0.1962612,nominatim,exact,Le bistro des copains
-Le Café Noir,Le Mans,cafenoir,22,Rue du Docteur Leroy,72000,48.0028206724181,0.196367151840918,manuel,exact,
-Le Carroi,La Flèche,carroi,27,Rue Grollier,72200,47.6987938667276,-0.0730756697830832,manuel,exact,Le Carroi
-Le Caveau,Le Mans,caveau,32,Rue du Docteur Leroy,72000,48.002410551079,0.1961432266739,nominatim,approximate,Caveau Letenneur
-Le Chapiteau - Cité du cirque,Le Mans,chapiteaucitecirque,6,Boulevad Winston Churchill,72000,47.9867495776273,0.212567761076169,manuel,exact,
-Le chapiteau du Plongeoir,Le Mans,chapiteauplongeoir,6,Boulevad Winston Churchill,72000,47.9867495776273,0.212567761076169,manuel,exact,
-Le Circuit de la Bière,Le Mans,circuitbiere,,Route de Tours,72000,47.9511029705554,0.230411548298211,manuel,exact,
-Le Comptoir,Le Mans,comptoir,,Place Franklin Roosevelt,72000,48.0010773,0.198064,nominatim,exact,Le Comptoir Irlandais
-Le Courmesnil,Loué,courmesnil,,,,47.9945515,-0.1555455,nominatim,exact,Centre culturel le Courmesnil
-Le Français,Le Mans,francais,125,Avenue François Chancel,72000,48.0188215,0.1927847,nominatim,approximate,Place du Souvenir Français
-Le Guet à Pintes,Le Mans,guetpintes,14,Rue du Cornet,72000,48.0048966,0.1955588,nominatim,exact,Le Guet à Pintes
-Le Hangar 43,Le Mans,hangar43,,,,48.0033917,0.1993143,nominatim,approximate,Hangar à Léo
-Le Happy Days,Le Mans,happydays,4,rue des Maillets,72000,48.0122366172221,0.205975734129413,manuel,exact,Happy Days
-Le jardin du Plongeoir,Le Mans,jardinplongeoir,6,Boulevad Winston Churchill,72000,47.9867495776273,0.212567761076169,manuel,exact,
-Le Kaléidoscope,Le Mans,kaleidoscope,9,Rue du Cantal,72100,47.9915298,0.2215256,nominatim,exact,Centre social Le Kaléidoscope
-Le La Ré Do,Sillé-le-Guillaume,redo,17,Place de la République,72140,48.1828985865467,-0.129013388711254,manuel,exact,La Re Do
-Le Labo Sonore,Chérisay,labosonore,,,72610,48.3496403738005,0.12149540005251,manuel,exact,
-Le Lapin Blanc,Le Mans,lapinblanc,5,Rue Dorée,72000,48.0057584,0.1944124,nominatim,exact,Le Lapin Blanc
-Le Lézard,Le Mans,lezard,8,Rue de la Barillerie,72000,48.0063339,0.1981193,nominatim,exact,Le Lézard
-Le Local à Bières,Le Mans,localbieres,,Rue Ernest Sylvain Bollée,72230,47.9507449,0.1803088,nominatim,exact,Le local à bières
-Le Mac Kinley,Le Mans,mackinley,,Rond-point Université,72000,48.013755512991,0.163914794170971,manuel,exact,
-Le Mackeson,Le Mans,mackeson,42,Rue du Port,72000,48.0031106898569,0.193885520048336,manuel,exact,
-Le Manhattan Café,Le Mans,manhattancafe,21,Rue du Docteur Leroy,72000,48.0026772550906,0.195973377718768,manuel,exact,
-Le Mans Innovation,Le Mans,mansinnovation,57,Bd Demorieux,72000,47.9936693080735,0.186889494890395,manuel,exact,
-Le Mans plage,Le Mans,mansplage,,All. des Prairies de Funay,72000,47.9894172932522,0.22570619802332,nominatim,exact,
-Le Milwaukee,Le Mans,milwaukee,42,Rue des Ponts Neufs,72000,48.0066814584985,0.19807609121453,manuel,exact,
-Le Moloko,Le Mans,moloko,37,Av. Bollée,72000,48.0030397355531,0.205485048146415,manuel,exact,
-Le Mulligan,Le Mans,mulligan,,Rue Greffier,72000,48.0017928,0.1965937,nominatim,exact,Le Mulligan's
-Le New Lord's,Le Mans,newlords,32,Place des Comtes du Maine,72000,48.0046418167254,0.201416403673576,manuel,exact,
-Le New York Coffee,Le Mans,newyorkcoffee,,,72000,48.0146069891178,0.161452377045254,manuel,exact,
-Le Palace,Le Mans,palace,4,Rue Joseph Caillaux,72650,48.0522073,0.1649806,nominatim,approximate,Quick Palace
-Le Palais,Le Mans,palais,2,Rue Gambetta,72000,48.0045362069289,0.195439093641625,nominatim,exact,Le Palais
-Le Passeport,Le Mans,passeport,25,Rue d'Alger,72000,48.00213808601,0.195145334825893,manuel,exact,
-Le Pâtis,Le Mans,patis,,Rue du Colonel Raynal,72000,47.9996924,0.1856836,nominatim,exact,Le Pâtis
-Le Petit Pousset,Chahaignes,petitpousset,,,,47.7416369,0.5149056,nominatim,city,Chahaignes
-Le Pilier Rouge,Le Mans,pilierrouge,,Rue du Pilier Rouge,72000,48.0082773,0.1970308,nominatim,exact,Le Pilier Rouge
-Le Plongeoir,Le Mans,plongeoir,6,Boulevard Winston Churchill,72100,47.9869609,0.2124284,nominatim,exact,Le Plongeoir
-Le port,Le Mans,port,,Chemin Rural de la Châtaigneraie,72530,48.0186939,0.2777374,nominatim,exact,Le Port
-Le Portland Pub,Le Mans,portlandpub,32,Rue du Port,72000,48.0032353350964,0.1948925978648,manuel,exact,
-Le Quai des Arts,Vibraye,quaiarts,,,,48.064779,0.7273444,nominatim,exact,Le Quai des Arts
-Le Rabelais,Changé,rabelais,1,Pl. Victor Hugo,72560,47.9854376434055,0.283948551270323,nominatim,exact,Le cour de Rouillon
-Le RDV,Le Mans,rdv,,,,48.0073849,0.1967849,nominatim,city,Le Mans
-Le Road House,Le Mans,roadhouse,101,Av. du Général Leclerc,72000,47.9963403362607,0.193874597864362,manuel,exact,
-Le Shaker,Le Mans,shaker,32,Rue du Port,72000,48.0032353350964,0.1948925978648,manuel,exact,Le Shaker & co 
-Le Silo,Le Mans,silo,,Rue François Monier,72100,47.9532972,0.1869399,nominatim,exact,Le Silo
-Le Spot,Le Mans,spot,5,Rue Louis Harel de la Noë,72000,48.0165608,0.1503084,nominatim,exact,Le Spot
-Le St Barth,La Ferté-Bernard,stbarth,18,Rue Thiers,72400,48.1855993402947,0.657350995890908,manuel,exact,
-Le Stan,Le Mans,stan,2,Pl. de l'Éperon,72000,48.0054040668076,0.196627897864936,manuel,exact,
-Le Sun Rock Avenue,Le Mans,sunrockavenue,54,Avenue de la Libération,72000,48.0051473917375,0.187747403038558,manuel,exact,
-Le Terminus,Le Mans,terminus,1,Place du 117e Régiment d'Infanterie,72000,48.0107778,0.1820376,nominatim,exact,Le Terminus 117
-Le Val de Vray,Le Mans,valvray,,Rue de l'Église,72650,48.0613392,0.1546836,nominatim,approximate,Val de Vray
-Le Val'Rhonne,Moncé-en-Belin,valrhonne,,Allée de l'Europe,72650,47.8919630595936,0.202238813097587,manuel,exact,
-Le Vaud',Le Mans,vaud,,Grande Rue,72000,48.008075,0.1964926,nominatim,exact,Le Vaud'
-Le verre tige,Le Mans,verretige,,Escalier de la Pierre de Tucé,72000,48.0083463,0.1965967,nominatim,exact,Le Verre Tige
-Le Viking's,Le Mans,vikings,25,Rue d'Alger,72000,48.00213808601,0.195145334825893,manuel,exact,
-Le Vintage,Le Mans,vintage,,Allée du Bourg d'Anguy,72000,48.0037339,0.1988477,nominatim,approximate,Vintage Store
-Le Wagon,Le Mans,wagon,8,Rue Victor Bonhommet,72000,48.0050459,0.1965375,manuel,exact,
-Le Zoo,Le Mans,zoo,38,Rue du Port,72000,48.0029954,0.1941222,nominatim,exact,Le Zoo
-Les 3 mousses,Le Mans,3mousses,4,Route de Sillé-le-Guillaume,72650,48.078331,0.1154566,nominatim,exact,Les 3 mousses
-Les Allumés du jazz,Le Mans,allumesjazz,,Rue de la Galère,72000,48.0062096,0.1928736,nominatim,exact,Les Allumés du Jazz
-Les Amazones,Le Mans,amazones,,Boulevard Jean-Jacques Rousseau,72100,47.9760841,0.2021583,nominatim,exact,Les Amazones Club
-Les Atlantides,Le Mans,atlantides,,Avenue de Volos,72100,47.9881846,0.225766,nominatim,exact,Centre Aquatique Les Atlantides
-Les Cinéastes,Le Mans,cineastes,,Place des Comtes du Maine,72000,48.0042916,0.2002933,nominatim,exact,Les Cinéastes / Cinéma d'art & d'essai
-Les Docks,Le Mans,docks,31,Avenue Pierre Piffault,72100,47.9720889,0.1769116,nominatim,approximate,Docks Fouquet
-Les Fêlés du Bocal,Le Mans,felesbocal,198,Rue nationale,72000,47.9960719439807,0.201078874413394,nominatim,city,Le Mans
-Les Filo Folie's,Le Mans,filofolies,,,,48.0073849,0.1967849,nominatim,city,Le Mans
-Les Jardins de Belle Garde,Savigné-l'Évêque,jardinsbellegarde,,Bellegarde,72460,48.0906270583291,0.312386425064106,manuel,exact,
-Les Métairies,Allonnes,metairies,,Voie Verte des Bords de la Sarthe,72700,47.9598958,0.173158,nominatim,exact,Les Métairies
-Les moulins de Paillard,Poncé-sur-le-Loir,moulinspaillard,,Lieu-dit Les Moulins de Paillard,72340,47.7597490567728,0.655264262994951,manuel,exact,
-Les prés Marais,Saint-Mard-de-Réno,presmarais,,,,48.5085826,0.6345833,nominatim,exact,Les Prés Marais
-Les Quinconces,Le Mans,quinconces,,Place des Jacobins,72000,48.0078156,0.2007998,nominatim,exact,Centre culturel « Les Quinconces - L'Espal »
-Les Quinconces - grand théâtre,Le Mans,quinconcesgrandtheatre,4,Place des Jacobins,72000,48.0081834948847,0.200973149994019,manuel,exact,
-Les Quinconces – petit Théâtre,Le Mans,quinconcespetittheatre,4,Place des Jacobins,72000,48.0081834948847,0.200973149994019,manuel,exact,
-Les Saulnières,Le Mans,saulnieres,239,Avenue Rhin et Danube,72000,48.02025,0.1824686,nominatim,exact,Les Saulnières
-Les Subsistances,Le Mans,subsistances,165,Rue de la Foucaudière,72000,47.9777649489371,0.199276424287986,manuel,exact,
-Les Tourettes,Torcé-en-Vallée,tourettes,,,,48.1348728,0.4153642,nominatim,exact,Les Tourettes
-Libertà,Le Mans,liberta,,Rue Gambetta,72000,48.0041716,0.1947012,nominatim,exact,Liberta
-Librairie Thuard,Le Mans,librairiethuard,24,Rue de l'Étoile,72000,48.0055392,0.2007554,nominatim,exact,Librairie Thuard
-Lieu-dit Asnières,Le Mans,lieuditasnieres,,,,47.9442386,0.6390315,nominatim,approximate,Ancienne Route du Mans à Saint-Calais
-Lieu-dit Le Buron,Le Mans,lieuditburon,,,,47.9442386,0.6390315,nominatim,approximate,Ancienne Route du Mans à Saint-Calais
-Local des As,Le Mans,localas,,,,48.0037768,0.1616042,nominatim,approximate,TDF Le Mans sud 2 - local
-Lycée André Malraux,Allonnes,lyceeandremalraux,,Rue des Muloteries,72700,47.9571368,0.1671889,nominatim,exact,Lycée André Malraux
-Maine Saonnois,Le Mans,mainesaonnois,,,,48.0073849,0.1967849,nominatim,city,Le Mans
-mairie,La Fontaine-Saint-Martin,mairie,,,,47.7910412,0.0503336,nominatim,exact,Place de la Mairie
-mairie,Yvré-l'Évêque,mairie,,,,48.0139586,0.2706215,nominatim,exact,Mairie d'Yvré-l'Évêque
-Maison Albert,Le Mans,maisonalbert,14,Rue Albert Maignan,72000,48.0055392,0.2028218,nominatim,approximate,Rue Albert Maignan
-Maison de l'Eau,Le Mans,maisoneau,51,Rue de l'Estérel,72100,47.994184,0.2364439,nominatim,exact,Maison de l’Eau (Arche de la Nature)
-Maison de quartier Barbara,Le Mans,maisonquartierbarbara,,Allée de l'Aigle Noir,72100,47.9858515,0.2128882,nominatim,exact,Maison de quartier Barbara
-Maison de quartier Charles Trénet,Le Mans,maisonquartiercharlestrenet,,Rue Alfred de Vigny,72000,47.9994099,0.23038,nominatim,exact,Maison de quartier Charles Trenet
-Maison de quartier Georges Moustaki,Le Mans,maisonquartiergeorgesmoustaki,,Rue des Cerisiers,72000,48.0170011,0.215484,nominatim,exact,Maison de quartier Georges Moustaki
-Maison de quartier l'Oiselière,Le Mans,maisonquartieroiseliere,,Rue d'Isaac,72000,48.0148554,0.2257937,nominatim,exact,Maison de quartier l'Oiselière
-Maison de quartier Les Aloès,Le Mans,maisonquartieraloes,,,,47.9969912,0.2002327,nominatim,approximate,Maison de quartier René Clair
-Maison de quartier Les Ardriers,Le Mans,maisonquartierardriers,,,,47.9969912,0.2002327,nominatim,approximate,Maison de quartier René Clair
-Maison de quartier Les Bruyères,Le Mans,maisonquartierbruyeres,,Cour des Érables,72100,47.978831,0.2315293,nominatim,exact,Maison de quartier des Bruyères
-Maison de quartier Pierre Guédou,Le Mans,maisonquartierpierreguedou,,Rue du Pont,72100,47.9886932,0.195881,nominatim,exact,Maison de quartier Pierre Guédou
-Maison des arts,Allonnes,maisonarts,,Rue Georges Bizet,72700,47.9699093,0.1640865,nominatim,exact,Maison des arts Mélinée et Missak Manouchian
-Maison des chemins creux,Coulaines,maisoncheminscreux,,Rue des Vignes,72190,48.0288184,0.2102631,nominatim,exact,Maison des Chemins Creux
-Maison des habitants,Le Mans,maisonhabitants,,Hameau du Poitou,72700,47.9526169,0.1663573,nominatim,exact,Salle Barbara
-Maison du Temps Libre,Fercé-sur-Sarthe,maisontempslibre,,Rue des Avelines,72430,47.9000145338689,-0.0324246451020068,manuel,exact,
-Marché de la cité des Pins,Le Mans,marchecitepins,,Place Raymond Adelet,72100,47.9683929,0.2048038,nominatim,exact,Marché de la Cité des Pins
-Marché des jacobins,Le Mans,marchejacobins,,Avenue de Paderborn,72000,48.008396,0.1989013,nominatim,exact,Marché des Jacobins
-Médiathèque,Allonnes,mediatheque,,,,47.9678072,0.1604197,nominatim,exact,Médiathèque Louise Michel
-Médiathèque,Arnage,mediatheque,,,,47.936736,0.184418,nominatim,exact,Médiathèque municipale Simone de Beauvoir
-Médiathèque,Bouloire,mediatheque,,,,47.9739105,0.5536616,nominatim,exact,Médiathèque
-Médiathèque,Champagné,mediatheque,,,,48.8156376,7.7858024,nominatim,exact,Médiathèque
-Médiathèque,Cérans-Foulletourte,mediatheque,,,,47.8281355,0.0785903,nominatim,exact,Médiathèque
-Médiathèque,Le Mans,mediatheque,,,,48.002921,0.1919093,nominatim,exact,Médiathèque
-Médiathèque,Loué,mediatheque,,,,47.9965376,-0.1511977,nominatim,city,Loué
-Médiathèque,Noyen-sur-Sarthe,mediatheque,,,,47.8727385,-0.0997184,nominatim,exact,Médiathèque
-Médiathèque,Sablé-sur-Sarthe,mediatheque,,,,47.8444116,-0.3302413,nominatim,exact,Médiathèque Intercommunale - Espace Reverdy
-Médiathèque,Saint-Calais,mediatheque,,,,50.7350831,1.6053429,nominatim,exact,Médiathèque
-Médiathèque,Sillé-le-Guillaume,mediatheque,,,,48.1835166,-0.125854,nominatim,exact,Médiathèque la Tannerie
-Médiathèque George Sand,Le Mans,mediathequegeorgesand,1,Place George Sand,72530,48.0142124,0.2713988,nominatim,exact,Médiathèque George Sand
-Médiathèque Louis Aragon,Le Mans,mediathequelouisaragon,,Rue du Port,72000,48.002887,0.1926403,nominatim,exact,Médiathèque Louis Aragon
-Médiathèque modularium,Le Mans,mediathequemodularium,,,,48.0073849,0.1967849,nominatim,city,Le Mans
-MJC Jacques Brel,Arnage,mjcjacquesbrel,67,Rue des Collèges,72230,47.9369120511961,0.184480584391633,manuel,exact,
-MJC Prévert,Le Mans,mjcprevert,,,,48.0071594,0.1957478,nominatim,approximate,M.J.C. Prévert
-Moulin du Blaireau,Piacé,moulinblaireau,7 bis,Rue de l'Église,72170,48.2590365720805,0.115187292339169,manuel,exact,
-MPT Jean Moulin,Le Mans,mptjeanmoulin,,,,47.9749063,0.2201096,nominatim,approximate,Maison pour tous Jean Moulin
-Mur plein champ Tessé,Le Mans,murpleinchamptesse,2,Avenue de Paderborn,72000,48.0103836672441,0.20408379786526,manuel,exact,
-Musée de la musique mécanique,Dollon,museemusiquemecanique,12,Grande Rue,72390,48.0386912070186,0.588092583016257,manuel,exact,
-Musée de Tessé,Le Mans,museetesse,2,Avenue de Paderborn,72000,48.0102902,0.203547,nominatim,exact,Musée de Tessé
-Musée Jean-Claude Boulard,Le Mans,museejeanclaudeboulard,2,Rue Claude Blondeau,72000,48.0071116,0.1981579,nominatim,exact,Musée Jean-Claude-Boulard / Carré Plantagenêt
-Notre-Dame de la Couture,Le Mans,notredamecouture,22,Rue Berthelot,72000,48.0023280638939,0.200564680258251,manuel,exact,
-Ô Bord du Loir,Thorée les Pins,obordloir,1,Lieu dit Camping,72800,47.6966519619695,0.0577643436486052,manuel,exact,La Bamboche du Loir
-Palais des Congrès,Le Mans,palaiscongres,,Rue Paul Ligneul,72000,47.9997257,0.1922223,nominatim,exact,Palais des Congrès
-Parc de l'Épine,Le Mans,parcepine,,Rue de Chinon,72000,48.0202902,0.1773929,nominatim,exact,Parc Roland et Annette Becdelièvre
-Parc de l'Huisne,Le Mans,parchuisne,,Route de Paris,72530,48.0034171,0.2592087,nominatim,exact,Papéa Parc
-Parc de la Gironde,Coulaines,parcgironde,,Rue Jean-Claude Boulard,72190,48.025249,0.2073304,nominatim,exact,Parc de la Gironde
-Parc de la mairie,Cures,parcmairie,,,72240,48.100620381119,-0.00430936216400422,manuel,exact,
-Parc de la résidence autonomie,Le Mans,parcresidenceautonomie,183,Quai Ledru-Rollin,72000,48.0133872202536,0.197752524154689,manuel,exact,
-Parc de Tessé,Le Mans,parctesse,,Avenue de Paderborn,72000,48.0098732,0.2037429,nominatim,exact,Jardin du musée de Tessé
-Parc de Vaurouzé,Le Mans,parcvaurouze,,,72000,48.0164943013963,0.169773138543051,manuel,exact,
-Parc des 3 vallées,Le Mans,parc3vallees,,,,48.0265446,0.2171749,nominatim,approximate,Parc des Trois Vallées
-Parc des Carmes,La Flèche,parccarmes,,,,47.6963479,-0.0729279,nominatim,exact,Parc des Carmes
-Parc des Touches,Brains-sur-Gée,parctouches,,,72550,48.0128036759634,-0.0188555025508275,manuel,exact,
-Parc du château,Le Mans,parcchateau,,Rue Robert Triger,72000,48.0100439,0.1993346,nominatim,exact,Square du Château
-Parc du Gué de Maulny,Le Mans,parcguemaulny,,Chemin de la Prairie,72100,47.9901934,0.1856633,nominatim,exact,Parc du Gué-de-Maulny
-"Parc du Petit Train, rue Pierre Levegh",Le Mans,parcpetittrainruepierrelevegh,,,,47.9634803,0.1047268,nominatim,approximate,Le Petit Parc
-Parc face au chateau,Le Mans,parcfacechateau,,,,48.0073849,0.1967849,nominatim,city,Le Mans
-Parc Gabriel Paillereau,Allonnes,parcgabrielpaillereau,12,Rue Charles Darwin,72700,47.9743142311417,0.147575689916804,manuel,exact,
-Parc Jean du Bellay,Le Mans,parcjeanbellay,,Rue de Parence,72530,48.0175782,0.2750064,nominatim,exact,Parc Jean du Bellay
-Parc Théodore Monod,Le Mans,parctheodoremonod,,Rue Théodore Monod,72000,48.0113046,0.1807363,nominatim,exact,Parc Théodore Monod
-Parking aérien des Quinconces,Le Mans,parkingaerienquinconces,,,,48.0084498,0.2021442,nominatim,approximate,Parking aérien P1
-Parking Quinconces,Le Mans,parkingquinconces,,Place des Jacobins,72000,48.0077348795686,0.19963677772103,manuel,exact,
-Parking rotonde du CROUS,Le Mans,parkingrotondecrous,,,,47.9568015,0.2008211,nominatim,approximate,Rotonde
-Partout en ville,Le Mans,partoutenville,,,,48.0073849,0.1967849,nominatim,city,Le Mans
-Parvis de l'espace du Narais,Saint-Mars-la-Brière,parvisespacenarais,,Allée des Châtaigniers,72470,48.0288238210427,0.382718967183835,manuel,exact,
-Parvis de l'Espal,Le Mans,parvisespal,,Rue de l'Estérel,72000,47.9953186307932,0.233152829281237,manuel,exact,
-Parvis de la maison des Arts,Le Mans,parvismaisonarts,,,,48.0073849,0.1967849,nominatim,city,Le Mans
-Parvis des Quinconces,Le Mans,parvisquinconces,,Place des Jacobins,72000,48.0077348795686,0.19963677772103,manuel,exact,
-Passerelle des Atlantides,Le Mans,passerelleatlantides,,,72000,47.9894214072152,0.225140535090694,manuel,exact,
-Pirate Café,Le Mans,piratecafe,46,Rue du Port,72000,48.0030439686215,0.193655220048324,manuel,exact,
-Place d'Alger,Le Mans,placealger,,Place d'Alger,72000,48.0020997,0.1939267,nominatim,exact,Place d'Alger
-Place de l'Eglise,Montfort-le-Gesnois,placeeglise,,,,48.049078,0.403157,nominatim,city,Montfort-le-Gesnois
-Place de l'église,Allonnes,placeeglise,,,,47.9685779,0.1546606,nominatim,exact,Place de l'Église
-Place de l'église,Champagné,placeeglise,,,,48.0262995,0.3324422,nominatim,exact,Place de l'Église
-Place de l'église,Connerré,placeeglise,,,,48.0604578,0.4933923,nominatim,city,Connerré
-Place de l'église,Fercé-sur-Sarthe,placeeglise,,,,47.90155,-0.0308953,nominatim,exact,Place de l'Église
-Place de l'église,Fillé,placeeglise,,,,44.7676836,-1.1393485,nominatim,approximate,La fille du barbu
-Place de l'église,La Bazoge,placeeglise,,,,48.0989559,0.1544523,nominatim,city,La Bazoge
-Place de l'église,Le Mans,placeeglise,,Rue des Ponts,72380,48.1186574,0.1827067,nominatim,exact,Place de l'Église
-Place de l'église,Marolles-les-Braults,placeeglise,,,,48.252152,0.3133522,nominatim,exact,Place de l'Église
-Place de l'église,Saint-Jean-du-Bois,placeeglise,,,,47.8705619,-0.0390691,nominatim,exact,Place de l'Église
-Place de l'église,Sillé-le-Philippe,placeeglise,,,,48.1069075,0.3520896,nominatim,city,Sillé-le-Philippe
-Place de l'église,Tresson,placeeglise,,,,47.9037815,0.5731669,nominatim,city,Tresson
-Place de l'église,Volnay,placeeglise,,,72370,47.9750725747287,0.461413495948073,nominatim,exact,Place de l'Église
-Place de l'Europe,Coulaines,placeeurope,,Place de l'Europe,72190,48.0227483,0.2079682,nominatim,exact,Place de l'Europe
-Place de la Boussinière,Le Mans,placeboussiniere,,Rue Philippe,72000,48.0135857,0.1898843,nominatim,exact,Place Édouard de la Boussinière
-Place de la gare,Le Mans,placegare,,,,47.9287945,0.1894404,nominatim,exact,Place de la Gare
-Place de la liberté,Lavernat,placeliberte,,,72500,47.7181770900507,0.3334796305678,manuel,exact,
-Place de la mairie,Allonnes,placemairie,,,,47.3016671,0.0637802,nominatim,exact,Place de la Mairie
-Place de la mairie,Champagné,placemairie,,,,45.2718571,4.799238,nominatim,exact,Place de la Mairie
-Place de la mairie,Le Mans,placemairie,,,,47.9723521,0.0999677,nominatim,exact,Place de la Mairie
-Place de la Mairie,Loué,placemairie,,,,47.9965376,-0.1511977,nominatim,city,Loué
-Place de la mairie,Yvré-l'Évêque,placemairie,,,,48.0137909,0.270926,nominatim,city,Yvré-l'Évêque
-Place de la paix,Le Mans,placepaix,,Place de la Paix,72700,47.9685071,0.1553824,nominatim,exact,Place de la Paix
-Place de la république,Le Mans,placerepublique,40 ter,Place de la République,72000,48.0041261,0.1964694,nominatim,exact,Place de la République
-Place de la Sirène,Le Mans,placesirene,,Place de la Sirène,72000,48.0063251,0.1985369,nominatim,exact,Place de la Sirène
-Place des jacobins,Le Mans,placejacobins,,Place des Jacobins,72000,48.0078156,0.2007998,nominatim,exact,Centre culturel « Les Quinconces - L'Espal »
-Place des Quinconces,Le Mans,placequinconces,,Place des Jacobins,72000,48.0078156,0.2007998,nominatim,exact,Centre culturel « Les Quinconces - L'Espal »
-Place des Sablons,Le Mans,placesablons,41,Place des Sablons,72100,47.9911977,0.2228603,nominatim,exact,Place des Sablons
-Place du Cardinal Grente,Le Mans,placecardinalgrente,4,Place du Cardinal Grente,72000,48.0098766,0.1983016,nominatim,exact,Place du Cardinal Grente
-Place du Jet d'eau,Le Mans,placejeteau,,Avenue de Paderborn,72000,48.0083364,0.1987985,nominatim,exact,Place du Jet d'Eau
-Place du Kiosque,Le Lude,placekiosque,,,72800,47.6572143,0.1551409,nominatim,city,Le Lude
-Place du Mail,Allonnes,placemail,,Place du Mail,72700,47.9694701,0.160113,nominatim,exact,Place du Mail
-Place du marché,Le Mans,placemarche,,Place du Marché,72220,47.8783115,0.2272179,nominatim,exact,Place du Marché
-Place du marché des Sablons,Le Mans,placemarchesablons,,,,47.8783115,0.2272179,nominatim,approximate,Place du Marché
-Place Henri IV,La Flèche,placehenriiv,,Place Henri IV,72220,47.6992910699391,-0.0752667874278986,nominatim,exact,Place Henri IV
-Place Saint Nicolas,Le Mans,placesaintnicolas,13,Place Saint-Nicolas,72000,48.0053534,0.1984797,nominatim,exact,Place Saint-Nicolas
-Place St Michel,Le Mans,placestmichel,2,Place Saint-Michel,72000,48.0092268,0.1982686,nominatim,exact,Place Saint-Michel
-Place St Pierre,Le Mans,placestpierre,,,,48.0073431,0.1966481,nominatim,exact,Place Saint-Pierre
-Plaine de Chaoué,Allonnes,plainechaoue,,Rue du Moulin de Chaoué,72700,47.9724614733402,0.16634531002806,manuel,exact,
-Plaine de jeux,Le Mans,plainejeux,,Avenue Jean Jaurès,72560,47.9836843,0.2830817,nominatim,exact,Plaine de jeux François Mitterrand
-Plaine du Ronceray,Le Mans,plaineronceray,,Allée Beethoven,72100,47.9710963,0.2078324,nominatim,exact,Plaine du Ronceray
-Plaine du Val’Rhonne,Moncé-en-Belin,plaineval’rhonne,,Allée de l'Europe,72230,47.8919343577341,0.202324653925616,manuel,exact,
-Plaine du verger,Changé,plaineverger,,,72560,47.9891967032938,0.249406489360025,nominatim,exact,Plaine du Verger
-Plan d'eau,Le Mans,planeau,,Rue Auguste de Clinchamp,72560,47.9913672,0.2901824,nominatim,exact,Plan d'eau communal
-Pôle culturel,Le Mans,poleculturel,,,,48.0073849,0.1967849,nominatim,city,Le Mans
-Pont romain,Le Mans,pontromain,1,Chemin de Réveillon,72530,48.0192451,0.2794095,nominatim,exact,Le Pont Romain
-Port du Mans,Le Mans,portmans,101,Quai Amiral Lalande,72230,48.001851735384,0.189546483203549,manuel,exact,
-Prairie du chateau,Sablé-sur-Sarthe,prairiechateau,,,,47.8329912,-0.329063,nominatim,exact,Hippodrome de la Prairie du Château
-Prieuré de Mayenne,Ballots,prieuremayenne,,,53350,47.8762529,-1.059604,nominatim,exact,Prieuré des Bonshommes de Ballots
-Prieuré de Vivoin,Vivoin,prieurevivoin,,,,48.2342845,0.1560111,nominatim,exact,Prieuré de Vivoin
-Promenade Newton,Le Mans,promenadenewton,,Promenade Newton,72100,47.9864305,0.2133704,nominatim,exact,Promenade Newton
-Quai Louis Blanc,Le Mans,quailouisblanc,,Quai Louis Blanc,72000,48.0138266,0.1997808,nominatim,exact,Quai Louis Blanc
-R-Volt,Le Mans,rvolt,7,Rue du Port,72000,48.0029922,0.1946912,nominatim,exact,R-Volt club
-Restaurant l'Éternel,La Fontaine-Saint-Martin,restauranteternel,,,,47.7926288,0.0431436,nominatim,exact,L'Éternel
-Rue Claude Blondeau,Le Mans,rueclaudeblondeau,13,Rue Claude Blondeau,72000,48.006675,0.1987696,nominatim,exact,Rue Claude Blondeau
-Rue de Belgique Sablons,Le Mans,ruebelgiquesablons,10,Rue de Belgique,72100,47.992511,0.2311962,nominatim,exact,Rue de Belgique
-Rue de la Piscine,Le Mans,ruepiscine,17,Rue de la Piscine,72220,47.8229095,0.2779246,nominatim,exact,Rue de la Piscine
-Rue du Gué,Le Mans,ruegue,,Rue du Gué,72220,47.8923238,0.2621007,nominatim,exact,Rue du Gué
-Salle Aimée le Prilleux,Le Mans,salleaimeeprilleux,,,,48.0210715,0.3305492,nominatim,approximate,Salle polyvalente Aimée Prilleux
-Salle André Voisin,Fresnay-sur-Sarthe,salleandrevoisin,3,Place Thiers,72130,48.2815739249037,0.0201407317572735,manuel,exact,Halles André Voisin / Cinema
-Salle associative,Le Mans,salleassociative,,Rue de Sablé,72700,47.9719667,0.097513,nominatim,exact,Salle Associative
-Salle Atlantis,Saint-Cosme-en-Vairais,salleatlantis,,Rue de l'Ormeau,72110,48.2739193,0.4598296,nominatim,approximate,Complexe culturel Atlantis
-Salle Cattois Roncin,Meurcé,sallecattoisroncin,,Place Cattois Roncin,72170,48.2346912976559,0.202970089915867,manuel,exact,Place Cattois Roncin
-Salle Chorus,Le Mans,sallechorus,,Place de la République,72000,48.0041788,0.1956641,nominatim,approximate,Scène de jazz + chorus
-Salle Claircigny,Le Mans,salleclaircigny,,Rue de Claircigny,72000,48.01361,0.19331,nominatim,exact,Salle municipale Claircigny
-Salle Communale,Le Mans,sallecommunale,,,,48.0265349,0.0796582,nominatim,exact,Salle Communale
-Salle Coppélia,La Flèche,sallecoppelia,,Allée de la Girouette,72200,47.6969012241096,-0.0745775841893583,manuel,exact,
-Salle de Tresson,Tresson,salletresson,,,72440,47.8946363727919,0.582382160462207,manuel,exact,
-Salle des concerts,Le Mans,salleconcerts,,Rue du Port,72000,48.0026277,0.1922505,nominatim,exact,Salle des concerts
-Salle des fêtes,Arnage,sallefetes,,,,47.9265284,0.189545,nominatim,exact,Salle des fêtes La Bulle
-Salle des fêtes,Arthezé,sallefetes,,,,47.7880819,-0.1194115,nominatim,city,Arthezé
-Salle des fêtes,Auvers le Hamon,sallefetes,,,,47.901369,-0.3512822,nominatim,exact,Salle des fêtes
-Salle des fêtes,Auvers-le-Hamon,sallefetes,,,,47.901369,-0.3512822,nominatim,exact,Salle des fêtes
-Salle des fêtes,Beaumont-sur-Sarthe,sallefetes,,,,48.2264796,0.132823,nominatim,city,Beaumont-sur-Sarthe
-Salle des fêtes,Brûlon,sallefetes,,,,47.9675049,-0.2355172,nominatim,city,Brûlon
-Salle des fêtes,Champagné,sallefetes,,,,47.3779609,4.1794538,nominatim,exact,Salle des fêtes
-Salle des Fêtes,Congé-sur-Orne,sallefetes,,,,48.1987995,0.2516631,nominatim,exact,Salle des Fêtes
-Salle des fêtes,Cures,sallefetes,,,,45.3658981,4.6821829,nominatim,exact,Salle des Fêtes
-Salle des fêtes,Dollon,sallefetes,,,,48.0387722,0.5915528,nominatim,exact,Complexe Roland Pitard
-Salle des fêtes,Fillé,sallefetes,,,,47.8981489,0.1267769,nominatim,city,Fillé
-Salle des fêtes,Jupilles,sallefetes,,,,47.7923438,0.4114714,nominatim,exact,Salle des Fêtes
-Salle des fêtes,La Chapelle-Saint-Aubin,sallefetes,,,,48.0341335,0.1600629,nominatim,city,La Chapelle-Saint-Aubin
-Salle des fêtes,La Ferté-Bernard,sallefetes,,,,48.1860576,0.6554511,nominatim,city,La Ferté-Bernard
-Salle des fêtes,La Guierche,sallefetes,,,,48.1132085,0.1943092,nominatim,city,La Guierche
-Salle des fêtes,Le Mans,sallefetes,,Rue Robert Desnos,72000,48.0140675,0.1797018,nominatim,exact,Salle des fêtes
-Salle des fêtes,Louplande,sallefetes,,,,47.943814,0.0409759,nominatim,city,Louplande
-Salle des fêtes,Malicorne-sur-Sarthe,sallefetes,,,,47.810599,-0.083941,nominatim,exact,Salle des Fêtes
-Salle des fêtes,Mamers,sallefetes,,,,47.9210246,0.7432032,nominatim,exact,Salle des Fêtes
-Salle des fêtes,Moncé en Belin,sallefetes,,,,47.8941045,0.2038619,nominatim,city,Moncé-en-Belin
-Salle des fêtes,Mulsanne,sallefetes,,,,47.9069356,0.2460607,nominatim,city,Mulsanne
-Salle des fêtes,Mézières-sur-Ponthouin,sallefetes,,,,48.193291,0.2992324,nominatim,exact,Salle des fêtes
-Salle des fêtes,Neufchâtel-en-Saosnois,sallefetes,,,,48.3768182,0.2464049,nominatim,city,Neufchâtel-en-Saosnois
-Salle des fêtes,Neuvillalais,sallefetes,,,,48.1567492,0.0018977,nominatim,city,Neuvillalais
-Salle des fêtes,Neuville-sur-Sarthe,sallefetes,,,,48.0753824,0.1897267,nominatim,city,Neuville-sur-Sarthe
-Salle des fêtes,Parcé-sur-Sarthe,sallefetes,,,,47.8434492,-0.1986762,nominatim,city,Parcé-sur-Sarthe
-Salle des fêtes,Piacé,sallefetes,,,,48.2574025,0.1118168,nominatim,exact,Salle des fêtes
-Salle des fêtes,Poillé-sur-Vègre,sallefetes,,,,47.9198934,-0.2660579,nominatim,exact,Salle des Fêtes
-Salle des fêtes,Précigné,sallefetes,,,,47.765652,-0.3255834,nominatim,exact,Salle des Fêtes
-Salle des fêtes,Rouillon,sallefetes,,,,48.0073958,0.1364063,nominatim,city,Rouillon
-Salle des fêtes,Saint-Calais,sallefetes,,,,47.9210246,0.7432032,nominatim,exact,Salle des Fêtes
-Salle des fêtes,Saint-Denis-d'Orques,sallefetes,,,,48.0274356,-0.2730156,nominatim,city,Saint-Denis-d'Orques
-Salle des fêtes,Saint-Georges-du-Bois,sallefetes,,,,47.9726629,0.1010947,nominatim,city,Saint-Georges-du-Bois
-Salle des fêtes,Saint-Pavace,sallefetes,,,,48.0386173,0.1875497,nominatim,city,Saint-Pavace
-Salle des fêtes,Savigné-l'Évêque,sallefetes,,,,48.0773296,0.2962126,nominatim,city,Savigné-l'Évêque
-Salle des fêtes,Solesmes,sallefetes,,,,47.8514506,-0.3020139,nominatim,city,Solesmes
-Salle des fêtes,Souligné-sous-Ballon,sallefetes,,,,48.139041,0.2329009,nominatim,exact,Salle des fêtes
-Salle des fêtes,Soulitré,sallefetes,,,,48.011687,0.4558297,nominatim,exact,Salle des fêtes
-Salle des fêtes,Teloché,sallefetes,,,,47.888782,0.2677971,nominatim,exact,Salle des fêtes
-Salle des fêtes,Vancé,sallefetes,,,,47.8317838,0.6469322,nominatim,city,Vancé
-Salle des planches,Le Mans,salleplanches,,Chemin des Planches,72380,48.1620529,0.1594225,nominatim,approximate,L'Ouche des Planches
-Salle du Cloître,Mamers,sallecloitre,,Place de la République,72600,48.3495568362618,0.36878772575451,manuel,exact,
-Salle du Foyer Loisirs de Parigné-L'Évêque,Parigné-L'Évêque,sallefoyerloisirsparigneeveque,9,Rue des Écoles,72250,47.9324,0.376251,manuel,exact,Foyer Loisirs
-Salle Edith Piaf,Le Mans,salleedithpiaf,6171,Rue Émile Zola,72230,47.910435,0.2526646,nominatim,exact,Salle Edith Piaf
-Salle G. Moquet,Allonnes,sallegmoquet,,Boulevard Pasteur,72700,47.9721306,0.1603755,nominatim,approximate,Salle Guy Môquet
-Salle Georges Brassens,Le Mans,sallegeorgesbrassens,,Sentier de la Souche,72530,48.0164706,0.2712781,nominatim,exact,Salle Georges Brassens
-Salle Jean Carmet,Allonnes,sallejeancarmet,5,Boulevard d'Anjou,72700,47.9670232,0.1608339,nominatim,exact,Salle Jean Carmet
-Salle Jean de la Fontaine,Marolles-les-Braults,sallejeanfontaine,38,Rue Henri et Charles Chardon,72260,48.2474449207215,0.313004890535262,manuel,exact,
-Salle l'Eden,Le Mans,salleeden,21,Rue Beauverger,72000,47.9994173741935,0.201222762376086,manuel,exact,
-Salle Les Sources,Coulaines,sallesources,,Place Jean-Claude Boulard,72190,48.0250573427247,0.205660282542915,manuel,exact,
-Salle Madeleine Marie,Sablé-sur-Sarthe,sallemadeleinemarie,25,Rue Saint-Denis,72300,47.8392481539569,-0.339079477993571,manuel,exact,
-Salle Mélusine,Le Mans,sallemelusine,,Rue de Mélusine,72530,48.0002205,0.2470691,nominatim,approximate,Mélusine
-Salle Michel Berger,Le Mans,sallemichelberger,,,,47.9820653,0.2884807,nominatim,approximate,Salle Léon Liberge
-Salle municipale,Arnage,sallemunicipale,,,,47.936736,0.184418,nominatim,approximate,Médiathèque municipale Simone de Beauvoir
-Salle municipale,Fay,sallemunicipale,,,,49.3757661,2.4130763,nominatim,approximate,Police Municipale
-Salle municipale,Le Mans,sallemunicipale,,,,47.9817765,0.2090159,nominatim,exact,Salle municipale Henri Barbin
-Salle Paul Richard,Montfort-le-Gesnois,sallepaulrichard,,Rue des Violettes,72450,48.0530394318605,0.419494314496554,nominatim,approximate,Salle Paul Nicolle
-Salle Polyvalente,Allonnes,sallepolyvalente,,,,47.969283,0.1578819,nominatim,city,Allonnes
-Salle Polyvalente,Arnage,sallepolyvalente,,,,47.9269544,0.1889245,nominatim,city,Arnage
-Salle Polyvalente,Bouloire,sallepolyvalente,,,,47.9696548,0.5493923,nominatim,exact,Salle polyvalente
-Salle Polyvalente,Brette-les-Pins,sallepolyvalente,,,,47.9152978,0.3296973,nominatim,exact,Salle polyvalente
-Salle Polyvalente,Champagné,sallepolyvalente,,,,45.271228,4.7997175,nominatim,exact,Salle polyvalente
-Salle Polyvalente,Courcemont,sallepolyvalente,,,,48.1735375,0.3499978,nominatim,exact,Salle Polyvalente
-Salle Polyvalente,Cérans-Foulletourte,sallepolyvalente,,,,47.8267795,0.0827761,nominatim,exact,Salle Polyvalente
-Salle Polyvalente,Fay,sallepolyvalente,,,,49.0727728,-0.491058,nominatim,exact,Salle Polyvalente
-Salle Polyvalente,La Ferté-Bernard,sallepolyvalente,,,,48.1873298,0.6485452,nominatim,approximate,La laverie - Centre culturel
-Salle Polyvalente,La Flèche,sallepolyvalente,,,,47.8669517,0.4607935,nominatim,exact,Salle polyvalente
-Salle Polyvalente,Le Breil-sur-Mérize,sallepolyvalente,,,,48.0014302,0.4775274,nominatim,exact,Salle Polyvalente
-Salle Polyvalente,Le Mans,sallepolyvalente,,,,47.825177,0.280682,nominatim,exact,Salle Polyvalente
-Salle Polyvalente,Mamers,sallepolyvalente,,,,48.4141665,0.1063225,nominatim,exact,Salle Polyvalente
-Salle Polyvalente,Marolles-les-Braults,sallepolyvalente,,,,48.2522145,0.3135215,nominatim,city,Marolles-les-Braults
-Salle Polyvalente,Montfort-le-Gesnois,sallepolyvalente,,,,48.0529091,0.4192159,nominatim,exact,Salle Polyvalente
-Salle Polyvalente,Neufchâtel-en-Saosnois,sallepolyvalente,,,,48.3740259,0.2467552,nominatim,exact,Salle polyvalente
-Salle Polyvalente,Noyen-sur-Sarthe,sallepolyvalente,,,,47.8609642,-0.1034251,nominatim,exact,Salle polyvalente
-Salle Polyvalente,Parcé-sur-Sarthe,sallepolyvalente,,,,47.8476673,-0.2059478,nominatim,exact,salle polyvalente Jean Drouet
-Salle Polyvalente,Roézé-sur-Sarthe,sallepolyvalente,,,,47.8942967,0.0656575,nominatim,exact,Salle Polyvalente de Roëzé sur Sarthe
-Salle Polyvalente,Saint Saturnin,sallepolyvalente,,,,48.0641536,0.1594091,nominatim,city,Saint-Saturnin
-Salle Polyvalente,Saint-Mars-la-Brière,sallepolyvalente,,,,48.0301287,0.3718076,nominatim,city,Saint-Mars-la-Brière
-Salle Polyvalente,Sillé le Guillaume,sallepolyvalente,,,,48.1841304,-0.1275755,nominatim,city,Sillé-le-Guillaume
-Salle Polyvalente,Sillé-le-Philippe,sallepolyvalente,,,,48.1069075,0.3520896,nominatim,city,Sillé-le-Philippe
-Salle Polyvalente,Soulitré,sallepolyvalente,,,,48.0112992,0.4566434,nominatim,city,Soulitré
-Salle Polyvalente,Teillé,sallepolyvalente,,,,48.1807455,0.1870607,nominatim,exact,Salle Polyvalente
-Salle Polyvalente,Volnay,sallepolyvalente,,,,47.9456503,0.4746217,nominatim,city,Volnay
-Salle Polyvalente,Étival-lès-le-Mans,sallepolyvalente,,,,47.960109,0.0803536,nominatim,exact,Salle Polyvalente
-Salle Théophile Plé,Sablé-sur-Sarthe,salletheophileple,,,,47.8375265,-0.3303097,nominatim,exact,Salle Théophile Plé
-Salle Vauguélande,Tresson,sallevauguelande,,,,47.8938402,0.5794579,nominatim,exact,Salle Vauguélande
-Salon Arthé,Malicorne-sur-Sarthe,salonarthe,,,,47.8140326,-0.0852406,nominatim,exact,Salon ArThé
-Salon de la rue des 3 Sonnettes,Le Mans,salonrue3sonnettes,,Rue des 3 Sonnettes,72000,48.0062921774934,0.195818585528213,manuel,exact,
-Scène Joël Le Theule,Sablé-sur-Sarthe,scenejoeltheule,16,Rue Saint-Denis,72300,47.8390305355791,-0.337960932947041,manuel,exact,
-Secours catholique,Le Mans,secourscatholique,,Rue de la Mission,72000,47.993763,0.2020307,nominatim,exact,Secours Catholique
-Site de la Salle des Fêtes,Le Mans,sitesallefetes,,,,48.0073849,0.1967849,nominatim,city,Le Mans
-Square Dubois,Le Mans,squaredubois,,Rue du Square Jacques Dubois,72000,48.00869784219,0.197013711720644,nominatim,exact,Rue du Square Jacques Dubois
-Square Montreuil,Bouloire,squaremontreuil,,Square Montreuil,72440,47.9721857,0.5520972,nominatim,exact,Square Montreuil
-Square rue Galilée,Le Mans,squareruegalilee,,,72000,47.9888587579404,0.217123151640304,manuel,exact,
-Stade,Louplande,stade,,,,47.945295,0.042006,nominatim,exact,Stade
-Stade,Sillé-le-Philippe,stade,,,,48.1057637,0.3520143,nominatim,exact,Rue du Stade
-Stade du collège,Le Mans,stadecollege,,,,48.0073849,0.1967849,nominatim,city,Le Mans
-Stade Léon Bollée,Le Mans,stadeleonbollee,2,All. Jeanne Deroin,72000,48.0152366244213,0.193774641069806,manuel,exact,
-Studio 101,Coulaines,studio101,,Rue de Belle-Île,72190,48.0275835,0.1998299,nominatim,exact,Studio 101
-Studio de la Cie Marie Lenfant,Le Mans,studiociemarielenfant,35 bis,Rue des Fontenelles,72000,48.0177524080398,0.215626309752606,manuel,exact,
-Sun 7 Bar,Le Mans,sun7bar,32,Place des Comtes du Maine,72000,48.0046418167254,0.201416403673576,manuel,exact,
-Terrain de jeu,Le Mans,terrainjeu,,,,48.0073849,0.1967849,nominatim,city,Le Mans
-Tertre Rouge,Le Mans,tertrerouge,,Voie de la Liberté,72100,47.9604068,0.2148934,nominatim,exact,Tertre Rouge
-The Lodge,Le Mans,lodge,,Rue des Ponts Neufs,72000,48.0066308,0.1981096,nominatim,exact,The Lodge Irish Pub
-Théâtre de Chaoué,Le Mans,theatrechaoue,,Allée des Frères Rocher,72700,47.9714288,0.1657499,nominatim,exact,Théâtre de Chaoué
-Théâtre de l'Acthalia,Le Mans,theatreacthalia,,Rue Saint-Flaceau,72000,48.0067567,0.1952432,nominatim,exact,Théâtre de l'Acthalia
-Théâtre de l'Écluse,Le Mans,theatreecluse,,Rue des Acacias,72000,47.9971141,0.1835127,nominatim,exact,Théâtre de l'écluse
-Théâtre de l'Éphémère,Le Mans,theatreephemere,,Place des Jacobins,72000,48.0073783,0.1989582,nominatim,approximate,Théâtre Paul Scaron / Théâtre de l'Éphémère
-Théâtre de la Bertoche,Le Mans,theatrebertoche,217,Rue de la Bertinière,72000,47.9923015347829,0.217198647949137,manuel,exact,La Bertoche
-Théâtre de la Halle-au-Blé,La Flèche,theatrehalleble,,Rue du Mouton,72200,47.7002066,-0.0727053,nominatim,exact,Théâtre de la Halle au Blé
-Théâtre de Mamers,Le Mans,theatremamers,5,Route de Mamers,72290,48.1779117,0.2348455,nominatim,approximate,
-Théâtre des Quinconces,Le Mans,theatrequinconces,,Place des Jacobins,72000,48.0078156,0.2007998,nominatim,exact,Centre culturel « Les Quinconces - L'Espal »
-Théâtre des Récollets,Montval sur Loir,theatrerecollets,,Chemin des Récollets,72500,47.6969942,0.4125246,nominatim,approximate,Chemin des Récollets
-Théâtre du Passeur,Le Mans,theatrepasseur,,Rue de la Rivière,72000,48.0099636,0.2118261,nominatim,exact,Théâtre du Passeur
-Théâtre Épidaure,Bouloire,theatreepidaure,1,Rue de la Grosse Pierre,72440,47.9737047289703,0.554539367623309,manuel,exact,
-Théâtre Municipal,Le Mans,theatremunicipal,,,,47.9670232,0.1608339,nominatim,exact,Salle Jean Carmet
-Théâtre Paul Scarron,Le Mans,theatrepaulscarron,,Place des Jacobins,72000,48.0074778303478,0.19945039730097,nominatim,approximate,
-Twin's Beer,La Chapelle-Saint-Aubin,twinsbeer,6,Rue Jean Perrin,72650,48.0266929769744,0.172905384105315,manuel,exact,
-Un Singe en Hiver,Le Mans,unsingeenhiver,45,Avenue de la Libération,72000,48.0058613,0.1890035,manuel,exact,
-Unik Music,Le Mans,unikmusic,,Rue Nationale,72000,47.9979702,0.2005569,nominatim,exact,Unik Music
-Université,Le Mans,universite,,Rue Louis Harel de la Noë,72000,48.0170675,0.1507932,nominatim,exact,Université
-Université Amphi Extérieur Bât. Lettres,Le Mans,universiteamphiexterieurbatlettres,,Avenue Olivier Messiaen,72000,48.0173394253953,0.15736128234002,manuel,exact,
-V&B,Allonnes,vetb,1,Rue de la Bérardière,72700,47.9753232,0.1515879,nominatim,exact,V and B
-V&B Antarès,Le Mans,vetbantares,,Chemin de l'hippodrome,72100,47.9531611,0.226762,nominatim,exact,V and B
-Vaurouzé - Université,Le Mans,vaurouzeuniversite,,Boulevard Charles Nicolle,72000,48.0147356,0.1652025,nominatim,exact,Court de tennis Vaurouzé
-Véron fleurs,Le Mans,veronfleurs,27,Rue des Mûriers,72000,48.0085118987777,0.187395853734176,manuel,exact,
-Verre I Table,Le Mans,verreitable,,Rue Nationale,72000,47.9978989,0.2005843,nominatim,exact,Verre I Table
-Vieux Mans,Le Mans,vieuxmans,20,Rue des Chanoines,72000,48.008836,0.1971929,nominatim,exact,Cité Plantagenêt
-Washington DC,Le Mans,washingtondc,,,,47.994128,0.203715,nominatim,approximate,Washington
-White-UNDR Club,Le Mans,whiteundrclub,44,Rue des Ponts Neufs,72000,48.0066400985361,0.198798738588086,manuel,exact,
-CHS Etoc Demazy,Le Mans,chsetocdemazy,10,Rue Etoc Demazy,72000,47.9937527719202,0.190975007642793,manuel,exact,
+nom,ville,nom_normalise,adresse_numero,adresse_voie,code_postal,latitude,longitude,geo_source,geo_precision,nom_osm,is_generic
+14 hameau de verze,Saint-Rémy-du-Val,14hameauverze,14,Hameau de Verze,72600,48.351913808477,0.220231769062038,manuel,exact,,
+8 rue de Cyrus,Le Mans,8ruecyrus,8,Rue de Cyrus,72000,48.0051346,0.2134966,nominatim,exact,8,
+Abbaye Royale de l'Epau,Le Mans,abbayeroyaleepau,,Rue de l'Estérel,72530,47.9912478,0.2423797,nominatim,exact,Abbaye Royale de l'Épau,
+Antarès,Le Mans,antares,,Rue Juan Manuel Fangio,72100,47.9561565,0.226224,nominatim,exact,Antarès,
+Archives Musicales du Mans,Le Mans,archivesmusicalesmans,,,72000,47.9859416762294,0.20994415132415,nominatim,exact,8,
+Arrêt saint Martin,Le Mans,arretsaintmartin,,,72000,47.985727104451,0.209514976111933,nominatim,exact,Maison d'arrêt de Laval,
+Au coeur des artistes,Le Mans,coeurartistes,17,Rue Gambetta,72000,48.0048597,0.1942828,nominatim,exact,Au cœur des artistes,
+Auberge,Le Mans,auberge,72,Cour Saint-Victeur,72000,48.0071003,0.1906492,nominatim,exact,Auberge de la Fontaine,
+Aux 3 Brasseurs,Le Mans,3brasseurs,,Rue Jean de Vignolles,72650,48.0467553,0.1720127,nominatim,approximate,3 Brasseurs,
+Baccara La Sirène,Le Mans,baccarasirene,2,Rue Marchande,72000,48.006312764925,0.198720747621314,manuel,exact,Au Baccara,
+Bar à Z’Arts,La Flèche,barz’arts,,Place de l'Hôtel de Ville,72200,47.7285228,0.5734835,nominatim,approximate,Café des Arts,
+Bar de la Rotonde,Le Mans,barrotonde,,Giratoire de la Rotonde,72100,47.9573643,0.1986721,nominatim,approximate,Giratoire de la Rotonde,
+Bar des sports,Le Mans,barsports,,Rue Principale,72380,48.1495581,0.1322235,nominatim,exact,Bar des sports,
+Bar l'Olivier,Le Mans,barolivier,,Place George Washington,72000,47.9959093,0.2029105,nominatim,exact,L'Olivier,
+Bars et restaurants,Le Mans,barsetrestaurants,,,72000,48.0073849,0.1967849,nominatim,city,Le Mans,
+Base de loisirs,Lavaré,baseloisirs,,,,48.0539923,0.6525776,nominatim,exact,Base de Loisirs Lavaré,
+Bât. H rue Maurice Ravel,Allonnes,bathruemauriceravel,,Rue Maurice Ravel,72700,47.9699605939392,0.161753205988298,manuel,exact,,
+Bateau Lavoir Café,Le Mans,bateaulavoircafe,105 bis,Grande Rue,72000,48.0068338884214,0.195012999875588,manuel,exact,,
+Beaux-Arts,Le Mans,beauxarts,,Place des Thermes,72000,48.0063067,0.1961357,nominatim,exact,École supérieure des beaux-arts,
+Bibliotheque,Savigné-l'Évêque,bibliotheque,,,,48.0773296,0.2962126,nominatim,city,Savigné-l'Évêque,1
+Bibliothèque,Bouloire,bibliotheque,,,,47.9724995,0.5524301,nominatim,city,Bouloire,1
+Bibliothèque,Château-du-Loir,bibliotheque,,,,47.6965942,0.4159617,nominatim,exact,Bibliothèque-ludothèque,1
+bibliothèque,La Chapelle-Saint-Aubin,bibliotheque,,,,48.0341335,0.1600629,nominatim,city,La Chapelle-Saint-Aubin,1
+bibliothèque,La Flèche,bibliotheque,,,,47.742358,0.0569718,nominatim,exact,Bibliothèque,1
+Bibliothèque,La Guierche,bibliotheque,,,,48.1132085,0.1943092,nominatim,city,La Guierche,1
+Bibliothèque,Le Mans,bibliotheque,,,,48.0247785,0.3324378,nominatim,exact,Bibliothèque,1
+Bibliothèque,Moncé en Belin,bibliotheque,,,,47.8941045,0.2038619,nominatim,city,Moncé-en-Belin,1
+Bibliothèque,Saint-Calais,bibliotheque,,,,47.9206266,0.7430906,nominatim,exact,Musée-Bibliothèque,1
+Bibliothèque,Saint-Georges-le-Gaultier,bibliotheque,,,,48.2968771,-0.1061149,nominatim,city,Saint-Georges-le-Gaultier,1
+Bibliothèque,Sainte-Jamme-sur-Sarthe,bibliotheque,,,,48.1415274,0.1654889,nominatim,exact,Bibliothèque municipale,1
+Bibliothèque,Savigné-l'Évêque,bibliotheque,,,,48.0773296,0.2962126,nominatim,city,Savigné-l'Évêque,1
+Bibliothèque universitaire,Le Mans,bibliothequeuniversitaire,,Boulevard Paul d'Estournelles de Constant,72000,48.0160219,0.1605519,nominatim,exact,Bibliothèque universitaire,
+Bières et Chopes,Le Mans,bieresetchopes,,Ligne droite des Hunaudières,72100,47.9529814,0.2291927,nominatim,exact,Bières et Chopes,
+Bistro Broc Café,Le Mans,bistrobroccafe,,Boulevard des Ravalières,72560,47.9773437,0.2716957,nominatim,exact,Bistro Broc Café,
+Bld Winston Churchill,Le Mans,bldwinstonchurchill,,Boulevard Winston Churchill,72000,48.0073849,0.1967849,manuel,exact,,
+Blue Zinc,Le Mans,bluezinc,45,Avenue de la Libération,72000,48.0058613,0.1890035,nominatim,exact,Blue Zinc,
+Boire du Bon,Le Mans,boirebon,,Rue du Monnet,72190,48.0378706,0.1880358,nominatim,exact,Boire du Bon,
+Bords de l'Huisne,Le Mans,bordshuisne,,Boulevard Winston Churchill,72100,47.9907146,0.2199553,nominatim,exact,Bords de l'Huisne,
+Brasserie Mage Malte,Mamers,brasseriemagemalte,109,Rue Charles Granger,72600,48.3561295160324,0.36801919128359,manuel,exact,,
+Brasserie Septante-Deux,Le Mans,brasserieseptantedeux,21,Rue du Docteur Leroy,72000,48.0024693727632,0.196207617341453,manuel,exact,,
+Café des Arts,La Chartre-sur-le-Loir,cafearts,5,Place de la Liberté,72340,47.7285228,0.5734835,nominatim,exact,Café des Arts,
+Café des Brasseurs,Le Mans,cafebrasseurs,,,,48.0467553,0.1720127,nominatim,approximate,3 Brasseurs,
+Café Folk,Le Mans,cafefolk,9,Rue du Cornet,72000,48.0049184,0.1953471,nominatim,exact,Cafe Folk,
+Café théatre Éolienne,Arnage,cafetheatreeolienne,,,72230,47.9370691716989,0.185093001101646,nominatim,exact,,
+Camion-théâtre,Le Mans,camiontheatre,,,,48.0073849,0.1967849,nominatim,city,Le Mans,
+Campus de l'université,Le Mans,campusuniversite,,,,48.0171041,0.1626348,nominatim,approximate,Campus de l'Université du Mans,
+Carré Plantagenêt,Le Mans,carreplantagenet,2,Rue Claude Blondeau,72000,48.0071116,0.1981579,nominatim,exact,Musée Jean-Claude-Boulard / Carré Plantagenêt,
+Casa Minga,Le Mans,casaminga,,Rue Nationale,72000,48.0005414,0.1985619,nominatim,exact,Casa Minga,
+Cathédrale Saint-Julien,Le Mans,cathedralesaintjulien,,Place Saint-Michel,72000,48.0093011,0.198797,nominatim,exact,Cathédrale Saint-Julien,
+Cave municipale,Le Mans,cavemunicipale,,,72000,48.0073849,0.1967849,nominatim,city,Le Mans,
+Caveau 105,Le Mans,caveau105,105,Grande Rue,72000,48.0068179926199,0.195070203819247,nominatim,exact,,
+Centre Cial les Jacobins,Le Mans,centrecialjacobins,13,Rue Claude Blondeau,72000,48.0069312661394,0.199314678456944,manuel,exact,Centre commercial Les Jacobins,
+Centre Culturel,Le Mans,centreculturel,,,,48.0078156,0.2007998,nominatim,exact,Centre culturel « Les Quinconces - L'Espal »,1
+Centre culturel,Le Mans,centreculturel,,,,48.0078156,0.2007998,nominatim,exact,Centre culturel « Les Quinconces - L'Espal »,1
+Centre culturel,Saint-Calais,centreculturel,,Pl. de L Hôtel de ville,72120,47.9206472512812,0.743201655665312,nominatim,exact,Centre Culturel,1
+Centre Culturel,Vaas,centreculturel,,,,47.6678665,0.3100938,nominatim,approximate,Espace Culturel,1
+Centre Culturel Athéna,La Ferté-Bernard,centreculturelathena,,Av. du Général de Gaulle,72400,48.1830183374201,0.650172345269328,manuel,exact,,
+Centre des Etangs-Chauds,Le Mans,centreetangschauds,,Chemin des Étangs Chauds,72100,47.9785994,0.2425382,nominatim,approximate,Chemin des Étangs Chauds,
+Centre des expositions,Le Mans,centreexpositions,,Giratoire de l'Oasis,72100,47.9607676,0.2004644,nominatim,exact,Oasis - Centre des Expositions,
+Centre équestre,Le Mans,centreequestre,,Chemin Rural des Métairies,72700,47.9606038,0.1673345,nominatim,exact,Centre Équestre,
+Centre hospitalier,Le Mans,centrehospitalier,,Avenue Rubillard,72000,48.0154142,0.1777417,nominatim,exact,Centre hospitalier du Mans,
+Centre Musical International de Roussigny,Saint-Ulphace,centremusicalinternationalroussigny,,,72320,48.1648892676544,0.845048028049695,manuel,exact,Centre Musical International de Roussigny,
+Centre Social Mazagran,Le Mans,centresocialmazagran,,,,47.9712089,0.2128648,nominatim,approximate,Centre social des quartiers sud,
+Centre St Christophe,La Chapelle-Saint-Aubin,centrestchristophe,,Chemin de Beauchene,72650,48.039266,0.1519688,nominatim,exact,Centre Saint-Christophe,
+Centre Ville,Le Mans,centreville,,,,48.0017357,0.2030617,nominatim,exact,Parking Zenpark Le Mans - Centre-Ville - Préfecture,
+Chapelle de l'Oratoire,Le Mans,chapelleoratoire,,Rue Montesquieu,72000,48.0103371,0.2005372,nominatim,exact,Chapelle de l'Oratoire,
+Chapelle Sainte Cécile,Le Mans,chapellesaintececile,,,,48.1195362,0.1812042,nominatim,approximate,Rue de la Chapelle Sainte-Anne,
+Chapêlmêle,Alençon,chapelmele,,,61000,48.4377527,0.0704145,nominatim,exact,La Chapêlmèle,
+Chapiteau,Le Mans,chapiteau,6,Boulevard Winston Churchill,72100,47.9865185,0.2127646,nominatim,exact,Le châpiteau,
+Chapiteau bleu promenade Newton,Le Mans,chapiteaubleupromenadenewton,,Promenade Newton,72000,47.9874026929278,0.219866163054687,manuel,exact,,
+Chapiteau bulle promenade Newton,Le Mans,chapiteaubullepromenadenewton,,Promenade Newton,72000,47.9873525018594,0.219941287567278,manuel,exact,,
+Chapiteau du parc de Casablanca,Le Mans,chapiteauparccasablanca,,Rue de Casablanca,72000,48.0151797810582,0.230821110746493,manuel,exact,,
+Chapiteau promenade Newton,Le Mans,chapiteaupromenadenewton,,Promenade Newton,72000,47.9873525018594,0.219941287567278,manuel,exact,,
+"Chapiteau, parc de l'Epine",Le Mans,chapiteauparcepine,,Allée de Cannes,72000,48.0180809360434,0.178740280161252,manuel,exact,,
+Château de Courtanvaux,Bessé-sur-Braye,chateaucourtanvaux,,,72310,47.8441875,0.7355992,nominatim,exact,Château de Courtanvaux,
+Château de la Forêterie,Le Mans,chateauforeterie,,Chemin des Métairies,72700,47.9619338,0.1716336,nominatim,exact,Château de la Forêterie,
+Chez Marcelle,Le Mans,chezmarcelle,,Rue des Ponts Neufs,72000,48.0065772,0.1981638,nominatim,exact,Chez Marcelle,
+Chope et Compagnie,Le Mans,chopeetcompagnie,3,Rue des Petites Marniéres,72650,48.0467565,0.1703818,nominatim,exact,Chope et Compagnie,
+Chope et Compagnie Le Mans Nord,Le Mans,chopeetcompagniemansnord,,,,47.9801752,0.1960748,nominatim,approximate,Chope & Compagnie,
+Chope et Compagnie Le Mans Sud,Le Mans,chopeetcompagniemanssud,,,,47.9801752,0.1960748,nominatim,approximate,Chope & Compagnie,
+Chorus,Le Mans,chorus,,Place de la République,72000,48.0038380128902,0.195650270414633,manuel,exact,,
+CHS,Allonnes,chs,20,Av. du 19 Mars 1962,72700,47.9592729252058,0.16381661333794,manuel,exact,,
+Cinéma le Français,Le Mans,cinemafrancais,,Rue Gambetta,72000,48.005512517726,0.193236059320388,manuel,exact,,
+Cinéma Le Kid,La Flèche,cinemakid,,,,47.6992923,-0.0758035,nominatim,exact,Cinéma le Kid,
+Cinéma le Royal,Le Mans,cinemaroyal,,Avenue Félix Géneslay,72100,47.9687504,0.2040136,nominatim,exact,Le Royal,
+Cinéma Rex,Mamers,cinemarex,2,Rue de la Gare,72600,48.3473279430055,0.364700949432122,nominatim,exact,Cinema Rex,
+Circuit Bugatti,Le Mans,circuitbugatti,,Allée du Château du Houx,72100,47.9571572,0.2161411,nominatim,exact,Circuit Bugatti,
+Circuit des 24 heures,Le Mans,circuit24heures,,Passerelle Dunlop,72100,47.9578006,0.2125049,nominatim,exact,Circuit des 24 Heures du Mans,
+Cirque Mimulus,Fresnay-sur-Sarthe,cirquemimulus,,Place de la Gare,72130,48.2814645674503,0.0298359224983774,manuel,exact,,
+Cité du cirque & promenade Newton,Le Mans,citecirqueetpromenadenewton,,,,47.9860917,0.2120548,nominatim,approximate,Le Plongeoir - Cité du Cirque,
+Cité Plantagenêt,Le Mans,citeplantagenet,20,Rue des Chanoines,72000,48.008836,0.1971929,nominatim,exact,Cité Plantagenêt,
+Club La Suite 72,Le Mans,clubsuite72,123,Avenue de la Libération,72000,48.0040684860758,0.186919540225561,manuel,exact,Discothèque La Suite,
+Collégiale Saint-Pierre-la-Cour,Le Mans,collegialesaintpierrecour,,,,48.0070847,0.1968794,nominatim,exact,Collégiale Saint-Pierre-la-Cour,
+Comédie Le Mans,Le Mans,comediemans,37,Rue nationale,72000,47.9999282792832,0.19922430212825,manuel,exact,,
+Comissariat,Le Mans,comissariat,,,72000,48.0073849,0.1967849,nominatim,city,Le Mans,
+Comité des fêtes,Le Mans,comitefetes,,Cour des Érables,72100,47.9789319,0.2315588,nominatim,exact,Association du Comité des Fêtes des Bruyères,
+Complexe culturel Atlantis,Saint-Cosme-en-Vairais,complexeatlantis,,,,48.2739193,0.4598296,nominatim,exact,Complexe culturel Atlantis,
+Conservatoire,Le Mans,conservatoire,,Escalier de la Pierre de Tucé,72000,48.008326,0.1960978,nominatim,exact,"Conservatoire à rayonnement départemental de musique, d'art dramatique et de danse du Mans",
+CPFI,Le Mans,cpfi,11,Rue des Frères Gréban,72000,48.0055169,0.1892603,nominatim,exact,Centre du Patrimoine de la Facture Instrumentale,
+Cri-Cri Plage,Solesmes,cricriplage,,,,47.8512165,-0.3070613,nominatim,exact,Cri-Cri Plage,
+CTTM,Le Mans,cttm,20,Rue Thalès de Milet,72000,48.0189217,0.15926,nominatim,exact,CTTM,
+Derrière le complexe R. Garnier,Allonnes,derrierecomplexergarnier,13,Avenue Charles de Gaulle,72700,47.9727682076964,0.159647541953421,manuel,exact,,
+Domaine de la Gandonnière,Champgenéteux,domainegandonniere,,,,48.2812966,-0.4001172,nominatim,exact,Le Domaine,
+Domaine du Gasseau,Saint-Léonard-des-Bois,domainegasseau,,,,48.3598847,-0.0769569,nominatim,exact,Domaine du Gasseau,
+Dôme Sonore,Le Mans,domesonore,,,72000,48.0073849,0.1967849,nominatim,city,Le Mans,
+École Camille Claudel,Le Mans,ecolecamilleclaudel,17,Rue d'Helsinki,72000,48.0191993,0.2118961,nominatim,exact,École élémentaire Camille Claudel,
+École de l'Épau,Le Mans,ecoleepau,,,,47.9869475,0.2799148,nominatim,exact,École élémentaire de l'Épau,
+École de musique de Saint Saturnin,Le Mans,ecolemusiquesaintsaturnin,,,,48.0148983,0.1543145,nominatim,approximate,Institut technologique européen des métiers de la musique,
+École Garnier-Pagès,Le Mans,ecolegarnierpages,,Rue Garnier Pagès,72000,47.9940853,0.1747873,nominatim,exact,École élémentaire Garnier-Pages,
+École Jean Mermoz,Le Mans,ecolejeanmermoz,,Rue du Capitaine Ferber,72100,47.9677189,0.2048675,nominatim,exact,École élémentaire Jean Mermoz,
+École Maternelle des Maillets,Le Mans,ecolematernellemaillets,35B,Rue des Fontenelles,72000,48.0175484,0.2137524,nominatim,exact,École maternelle des Maillets,
+École Philippeaux,Le Mans,ecolephilippeaux,,Rue de Préau,72100,47.987632,0.2074972,nominatim,exact,École élémentaire Pierre Philippeaux,
+École primaire Montaigu,Le Mans,ecoleprimairemontaigu,,,,48.008821,0.0697157,nominatim,approximate,École primaire,
+École Supérieure d'Art et de Design,Le Mans,ecolesuperieureartetdesign,,,,48.0189593,0.1576816,nominatim,approximate,École nationale supérieure d'ingénieurs du Mans,
+Eglise,Brette-les-Pins,eglise,,,,47.9131644,0.3381217,nominatim,exact,Église Saint-Martin,1
+Eglise,Champagné,eglise,,,,48.0261257149857,0.332801453818514,nominatim,exact,Eglise (St Charles),1
+Eglise,La Bazoge,eglise,,,,48.0993272,0.1552981,nominatim,exact,Rue de l'Église,1
+Eglise,Montval-sur-Loir,eglise,,,,47.6939067,0.4187247,nominatim,exact,Église Saint-Guingalois,1
+Église,Arnage,eglise,,,,47.9307246,0.18456,nominatim,exact,Place de l'Église,1
+Église,Bonnétable,eglise,,,,48.1744415,0.4291123,nominatim,exact,Église,1
+Église,Brette-les-Pins,eglise,,,,47.9131644,0.3381217,nominatim,exact,Église Saint-Martin,1
+Église,Changé,eglise,,,,47.9875117,0.2820787,nominatim,exact,Église,1
+Église,Chantenay-Villedieu,eglise,,,,47.939198,-0.1644061,nominatim,exact,Église Saint-Georges,1
+Église,Connerré,eglise,,,,48.0597754,0.4932309,nominatim,exact,Rue de l'Église,1
+Église,Coulaines,eglise,,,,48.0238354,0.2048118,nominatim,exact,Église Saint-Nicolas,1
+Église,Courceboeufs,eglise,,,,48.1367056,0.2867853,nominatim,exact,Église,1
+Église,Courcival,eglise,,,,48.2292186,0.3962813,nominatim,exact,Église Saint-Brice,1
+Église,Dollon,eglise,,,,48.0387007,0.5868168,nominatim,exact,Place de l'Église,1
+Église,Fercé-sur-Sarthe,eglise,,,,47.90155,-0.0308953,nominatim,exact,Place de l'Église,1
+Église,La Ferté-Bernard,eglise,,,,48.1861915,0.6531759,nominatim,exact,Église Notre-Dame des Marais,1
+Église,La Flèche,eglise,,,,47.8385562,-0.3301195,nominatim,exact,Église,1
+Église,La Suze-sur-Sarthe,eglise,,,,47.8896601,0.0274651,nominatim,exact,Église,1
+Église,Lavaré,eglise,,,,48.053914,0.6456325,nominatim,exact,Église Saint-Pierre,1
+Église,Le Mans,eglise,,,,47.8297945,0.2728886,nominatim,exact,Église,1
+Église,Mamers,eglise,,,,48.1744415,0.4291123,nominatim,exact,Église,1
+Église,Montval-sur-Loir,eglise,,,,47.6939067,0.4187247,nominatim,exact,Église Saint-Guingalois,1
+Église,Mulsanne,eglise,,,,47.9056557,0.2496594,nominatim,exact,Rue de l'Église,1
+Église,Poillé-sur-Vègre,eglise,,,,47.919614,-0.2651708,nominatim,exact,Impasse de l'Église,1
+Église,Rouessé-Vassé,eglise,,,,48.1593255,-0.1993965,nominatim,exact,Place de l'Église,1
+Église,Saint Pierre des Ormes,eglise,,,,48.3064828,0.4219807,nominatim,exact,Église Saint-Pierre,1
+Église,Saint Saturnin,eglise,,,,48.0582464757113,0.152086572789397,nominatim,exact,Église Notre-Dame,1
+Église,Saint-Mars-la-Brière,eglise,,,,48.0290708,0.3712418,nominatim,exact,Place de l'Église,1
+Église,Saint-Vincent-des-Prés,eglise,,,,48.2960981,0.3854327,nominatim,exact,Église Saint-Viventien,1
+Église,Savigné-l'Évêque,eglise,,,,48.0772719,0.2969996,nominatim,exact,Place de l'Église,1
+Église,Sillé le Guillaume,eglise,,,,48.184581,-0.1265121,nominatim,exact,Église Notre-Dame de L'Assomption,1
+Église,Tresson,eglise,,,,47.903532,0.575016,nominatim,exact,Église Saint-Martin,1
+Église,Vancé,eglise,,,,47.831845,0.6468686,nominatim,exact,Église Saint-Martin,1
+Église,Volnay,eglise,,,,47.9326369,0.4680528,nominatim,exact,Église,1
+Église,Yvré-l'Évêque,eglise,,,,48.0136832,0.2717178,nominatim,exact,Église Saint-Germain,1
+Église d'Arnage,Le Mans,eglisearnage,,Place de l'Église,72230,47.9307271,0.1845488,nominatim,exact,Place de l'Église,
+Église de Bonnétable,Bonnétable,eglisebonnetable,,,72110,48.1744415,0.4291123,nominatim,exact,Église,
+Eglise de Chevillé,Chevillé,eglisecheville,,Place du Café,72350,47.9482853,-0.2235765,nominatim,exact,Église Notre-Dame,
+Église de René,René,egliserene,,,,48.2786879,0.2216477,nominatim,exact,Place de l'Église,
+Église notre dame du Pré,Le Mans,eglisepre,,Pl. du Pré,72000,48.0098221770522,0.192896161643124,manuel,exact,,
+Église notre dame,Le Mans,eglisenotredame,,,,48.0996625,0.1561271,nominatim,exact,Église Notre-Dame,
+Église Notre-Dame-de-Sainte-Croix,Le Mans,eglisenotredamesaintecroix,,Rue Notre-Dame,72000,48.0035936,0.210094,nominatim,exact,Église Notre-Dame-de-Sainte-Croix,
+Église Saint Gilles,Le Mans,eglisesaintgilles,,Place de l'Église,72230,47.9309595,0.1845872,nominatim,exact,Église Saint-Gilles,
+Eglise Saint Guingalois,Montval-sur-Loir,eglisesaintguingalois,,ue Gendron,72500,47.6939280934186,0.419252656812547,nominatim,exact,,
+Église Saint Nicolas,Le Mans,eglisesaintnicolas,,Rue du Général de Gaulle,72190,48.0238354,0.2048118,nominatim,exact,Église Saint-Nicolas,
+Eglise St Nicolas,Le Mans,eglisestnicolas,,Rue du Général de Gaulle,72190,48.0238354,0.2048118,nominatim,exact,Église Saint-Nicolas,
+Église St. Aldric,Le Mans,eglisestaldric,,Rue d'Isaac,72000,48.0124568,0.2128698,nominatim,exact,Église Saint-Aldric,
+EHPAD La reposance,Le Mans,ehpadreposance,4,Rue de l'Épau,72100,47.9939112,0.2220044,nominatim,exact,Ehpad La Reposance,
+Entre la place des Jacobins et la place de la République,Le Mans,entreplacejacobinsetplacerepublique,,,72000,48.0073849,0.1967849,nominatim,city,Le Mans,
+Épicerie du Pré,Le Mans,epiceriepre,31,Rue du Pré,72000,48.0108167561469,0.194687488953741,manuel,exact,,
+EPSM de la Sarthe,Allonnes,epsmsarthe,,Avenue du 19 Mars 1962,72700,47.9592411,0.162224,nominatim,exact,EPSM de la Sarthe,
+ESAD TALM,Le Mans,esadtalm,,Place des Thermes,72000,48.0063067,0.1961357,nominatim,exact,,
+Espace bis 18 rue St Martin,Le Mans,espacebis18ruestmartin,18,Rue Saint-Martin,72000,48.005421,0.1970424,nominatim,exact,L'espace Bis de la librairie Bulle,
+Espace Culturel,La Bazoge,espaceculturel,,,,48.0989559,0.1544523,nominatim,city,La Bazoge,1
+Espace culturel L'Orée du Bois,Le Mans,espacecultureloreebois,,Chemin de Beauchene,72650,48.039266,0.1519688,nominatim,exact,Centre Saint-Christophe,
+Espace des Rivauderies,Le Mans,espacerivauderies,,,72000,48.0073849,0.1967849,nominatim,city,Le Mans,
+Espace du Narais,Saint-Mars-la-Brière,espacenarais,,All. des Châtaigniers,72470,48.0286803211158,0.382182526750326,manuel,exact,,
+Espace Faïence,Malicorne,espacefaience,,Rue Victor Hugo,72270,47.813164,-0.0833893,nominatim,exact,Malicorne Espace Faïence,
+Espace Henri Salvador,Le Mans,espacehenrisalvador,2,Place Jean-Claude Boulard,72190,48.0250891,0.2056839,nominatim,exact,Espace culturel Henri Salvador,
+Espace Ronsard,Le Mans,espaceronsard,,Escalier des Ponts Neufs,72000,48.0070847,0.1970721,nominatim,approximate,Jardin Pierre de Ronsard,
+Espace Saugonna,Mamers,espacesaugonna,2,Rue de la Gare,72600,48.3473279431225,0.364690218345867,manuel,exact,Saugonna,
+Espace Scélia,Sargé-lès-le-Mans,espacescelia,,Rue Didier Pironi,72190,48.0357033,0.2408021,nominatim,exact,Espace culturel Scelia,
+Espace Vègre et Champagne,Brûlon,espacevegreetchampagne,12,Route de Viré,72350,47.9729951575024,-0.237909585917734,manuel,exact,Salle Espace Vègre et Champagne,
+Esplanade de la Maison des Arts,Le Mans,esplanademaisonarts,,,72000,48.0073849,0.1967849,nominatim,city,Le Mans,
+Esplanade du Bicentenaire,Le Mans,esplanadebicentenaire,,Esplanade du Bicentenaire,72000,48.007151,0.1943517,nominatim,exact,Esplanade du Bicentenaire,
+Esplanade Nelson Mandela,Le Mans,esplanadenelsonmandela,,Rue George Sand,72530,48.0149098,0.2697582,nominatim,exact,Esplanade Nelson Mandela,
+"Esprit Barbara, café solidaire",Le Mans,espritbarbaracafesolidaire,,,,48.0020479,0.1959769,nominatim,approximate,L’esprit de Barbara,
+EVE - Scène universitaire,Le Mans,evesceneuniversitaire,,Avenue René Laennec,72000,48.0177064,0.1610047,nominatim,exact,EVE - scène universitaire,
+Ferme des Grues Rouges,Saint Saturnin,fermegruesrouges,,,72650,47.9367012395356,0.36101149503084,manuel,exact,,
+FIAA Le Mans,Le Mans,fiaamans,1,Rue Gambetta,72000,48.0037566762954,0.195545433660306,manuel,exact,Centre d'art FIAA,
+Forum FNAC,Le Mans,forumfnac,13,Rue Claude Blondeau,72000,48.0062680972098,0.199397984964277,manuel,exact,,
+Foyer Rural,Crosmières,foyerrural,,,,47.7454115,-0.1516105,nominatim,exact,Foyer rural,
+Foyer rural,Crosmières,foyerrural,,,,47.7454115,-0.1516105,nominatim,exact,Foyer rural,
+Foyer rural,Thorigné sur Dué,foyerrural,,,,48.0373658,0.5338283,nominatim,city,Thorigné-sur-Dué,
+Funky Toons Café,Le Mans,funkytoonscafe,,,,48.0073849,0.1967849,nominatim,city,Le Mans,
+Galerie Auchan,La Chapelle-Saint-Aubin,galerieauchan,,ZAC du Moulin aux Moines,72650,48.0427746052529,0.175364573612406,manuel,exact,Aushopping Le Mans,
+Gare TGV,Le Mans,garetgv,,,72000,47.9958120683416,0.192637473458077,manuel,exact,,
+Gite d'Asnières,Chahaignes,giteasnieres,,,72340,47.7349692,0.5343635,nominatim,exact,Gite d'Asnieres,
+Grape Bar,Le Mans,grapebar,2,Rue du Ah Ah,72000,48.0071501554739,0.191658393635702,manuel,exact,,
+Guinguette,Allonnes,guinguette,,,72700,47.969283,0.1578819,nominatim,city,Allonnes,
+Guinguette de la Gèmerie,Arnage,guinguettegemerie,,Rue de la Gemerie,72230,47.9426148887396,0.179810407812562,manuel,exact,,
+Gymnase,Bouloire,gymnase,,,,47.9724995,0.5524301,nominatim,city,Bouloire,1
+Gymnase,Montfort-le-Gesnois,gymnase,,,,48.049078,0.403157,nominatim,city,Montfort-le-Gesnois,1
+Gymnase,Yvré-l'Évêque,gymnase,,,,48.0168337,0.271732,nominatim,exact,Gymnase Halle de Brou,1
+Gymnase A. Fournier,Le Mans,gymnasefournier,,,,47.9867742,0.2151102,nominatim,approximate,Gymnase Alain Fournier,
+Gymnase André Malraux,Allonnes,gymnaseandremalraux,,Rue de Beau Soleil,72700,47.9555768,0.167663,nominatim,exact,Gymnase André Malraux,
+Hall d'Antarès,Le Mans,hallantares,2,Av. Antarès,72000,47.9562131028902,0.227167897861847,manuel,exact,,
+Halles,Beaumont-sur-Sarthe,halles,,,,48.2253475,0.130943,nominatim,exact,Halles,
+Halles,Château-du-Loir,halles,,,,47.6933321,0.4196319,nominatim,exact,Rue des Halles,
+Halles,La Ferté-Bernard,halles,,,,48.1851826,0.6539269,nominatim,exact,Halles Denis Béalet,
+Halles,Le Mans,halles,,Rue Barbier,72000,48.0038201,0.1940761,nominatim,exact,Courboulay,
+Halles,Mamers,halles,,,,48.278967,0.2224094,nominatim,exact,Halles,
+Hangar Créalab,Le Mans,hangarcrealab,,Rue d'Alger,72000,48.0017769,0.1931164,nominatim,exact,Hangar Crealab,
+HangArt,Coulans-sur-Gée,hangart,,Route Départementale 357,72550,48.0179024,0.0083108,nominatim,exact,Hangart,
+Hops Store,Saint-Saturnin,hopsstore,12,Rue des Petites Marnières,72650,48.0474175744427,0.171065926702909,manuel,exact,,
+Ibis hotel du centre,Le Mans,ibishotelcentre,2,Rue du Ah Ah,72000,48.0071501554739,0.191658393635702,manuel,exact,,
+Il était une fois...,Le Mans,iletaitunefois,,,,48.0073849,0.1967849,nominatim,city,Le Mans,
+Île aux Planches (pont de fer),Le Mans,ileplanchespontfer,,,,47.9987015,0.1877337,nominatim,approximate,Île aux Planches,
+Île de Moulinsart,Fillé,ilemoulinsart,,Rue du Canal,72210,47.8958010345319,0.127146778286207,manuel,exact,,
+Ile promenade Newton,Le Mans,ilepromenadenewton,,,72000,47.9875392010773,0.220445541477132,manuel,exact,,
+Itemm,Le Mans,itemm,71,Avenue Olivier Messiaen,72000,48.0146366,0.1548242,nominatim,exact,ITEMM,
+Jardin des plantes,Le Mans,jardinplantes,,Rue de l'Éventail,72000,48.0054267,0.2096007,nominatim,exact,Jardin des plantes,
+Jardin Potager,Le Mans,jardinpotager,,Impasse Villa de Tessé,72000,48.0102505,0.2043398,nominatim,exact,Potager,
+Jardins de la cathédrale,Le Mans,jardinscathedrale,,Avenue de Paderborn,72000,48.0092028,0.1996199,nominatim,exact,Futur jardin de la cathédrale,
+Jardins des Plantes,Saumur,jardinsplantes,,,,47.2856311,-0.1297576,nominatim,exact,Voyage des Plantes,
+Jim & Jump,Le Mans,jimetjump,3,Rue Louis Harel de la Noë,72000,48.0163852,0.1509024,nominatim,exact,Jim & Jump,
+Kiosque du jardin des Plantes,Le Mans,kiosquejardinplantes,,Jardin des Plantes,72000,48.0074415405949,0.209507622489775,manuel,exact,,
+Kiosque Mozaïc,Le Mans,kiosquemozaic,,Square des Ursulines,72000,48.005366651575,0.199450099101888,manuel,exact,,
+L.n.c,Le Mans,nc,,,,48.0073849,0.1967849,nominatim,city,Le Mans,
+L'Alambik MJC Ronceray,Le Mans,alambikmjcronceray,47,Bd de la Fresnellerie,72000,47.9701537555194,0.209919645895686,manuel,exact,,
+L'Arena,Coulaines,arena,1,Rue de Champ Fleuri,72190,48.0288016211013,0.200095769050923,manuel,exact,,
+L'Austral,Le Mans,austral,4,Place du 117e Régiment d'Infanterie,72000,48.011083,0.1819342,nominatim,exact,L'austral,
+L'Ebauche,Jupilles,ebauche,,,,47.7914398,0.4126408,nominatim,exact,L'Ébauche,
+L'Echappée,Champagné,echappee,,Rue Célestin Freinet,72470,48.0237557,0.3320482,nominatim,exact,L'Échappée,
+L'Elephant Pub,Le Mans,elephantpub,25,Rue d’Alger,72000,48.0021596962741,0.194898589736851,manuel,exact,,
+L'Entracte,La Flèche,entracte,40 ter,Rue Carnot,72200,47.6997136572458,-0.0748285143514468,nominatim,exact,L'entracte,
+L'Envol,La Bazoge,envol,22,Rue des Hortensias,72650,48.0957568121283,0.147525312985695,manuel,exact,L'Envol,
+L'Éolienne,Arnage,eolienne,,Allée du Bord de Sarthe,72230,47.9366712,0.1841403,nominatim,exact,Espace culturel l'Éolienne,
+L'Épicerie sur le Zinc,Le Mans,epiceriesurzinc,45,Avenue de la Libération,72000,48.0058613,0.1890035,nominatim,exact,,
+L'Escale,Le Mans,escale,,Rue des Fougères,72470,48.0083739,0.3314157,nominatim,exact,L'escale,
+L'Espal,Le Mans,espal,,Rue de l'Estérel,72100,47.9952547,0.2330647,nominatim,exact,L'Espal,
+L'Étable,Jauzé,etable,,,,48.2099964,0.3906852,nominatim,exact,Clos de L'Etable,
+L'Étoile du Nord,Le Mans,etoilenord,10,Rue du Nord,72000,48.005816713509,0.211466275309596,manuel,exact,,
+L'Herberie,Coulaines,herberie,,Rue de la Baule,72190,48.0235536,0.2007431,nominatim,exact,L'herberie,
+L'île aux Planches,Le Mans,ileplanches,,,,47.9987015,0.1877337,nominatim,approximate,Île aux Planches,
+L'Îlot Co,Saint-Georges-du-Bois,ilotco,1030,Rue de Souligné,72700,47.9720997458965,0.0870452647623998,nominatim,approximate,L'îlot de biodiversité de Marigny Le Lozon,
+L'Instinct,Le Mans,instinct,,Rue de Beaugé,72000,48.0129506,0.1498796,nominatim,exact,Restaurant À l'instinct,
+L'Inventaire,Le Mans,inventaire,97,Grande Rue,72000,48.0071594,0.1957478,manuel,exact,,
+L'Oasis,Le Mans,oasis,,Rue Jean Navarre,72100,47.9597745,0.2022957,nominatim,exact,L'Oasis,
+L'Olivier,Le Mans,olivier,,Place George Washington,72000,47.9959093,0.2029105,nominatim,exact,L'Olivier,
+L'Orée du bois,Le Mans,oreebois,,Chemin de Beauchene,72650,48.039266,0.1519688,nominatim,exact,Centre Saint-Christophe,
+L'Union Jack,Le Mans,unionjack,32,Rue du Docteur Leroy,72000,48.0022931266323,0.196217713981494,manuel,exact,,
+L'Utopitre,Le Mans,utopitre,6,Bd Paul d'Estournelles de Constant,72000,48.0161888851772,0.163662994171129,manuel,exact,,
+La bonne pioche,Marçon,bonnepioche,21,Pl. de l'Église,72340,47.7102818211005,0.510986892304681,manuel,exact,,
+La Brass'vie,Le Mans,brassvie,3,Pl. André Ricordeau,72000,47.7905903412156,0.413523640180809,manuel,exact,,
+La Bulle,Le Mans,bulle,,Rue de l'Hôtel de Ville,72230,47.9265284,0.189545,nominatim,exact,Salle des fêtes La Bulle,
+La Capitainerie,Le Mans,capitainerie,101,Quai Amiral Lalande,72000,48.001718973353,0.189310243282101,nominatim,exact,La Capitainerie,
+La Capsule,Le Mans,capsule,137,Av. de la Libération,72000,48.0036287701513,0.186657054251506,manuel,exact,,
+La Casa,Le Mans,casa,40 ter,Rue des Maillets,72000,48.0122052256265,0.205743229000637,manuel,exact,,
+La Castélorienne,Montval-sur-Loir,castelorienne,,,,47.6882764,0.4148908,nominatim,exact,La Castélorienne,
+La Chaperie,Guécélard,chaperie,3,Route aux Lièvres,72230,47.8926560618961,0.147014512696427,manuel,exact,,
+La Chicane,Le Mans,chicane,,Bd Robert Schuman,72000,47.9904849573143,0.231289401968919,manuel,exact,,
+La Citadelle des Anges,Teloché,citadelleanges,,La Roche,72220,47.8813145319757,0.277542365327285,manuel,exact,,
+La Cité du cirque,Le Mans,citecirque,,Boulevard Winston Churchill,72100,47.9860917,0.2120548,nominatim,approximate,Le Plongeoir - Cité du Cirque,
+La flambée,Le Mans,flambee,28,Rue des Ponts Neufs,72000,48.0068282,0.1977053,nominatim,exact,La Flambée,
+La Fonderie,Le Mans,fonderie,,Rue Saint-Pavin des Champs,72000,48.0069461,0.1886115,nominatim,exact,La Fonderie,
+La Fosse jouanette,Saint-Pierre-du-Lorouër,fossejouanette,,,72150,47.8005453920473,0.509158588052552,manuel,exact,,
+La grange Dimeresse,Évron,grangedimeresse,,,,48.1579797,-0.4016596,nominatim,exact,Ruelle de la Grange Dîmeresse,
+La guinguette des Tanneries,Le Mans,guinguettetanneries,,Quai Louis Blanc,72000,48.0080212,0.1936012,nominatim,approximate,Guinguette des tanneries,
+La Halte Mancelle,Le Mans,haltemancelle,6,Rue Jeanne d'Arc,72000,48.0019968,0.2095558,nominatim,exact,La Halte Mancelle,
+La Longère,Le Mans,longere,,Chemin de L'Ebrarderie,72380,48.1188496,0.1892209,nominatim,exact,La Longère,
+La Maison Café,Le Mans,maisoncafe,5,Rue Victor Bonhommet,72000,48.0049746296569,0.196387527596196,manuel,exact,,
+La Passerelle,Connerré,passerelle,40 ter,Av. Carnot,72160,48.0610257172619,0.492237441684012,manuel,exact,,
+La Péniche Excelsior,Allonnes,penicheexcelsior,,,72700,47.9754699332366,0.160959827932411,manuel,exact,La Péniche Excelsior,
+La pince à vélo,Le Mans,pincevelo,,Rue du 8 Mai,72220,47.8890194,0.268298,nominatim,exact,La Pince à Vélo,
+La Piraterie,Le Mans,piraterie,90,Quai Amiral Lalande,72000,48.0030571392161,0.189766662510787,manuel,exact,,
+La Pléiade,Bessé-sur-Braye,pleiade,,,72310,47.8328641979251,0.753517362429581,nominatim,exact,La Pléiade,
+La Ruche,Le Mans,ruche,,Avenue Rubillard,72000,48.0134129,0.1752376,nominatim,exact,La Ruche (Nouvel internat du CH du Mans),
+La Sandwicherie,Le Mans,sandwicherie,17,Rue du Cornet,72000,48.0051724584758,0.195228829810334,manuel,exact,,
+La Saynète,Le Mans,saynete,,,,48.0073849,0.1967849,nominatim,city,Le Mans,
+La Sirène,Le Mans,sirene,15,Rue Claude Blondeau,72000,48.0064957,0.1987274,nominatim,exact,La Sirène,
+La Source,Le Mans,source,7,Rue Pasteur,72000,48.0056332614617,0.192730118785285,manuel,exact,,
+La Visitation,Le Mans,visitation,11,Rue Barbier,72000,48.0037179,0.1936164,nominatim,exact,La Visitation,
+Lac de la Monnerie,La Flèche,lacmonnerie,,,72200,47.6977483798362,-0.0496326804238963,manuel,exact,,
+Le 108,Le Mans,108,,,,48.0073849,0.1967849,nominatim,exact,Le Mans,
+Le Bacchus,La Ferté-Bernard,bacchus,3,Rue Robert Garnier,72400,48.1868769834014,0.65486473951596,manuel,exact,,
+Le Backstage,Le Mans,backstage,32,Rue du Docteur Leroy,72000,48.0022931266323,0.196217713981494,manuel,exact,,
+Le Bakoua,Le Mans,bakoua,,Rue de la Galère,72000,48.0056916292848,0.194710410194579,manuel,exact,,
+Le Barouf,Le Mans,barouf,8,Rue Victor Bonhommet,72000,48.0050459,0.1965375,nominatim,exact,Le Barouf,
+Le bourg,Le Mans,bourg,,Chemin du Petit Large,72000,47.98301,0.161243,nominatim,exact,Le Bourg,
+Le Box Café,Le Mans,boxcafe,13,Pl. de l'Éperon,72000,48.0052277887577,0.194922596017709,manuel,exact,,
+Le Café Crème,Le Mans,cafecreme,2,Rue de la Barillerie,72000,48.0064323,0.1983416,nominatim,approximate,Café Crème,
+Le Café de la Gare,Le Mans,cafegare,,Rue d'Eichthal,72000,47.9998962,0.1962612,nominatim,exact,Le bistro des copains,
+Le Café Noir,Le Mans,cafenoir,22,Rue du Docteur Leroy,72000,48.0028206724181,0.196367151840918,manuel,exact,,
+Le Carroi,La Flèche,carroi,27,Rue Grollier,72200,47.6987938667276,-0.0730756697830832,manuel,exact,Le Carroi,
+Le Caveau,Le Mans,caveau,32,Rue du Docteur Leroy,72000,48.002410551079,0.1961432266739,nominatim,approximate,Caveau Letenneur,
+Le Chapiteau - Cité du cirque,Le Mans,chapiteaucitecirque,6,Boulevad Winston Churchill,72000,47.9867495776273,0.212567761076169,manuel,exact,,
+Le chapiteau du Plongeoir,Le Mans,chapiteauplongeoir,6,Boulevad Winston Churchill,72000,47.9867495776273,0.212567761076169,manuel,exact,,
+Le Circuit de la Bière,Le Mans,circuitbiere,,Route de Tours,72000,47.9511029705554,0.230411548298211,manuel,exact,,
+Le Comptoir,Le Mans,comptoir,10,Rue de la Barillerie,72000,48.0062700810521,0.197978680647803,manuel,exact,,
+Le Courmesnil,Loué,courmesnil,,,,47.9945515,-0.1555455,nominatim,exact,Centre culturel le Courmesnil,
+Le Guet à Pintes,Le Mans,guetpintes,14,Rue du Cornet,72000,48.0048966,0.1955588,nominatim,exact,Le Guet à Pintes,
+Le Happy Days,Le Mans,happydays,4,rue des Maillets,72000,48.0122366172221,0.205975734129413,manuel,exact,Happy Days,
+Le jardin du Plongeoir,Le Mans,jardinplongeoir,6,Boulevad Winston Churchill,72000,47.9867495776273,0.212567761076169,manuel,exact,,
+Le Kaléidoscope,Le Mans,kaleidoscope,9,Rue du Cantal,72100,47.9915298,0.2215256,nominatim,exact,Centre social Le Kaléidoscope,
+Le La Ré Do,Sillé-le-Guillaume,redo,17,Place de la République,72140,48.1828985865467,-0.129013388711254,manuel,exact,La Re Do,
+Le Labo Sonore,Chérisay,labosonore,,,72610,48.3496403738005,0.12149540005251,manuel,exact,,
+Le Lapin Blanc,Le Mans,lapinblanc,5,Rue Dorée,72000,48.0057584,0.1944124,nominatim,exact,Le Lapin Blanc,
+Le Lézard,Le Mans,lezard,8,Rue de la Barillerie,72000,48.0063339,0.1981193,nominatim,exact,Le Lézard,
+Le Local à Bières,Le Mans,localbieres,,Rue Ernest Sylvain Bollée,72230,47.9507449,0.1803088,nominatim,exact,Le local à bières,
+Le Mac Kinley,Le Mans,mackinley,,Rond-point Université,72000,48.013755512991,0.163914794170971,manuel,exact,,
+Le Mackeson,Le Mans,mackeson,42,Rue du Port,72000,48.0031106898569,0.193885520048336,manuel,exact,,
+Le Manhattan Café,Le Mans,manhattancafe,21,Rue du Docteur Leroy,72000,48.0026772550906,0.195973377718768,manuel,exact,,
+Le Mans Innovation,Le Mans,mansinnovation,57,Bd Demorieux,72000,47.9936693080735,0.186889494890395,manuel,exact,,
+Le Mans plage,Le Mans,mansplage,,All. des Prairies de Funay,72000,47.9894172932522,0.22570619802332,nominatim,exact,,
+Le Milwaukee,Le Mans,milwaukee,42,Rue des Ponts Neufs,72000,48.0066814584985,0.19807609121453,manuel,exact,,
+Le Moloko,Le Mans,moloko,37,Av. Bollée,72000,48.0030397355531,0.205485048146415,manuel,exact,,
+Le Mulligan,Le Mans,mulligan,,Rue Greffier,72000,48.0017928,0.1965937,nominatim,exact,Le Mulligan's,
+Le New Lord's,Le Mans,newlords,32,Place des Comtes du Maine,72000,48.0046418167254,0.201416403673576,manuel,exact,,
+Le New York Coffee,Le Mans,newyorkcoffee,,,72000,48.0146069891178,0.161452377045254,manuel,exact,,
+Le Palace,Le Mans,palace,4,Rue Joseph Caillaux,72650,48.0522073,0.1649806,nominatim,approximate,Quick Palace,
+Le Palais,Le Mans,palais,2,Rue Gambetta,72000,48.0045362069289,0.195439093641625,nominatim,exact,Le Palais,
+Le Passeport,Le Mans,passeport,25,Rue d'Alger,72000,48.00213808601,0.195145334825893,manuel,exact,,
+Le Pâtis,Le Mans,patis,,Rue du Colonel Raynal,72000,47.9996924,0.1856836,nominatim,exact,Le Pâtis,
+Le Petit Pousset,Chahaignes,petitpousset,,,,47.7416369,0.5149056,nominatim,city,Chahaignes,
+Le Pilier Rouge,Le Mans,pilierrouge,,Rue du Pilier Rouge,72000,48.0082773,0.1970308,nominatim,exact,Le Pilier Rouge,
+Le Plongeoir,Le Mans,plongeoir,6,Boulevard Winston Churchill,72100,47.9869609,0.2124284,nominatim,exact,Le Plongeoir,
+Le Port,Le Mans,port,,Chemin Rural de la Châtaigneraie,72530,48.0186939,0.2777374,nominatim,exact,Le Port,
+Le Portland Pub,Le Mans,portlandpub,32,Rue du Port,72000,48.0032353350964,0.1948925978648,manuel,exact,,
+Le Quai des Arts,Vibraye,quaiarts,,,,48.064779,0.7273444,nominatim,exact,Le Quai des Arts,
+Le Rabelais,Changé,rabelais,1,Pl. Victor Hugo,72560,47.9854376434055,0.283948551270323,nominatim,exact,Le cour de Rouillon,
+Le RDV,Le Mans,rdv,,,,48.0073849,0.1967849,nominatim,city,Le Mans,
+Le Road House,Le Mans,roadhouse,101,Av. du Général Leclerc,72000,47.9963403362607,0.193874597864362,manuel,exact,,
+Le Shaker,Le Mans,shaker,32,Rue du Port,72000,48.0032353350964,0.1948925978648,manuel,exact,Le Shaker & co ,
+Le Silo,Le Mans,silo,,Rue François Monier,72100,47.9532972,0.1869399,nominatim,exact,Le Silo,
+Le Spot,Le Mans,spot,5,Rue Louis Harel de la Noë,72000,48.0165608,0.1503084,nominatim,exact,Le Spot,
+Le St Barth,La Ferté-Bernard,stbarth,18,Rue Thiers,72400,48.1855993402947,0.657350995890908,manuel,exact,,
+Le Stan,Le Mans,stan,2,Pl. de l'Éperon,72000,48.0051611763479,0.19605729352017,manuel,exact,,
+Le Sun Rock Avenue,Le Mans,sunrockavenue,54,Avenue de la Libération,72000,48.0051473917375,0.187747403038558,manuel,exact,,
+Le Terminus,Le Mans,terminus,1,Place du 117e Régiment d'Infanterie,72000,48.0107778,0.1820376,nominatim,exact,Le Terminus 117,
+Le Val de Vray,Le Mans,valvray,,Rue de l'Église,72650,48.0613392,0.1546836,nominatim,approximate,Val de Vray,
+Le Val'Rhonne,Moncé-en-Belin,valrhonne,,Allée de l'Europe,72650,47.8919630595936,0.202238813097587,manuel,exact,,
+Le Vaud',Le Mans,vaud,,Grande Rue,72000,48.008075,0.1964926,nominatim,exact,Le Vaud',
+Le Verre Tige,Le Mans,verretige,,Escalier de la Pierre de Tucé,72000,48.0083463,0.1965967,nominatim,exact,Le Verre Tige,
+Le Viking's,Le Mans,vikings,25,Rue d'Alger,72000,48.00213808601,0.195145334825893,manuel,exact,,
+Le Vintage,Le Mans,vintage,,Allée du Bourg d'Anguy,72000,48.0037339,0.1988477,nominatim,approximate,Vintage Store,
+Le Wagon,Le Mans,wagon,8,Rue Victor Bonhommet,72000,48.0050459,0.1965375,manuel,exact,,
+Le Zoo,Le Mans,zoo,38,Rue du Port,72000,48.0029954,0.1941222,nominatim,exact,Le Zoo,
+Les 3 mousses,Le Mans,3mousses,4,Route de Sillé-le-Guillaume,72650,48.078331,0.1154566,nominatim,exact,Les 3 mousses,
+Les Allumés du jazz,Le Mans,allumesjazz,,Rue de la Galère,72000,48.0062096,0.1928736,nominatim,exact,Les Allumés du Jazz,
+Les Amazones,Le Mans,amazones,,Boulevard Jean-Jacques Rousseau,72100,47.9760841,0.2021583,nominatim,exact,Les Amazones Club,
+Les Atlantides,Le Mans,atlantides,,Avenue de Volos,72100,47.9881846,0.225766,nominatim,exact,Centre Aquatique Les Atlantides,
+Les Cinéastes,Le Mans,cineastes,,Place des Comtes du Maine,72000,48.0042916,0.2002933,nominatim,exact,Les Cinéastes / Cinéma d'art & d'essai,
+Les Docks,Le Mans,docks,,Quai Amiral Lalande,72000,48.0048253291164,0.189900020683983,manuel,exact,,
+Les Fêlés du Bocal,Le Mans,felesbocal,198,Rue nationale,72000,47.9960719439807,0.201078874413394,manuel,exact,,
+Les Filo Folie's,Le Mans,filofolies,,,,48.0073849,0.1967849,manuel,exact,,
+Les Jardins de Belle Garde,Savigné-l'Évêque,jardinsbellegarde,,Bellegarde,72460,48.0906270583291,0.312386425064106,manuel,exact,,
+Les Métairies,Allonnes,metairies,,Voie Verte des Bords de la Sarthe,72700,47.9598958,0.173158,nominatim,exact,Les Métairies,
+Les moulins de Paillard,Poncé-sur-le-Loir,moulinspaillard,,Lieu-dit Les Moulins de Paillard,72340,47.7597490567728,0.655264262994951,manuel,exact,,
+Les prés Marais,Saint-Mard-de-Réno,presmarais,,,,48.5085826,0.6345833,nominatim,exact,Les Prés Marais,
+Les Quinconces,Le Mans,quinconces,,Place des Jacobins,72000,48.0078156,0.2007998,nominatim,exact,Centre culturel « Les Quinconces - L'Espal »,
+Les Quinconces - grand théâtre,Le Mans,quinconcesgrandtheatre,4,Place des Jacobins,72000,48.0081834948847,0.200973149994019,manuel,exact,,
+Les Quinconces – petit Théâtre,Le Mans,quinconcespetittheatre,4,Place des Jacobins,72000,48.0081834948847,0.200973149994019,manuel,exact,,
+Les Saulnières,Le Mans,saulnieres,239,Avenue Rhin et Danube,72000,48.02025,0.1824686,nominatim,exact,Les Saulnières,
+Les Subsistances,Le Mans,subsistances,165,Rue de la Foucaudière,72000,47.9777649489371,0.199276424287986,manuel,exact,,
+Les Tourettes,Torcé-en-Vallée,tourettes,,,,48.1348728,0.4153642,nominatim,exact,Les Tourettes,
+Libertà,Le Mans,liberta,,Rue Gambetta,72000,48.0041716,0.1947012,nominatim,exact,Liberta,
+Librairie Thuard,Le Mans,librairiethuard,24,Rue de l'Étoile,72000,48.0055392,0.2007554,nominatim,exact,Librairie Thuard,
+Lieu-dit Asnières,Le Mans,lieuditasnieres,,,,47.9442386,0.6390315,nominatim,approximate,Ancienne Route du Mans à Saint-Calais,
+Lieu-dit Le Buron,Le Mans,lieuditburon,,,,47.9442386,0.6390315,nominatim,approximate,Ancienne Route du Mans à Saint-Calais,
+Local des As,Le Mans,Saint-Jacques,,,,48.0037768,0.1616042,nominatim,approximate,TDF Le Mans sud 2 - local,
+Lycée André Malraux,Allonnes,lyceeandremalraux,,Rue des Muloteries,72700,47.9571368,0.1671889,nominatim,exact,Lycée André Malraux,
+Maine Saonnois,Le Mans,mainesaonnois,,,,48.0073849,0.1967849,nominatim,city,Le Mans,
+mairie,La Fontaine-Saint-Martin,mairie,,,,47.7910412,0.0503336,nominatim,exact,Place de la Mairie,1
+mairie,Yvré-l'Évêque,mairie,,,,48.0139586,0.2706215,nominatim,exact,Mairie d'Yvré-l'Évêque,1
+Maison Albert,Le Mans,maisonalbert,14,Rue Albert Maignan,72000,48.0055392,0.2028218,nominatim,approximate,Rue Albert Maignan,
+Maison de l'Eau,Le Mans,maisoneau,51,Rue de l'Estérel,72100,47.994184,0.2364439,nominatim,exact,Maison de l’Eau (Arche de la Nature),
+Maison de quartier Barbara,Le Mans,maisonquartierbarbara,,Allée de l'Aigle Noir,72100,47.9858515,0.2128882,nominatim,exact,Maison de quartier Barbara,
+Maison de quartier Charles Trénet,Le Mans,maisonquartiercharlestrenet,,Rue Alfred de Vigny,72000,47.9994099,0.23038,nominatim,exact,Maison de quartier Charles Trenet,
+Maison de quartier Georges Moustaki,Le Mans,maisonquartiergeorgesmoustaki,,Rue des Cerisiers,72000,48.0170011,0.215484,nominatim,exact,Maison de quartier Georges Moustaki,
+Maison de quartier l'Oiselière,Le Mans,maisonquartieroiseliere,,Rue d'Isaac,72000,48.0148554,0.2257937,nominatim,exact,Maison de quartier l'Oiselière,
+Maison de quartier Les Aloès,Le Mans,maisonquartieraloes,,,,47.9969912,0.2002327,nominatim,approximate,Maison de quartier René Clair,
+Maison de quartier Les Ardriers,Le Mans,maisonquartierardriers,,,,47.9969912,0.2002327,nominatim,approximate,Maison de quartier René Clair,
+Maison de quartier Les Bruyères,Le Mans,maisonquartierbruyeres,,Cour des Érables,72100,47.978831,0.2315293,nominatim,exact,Maison de quartier des Bruyères,
+Maison de quartier Pierre Guédou,Le Mans,maisonquartierpierreguedou,,Rue du Pont,72100,47.9886932,0.195881,nominatim,exact,Maison de quartier Pierre Guédou,
+Maison des arts,Allonnes,maisonarts,,Rue Georges Bizet,72700,47.9699093,0.1640865,nominatim,exact,Maison des arts Mélinée et Missak Manouchian,
+Maison des chemins creux,Coulaines,maisoncheminscreux,,Rue des Vignes,72190,48.0288184,0.2102631,nominatim,exact,Maison des Chemins Creux,
+Maison des habitants,Le Mans,maisonhabitants,,Hameau du Poitou,72700,47.9526169,0.1663573,nominatim,exact,Salle Barbara,
+Maison du Temps Libre,Fercé-sur-Sarthe,maisontempslibre,,Rue des Avelines,72430,47.9000145338689,-0.0324246451020068,manuel,exact,,
+Marché de la cité des Pins,Le Mans,marchecitepins,,Place Raymond Adelet,72100,47.9683929,0.2048038,nominatim,exact,Marché de la Cité des Pins,
+Marché des jacobins,Le Mans,marchejacobins,,Avenue de Paderborn,72000,48.008396,0.1989013,nominatim,exact,Marché des Jacobins,
+Médiathèque,Allonnes,mediatheque,,,,47.9678072,0.1604197,nominatim,exact,Médiathèque Louise Michel,1
+Médiathèque,Arnage,mediatheque,,,,47.936736,0.184418,nominatim,exact,Médiathèque municipale Simone de Beauvoir,1
+Médiathèque,Bouloire,mediatheque,,,,47.9739105,0.5536616,nominatim,exact,Médiathèque,1
+Médiathèque,Champagné,mediatheque,,Rue Célestin Freinet,72470,48.0237557,0.3320482,manuel,exact,Médiathèque,1
+Médiathèque,Cérans-Foulletourte,mediatheque,,,,47.8281355,0.0785903,nominatim,exact,Médiathèque,1
+Médiathèque,Le Mans,mediatheque,,,,48.002921,0.1919093,nominatim,exact,Médiathèque,1
+Médiathèque,Loué,mediatheque,,,,47.9965376,-0.1511977,nominatim,city,Loué,1
+Médiathèque,Noyen-sur-Sarthe,mediatheque,,,,47.8727385,-0.0997184,nominatim,exact,Médiathèque,1
+Médiathèque,Sablé-sur-Sarthe,mediatheque,,,,47.8444116,-0.3302413,nominatim,exact,Médiathèque Intercommunale - Espace Reverdy,1
+Médiathèque,Saint-Calais,mediatheque,,Pl. de L Hôtel de ville,72120,47.9206148313611,0.743099955665289,manuel,exact,,
+Médiathèque,Sillé-le-Guillaume,mediatheque,,,,48.1835166,-0.125854,nominatim,exact,Médiathèque la Tannerie,1
+Médiathèque George Sand,Le Mans,mediathequegeorgesand,1,Place George Sand,72530,48.0142124,0.2713988,nominatim,exact,Médiathèque George Sand,
+Médiathèque Louis Aragon,Le Mans,mediathequelouisaragon,,Rue du Port,72000,48.002887,0.1926403,nominatim,exact,Médiathèque Louis Aragon,
+Médiathèque modularium,Le Mans,mediathequemodularium,,,,48.0073849,0.1967849,nominatim,city,Le Mans,
+MJC Jacques Brel,Arnage,mjcjacquesbrel,67,Rue des Collèges,72230,47.9369120511961,0.184480584391633,manuel,exact,,
+MJC Prévert,Le Mans,mjcprevert,,,72000,48.0071594,0.1957478,nominatim,approximate,M.J.C. Prévert,
+Moulin du Blaireau,Piacé,moulinblaireau,7 bis,Rue de l'Église,72170,48.2590365720805,0.115187292339169,manuel,exact,,
+MPT Jean Moulin,Le Mans,mptjeanmoulin,,,,47.9749063,0.2201096,nominatim,approximate,Maison pour tous Jean Moulin,
+Mur plein champ Tessé,Le Mans,murpleinchamptesse,2,Avenue de Paderborn,72000,48.0103836672441,0.20408379786526,manuel,exact,,
+Musée de la musique mécanique,Dollon,museemusiquemecanique,12,Grande Rue,72390,48.0386912070186,0.588092583016257,manuel,exact,,
+Musée de Tessé,Le Mans,museetesse,2,Avenue de Paderborn,72000,48.0102902,0.203547,nominatim,exact,Musée de Tessé,
+Musée Jean-Claude Boulard,Le Mans,museejeanclaudeboulard,2,Rue Claude Blondeau,72000,48.0071116,0.1981579,nominatim,exact,Musée Jean-Claude-Boulard / Carré Plantagenêt,
+Notre-Dame de la Couture,Le Mans,notredamecouture,22,Rue Berthelot,72000,48.0023280638939,0.200564680258251,manuel,exact,,
+Ô Bord du Loir,Thorée les Pins,obordloir,1,Lieu dit Camping,72800,47.6966519619695,0.0577643436486052,manuel,exact,La Bamboche du Loir,
+Palais des Congrès,Le Mans,palaiscongres,,Rue Paul Ligneul,72000,47.9997257,0.1922223,nominatim,exact,Palais des Congrès,
+Parc de l'Épine,Le Mans,parcepine,,Rue de Chinon,72000,48.0202902,0.1773929,nominatim,exact,Parc Roland et Annette Becdelièvre,
+Parc de l'Huisne,Le Mans,parchuisne,,Route de Paris,72530,48.0034171,0.2592087,nominatim,exact,Papéa Parc,
+Parc de la Gironde,Coulaines,parcgironde,,Rue Jean-Claude Boulard,72190,48.025249,0.2073304,nominatim,exact,Parc de la Gironde,
+Parc de la mairie,Cures,parcmairie,,,72240,48.100620381119,-0.00430936216400422,manuel,exact,,
+Parc de la résidence autonomie,Le Mans,parcresidenceautonomie,183,Quai Ledru-Rollin,72000,48.0133872202536,0.197752524154689,manuel,exact,,
+Parc de Tessé,Le Mans,parctesse,,Avenue de Paderborn,72000,48.0098732,0.2037429,nominatim,exact,Jardin du musée de Tessé,
+Parc de Vaurouzé,Le Mans,parcvaurouze,,,72000,48.0164943013963,0.169773138543051,manuel,exact,,
+Parc des 3 vallées,Le Mans,parc3vallees,,,,48.0265446,0.2171749,nominatim,approximate,Parc des Trois Vallées,
+Parc des Carmes,La Flèche,parccarmes,,,,47.6963479,-0.0729279,nominatim,exact,Parc des Carmes,
+Parc des Touches,Brains-sur-Gée,parctouches,,,72550,48.0128036759634,-0.0188555025508275,manuel,exact,,
+Parc du château,Le Mans,parcchateau,,Rue Robert Triger,72000,48.0100439,0.1993346,nominatim,exact,Square du Château,
+Parc du Gué de Maulny,Le Mans,parcguemaulny,,Chemin de la Prairie,72100,47.9901934,0.1856633,nominatim,exact,Parc du Gué-de-Maulny,
+"Parc du Petit Train, rue Pierre Levegh",Le Mans,parcpetittrainruepierrelevegh,,,,47.9634803,0.1047268,nominatim,approximate,Le Petit Parc,
+Parc face au chateau,Le Mans,parcfacechateau,,,,48.0073849,0.1967849,nominatim,city,Le Mans,
+Parc Gabriel Paillereau,Allonnes,parcgabrielpaillereau,12,Rue Charles Darwin,72700,47.9743142311417,0.147575689916804,manuel,exact,,
+Parc Jean du Bellay,Yvré-l'Évêque,parcjeanbellay,,Rue de Parence,72530,48.0175782,0.2750064,nominatim,exact,Parc Jean du Bellay,
+Parc Théodore Monod,Le Mans,parctheodoremonod,,Rue Théodore Monod,72000,48.0113046,0.1807363,nominatim,exact,Parc Théodore Monod,
+Parking des Quinconces,Le Mans,parkingaerienquinconces,,,,48.0084498,0.2021442,nominatim,approximate,Parking aérien P1,
+Parking Quinconces,Le Mans,parkingquinconces,,Place des Jacobins,72000,48.0077348795686,0.19963677772103,manuel,exact,,
+Parking rotonde du CROUS,Le Mans,parkingrotondecrous,,,72000,48.0161999798413,0.165789034875396,manuel,exact,,
+Partout en ville,Le Mans,partoutenville,,,,48.0073849,0.1967849,nominatim,city,Le Mans,
+Parvis de l'espace du Narais,Saint-Mars-la-Brière,parvisespacenarais,,Allée des Châtaigniers,72470,48.0288238210427,0.382718967183835,manuel,exact,,
+Parvis de l'Espal,Le Mans,parvisespal,,Rue de l'Estérel,72000,47.9950704681343,0.23216925594334,manuel,exact,,
+Parvis de la maison des Arts,Le Mans,parvismaisonarts,,,,48.0073849,0.1967849,nominatim,city,Le Mans,
+Parvis des Quinconces,Le Mans,parvisquinconces,,Place des Jacobins,72000,48.0077348795686,0.19963677772103,manuel,exact,,
+Passerelle des Atlantides,Le Mans,passerelleatlantides,,,72000,47.9894214072152,0.225140535090694,manuel,exact,,
+Pirate Café,Le Mans,piratecafe,46,Rue du Port,72000,48.0030439686215,0.193655220048324,manuel,exact,,
+Place d'Alger,Le Mans,placealger,,Place d'Alger,72000,48.0020997,0.1939267,nominatim,exact,Place d'Alger,
+Place de l'Eglise,Montfort-le-Gesnois,placeeglise,,,,48.049078,0.403157,nominatim,city,Montfort-le-Gesnois,
+Place de l'église,Allonnes,placeeglise,,,,47.9685779,0.1546606,nominatim,exact,Place de l'Église,
+Place de l'église,Champagné,placeeglise,,,,48.0262995,0.3324422,nominatim,exact,Place de l'Église,
+Place de l'église,Connerré,placeeglise,,,,48.0604578,0.4933923,nominatim,city,Connerré,
+Place de l'église,Fercé-sur-Sarthe,placeeglise,,,,47.90155,-0.0308953,nominatim,exact,Place de l'Église,
+Place de l'église,Fillé,placeeglise,,,,44.7676836,-1.1393485,nominatim,approximate,La fille du barbu,
+Place de l'église,La Bazoge,placeeglise,,,,48.0989559,0.1544523,nominatim,city,La Bazoge,
+Place de l'église,Le Mans,placeeglise,,Rue des Ponts,72380,48.1186574,0.1827067,nominatim,exact,Place de l'Église,
+Place de l'église,Marolles-les-Braults,placeeglise,,,,48.252152,0.3133522,nominatim,exact,Place de l'Église,
+Place de l'église,Saint-Jean-du-Bois,placeeglise,,,,47.8705619,-0.0390691,nominatim,exact,Place de l'Église,
+Place de l'église,Sillé-le-Philippe,placeeglise,,,,48.1069075,0.3520896,nominatim,city,Sillé-le-Philippe,
+Place de l'église,Tresson,placeeglise,,,,47.9037815,0.5731669,nominatim,city,Tresson,
+Place de l'église,Volnay,placeeglise,,,72370,47.9750725747287,0.461413495948073,nominatim,exact,Place de l'Église,
+Place de l'Europe,Coulaines,placeeurope,,Place de l'Europe,72190,48.0227483,0.2079682,nominatim,exact,Place de l'Europe,
+Place de la Boussinière,Le Mans,placeboussiniere,,Rue Philippe,72000,48.0135857,0.1898843,nominatim,exact,Place Édouard de la Boussinière,
+Place de la gare,Le Mans,placegare,,,,47.9287945,0.1894404,nominatim,exact,Place de la Gare,
+Place de la liberté,Lavernat,placeliberte,,,72500,47.7181770900507,0.3334796305678,manuel,exact,,
+Place de la mairie,Allonnes,placemairie,,,72700,47.9686963923128,0.16114016862314,manuel,exact,,
+Place de la mairie,Champagné,placemairie,,,,48.0211884081562,0.330528068890077,nominatim,exact,Place de la Mairie,1
+Place de la mairie,Le Mans,placemairie,,,,47.9723521,0.0999677,nominatim,exact,Place de la Mairie,1
+Place de la Mairie,Loué,placemairie,,,,47.9965376,-0.1511977,nominatim,city,Loué,1
+Place de la mairie,Yvré-l'Évêque,placemairie,,,,48.0137909,0.270926,nominatim,city,Yvré-l'Évêque,1
+Place de la paix,Le Mans,placepaix,,Place de la Paix,72700,47.9685071,0.1553824,nominatim,exact,Place de la Paix,
+Place de la république,Le Mans,placerepublique,40 ter,Place de la République,72000,48.0041261,0.1964694,nominatim,exact,Place de la République,
+Place de la Sirène,Le Mans,placesirene,,Place de la Sirène,72000,48.0063251,0.1985369,nominatim,exact,Place de la Sirène,
+Place des jacobins,Le Mans,placejacobins,,Place des Jacobins,72000,48.0078156,0.2007998,nominatim,exact,Centre culturel « Les Quinconces - L'Espal »,
+Place des Quinconces,Le Mans,placequinconces,,Place des Jacobins,72000,48.0078156,0.2007998,nominatim,exact,Centre culturel « Les Quinconces - L'Espal »,
+Place des Sablons,Le Mans,placesablons,41,Place des Sablons,72100,47.9911977,0.2228603,nominatim,exact,Place des Sablons,
+Place du Cardinal Grente,Le Mans,placecardinalgrente,4,Place du Cardinal Grente,72000,48.0098766,0.1983016,nominatim,exact,Place du Cardinal Grente,
+Place du Jet d'eau,Le Mans,placejeteau,,Avenue de Paderborn,72000,48.0083364,0.1987985,nominatim,exact,Place du Jet d'Eau,
+Place du Kiosque,Le Lude,placekiosque,,,72800,47.6572143,0.1551409,nominatim,city,Le Lude,
+Place du Mail,Allonnes,placemail,,Place du Mail,72700,47.9694701,0.160113,nominatim,exact,Place du Mail,
+Place du marché,Le Mans,placemarche,,Place du Marché,72220,47.8783115,0.2272179,nominatim,exact,Place du Marché,
+Place du marché des Sablons,Le Mans,placemarchesablons,,,,47.8783115,0.2272179,nominatim,approximate,Place du Marché,
+Place Henri IV,La Flèche,placehenriiv,,Place Henri IV,72220,47.6992910699391,-0.0752667874278986,nominatim,exact,Place Henri IV,
+Place Saint Nicolas,Le Mans,placesaintnicolas,13,Place Saint-Nicolas,72000,48.0053534,0.1984797,nominatim,exact,Place Saint-Nicolas,
+Place St Michel,Le Mans,placestmichel,2,Place Saint-Michel,72000,48.0092268,0.1982686,nominatim,exact,Place Saint-Michel,
+Place St Pierre,Le Mans,placestpierre,,,,48.0073431,0.1966481,nominatim,exact,Place Saint-Pierre,
+Plaine de Chaoué,Allonnes,plainechaoue,,Rue du Moulin de Chaoué,72700,47.9724614733402,0.16634531002806,manuel,exact,,
+Plaine de jeux,Le Mans,plainejeux,,Avenue Jean Jaurès,72560,47.9836843,0.2830817,nominatim,exact,Plaine de jeux François Mitterrand,
+Plaine du Ronceray,Le Mans,plaineronceray,,Allée Beethoven,72100,47.9710963,0.2078324,nominatim,exact,Plaine du Ronceray,
+Plaine du Val’Rhonne,Moncé-en-Belin,plaineval’rhonne,,Allée de l'Europe,72230,47.8919343577341,0.202324653925616,manuel,exact,,
+Plaine du verger,Changé,plaineverger,,,72560,47.9891967032938,0.249406489360025,nominatim,exact,Plaine du Verger,
+Plan d'eau,Le Mans,planeau,,Rue Auguste de Clinchamp,72560,47.9913672,0.2901824,nominatim,exact,Plan d'eau communal,
+Pôle culturel,Le Mans,poleculturel,,,,48.0073849,0.1967849,nominatim,city,Le Mans,
+Pont romain,Le Mans,pontromain,1,Chemin de Réveillon,72530,48.0192451,0.2794095,nominatim,exact,Le Pont Romain,
+Port du Mans,Le Mans,portmans,101,Quai Amiral Lalande,72230,48.0018223798991,0.189138197231187,manuel,exact,,
+Prairie du chateau,Sablé-sur-Sarthe,prairiechateau,,,,47.8329912,-0.329063,nominatim,exact,Hippodrome de la Prairie du Château,
+Prieuré de Mayenne,Dangeul,prieuremayenne,,,72260,48.240685871721,0.269330681833806,nominatim,exact,Prieuré des Bonshommes de Ballots,
+Prieuré de Vivoin,Vivoin,prieurevivoin,,,,48.2342845,0.1560111,nominatim,exact,Prieuré de Vivoin,
+Promenade Newton,Le Mans,promenadenewton,,Promenade Newton,72100,47.9864305,0.2133704,nominatim,exact,Promenade Newton,
+Quai Louis Blanc,Le Mans,quailouisblanc,,Quai Louis Blanc,72000,48.0138266,0.1997808,nominatim,exact,Quai Louis Blanc,
+R-Volt,Le Mans,rvolt,7,Rue du Port,72000,48.0029922,0.1946912,nominatim,exact,R-Volt club,
+Restaurant l'Éternel,La Fontaine-Saint-Martin,restauranteternel,,,,47.7926288,0.0431436,nominatim,exact,L'Éternel,
+Rue Claude Blondeau,Le Mans,rueclaudeblondeau,13,Rue Claude Blondeau,72000,48.006675,0.1987696,nominatim,exact,Rue Claude Blondeau,
+Rue de Belgique Sablons,Le Mans,ruebelgiquesablons,10,Rue de Belgique,72100,47.992511,0.2311962,nominatim,exact,Rue de Belgique,
+Rue de la Piscine,Le Mans,ruepiscine,17,Rue de la Piscine,72220,47.8229095,0.2779246,nominatim,exact,Rue de la Piscine,
+Rue du Gué,Le Mans,ruegue,,Rue du Gué,72220,47.8923238,0.2621007,nominatim,exact,Rue du Gué,
+Salle Aimée le Prilleux,Le Mans,salleaimeeprilleux,,,,48.0210715,0.3305492,nominatim,approximate,Salle polyvalente Aimée Prilleux,
+Salle André Voisin,Fresnay-sur-Sarthe,salleandrevoisin,3,Place Thiers,72130,48.2815739249037,0.0201407317572735,manuel,exact,Halles André Voisin / Cinema,
+Salle associative,Le Mans,salleassociative,,Rue de Sablé,72700,47.9719667,0.097513,nominatim,exact,Salle Associative,
+Salle Cattois Roncin,Meurcé,sallecattoisroncin,,Place Cattois Roncin,72170,48.2346912976559,0.202970089915867,manuel,exact,Place Cattois Roncin,
+Salle Claircigny,Le Mans,salleclaircigny,,Rue de Claircigny,72000,48.01361,0.19331,nominatim,exact,Salle municipale Claircigny,
+Salle Communale,Fillé,sallecommunale,,,72210,47.89434937497,0.125254568737704,nominatim,exact,Salle Communale,1
+Salle Communale,Rouessé-Vassé,sallecommunale,20,20 Rue Saint-Mathurin,72140,48.1554200182121,-0.19877585815283,nominatim,exact,Salle Communale,1
+Salle Communale,Marçon,sallecommunale,,,72340,47.7126238249011,0.495110792101675,nominatim,exact,Salle Communale,1
+Salle Coppélia,La Flèche,sallecoppelia,,Allée de la Girouette,72200,47.6969012241096,-0.0745775841893583,manuel,exact,,
+Salle de Tresson,Tresson,salletresson,,,72440,47.8946363727919,0.582382160462207,manuel,exact,,
+Salle des concerts,Le Mans,salleconcerts,,Rue du Port,72000,48.0026277,0.1922505,nominatim,exact,Salle des concerts,
+Salle des fêtes,Arnage,sallefetes,,,,47.9265284,0.189545,nominatim,exact,Salle des fêtes La Bulle,1
+Salle des fêtes,Arthezé,sallefetes,,,,47.7880819,-0.1194115,nominatim,city,Arthezé,1
+Salle des fêtes,Auvers le Hamon,sallefetes,,,,47.901369,-0.3512822,nominatim,exact,Salle des fêtes,1
+Salle des fêtes,Auvers-le-Hamon,sallefetes,,,,47.901369,-0.3512822,nominatim,exact,Salle des fêtes,1
+Salle des fêtes,Beaumont-sur-Sarthe,sallefetes,,,,48.2264796,0.132823,nominatim,city,Beaumont-sur-Sarthe,1
+Salle des fêtes,Brûlon,sallefetes,,,,47.9675049,-0.2355172,nominatim,city,Brûlon,1
+Salle des fêtes,Champagné,sallefetes,,Rue Léopold Gouloumès,72470,48.0211724431011,0.330542726832686,nominatim,exact,Salle des fêtes,1
+Salle des Fêtes,Congé-sur-Orne,sallefetes,,,,48.1987995,0.2516631,nominatim,exact,Salle des Fêtes,1
+Salle des fêtes,Cures,sallefetes,,,72240,48.1001565019638,-0.00357670248208484,nominatim,exact,Salle des Fêtes,1
+Salle des fêtes,Dollon,sallefetes,,,,48.0387722,0.5915528,nominatim,exact,Complexe Roland Pitard,1
+Salle des fêtes,Fillé,sallefetes,,,,47.8981489,0.1267769,nominatim,city,Fillé,1
+Salle des fêtes,Jupilles,sallefetes,,,,47.7923438,0.4114714,nominatim,exact,Salle des Fêtes,1
+Salle des fêtes,La Chapelle-Saint-Aubin,sallefetes,,,,48.0341335,0.1600629,nominatim,city,La Chapelle-Saint-Aubin,1
+Salle des fêtes,La Ferté-Bernard,sallefetes,,,,48.1860576,0.6554511,nominatim,city,La Ferté-Bernard,1
+Salle des fêtes,La Guierche,sallefetes,,,,48.1132085,0.1943092,nominatim,city,La Guierche,1
+Salle des fêtes,Le Mans,sallefetes,,Rue Robert Desnos,72000,48.0140675,0.1797018,nominatim,exact,Salle des fêtes,1
+Salle des fêtes,Louplande,sallefetes,,,,47.943814,0.0409759,nominatim,city,Louplande,1
+Salle des fêtes,Malicorne-sur-Sarthe,sallefetes,,,,47.810599,-0.083941,nominatim,exact,Salle des Fêtes,1
+Salle des fêtes,Mamers,sallefetes,,,,47.9210246,0.7432032,nominatim,exact,Salle des Fêtes,1
+Salle des fêtes,Moncé en Belin,sallefetes,,,,47.8941045,0.2038619,nominatim,city,Moncé-en-Belin,1
+Salle des fêtes,Mulsanne,sallefetes,,,,47.9069356,0.2460607,nominatim,city,Mulsanne,1
+Salle des fêtes,Mézières-sur-Ponthouin,sallefetes,,,,48.193291,0.2992324,nominatim,exact,Salle des fêtes,1
+Salle des fêtes,Neufchâtel-en-Saosnois,sallefetes,,,,48.3768182,0.2464049,nominatim,city,Neufchâtel-en-Saosnois,1
+Salle des fêtes,Neuvillalais,sallefetes,,,,48.1567492,0.0018977,nominatim,city,Neuvillalais,1
+Salle des fêtes,Neuville-sur-Sarthe,sallefetes,,,,48.0753824,0.1897267,nominatim,city,Neuville-sur-Sarthe,1
+Salle des fêtes,Parcé-sur-Sarthe,sallefetes,,,,47.8434492,-0.1986762,nominatim,city,Parcé-sur-Sarthe,1
+Salle des fêtes,Piacé,sallefetes,,,,48.2574025,0.1118168,nominatim,exact,Salle des fêtes,1
+Salle des fêtes,Poillé-sur-Vègre,sallefetes,,,,47.9198934,-0.2660579,nominatim,exact,Salle des Fêtes,1
+Salle des fêtes,Précigné,sallefetes,,,,47.765652,-0.3255834,nominatim,exact,Salle des Fêtes,1
+Salle des fêtes,Rouillon,sallefetes,,,,48.0073958,0.1364063,nominatim,city,Rouillon,1
+Salle des fêtes,Saint-Calais,sallefetes,,,,47.9210246,0.7432032,nominatim,exact,Salle des Fêtes,1
+Salle des fêtes,Saint-Denis-d'Orques,sallefetes,,,,48.0274356,-0.2730156,nominatim,city,Saint-Denis-d'Orques,1
+Salle des fêtes,Saint-Georges-du-Bois,sallefetes,,,,47.9726629,0.1010947,nominatim,city,Saint-Georges-du-Bois,1
+Salle des fêtes,Saint-Pavace,sallefetes,,,,48.0386173,0.1875497,nominatim,city,Saint-Pavace,1
+Salle des fêtes,Savigné-l'Évêque,sallefetes,,,,48.0773296,0.2962126,nominatim,city,Savigné-l'Évêque,1
+Salle des fêtes,Solesmes,sallefetes,,,,47.8514506,-0.3020139,nominatim,city,Solesmes,1
+Salle des fêtes,Souligné-sous-Ballon,sallefetes,,,,48.139041,0.2329009,nominatim,exact,Salle des fêtes,1
+Salle des fêtes,Soulitré,sallefetes,,,,48.011687,0.4558297,nominatim,exact,Salle des fêtes,1
+Salle des fêtes,Teloché,sallefetes,,,,47.888782,0.2677971,nominatim,exact,Salle des fêtes,1
+Salle des fêtes,Vancé,sallefetes,,,,47.8317838,0.6469322,nominatim,city,Vancé,1
+Salle des planches,Le Mans,salleplanches,,Chemin des Planches,72380,48.1620529,0.1594225,nominatim,approximate,L'Ouche des Planches,
+Salle du Cloître,Mamers,sallecloitre,,Place de la République,72600,48.3495568362618,0.36878772575451,manuel,exact,,
+Salle du Foyer Loisirs de Parigné-L'Évêque,Parigné-L'Évêque,sallefoyerloisirsparigneeveque,9,Rue des Écoles,72250,47.9324,0.376251,manuel,exact,Foyer Loisirs,
+Salle Edith Piaf,Le Mans,salleedithpiaf,6171,Rue Émile Zola,72230,47.910435,0.2526646,nominatim,exact,Salle Edith Piaf,
+Salle G. Moquet,Allonnes,sallegmoquet,,Boulevard Pasteur,72700,47.9721306,0.1603755,nominatim,approximate,Salle Guy Môquet,
+Salle Georges Brassens,Le Mans,sallegeorgesbrassens,,Sentier de la Souche,72530,48.0164706,0.2712781,nominatim,exact,Salle Georges Brassens,
+Salle Jean Carmet,Allonnes,sallejeancarmet,5,Boulevard d'Anjou,72700,47.9670232,0.1608339,nominatim,exact,Salle Jean Carmet,
+Salle Jean de la Fontaine,Marolles-les-Braults,sallejeanfontaine,38,Rue Henri et Charles Chardon,72260,48.2474449207215,0.313004890535262,manuel,exact,,
+Salle l'Eden,Le Mans,salleeden,21,Rue Beauverger,72000,47.9994173741935,0.201222762376086,manuel,exact,,
+Salle Les Sources,Coulaines,sallesources,,Place Jean-Claude Boulard,72190,48.0250573427247,0.205660282542915,manuel,exact,,
+Salle Madeleine Marie,Sablé-sur-Sarthe,sallemadeleinemarie,25,Rue Saint-Denis,72300,47.8390969257332,-0.339530089617064,manuel,exact,,
+Salle Mélusine,Bonnétable,sallemelusine,,Rue de Mélusine,72530,48.1854367544777,0.427261687281889,nominatim,approximate,Mélusine,
+Salle Michel Berger,Savigné-l'Évêque,sallemichelberger,,All. Louis Guy,,48.0743217011682,0.302792464337299,manuel,exact,,
+Salle municipale,Arnage,sallemunicipale,,,,47.936736,0.184418,nominatim,approximate,Médiathèque municipale Simone de Beauvoir,1
+Salle municipale,Fay,sallemunicipale,,,,48.0083019514103,0.0716817307276621,nominatim,approximate,Police Municipale,1
+Salle municipale,Le Mans,sallemunicipale,,,,47.9817765,0.2090159,nominatim,exact,Salle municipale Henri Barbin,1
+Salle Paul Richard,Montfort-le-Gesnois,sallepaulrichard,,Rue des Violettes,72450,48.0530394318605,0.419494314496554,nominatim,approximate,Salle Paul Nicolle,
+Salle Polyvalente,Allonnes,sallepolyvalente,,,,47.969283,0.1578819,nominatim,city,Allonnes,1
+Salle Polyvalente,Arnage,sallepolyvalente,,,,47.9269544,0.1889245,nominatim,city,Arnage,1
+Salle Polyvalente,Bouloire,sallepolyvalente,,,,47.9696548,0.5493923,nominatim,exact,Salle polyvalente,1
+Salle Polyvalente,Brette-les-Pins,sallepolyvalente,,,,47.9152978,0.3296973,nominatim,exact,Salle polyvalente,1
+Salle Polyvalente,Champagné,sallepolyvalente,,,,48.0211883159842,0.330534085742134,nominatim,exact,Salle polyvalente,1
+Salle Polyvalente,Courcemont,sallepolyvalente,,,,48.1735375,0.3499978,nominatim,exact,Salle Polyvalente,1
+Salle Polyvalente,Cérans-Foulletourte,sallepolyvalente,,,,47.8267795,0.0827761,nominatim,exact,Salle Polyvalente,1
+Salle Polyvalente,Fay,sallepolyvalente,,,,48.0085199999815,0.0701763814345328,nominatim,exact,Salle Polyvalente,1
+Salle Polyvalente,La Ferté-Bernard,sallepolyvalente,,,,48.1873298,0.6485452,nominatim,approximate,La laverie - Centre culturel,1
+Salle Polyvalente,La Flèche,sallepolyvalente,,,,47.8669517,0.4607935,nominatim,exact,Salle polyvalente,1
+Salle Polyvalente,Le Breil-sur-Mérize,sallepolyvalente,,,,48.0014302,0.4775274,nominatim,exact,Salle Polyvalente,1
+Salle Polyvalente,Le Mans,sallepolyvalente,,,,47.825177,0.280682,nominatim,exact,Salle Polyvalente,1
+Salle Polyvalente,Mamers,sallepolyvalente,,,,48.4141665,0.1063225,nominatim,exact,Salle Polyvalente,1
+Salle Polyvalente,Marolles-les-Braults,sallepolyvalente,,,,48.2522145,0.3135215,nominatim,city,Marolles-les-Braults,1
+Salle Polyvalente,Montfort-le-Gesnois,sallepolyvalente,,,,48.0529091,0.4192159,nominatim,exact,Salle Polyvalente,1
+Salle Polyvalente,Neufchâtel-en-Saosnois,sallepolyvalente,,,,48.3740259,0.2467552,nominatim,exact,Salle polyvalente,1
+Salle Polyvalente,Noyen-sur-Sarthe,sallepolyvalente,,,,47.8609642,-0.1034251,nominatim,exact,Salle polyvalente,1
+Salle Polyvalente,Parcé-sur-Sarthe,sallepolyvalente,,,,47.8476673,-0.2059478,nominatim,exact,salle polyvalente Jean Drouet,1
+Salle Polyvalente,Roézé-sur-Sarthe,sallepolyvalente,,,,47.8942967,0.0656575,nominatim,exact,Salle Polyvalente de Roëzé sur Sarthe,1
+Salle Polyvalente,Saint Saturnin,sallepolyvalente,,,,48.0641536,0.1594091,nominatim,city,Saint-Saturnin,1
+Salle Polyvalente,Saint-Mars-la-Brière,sallepolyvalente,,,,48.0301287,0.3718076,nominatim,city,Saint-Mars-la-Brière,1
+Salle Polyvalente,Sillé le Guillaume,sallepolyvalente,,,,48.1841304,-0.1275755,nominatim,city,Sillé-le-Guillaume,1
+Salle Polyvalente,Sillé-le-Philippe,sallepolyvalente,,,,48.1069075,0.3520896,nominatim,city,Sillé-le-Philippe,1
+Salle Polyvalente,Soulitré,sallepolyvalente,,,,48.0112992,0.4566434,nominatim,city,Soulitré,1
+Salle Polyvalente,Teillé,sallepolyvalente,,,,48.1807455,0.1870607,nominatim,exact,Salle Polyvalente,1
+Salle Polyvalente,Volnay,sallepolyvalente,,,,47.9456503,0.4746217,nominatim,city,Volnay,1
+Salle Polyvalente,Étival-lès-le-Mans,sallepolyvalente,,,,47.960109,0.0803536,nominatim,exact,Salle Polyvalente,1
+Salle Théophile Plé,Sablé-sur-Sarthe,salletheophileple,,,,47.8375265,-0.3303097,nominatim,exact,Salle Théophile Plé,
+Salle Vauguélande,Tresson,sallevauguelande,,,,47.8938402,0.5794579,nominatim,exact,Salle Vauguélande,
+Salon Arthé,Malicorne-sur-Sarthe,salonarthe,,,,47.8140326,-0.0852406,nominatim,exact,Salon ArThé,
+Salon de la rue des 3 Sonnettes,Le Mans,salonrue3sonnettes,,Rue des 3 Sonnettes,72000,48.0062921774934,0.195818585528213,manuel,exact,,
+Scène Joël Le Theule,Sablé-sur-Sarthe,scenejoeltheule,16,Rue Saint-Denis,72300,47.8390305355791,-0.337960932947041,manuel,exact,,
+Secours catholique,Le Mans,secourscatholique,,Rue de la Mission,72000,47.993763,0.2020307,nominatim,exact,Secours Catholique,
+Site de la Salle des Fêtes,Le Mans,sitesallefetes,,Rue Saint-Martin,72290,48.1390913218789,0.232879785549835,manuel,exact,,
+Square Dubois,Le Mans,squaredubois,,Rue du Square Jacques Dubois,72000,48.00869784219,0.197013711720644,nominatim,exact,Rue du Square Jacques Dubois,
+Square Montreuil,Bouloire,squaremontreuil,,Square Montreuil,72440,47.9721857,0.5520972,nominatim,exact,Square Montreuil,
+Square rue Galilée,Le Mans,squareruegalilee,,,72000,47.9888587579404,0.217123151640304,manuel,exact,,
+Stade,Louplande,stade,,,,47.945295,0.042006,nominatim,exact,Stade,1
+Stade,Sillé-le-Philippe,stade,,,,48.1057637,0.3520143,nominatim,exact,Rue du Stade,1
+Stade du collège,Le Mans,stadecollege,,,,48.0073849,0.1967849,nominatim,city,Le Mans,
+Stade Léon Bollée,Le Mans,stadeleonbollee,2,All. Jeanne Deroin,72000,48.0152366244213,0.193774641069806,manuel,exact,,
+Studio 101,Coulaines,studio101,,Rue de Belle-Île,72190,48.0275835,0.1998299,nominatim,exact,Studio 101,
+Studio de la Cie Marie Lenfant,Le Mans,studiociemarielenfant,35 bis,Rue des Fontenelles,72000,48.0177524080398,0.215626309752606,manuel,exact,,
+Sun 7 Bar,Le Mans,sun7bar,,Place des Comtes du Maine,72000,48.0043152116038,0.200469534250929,manuel,exact,,
+Terrain de jeu,Le Mans,terrainjeu,,,,48.0073849,0.1967849,nominatim,city,Le Mans,
+Tertre Rouge,Le Mans,tertrerouge,,Voie de la Liberté,72100,47.9604068,0.2148934,nominatim,exact,Tertre Rouge,
+The Lodge,Le Mans,lodge,,Rue des Ponts Neufs,72000,48.0066308,0.1981096,nominatim,exact,The Lodge Irish Pub,
+Théâtre de Chaoué,Le Mans,theatrechaoue,,Allée des Frères Rocher,72700,47.9714288,0.1657499,nominatim,exact,Théâtre de Chaoué,
+Théâtre de l'Acthalia,Le Mans,theatreacthalia,105,Grande Rue,72000,48.0068179926199,0.195070203819247,nominatim,exact,,
+Théâtre de l'Écluse,Le Mans,theatreecluse,,Rue des Acacias,72000,47.9971141,0.1835127,nominatim,exact,Théâtre de l'écluse,
+Théâtre de l'Éphémère,Le Mans,theatreephemere,,Place des Jacobins,72000,48.0073783,0.1989582,nominatim,approximate,Théâtre Paul Scaron / Théâtre de l'Éphémère,
+Théâtre de la Bertoche,Le Mans,theatrebertoche,217,Rue de la Bertinière,72000,47.9923015347829,0.217198647949137,manuel,exact,La Bertoche,
+Théâtre de la Halle-au-Blé,La Flèche,theatrehalleble,,Rue du Mouton,72200,47.7002066,-0.0727053,nominatim,exact,Théâtre de la Halle au Blé,
+Théâtre de Mamers,Le Mans,theatremamers,,,72600,48.3507380111748,0.369784466250052,manuel,exact,,
+Théâtre des Quinconces,Le Mans,theatrequinconces,,Place des Jacobins,72000,48.0078156,0.2007998,nominatim,exact,Centre culturel « Les Quinconces - L'Espal »,
+Théâtre des Récollets,Montval sur Loir,theatrerecollets,,Chemin des Récollets,72500,47.6969942,0.4125246,nominatim,approximate,Chemin des Récollets,
+Théâtre du Passeur,Le Mans,theatrepasseur,,Rue de la Rivière,72000,48.0099636,0.2118261,nominatim,exact,Théâtre du Passeur,
+L'Epidaure,Bouloire,theatreepidaure,1,Rue de la Grosse Pierre,72440,47.9737047289703,0.554539367623309,manuel,exact,,
+Théâtre Municipal,Le Mans,theatremunicipal,,,,47.9670232,0.1608339,nominatim,exact,Salle Jean Carmet,
+Théâtre Paul Scarron,Le Mans,theatrepaulscarron,,Place des Jacobins,72000,48.007353606303,0.198935077290558,manuel,exact,,
+Twin's Beer,La Chapelle-Saint-Aubin,twinsbeer,6,Rue Jean Perrin,72650,48.0266929769744,0.172905384105315,manuel,exact,,
+Un Singe en Hiver,Le Mans,unsingeenhiver,45,Avenue de la Libération,72000,48.0058613,0.1890035,manuel,exact,,
+Unik Music,Le Mans,unikmusic,,Rue Nationale,72000,47.9979702,0.2005569,nominatim,exact,Unik Music,
+Université,Le Mans,universite,,Rue Louis Harel de la Noë,72000,48.0170675,0.1507932,nominatim,exact,Université,
+Université Amphi Extérieur Bât. Lettres,Le Mans,universiteamphiexterieurbatlettres,,Avenue Olivier Messiaen,72000,48.0173394253953,0.15736128234002,manuel,exact,,
+V&B,Allonnes,vetb,1,Rue de la Bérardière,72700,47.9753232,0.1515879,nominatim,exact,V and B,
+V&B Antarès,Le Mans,vetbantares,,Chemin de l'hippodrome,72100,47.9531611,0.226762,nominatim,exact,V and B,
+Vaurouzé - Université,Le Mans,vaurouzeuniversite,,Boulevard Charles Nicolle,72000,48.0147356,0.1652025,nominatim,exact,Court de tennis Vaurouzé,
+Véron fleurs,Le Mans,veronfleurs,27,Rue des Mûriers,72000,48.0085118987777,0.187395853734176,manuel,exact,,
+Verre I Table,Le Mans,verreitable,,Rue Nationale,72000,47.9978989,0.2005843,nominatim,exact,Verre I Table,
+Vieux Mans,Le Mans,vieuxmans,20,Rue des Chanoines,72000,48.008836,0.1971929,nominatim,exact,Cité Plantagenêt,
+Washington DC,Le Mans,washingtondc,,,,47.994128,0.203715,nominatim,approximate,Washington,
+White-UNDR Club,Le Mans,whiteundrclub,44,Rue des Ponts Neufs,72000,48.0065143251696,0.19825972584656,manuel,exact,,
+CHS Etoc Demazy,Le Mans,chsetocdemazy,10,Rue Etoc Demazy,72000,47.9937527719202,0.190975007642793,manuel,exact,,
+Le Comptoir Des Papilles,Le Mans,comptoirpapilles,76,Bd Marie et Alexandre Oyon,72000,47.9936506315053,0.194633960763594,manuel,exact,,
+L'Étoile des Saveurs,Le Mans,,,Quai Amiral Lalande,72000,48.0018468201041,0.188832217407273,manuel,exact,,
+Parking rue de la mission,Le Mans,,,,72000,47.9936516881379,0.202466520581573,manuel,exact,,
+Allée des Prairies de Funay,Le Mans,,,,72000,47.9882244098503,0.22418229782783,manuel,exact,,
+Grand Atelier,Le Mans,,,Avenue René Laennec,72000,48.0177064,0.1610047,manuel,exact,,
+La Tente,Le Mans,,,,72000,48.0208797089944,0.145496103037164,manuel,exact,,
+Café Berlin,Le Mans,,10,Pl. de l'Éperon,72000,48.0052362695794,0.194941957245254,manuel,exact,,
+Chez Rouillon,Le Mans,,41,Av. Gl Leclerc,72000,47.9987234546006,0.195523716637859,manuel,exact,,
+Collège Notre Dame,La Flèche,,46,Rue de la Magdeleine,72200,47.7006404299793,-0.0802703598536355,manuel,exact,,
+Cour Ecole Descartes,La Flèche,,12,Rue Pape-Carpantier,72200,47.6983233912669,-0.0741770021821445,manuel,exact,,
+Espace Ephémère Centre Jacobins,Le Mans,,13,Rue Claude Blondeau,72000,48.0069312661394,0.199314678456944,manuel,exact,,
+L'Orange Bleue,Fillé,,,Rue du Canal,72210,47.8958010345319,0.127146778286207,manuel,exact,,
+La Cave à Bières,Saint-Léonard-des-Bois,,35,Rue des Alpes Mancelles,72130,48.3509969984495,-0.0780229145388218,manuel,exact,,
+Le Loft,Le Mans,,23,Rue d'Alger,72000,48.0020425402002,0.194617780033459,manuel,exact,,
+Place du marché au blé,La Flèche,,,,72200,47.7000864759597,-0.0729831288109646,manuel,exact,,
+Place Marie Pape Carpentier,La Flèche,,,,72200,47.6986720312382,-0.0755880203628761,manuel,exact,,
+Quartier St Exupéry,Sablé-sur-Sarthe,,,,72300,47.8374273761634,-0.31603815082003,manuel,exact,,
+Centre Beaulieu,Le Mans,,,,72000,48.0137001429453,0.194722481676563,manuel,exact,,
+Crafty Pub,Le Mans,,10,Rue de la Barillerie,72000,48.0062700810521,0.197978680647803,manuel,exact,,
+Le Poulpe à Vapeur,Le Mans,,114,Rue René Bechepay,72000,47.989811514379,0.197237811402185,manuel,exact,,
+Cinéma Zoom,Saint-Calais,,,,72120,47.9206742202678,0.743156395064636,manuel,exact,,
+Théâtre Poche,Sablé-sur-Sarthe,,16,Rue Saint-Denis,72300,47.8390305355791,-0.337960932947041,manuel,exact,,
+L'Endroit,Le Mans,,42,Rue des Ponts Neufs,72000,48.0065919468485,0.198144095808229,manuel,exact,,
+La Fabrique,Le Mans,,5,Bd Anatole France,72000,48.0009847881298,0.188009449277871,manuel,exact,,
+Le Bar Aux Maîtres,Le Mans,,14,Rue du Cornet,72000,48.0048830356273,0.195567745869961,manuel,exact,,
+Le Celtic,Le Mans,,158,Av. Jean Jaurès,72000,47.9884447366919,0.20751441447789,manuel,exact,,
+Le Diabolo Menthe,Le Mans,,7,Place George Washington,72000,47.9959150632849,0.202928418996392,manuel,exact,,
+Le Lieu,Mamers,,8,Rue du Dr Godard,72600,48.350680418456,0.36790621713873,manuel,exact,,
+Loiseau de la ferme,La Milesse,,,Rue de Sillé,72650,48.0673743222047,0.132140670259795,manuel,exact,,
+Macallan,Le Mans,,7,Rue du Port,72000,48.0029922,0.1946912,manuel,exact,,
+Salle Printania,La Flèche,,39,Av. de Verdun,72200,47.6970494489012,-0.0896769080479326,manuel,exact,,
+Halle Villainoise,Villaines-sous-Lucé,,13,Rue de Saint-Calais,72150,47.8650744101992,0.480538264131675,manuel,exact,,
+MJC Hervé Bazin,Le Lude,,2,Rue Emile Crétois,72800,47.6484801620134,0.158462511034299,manuel,exact,,
+Salle Besnardeau,Sillé-le-Guillaume,,8,Pl. Paul Brulat,72140,48.1855230948398,-0.127352029762843,manuel,exact,Salle de Spectacles Léon Besnardeau,
+La Belinoise,Laigné-Saint-Gervais,,,Rue de la Noé Gourdé,72220,47.8733612848366,0.222308569045622,manuel,exact,,
+Théâtre de l'Enfumeraie,Allonnes,,,Rue du Moulin de Chaoue,72700,47.9713823777498,0.16580315432623,manuel,exact,,
+Centre Culturel Maurice Termeau,Sillé-le-Guillaume,,34,Rue du Dr Touchard,72140,48.1822659310077,-0.126844128856576,manuel,exact,,
+The Hideout,Le Mans,,44,Rue des Ponts Neufs,72000,48.0065143251696,0.19825972584656,manuel,exact,,
+Les Frères Mousse,Coulaines,,105 bis,Rue de Champ Fleuri,72190,48.0286652962356,0.200127953281725,manuel,exact,,
+Salle Louise Labé,Yvré-l'Évêque,,,Rue Caillaux,72530,48.0158592273545,0.272776517523416,manuel,exact,,
+Théâtre du Petit Seux,Coulaines,,7,ue du Petit Seux,72190,48.0331925233783,0.207732754406866,manuel,exact,,
+Les Ecuries,Ruaudin,,,,72230,47.9437403542214,0.263764976440939,manuel,exact,,
+Cour Ecole Saint-Jacques,La Flèche,,14,Rue Saint-Jacques,72200,47.6997831084578,0.0799778099210132,manuel,exact,,
+Elastique à Musique,Le Mans,,14,Rue du Père Mersenne,72200,47.9983803695309,0.194036753045626,manuel,exact,,
+Le Café du Jet d’Eau,Le Mans,,,Place du Jet d'eau,72000,48.0085237521972,0.198533248803884,manuel,exact,,
+Le Little Café,Le Mans,,11,Rue Victor Bonhommet,72000,48.0051461487827,0.196147786605177,manuel,exact,,
+Le Lord's,Le Mans,,,Place des Comtes du Maine,72000,48.0043152116038,0.200469534250929,manuel,exact,,
+Centre des Expositions Paul Courboulay,Le Mans,,,Rue Paul Courboulay,72000,48.0057188365268,0.191878372705272,manuel,exact,,
+Domaine De Vaujoubert,Rouillon,,,Route de la vove,72700,48.011397935568,0.152049640168064,manuel,exact,,
+École Paul Langevin,Allonnes,,92 bis,Bd de Vendée,72700,47.95218921665,0.172780169001864,manuel,exact,,
+Le Fer à Cheval,Saint-Pierre-du-Lorouër,,2,Rue de la Fontaine,72150,47.8060300004019,0.522427199752764,manuel,exact,,
+Le Chicago,Le Mans,,,Rue de la Galère,72000,48.0056916292848,0.194710410194579,manuel,exact,,
+Espace Simone Signoret,Mulsanne,,,,72230,47.9136115991552,0.247859640756426,manuel,exact,,
+Les Planches,Courdemanche,,,,72150,47.8149078023106,0.563654522697372,manuel,exact,,
+Rey Gin's,Le Mans,,,,72000,48.0029451811097,0.193994529104327,manuel,exact,,
+Le Chalet du Lac,Tuffé-Val-de-la-Chéronne,,,Imp. du Plan d'Eau,72160,48.11891621794,0.51150953158186,manuel,exact,,
+La Povostière,Saint-Paul-le-Gaultier,,,,72130,48.3169157447125,-0.103904505616599,manuel,exact,,
+La Richardière,Lhomme,,,,72340,47.7615377279242,0.547269433718109,manuel,exact,,
+Le 80,Le Mans,,80,Rue Nationale,72000,47.9986518012622,0.200072120345295,manuel,exact,,
+La P'tite Marie,Le Mans,,77,Bd Lamartine,72000,47.9972115027386,0.189953510330269,manuel,exact,,
+Le Clin d'œil,Le Mans,,,Rle des Moulins du Gué de Maulny,72000,47.992086307695,0.190695556736691,manuel,exact,,
+Le Capella,La Chapelle-Saint-Aubin,,35 bis,Rue de l'Europe,72650,48.0348321358286,0.160419984611579,manuel,exact,,
+Le Jungle Café,Le Mans,,32,Rue du Port,72000,48.0032353350964,0.1948925978648,manuel,exact,,
+Le Bohême Café,Beaumont-sur-Sarthe,,5,Rue Louatron,72170,48.0177494426384,0.275206484628433,manuel,exact,,
+Chez Clara ,Montaillé,,5,Pl. de l'Église,72120,47.9364490355627,0.700893667985545,manuel,exact,,
+Le Corvette's Café,Bonnétable,,,Rue Alexandre Rigot,72110,48.1796243633276,0.42462422511576,manuel,exact,,
+Le Cheval Blanc,La Chapelle-Saint-Rémy,,10,Pl. de l'Eglise,72160,48.1073826003536,0.45710621900851,manuel,exact,,
+Luna Café,Le Mans,,37,Rue du Dr Leroy,72000,48.0018784568283,0.196692650827742,manuel,exact,,
+L’Arc en Ciel,Le Mans,,4,Place du Gue de Maulny,72000,47.9919068666248,0.190569168397699,manuel,exact,,
+Le Chiquito,Laigné-Saint-Gervais,,17,Pl. du Mail,72220,47.8776594152157,0.217678533367347,manuel,exact,,
+Café du Centre,Domfront-en-Champagne,,16,Pl. de l'Église,72240,48.1050808861334,0.0258188386022106,manuel,exact,,
+Le Witch's bar,Souligné-sous-Ballon,,16,Grande Rue,72290,48.1374820785881,0.237344751330225,manuel,exact,,
+La Crémaillère,Loué,,1,Rue Marchande,72540,47.994738169518,-0.151920585087215,manuel,exact,,
+Le Pub Elysée,Sablé-sur-Sarthe,,13,Pl. Raphaël Elize,72300,47.8399706321966,-0.332987485669836,manuel,exact,,
+Le Soleil d'Or,Courceboeufs,,25,rue du Sergent Pitou,72290,48.1373207973111,0.287803274179937,manuel,exact,,

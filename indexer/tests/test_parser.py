@@ -806,6 +806,17 @@ Dimanche 21
         assert event.lieu_raw is not None
         assert "Éphémère" in event.lieu_raw
 
+    def test_lieu_with_24h_in_name(self, lieu_ref, ville_ref):
+        """Test que 'Circuit des 24h' est extrait complet (24h n'est pas une heure)."""
+        # Bidul 34 - le "24h" fait partie du nom du lieu, pas une heure d'événement
+        text = "COLD TURKEY (rock) et MOON MARTIN (rock), Circuit des 24h, Le Mans, (gratuit avec entree 24h) Tel: 02 43 78 16 03"
+        events = parse_event_line_v2(text, 6, 1997, lieu_ref, ville_ref)
+        assert len(events) == 1
+        event = events[0]
+        # Le lieu doit contenir "24h" complet
+        assert event['lieu_raw'] == 'Circuit des 24h'
+        assert event['ville_raw'] == 'Le Mans'
+
 
 class TestSplitOnDatesV2NoFalseSplit:
     """Tests pour éviter les faux splits sur 'de 18 mois', 'de 14 ans', etc."""
@@ -1001,6 +1012,16 @@ class TestSplitBlocFusedEvents:
         assert 'Soirée open mix' in parts[0]
         assert 'Birdland' in parts[1]
 
+    def test_split_on_ballot_box(self):
+        """Split sur ballot box ☐ séparant les événements (bidul 238)."""
+        text = '☐ "Spectacle1" (conte), Cie A, Lieu1, 15h ☐ "Spectacle2" (sp.), Cie B, Lieu2, 16h ☐ Spectacle3, Lieu3, 17h'
+        from core.parser import split_bloc_fused_events
+        parts = split_bloc_fused_events(text)
+        assert len(parts) == 3
+        assert 'Spectacle1' in parts[0]
+        assert 'Spectacle2' in parts[1]
+        assert 'Spectacle3' in parts[2]
+
     def test_split_on_parenthesis_then_double_chevron(self):
         """Split après parenthèse fermante suivie de << (guillemets OCR)."""
         text = 'Les Spectaculaires: Soirée PETITES FORMES (àpd 12ans): "Pitt" + "Ma foi" + "Bertha", Jean Carmet, Allonnes 19h, 15€ repas compris (sur résa.) <<Pièce montée" (th.), Espace Scélia Sargé, 20h30, 6/10€'
@@ -1050,6 +1071,16 @@ class TestExtractFormattedSpectacles:
         assert len(spectacles) == 1
         assert spectacles[0]['nom'] == "Métis'sages"
         assert spectacles[0]['style'] == "contes et légendes d'ailleurs"
+
+    def test_split_bold_tags_merged(self):
+        """Les balises <b> consécutives sont fusionnées (bidul 205)."""
+        from core.parser import extract_formatted_spectacles
+        # Le titre est coupé entre deux balises <b>
+        text = '<b>"A</b><b>Hfa de Yambolé"</b> <i>(conte dès 12 ans)</i>'
+        spectacles = extract_formatted_spectacles(text)
+        assert len(spectacles) == 1
+        assert spectacles[0]['nom'] == 'AHfa de Yambolé'
+        assert spectacles[0]['style'] == 'conte dès 12 ans'
 
 
 class TestSplitRegionalSection:
@@ -1549,6 +1580,397 @@ class TestExtractEventNameQuotedWithColon:
         text = "\uf0b5 Before Festival Teriaki : LA COLONIE"
         assert is_named_event(text) is True
         assert extract_event_name(text) == "Before Festival Teriaki"
+
+
+class TestSpectacleDeAuteurPattern:
+    """Tests pour le pattern '"Spectacle" (style) de Auteur' (bidul 208)."""
+
+    @pytest.fixture
+    def parser(self):
+        return EventParser(bidul_mois=2, bidul_annee=2016)
+
+    def test_spectacle_de_auteur_basic(self, parser):
+        """Test pattern basique: "Spectacle" (style) de Auteur."""
+        text = '"Venezuela" (théâtre) de Guy Helminger, Lieu, 18h30'
+        artistes, spectacles, genres, _ = parser._extract_spectacle_artiste_pattern(text)
+
+        assert len(spectacles) == 1
+        assert spectacles[0] == "Venezuela"
+        assert len(genres) == 1
+        assert genres[0] == "théâtre"
+        assert len(artistes) == 1
+        assert artistes[0].nom == "Guy Helminger"
+
+    def test_spectacle_de_auteur_with_html_tags(self, parser):
+        """Test avec balises HTML: <b>"Spectacle"</b> (<i>style</i>) de Auteur."""
+        text = '<b>"Venezuela"</b> (<i>théâtre</i>) de Guy Helminger, Lieu, 18h30'
+        artistes, spectacles, genres, _ = parser._extract_spectacle_artiste_pattern(text)
+
+        assert len(spectacles) == 1
+        assert spectacles[0] == "Venezuela"
+        assert len(genres) == 1
+        assert genres[0] == "théâtre"
+        assert len(artistes) == 1
+        assert artistes[0].nom == "Guy Helminger"
+
+    def test_spectacle_de_auteur_uppercase(self, parser):
+        """Test avec auteur en MAJUSCULES."""
+        text = '"Spectacle" (drame) de JEAN DUPONT, Lieu'
+        artistes, spectacles, genres, _ = parser._extract_spectacle_artiste_pattern(text)
+
+        assert len(artistes) == 1
+        assert "JEAN DUPONT" in artistes[0].nom.upper()
+
+    def test_spectacle_de_auteur_with_author_style(self, parser):
+        """Test avec style sur l'auteur aussi."""
+        text = '"Spectacle" (théâtre) de Guy Helminger (mise en scène), Lieu'
+        artistes, spectacles, genres, _ = parser._extract_spectacle_artiste_pattern(text)
+
+        assert len(artistes) == 1
+        assert artistes[0].genre == "mise en scène"
+
+    def test_spectacle_de_auteur_guillemets_francais(self, parser):
+        """Test avec guillemets français «»."""
+        text = '«Venezuela» (théâtre) de Guy Helminger, Lieu'
+        artistes, spectacles, genres, _ = parser._extract_spectacle_artiste_pattern(text)
+
+        assert len(spectacles) == 1
+        assert spectacles[0] == "Venezuela"
+
+    def test_spectacle_de_auteur_no_style(self, parser):
+        """Test sans style entre parenthèses."""
+        text = '"Spectacle" de Auteur Name, Lieu'
+        # Ce pattern ne matche pas car le style est requis
+        artistes, spectacles, genres, _ = parser._extract_spectacle_artiste_pattern(text)
+        # Peut matcher ou non selon le pattern - à vérifier le comportement actuel
+        # Le pattern actuel requiert "(style)" donc pas de match
+
+    def test_extract_before_lieu_spectacle_de_auteur(self):
+        """Test extract_before_lieu avec le pattern."""
+        text = '<b>"Venezuela"</b> (<i>théâtre</i>) de Guy Helminger, '
+        result = extract_before_lieu(text, len(text) - 2)
+
+        # Spectacle doit être extrait
+        spectacles = result.get('spectacles', [])
+        assert len(spectacles) >= 1
+        spectacle_noms = [s['nom'] if isinstance(s, dict) else s for s in spectacles]
+        assert "Venezuela" in spectacle_noms
+
+        # Artiste doit être extrait
+        artistes = result.get('artistes', [])
+        assert len(artistes) >= 1
+        artiste_noms = [a['nom'] if isinstance(a, dict) else a.nom for a in artistes]
+        assert any("Guy Helminger" in n for n in artiste_noms)
+
+    def test_parse_event_full_flow(self, parser):
+        """Test parsing complet avec EventParser._parse_event."""
+        text = '<b>"Venezuela"</b> (<i>théâtre</i>) de Guy Helminger, Th. de l\'Éphémère, 18h30, 8€'
+        event = parser._parse_event(text, 'Ve 19')
+
+        assert event is not None
+        # Spectacle
+        assert "Venezuela" in event.spectacles
+        # Artiste
+        artiste_noms = [a.nom if hasattr(a, 'nom') else a['nom'] for a in event.artistes]
+        assert any("Guy Helminger" in n for n in artiste_noms)
+
+    def test_multiple_spectacles_de_auteur(self, parser):
+        """Test avec spectacle suivi de 'de Auteur' quand d'autres patterns existent."""
+        # Le pattern "de Auteur" ne doit pas interférer avec d'autres extractions
+        text = '"Abeilles" de GILLES GRANOUILLET (travelling théâtre), Lieu'
+        artistes, spectacles, genres, _ = parser._extract_spectacle_artiste_pattern(text)
+
+        assert len(spectacles) >= 1
+        assert "Abeilles" in spectacles
+
+
+class TestSpectacleVirguleArtistePattern:
+    """Tests pour le pattern '"Spectacle" (style), Artiste' (bidul 219)."""
+
+    @pytest.fixture
+    def parser(self):
+        return EventParser(bidul_mois=3, bidul_annee=2018)
+
+    def test_spectacle_virgule_artiste_basic(self, parser):
+        """Test pattern basique: "Spectacle" (style), Artiste."""
+        text = '"L\'instant magique" (spectacle illusion), Greg Bagot, Lieu, 21h'
+        artistes, spectacles, genres, _ = parser._extract_spectacle_artiste_pattern(text)
+
+        assert len(spectacles) == 1
+        assert spectacles[0] == "L'instant magique"
+        assert len(genres) == 1
+        assert genres[0] == "spectacle illusion"
+        assert len(artistes) == 1
+        assert artistes[0].nom == "Greg Bagot"
+
+    def test_spectacle_virgule_artiste_with_html_tags(self, parser):
+        """Test avec balises HTML: <b>"Spectacle"</b> (<i>style</i>), Artiste."""
+        text = '<b>"L\'instant magique"</b> (<i>spectacle illusion</i>), Greg Bagot, Th. De l\'Acthalia, 21h'
+        artistes, spectacles, genres, _ = parser._extract_spectacle_artiste_pattern(text)
+
+        assert len(spectacles) == 1
+        assert spectacles[0] == "L'instant magique"
+        assert len(genres) == 1
+        assert genres[0] == "spectacle illusion"
+        assert len(artistes) == 1
+        assert artistes[0].nom == "Greg Bagot"
+
+    def test_spectacle_virgule_artiste_with_quote_before_tag(self, parser):
+        """Test avec guillemet avant la balise: "<b>Spectacle</b>" (style), Artiste."""
+        text = '"<b>L\'instant magique</b>" (<i>spectacle illusion</i>), Greg Bagot, Th. De l\'Acthalia, 21h'
+        artistes, spectacles, genres, _ = parser._extract_spectacle_artiste_pattern(text)
+
+        assert len(spectacles) == 1
+        assert spectacles[0] == "L'instant magique"
+        assert len(artistes) == 1
+        assert artistes[0].nom == "Greg Bagot"
+
+    def test_spectacle_virgule_artiste_guillemets_francais(self, parser):
+        """Test avec guillemets français «»."""
+        text = '«L\'instant magique» (spectacle illusion), Greg Bagot, Lieu'
+        artistes, spectacles, genres, _ = parser._extract_spectacle_artiste_pattern(text)
+
+        assert len(spectacles) == 1
+        assert spectacles[0] == "L'instant magique"
+
+    def test_spectacle_virgule_artiste_two_word_name(self, parser):
+        """Test avec prénom + nom."""
+        text = '"Spectacle" (magie), Jean Pierre Dupont, Lieu'
+        artistes, spectacles, genres, _ = parser._extract_spectacle_artiste_pattern(text)
+
+        assert len(artistes) == 1
+        assert "Jean Pierre Dupont" in artistes[0].nom or "Jean Pierre" in artistes[0].nom
+
+    def test_extract_before_lieu_spectacle_virgule_artiste(self):
+        """Test extract_before_lieu avec le pattern."""
+        text = '<b>"L\'instant magique"</b> (<i>spectacle illusion</i>), Greg Bagot, '
+        result = extract_before_lieu(text, len(text) - 2)
+
+        # Spectacle doit être extrait
+        spectacles = result.get('spectacles', [])
+        assert len(spectacles) >= 1
+        spectacle_noms = [s['nom'] if isinstance(s, dict) else s for s in spectacles]
+        assert any("instant magique" in n.lower() for n in spectacle_noms)
+
+        # Artiste doit être extrait
+        artistes = result.get('artistes', [])
+        assert len(artistes) >= 1
+        artiste_noms = [a['nom'] if isinstance(a, dict) else a.nom for a in artistes]
+        assert any("Greg Bagot" in n for n in artiste_noms)
+
+    def test_parse_event_full_flow(self, parser):
+        """Test parsing complet avec EventParser._parse_event."""
+        text = '<b>"L\'instant magique"</b> (<i>spectacle illusion</i>), Greg Bagot, Th. de l\'Acthalia, 21h, 12€'
+        event = parser._parse_event(text, 'Sa 10')
+
+        assert event is not None
+        # Spectacle
+        spectacle_lower = [s.lower() for s in event.spectacles]
+        assert any("instant magique" in s for s in spectacle_lower)
+        # Artiste
+        artiste_noms = [a.nom if hasattr(a, 'nom') else a['nom'] for a in event.artistes]
+        assert any("Greg Bagot" in n for n in artiste_noms)
+
+    def test_not_match_majuscule_artist(self, parser):
+        """Test que le pattern ne matche pas les artistes en MAJUSCULES."""
+        # Les MAJUSCULES sont pour les artistes musicaux, pas théâtre
+        text = '"Spectacle" (style), ARTISTE MAJUSCULE, Lieu'
+        artistes, spectacles, genres, _ = parser._extract_spectacle_artiste_pattern(text)
+
+        # Ne doit pas matcher car ARTISTE MAJUSCULE n'est pas Mixed Case
+        # Le spectacle peut être extrait par un autre pattern
+        if artistes:
+            # Si extrait, ne doit pas être "ARTISTE MAJUSCULE"
+            assert all("ARTISTE MAJUSCULE" not in a.nom for a in artistes)
+
+
+class TestGenericLocations:
+    """Tests pour les lieux génériques (Salle des fêtes, Église, etc.)."""
+
+    def test_load_lieu_patterns_includes_is_generic(self):
+        """Test que load_lieu_patterns inclut le flag is_generic."""
+        # Créer une liste avec un lieu générique et un lieu normal
+        lieu_ref_list = [
+            (1, "Salle des fêtes", "Arnage", True),
+            (2, "L'Oasis", "Le Mans", False),
+        ]
+        patterns = load_lieu_patterns(lieu_ref_list)
+
+        # Vérifier que les patterns ont le flag is_generic
+        salle_pattern = next((p for p in patterns if p['nom'] == "Salle des fêtes"), None)
+        oasis_pattern = next((p for p in patterns if p['nom'] == "L'Oasis"), None)
+
+        assert salle_pattern is not None
+        assert salle_pattern['is_generic'] is True
+
+        assert oasis_pattern is not None
+        assert oasis_pattern['is_generic'] is False
+
+    def test_load_lieu_patterns_no_duplicates_for_generic(self):
+        """Test qu'on ne crée pas de doublons pour les lieux génériques."""
+        # Plusieurs entrées pour le même lieu générique dans différentes villes
+        lieu_ref_list = [
+            (1, "Salle des fêtes", "Arnage", True),
+            (2, "Salle des fêtes", "Mamers", True),
+            (3, "Salle des fêtes", "Changé", True),
+        ]
+        # Passer un db_path inexistant pour éviter de charger les alias de la vraie DB
+        patterns = load_lieu_patterns(lieu_ref_list, db_path="/nonexistent/path.db")
+
+        # Il ne doit y avoir qu'un seul pattern pour "Salle des fêtes"
+        salle_patterns = [p for p in patterns if p['nom'] == "Salle des fêtes"]
+        assert len(salle_patterns) == 1
+
+    def test_find_lieu_v2_generic_extracts_ville_de(self):
+        """Test que find_lieu_in_text_v2 extrait la ville pour les lieux génériques (pattern 'de')."""
+        # Pattern: "salle communale de Rouessé Vassé"
+        lieu_ref_list = [
+            (1, "Salle Communale", "Fillé", True),
+        ]
+        ville_ref_list = [
+            (1, "Rouessé-Vassé"),
+            (2, "Fillé"),
+        ]
+
+        patterns = load_lieu_patterns(lieu_ref_list)
+        text = "RADEK AZUL BAND, salle communale de Rouessé Vassé, 14h"
+
+        result = find_lieu_in_text_v2(text, patterns, ville_ref_list)
+
+        assert result is not None
+        lieu_nom, lieu_id, start, end, lieu_ville = result
+        assert lieu_nom == "Salle Communale"
+        assert lieu_ville == "Rouessé-Vassé"  # Extrait du texte, pas du référentiel
+
+    def test_find_lieu_v2_generic_extracts_ville_comma(self):
+        """Test que find_lieu_in_text_v2 extrait la ville pour les lieux génériques (pattern virgule)."""
+        # Pattern: "salle des fêtes, Mamers"
+        lieu_ref_list = [
+            (1, "Salle des fêtes", "Arnage", True),
+        ]
+        ville_ref_list = [
+            (1, "Mamers"),
+            (2, "Arnage"),
+        ]
+
+        patterns = load_lieu_patterns(lieu_ref_list)
+        text = "Concert rock, salle des fêtes, Mamers, 20h"
+
+        result = find_lieu_in_text_v2(text, patterns, ville_ref_list)
+
+        assert result is not None
+        lieu_nom, lieu_id, start, end, lieu_ville = result
+        assert lieu_nom == "Salle des fêtes"
+        assert lieu_ville == "Mamers"
+
+    def test_find_lieu_v2_generic_extracts_ville_parentheses(self):
+        """Test que find_lieu_in_text_v2 extrait la ville entre parenthèses."""
+        # Pattern: "salle communale (Maréçon)"
+        lieu_ref_list = [
+            (1, "Salle Communale", "Fillé", True),
+        ]
+        ville_ref_list = [
+            (1, "Maréçon"),
+            (2, "Fillé"),
+        ]
+
+        patterns = load_lieu_patterns(lieu_ref_list)
+        text = "Concert, salle communale (Maréçon), 20h"
+
+        result = find_lieu_in_text_v2(text, patterns, ville_ref_list)
+
+        assert result is not None
+        lieu_nom, lieu_id, start, end, lieu_ville = result
+        assert lieu_nom == "Salle Communale"
+        assert lieu_ville == "Maréçon"
+
+    def test_find_lieu_v2_non_generic_uses_referentiel_ville(self):
+        """Test que les lieux non-génériques utilisent la ville du référentiel."""
+        lieu_ref_list = [
+            (1, "L'Oasis", "Le Mans", False),
+        ]
+        ville_ref_list = [
+            (1, "Le Mans"),
+        ]
+
+        patterns = load_lieu_patterns(lieu_ref_list)
+        text = "Concert rock, L'Oasis, 20h"
+
+        result = find_lieu_in_text_v2(text, patterns, ville_ref_list)
+
+        assert result is not None
+        lieu_nom, lieu_id, start, end, lieu_ville = result
+        assert lieu_nom == "L'Oasis"
+        assert lieu_ville == "Le Mans"  # Du référentiel
+
+    def test_find_lieu_v2_generic_normalizes_ville_with_hyphen(self):
+        """Test que la ville est normalisée (espace → tiret) pour le matching."""
+        # "Rouessé Vassé" dans le texte doit matcher "Rouessé-Vassé" dans le référentiel
+        lieu_ref_list = [
+            (1, "Salle Communale", "Fillé", True),
+        ]
+        ville_ref_list = [
+            (1, "Rouessé-Vassé"),  # Avec tiret
+        ]
+
+        patterns = load_lieu_patterns(lieu_ref_list)
+        text = "Concert, salle communale de Rouessé Vassé, 14h"  # Avec espace
+
+        result = find_lieu_in_text_v2(text, patterns, ville_ref_list)
+
+        assert result is not None
+        lieu_nom, lieu_id, start, end, lieu_ville = result
+        assert lieu_ville == "Rouessé-Vassé"  # Retourne le nom canonique avec tiret
+
+
+class TestBidul183SpecificCases:
+    """Tests pour les cas spécifiques du bidul 183."""
+
+    def test_ville_from_lieu_referentiel_not_in_ville_ref(self):
+        """Test que la ville du lieu est utilisée même si pas dans ville_ref (Crosmières)."""
+        lieu_ref_list = [
+            (161668, "Foyer Rural", "Crosmières", False),
+        ]
+        ville_ref_list = [
+            (1, "Le Mans"),
+        ]
+
+        events = parse_event_line_v2(
+            "Festival des Mots d'Hiver, Foyer Rural, Crosmières, 15h",
+            1, 2005, lieu_ref_list, ville_ref_list
+        )
+
+        assert len(events) == 1
+        assert events[0]['lieu_raw'] == "Foyer Rural"
+        assert events[0]['ville_raw'] == "Crosmières"
+
+    def test_lieu_extracted_from_style_pattern(self):
+        """Test extraction du lieu collé au style: (Th)Th. du passeur."""
+        lieu_ref_list = []
+        ville_ref_list = []
+
+        events = parse_event_line_v2(
+            '"La colonie pénitentiaire" (Th)Th. du passeur, 20h30,10/12€',
+            1, 2005, lieu_ref_list, ville_ref_list
+        )
+
+        assert len(events) == 1
+        assert events[0]['lieu_raw'] == "Th. du passeur"
+
+    def test_lieu_after_exclamation_mark(self):
+        """Test extraction du lieu après '!' (Le Passeport)."""
+        lieu_ref_list = [
+            (161799, "Le Passeport", "Le Mans", False),
+        ]
+        ville_ref_list = [
+            (1, "Le Mans"),
+        ]
+
+        text = 'Soirée Zombie organisé par l\'asso "105db": ARTISTE ! Le Passeport'
+        events = parse_event_line_v2(text, 1, 2005, lieu_ref_list, ville_ref_list)
+
+        assert len(events) == 1
+        assert events[0]['lieu_raw'] == "Le Passeport"
 
 
 if __name__ == "__main__":
