@@ -1,3 +1,149 @@
+# Release Notes - Indexer v1.22
+
+## Vue d'ensemble
+
+Version avec types de source `csv` et `xlsx` dans `biduls.description.csv` : la colonne `type` supporte maintenant 4 valeurs (`scan`, `texte`, `csv`, `xlsx`) pour définir explicitement la méthode d'extraction utilisée par `populate`. Les options `--csv-only` et `--pdf-only` filtrent les biduls par type.
+
+## Nouveautés v1.22
+
+### Nouveaux types de source
+
+La colonne `type` dans `biduls.description.csv` supporte maintenant :
+
+| Type | Description | Biduls concernés |
+|------|-------------|------------------|
+| `scan` | OCR du PDF (Google Cloud Vision / PaddleOCR) | 1-177 (scans historiques) |
+| `texte` | Extraction texte natif du PDF (PyMuPDF) | 178-264 |
+| `csv` | Import depuis fichier CSV | 265-291 |
+| `xlsx` | Import depuis fichier XLSX | 306-310 |
+
+### Options de filtrage `--csv-only` et `--pdf-only`
+
+Nouvelles sémantiques pour les options de filtrage :
+
+| Option | Comportement |
+|--------|--------------|
+| `--csv-only` | Traite uniquement les biduls de type `csv` ou `xlsx` |
+| `--pdf-only` | Traite uniquement les biduls de type `scan` ou `texte` |
+| (aucune) | Traite tous les biduls selon leur type configuré |
+
+```bash
+# Traiter uniquement les biduls CSV/XLSX (265-291, 306-310)
+python cli.py populate --csv-only
+
+# Traiter uniquement les biduls PDF (1-264)
+python cli.py populate --pdf-only
+
+# Traiter un bidul spécifique selon son type
+python cli.py populate --numero 280  # type=csv → import CSV
+python cli.py populate --numero 184  # type=scan → OCR
+```
+
+### Nouvelle fonction `get_bidul_type()`
+
+Fonction dans `core/ocr.py` pour récupérer le type de source d'un bidul :
+
+```python
+from core.ocr import get_bidul_type
+
+bidul_type = get_bidul_type(280)  # Retourne 'csv'
+bidul_type = get_bidul_type(184)  # Retourne 'scan'
+bidul_type = get_bidul_type(306)  # Retourne 'xlsx'
+```
+
+### Modifications techniques
+
+| Fichier | Modification |
+|---------|-------------|
+| `corpus/biduls.description.csv` | Types mis à jour : 265-291 → `csv`, 306-310 → `xlsx` |
+| `core/ocr.py` | Nouvelle fonction `get_bidul_type()`, `is_scan_from_csv()` utilise cette fonction |
+| `cli.py` | Logique `cmd_populate()` simplifiée avec filtrage par type |
+
+### Tests
+
+- 238 tests unitaires passent
+- Benchmark bidul 184 : 94.7% (stable)
+
+---
+
+# Release Notes - Indexer v1.21
+
+## Vue d'ensemble
+
+Version avec support complet de l'import/export CSV et XLSX : nouvelle colonne `source_file` dans `biduls.description.csv`, support du format XLSX 2025+ avec mapping de colonnes intelligent, et nouvelle commande `export` avec clause WHERE personnalisable.
+
+## Nouveautés v1.21
+
+### Colonne `source_file` dans biduls.description.csv
+
+Nouvelle colonne pour définir explicitement les fichiers sources CSV/XLSX :
+
+| Format | Exemple | Biduls |
+|--------|---------|--------|
+| CSV 2022 | `tapage_biduleur_janvier_2022.csv` | 265-275 |
+| CSV 2023+ | `202301_tapage_biduleur_janvier_2023.csv` | 276-291 |
+| XLSX 2025+ | `202510_tapage_biduleur_Octobre_2025.xlsx` | 306-310 |
+
+**Multi-fichiers pour biduls d'été :**
+```csv
+271,csv,par bloc,...,tapage_biduleur_juillet_2022.csv|tapage_biduleur_aout_2022.csv,Juillet-août
+```
+
+### Support du format XLSX 2025+
+
+Nouveau module d'import pour les fichiers XLSX avec mapping intelligent des colonnes :
+
+| Colonne XLSX | Champ base |
+|--------------|------------|
+| `FESTOCHE\nEVENEMENT` | `nom` (festival) |
+| `DATE` | `date_evenement` |
+| `HEURE` | `heure` |
+| `LIEU` | `lieu_raw` |
+| `VILLE` | `ville_raw` |
+| `PRIX` | `tarif_raw` |
+| `GENRE 1` | `type_evenement` |
+| `NOM SPECTACLE 1` | `nom_spectacle` |
+| `COMPAGNIE 1 (SV)\nou GROUPE 1/ARTISTE 1 (C)` | `artiste` |
+| `STYLE SPECTACLE 1 (SV)/CONCERT 1 (C)` | `style` |
+
+### Commande `export` avec clause WHERE
+
+Nouvelle commande pour exporter les événements vers CSV ou XLSX :
+
+```bash
+# Export par numéro
+python cli.py export --numero 280 --output export_280.csv
+
+# Export d'une plage
+python cli.py export --range 280-285 --output exports/
+
+# Export avec filtre SQL personnalisé
+python cli.py export --where "date_evenement >= '2023-01-01'" --output 2023.csv
+python cli.py export --where "ville_raw = 'Le Mans'" --output lemans.csv
+
+# Export XLSX
+python cli.py export --numero 306 --format xlsx --output export.xlsx
+```
+
+### Nouvelles fonctions
+
+| Module | Fonction | Description |
+|--------|----------|-------------|
+| `core/csv_importer.py` | `get_source_files_from_config()` | Lit `source_file` depuis le CSV |
+| `core/csv_importer.py` | `import_xlsx()` | Importe un fichier XLSX |
+| `core/csv_importer.py` | `import_bidul_from_source()` | Import unifié CSV/XLSX |
+| `core/csv_exporter.py` | `export_events()` | Export avec WHERE |
+| `core/csv_exporter.py` | `export_bidul()` | Export par numéro |
+| `core/csv_exporter.py` | `export_range()` | Export par plage |
+
+### Tests
+
+- 238 tests unitaires passent
+- Benchmark bidul 184 : 94.7%
+- Benchmark bidul 190 : 91.5%
+
+---
+
 # Release Notes - Indexer v1.18
 
 ## Vue d'ensemble

@@ -450,6 +450,21 @@ parser = EventParser(bidul_mois=7, bidul_annee=2011, date_format='inline')
 3. **Formatage incohérent** - Certains vieux numéros ont un formatage variable
 4. **OCR des très anciens Biduls** - Qualité variable selon l'état du scan
 
+## Changelog v1.22
+
+- **Types `csv` et `xlsx`** : La colonne `type` dans `biduls.description.csv` supporte maintenant `csv` et `xlsx` en plus de `scan` et `texte`
+- **Fonction `get_bidul_type()`** : Nouvelle fonction dans `core/ocr.py` pour récupérer le type de source
+- **Logique `populate` mise à jour** : Utilise le type configuré pour choisir la méthode d'extraction (CSV/XLSX prioritaire ou PDF)
+- **Biduls configurés** : 265-291 en type `csv`, 306-310 en type `xlsx`
+
+## Changelog v1.21
+
+- **Colonne `source_file`** : Nouvelle colonne dans `biduls.description.csv` pour définir les fichiers sources CSV/XLSX
+- **Support multi-fichiers** : Séparateur `|` pour biduls d'été (juillet+août)
+- **Import XLSX** : Support du nouveau format XLSX 2025+ avec mapping de colonnes intelligent
+- **Export WHERE** : Nouvelle commande `export` avec clause WHERE personnalisable
+- **Formats export** : Support CSV et XLSX pour l'export
+
 ## Changelog v1.6
 
 - **Schema v3** : Suppression des colonnes JSON redondantes (`artistes`, `spectacles`, `genres_raw`, `style`) de la table `evenement`
@@ -546,6 +561,144 @@ event_id = db.insert_evenement(bidul_numero, event)
 apply_overrides(db.connect(), event_id, bidul_numero, event.raw_text)
 ```
 
+## Module Import CSV/XLSX (`core/csv_importer.py`)
+
+Module pour importer les événements depuis les fichiers CSV ou XLSX sources.
+
+### Formats supportés
+
+| Format | Période | Colonnes |
+|--------|---------|----------|
+| CSV 2022 | Biduls 265-275 | festival, style_festival, date, horaire, lieu, ville, prix, genre, spectacle, troupe, style_spectacle, artiste1-4, style1-4 |
+| CSV 2023 | Biduls 276-291 | initiales, festival, style_festival, date, horaire, lieu, ville, prix, genre, spectacle1-4, artiste1-4, style1-4, lien1-4 |
+| XLSX 2025+ | Biduls 306-310 | FESTOCHE EVENEMENT, DATE, HEURE, LIEU, VILLE, PRIX, GENRE 1, NOM SPECTACLE 1-4, COMPAGNIE/ARTISTE 1-4, STYLE 1-4 |
+
+### Classes et fonctions principales
+
+```python
+def get_source_files_from_config(bidul_numero: int) -> list[str]:
+    """Récupère la liste des fichiers sources depuis biduls.description.csv."""
+
+def import_xlsx(xlsx_path: Path, bidul_numero: int, annee: int, mois: int) -> list[dict]:
+    """Importe un fichier XLSX (format 2025+)."""
+
+def import_bidul_from_source(
+    bidul_numero: int, source_paths: list[Path], annee: int, mois: int
+) -> list[dict]:
+    """Importe les événements depuis un ou plusieurs fichiers sources."""
+
+def find_source_files(
+    bidul_numero: int, mois: int, annee: int, csv_dir: Path
+) -> list[Path]:
+    """Trouve les fichiers sources (CSV ou XLSX) pour un Bidul."""
+```
+
+### Mapping colonnes XLSX
+
+Le format XLSX utilise des noms de colonnes avec newlines. Le matching est fait par patterns :
+
+```python
+XLSX_COLUMN_PATTERNS = {
+    'festival': ['FESTOCHE', 'EVENEMENT'],
+    'style_festival': ['STYLE', 'FESTOCHE', 'EVENEMENT'],
+    'date': ['DATE'],
+    'horaire': ['HEURE'],
+    'lieu': ['LIEU'],
+    'ville': ['VILLE'],
+    'prix': ['PRIX'],
+    'genre': ['GENRE 1'],
+    # Pour spectacle/artiste/style 1-4
+    'spectacle{n}': ['NOM SPECTACLE {n}'],
+    'artiste{n}': ['COMPAGNIE {n}', 'GROUPE {n}', 'ARTISTE {n}'],
+    'style{n}': ['STYLE', 'SPECTACLE {n}', 'CONCERT {n}'],
+}
+```
+
+### Multi-fichiers (biduls d'été)
+
+La colonne `source_file` dans `biduls.description.csv` supporte plusieurs fichiers séparés par `|` :
+
+```csv
+271,scan,inline,...,tapage_biduleur_juillet_2022.csv|tapage_biduleur_aout_2022.csv,
+```
+
+## Module Export CSV/XLSX (`core/csv_exporter.py`)
+
+Module pour exporter les événements vers des fichiers CSV ou XLSX.
+
+### Fonctions principales
+
+```python
+def export_events(
+    db_path: Path,
+    output_path: Path,
+    where_clause: Optional[str] = None,
+    params: Optional[tuple] = None,
+    output_format: str = 'csv'
+) -> int:
+    """
+    Exporte les événements vers un fichier CSV ou XLSX.
+
+    Args:
+        db_path: Chemin vers la base de données SQLite
+        output_path: Chemin du fichier de sortie
+        where_clause: Clause WHERE SQL (sans le mot WHERE)
+        params: Paramètres pour la clause WHERE (tuple de valeurs pour les ?)
+        output_format: 'csv' ou 'xlsx'
+
+    Returns:
+        Nombre d'événements exportés
+    """
+
+def export_bidul(db_path: Path, bidul_numero: int, output_path: Path, output_format: str = 'csv') -> int:
+    """Exporte un bidul spécifique."""
+
+def export_range(db_path: Path, start_numero: int, end_numero: int, output_dir: Path, output_format: str = 'csv') -> int:
+    """Exporte une plage de biduls dans un dossier."""
+```
+
+### Colonnes exportées
+
+```python
+EXPORT_COLUMNS = [
+    'bidul_numero',
+    'date_evenement',
+    'horaire',
+    'lieu',
+    'ville',
+    'prix',
+    'festival',
+    'style_festival',
+    'genre',
+    'spectacle1', 'artiste1', 'style1',
+    'spectacle2', 'artiste2', 'style2',
+    'spectacle3', 'artiste3', 'style3',
+    'spectacle4', 'artiste4', 'style4',
+]
+```
+
+### Requête SQL
+
+La requête joint `evenement` et `contenu_evenement` pour reconstruire le format des fichiers sources :
+
+```sql
+SELECT
+    e.bidul_numero,
+    e.date_evenement,
+    e.heure as horaire,
+    e.lieu_raw as lieu,
+    e.ville_raw as ville,
+    e.tarif_raw as prix,
+    e.nom as festival,
+    e.genre_evenement as style_festival,
+    e.type_evenement as genre,
+    c.nom_spectacle, c.artiste, c.style, c.ordre
+FROM evenement e
+LEFT JOIN contenu_evenement c ON c.evenement_id = e.id
+WHERE {where_clause}
+ORDER BY e.bidul_numero, e.date_evenement, e.id, c.ordre
+```
+
 ## Contribution
 
 1. Ajouter des lieux manquants dans `corpus/lieu.csv`
@@ -553,3 +706,4 @@ apply_overrides(db.connect(), event_id, bidul_numero, event.raw_text)
 3. Améliorer les patterns dans `parser.py` pour les cas limites
 4. Enrichir le benchmark avec de nouvelles références
 5. Ajouter des corrections manuelles dans `corpus/overrides/` (v1.14)
+6. Configurer les fichiers sources dans `corpus/biduls.description.csv` colonne `source_file`
