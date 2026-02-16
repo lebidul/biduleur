@@ -267,15 +267,28 @@ def write_xlsx(rows: list[dict], output_path: Path) -> int:
         Nombre de lignes écrites
     """
     try:
-        import pandas as pd
+        import openpyxl
+        from openpyxl import Workbook
     except ImportError:
-        logger.error("pandas requis pour les fichiers XLSX: pip install pandas openpyxl")
+        logger.error("openpyxl requis pour les fichiers XLSX: pip install openpyxl")
         return 0
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    df = pd.DataFrame(rows, columns=XLSX_EXPORT_COLUMNS)
-    df.to_excel(output_path, index=False)
+    # Créer le workbook avec openpyxl directement
+    wb = Workbook()
+    ws = wb.active
+
+    # Écrire les headers
+    for col_idx, col_name in enumerate(XLSX_EXPORT_COLUMNS, 1):
+        ws.cell(row=1, column=col_idx, value=col_name)
+
+    # Écrire les données
+    for row_idx, row_data in enumerate(rows, 2):
+        for col_idx, col_name in enumerate(XLSX_EXPORT_COLUMNS, 1):
+            ws.cell(row=row_idx, column=col_idx, value=row_data.get(col_name, ''))
+
+    wb.save(output_path)
 
     return len(rows)
 
