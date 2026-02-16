@@ -1109,7 +1109,13 @@ def cmd_export(args):
     from indexer.core.db import DEFAULT_DB_PATH
 
     output_path = Path(args.output)
-    output_format = args.format
+
+    # Inférer le format depuis l'extension si non spécifié explicitement
+    if args.format:
+        output_format = args.format
+    else:
+        ext = output_path.suffix.lower()
+        output_format = 'xlsx' if ext == '.xlsx' else 'csv'
 
     if args.numero:
         # Export d'un seul bidul
@@ -2541,8 +2547,8 @@ Maintenance (normalisation v2):
     p_export.add_argument('--range', '-r', help='Plage de numéros (ex: 280-290)')
     p_export.add_argument('--where', '-w', help='Clause WHERE SQL (ex: "ville_raw = \'Le Mans\'")')
     p_export.add_argument('--output', '-o', required=True, help='Fichier de sortie ou dossier')
-    p_export.add_argument('--format', '-f', choices=['csv', 'xlsx'], default='csv',
-                         help='Format de sortie (défaut: csv)')
+    p_export.add_argument('--format', '-f', choices=['csv', 'xlsx'],
+                         help='Format de sortie (déduit de l\'extension, sinon csv)')
 
     # purge
     p_purge = subparsers.add_parser('purge', help='Supprime les événements de la base')
