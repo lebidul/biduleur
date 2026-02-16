@@ -627,11 +627,11 @@ class BidulDB:
         """Retourne la liste des lieux du référentiel pour le parser.
 
         Returns:
-            Liste de tuples (id, nom, ville)
+            Liste de tuples (id, nom, ville, is_generic)
         """
         conn = self.connect()
-        rows = conn.execute("SELECT id, nom, ville FROM lieu_ref").fetchall()
-        return [(row['id'], row['nom'], row['ville']) for row in rows]
+        rows = conn.execute("SELECT id, nom, ville, is_generic FROM lieu_ref").fetchall()
+        return [(row['id'], row['nom'], row['ville'], row['is_generic'] or False) for row in rows]
 
     def get_ville_ref_list(self) -> list[tuple]:
         """Retourne la liste des villes du référentiel pour le parser.

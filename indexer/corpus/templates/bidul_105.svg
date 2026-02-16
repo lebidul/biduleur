@@ -22,14 +22,14 @@
      inkscape:pagecheckerboard="0"
      inkscape:deskcolor="#d1d1d1"
      inkscape:zoom="0.88917619"
-     inkscape:cx="962.12653"
-     inkscape:cy="1554.2476"
+     inkscape:cx="680.9674"
+     inkscape:cy="646.10367"
      inkscape:window-width="2576"
      inkscape:window-height="2041"
-     inkscape:window-x="2571"
+     inkscape:window-x="2562"
      inkscape:window-y="0"
      inkscape:window-maximized="0"
-     inkscape:current-layer="svg4" />
+     inkscape:current-layer="page-2" />
   <metadata
      id="metadata1">
     <bidul
@@ -42,7 +42,7 @@
      id="page-1">
     <image
        id="bg-page-1"
-       x="0"
+       x="-0.26889163"
        y="0"
        width="1653"
        height="2338"
@@ -53,7 +53,7 @@
        id="g1">
       <rect
          id="p1-s3"
-         x="0"
+         x="-0.26889163"
          y="1123"
          width="859"
          height="1215"
@@ -82,7 +82,7 @@
      style="display:inline">
     <image
        id="bg-page-2"
-       x="0"
+       x="-0.26889163"
        y="0"
        width="1653"
        height="2338"
@@ -93,10 +93,10 @@
        id="g3">
       <rect
          id="p2-s1"
-         x="0"
+         x="-0.26889163"
          y="0"
-         width="859"
-         height="1215"
+         width="891.61444"
+         height="1163.2667"
          fill="none"
          stroke="#008000"
          stroke-width="2"
@@ -113,7 +113,8 @@
          fill="none"
          stroke="#008000"
          stroke-width="1.46222"
-         data-order="4" />
+         data-order="4"
+         ry="3.3739095" />
     </g>
   </g>
 </svg>

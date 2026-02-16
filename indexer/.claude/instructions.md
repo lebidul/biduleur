@@ -27,9 +27,9 @@ python cli.py populate --numero 184 --replace
 python benchmark/compare_bidul.py 184
 python benchmark/compare_bidul.py 190
 
-# Scores de référence v1.18:
+# Scores de référence v1.20:
 # - Bidul 184: 94.6%
-# - Bidul 190: 90.6%
+# - Bidul 190: 91.5%
 ```
 
 **ATTENTION**: `extract` ne filtre pas les artifacts et produit trop d'événements. Toujours utiliser `populate` pour les benchmarks.
@@ -54,10 +54,28 @@ grep "^175" corpus/biduls.description.csv
 | `split_on_dates_v2()` | Découpe sur dates inline (Lu 02, Ma 03...) |
 | `split_bloc_fused_events()` | Sépare événements fusionnés (prix€ + MAJUSCULES) |
 | `parse_event_line_v2()` | Parse une ligne d'événement |
+| `extract_header_lieu()` | Extrait le lieu depuis un en-tête de bloc (v1.21) |
 | `_parse_inline_with_referentiel()` | Format inline avec référentiels (Je 02: ARTISTE, Lieu) |
 | `_parse_bloc_with_referentiel()` | Format bloc avec référentiels (dates en en-têtes) |
 | `_parse_inline_inherited_date()` | Format inline_inherited avec référentiels (biduls 1-16) |
 | `_parse_inline_inherited_format()` | Format inline_inherited sans référentiels (pour `parse()`) |
+
+### Propagation du lieu d'en-tête (v1.21)
+
+Certains blocs ont un en-tête avec le lieu suivi d'événements sans lieu :
+
+```
+Au Palais, café-concert, Le Mans, à 22h
+Ve 05: Concert Jazz avec Pascal MAFFEÏ
+Ve 12: Soirée Ambiance avec DJ FRED
+```
+
+La fonction `extract_header_lieu()` détecte ces patterns :
+- `Au X, Ville` → lieu="Le X" (conversion Au→Le)
+- `Nom Ville - tél...` → lieu="Nom", ville="Ville"
+- `Le/La X, Ville` → lieu="Le/La X", ville="Ville"
+
+Le lieu est propagé via `current_block_lieu_*` aux événements sans `lieu_raw`.
 
 **Note importante**: Le format `inline_inherited` a deux implémentations:
 - `_parse_inline_inherited_date()` : utilisé par `parse_with_referentiel()`
@@ -638,3 +656,116 @@ cursor.execute('''
 for row in cursor.fetchall():
     print(f"  {row[0]} - {row[1]}")
 ```
+
+## Ajouter un pattern d'extraction d'artiste/spectacle
+
+### Contexte
+Le workflow `populate` utilise `parse_event_line_v2()` (fonction standalone) qui appelle `extract_before_lieu()` pour extraire les artistes/spectacles. La classe `EventParser._parse_event()` n'est PAS utilisée par `populate`.
+
+### Architecture du parsing (IMPORTANT)
+
+```
+CLI populate
+    └── parse_with_referentiel()
+        └── _parse_bloc_with_referentiel() ou _parse_inline_with_referentiel()
+            └── parse_event_line_v2()        ← fonction standalone
+                └── extract_before_lieu()    ← extraction artistes/spectacles
+```
+
+**Attention** : `EventParser._extract_spectacle_artiste_pattern()` est utilisé uniquement par `_parse_event()`, qui n'est PAS dans le flux `populate`.
+
+### Workflow pour ajouter un nouveau pattern
+
+1. **Identifier le texte problématique**
+   ```python
+   # Récupérer le raw_text depuis la base
+   SELECT raw_text FROM evenement WHERE bidul_numero = XXX AND raw_text LIKE '%pattern%'
+   ```
+
+2. **Tester le pattern regex isolément**
+   ```python
+   import re
+   text = '...'  # raw_text exact
+   pattern = re.compile(r'...')
+   match = pattern.search(text)
+   print(match.groups() if match else "No match")
+   ```
+
+3. **Ajouter le pattern dans `extract_before_lieu()`** (ligne ~2778)
+   - C'est la fonction clé pour le flux `populate`
+   - Chercher la section `if has_formatting_tags(before):` pour les patterns HTML
+   - Ajouter le pattern AVANT le parsing classique
+
+   ```python
+   # Dans extract_before_lieu(), après les autres patterns spéciaux:
+   mon_pattern = r'...'
+   mon_match = re.search(mon_pattern, before)
+   if mon_match:
+       artiste_nom = mon_match.group(X).strip()
+       if artiste_nom and len(artiste_nom) > 2:
+           if not any(a['nom'].lower() == artiste_nom.lower() for a in result['artistes']):
+               result['artistes'].append({'nom': artiste_nom, 'style': style, 'is_musical': False})
+   ```
+
+4. **Optionnel : ajouter aussi dans `_extract_spectacle_artiste_pattern()`** (ligne ~5487)
+   - Pour la cohérence avec `EventParser._parse_event()`
+   - Utile si d'autres flux utilisent cette méthode
+
+5. **Tester avec populate**
+   ```bash
+   python cli.py purge --numero XXX
+   python cli.py populate --numero XXX --replace --reparse
+
+   # Vérifier le résultat
+   python -c "
+   import sqlite3
+   conn = sqlite3.connect('database/bidul_archives.db')
+   cursor = conn.cursor()
+   cursor.execute('''
+       SELECT e.raw_text, c.artiste, c.nom_spectacle
+       FROM evenement e
+       JOIN contenu_evenement c ON c.evenement_id = e.id
+       WHERE e.bidul_numero = XXX AND e.raw_text LIKE '%pattern%'
+   ''')
+   for row in cursor.fetchall():
+       print(f'artiste: {row[1]}, spectacle: {row[2]}')
+   "
+   ```
+
+6. **Ajouter les tests unitaires** dans `tests/test_parser.py`
+   - Tester `extract_before_lieu()` directement
+   - Tester avec `EventParser._parse_event()` si pattern ajouté là aussi
+
+7. **Lancer les benchmarks**
+   ```bash
+   python cli.py purge --numero 184 && python cli.py populate --numero 184 --replace
+   python benchmark/compare_bidul.py 184  # Attendu: 94.6%
+   python benchmark/compare_bidul.py 190  # Attendu: 91.5%
+   ```
+
+### Patterns existants dans `extract_before_lieu()`
+
+| Pattern | Exemple | Ligne |
+|---------|---------|-------|
+| `"Spectacle" (style) de Auteur` | `"Venezuela" (théâtre) de Guy Helminger` | ~3106 |
+| `"Spectacle" (style), Artiste` | `"L'instant magique" (illusion), Greg Bagot` | ~3133 |
+| `<<Spectacle" de Auteur` | `<<Pichol" de Claude Bonadonna` (guillemet OCR) | ~3121 |
+| Auteur avec initiales | `de C. Liscano`, `de J.-P. Dupont` | ~3121 |
+| Artistes en `<b>gras</b>` | `<b>ARTISTE</b> (rock)` | via `extract_formatted_artistes_musicaux()` |
+| Spectacles en `<b>"guillemets"</b>` | `<b>"Titre"</b>` | via `extract_formatted_spectacles()` |
+
+### Validation du lieu - cas particuliers
+
+| Cas | Exemple | Comportement |
+|-----|---------|--------------|
+| Lieu après `!` ou `.` | `Soirée X ! Le Passeport` | Lieu valide (séparateur) |
+| Lieu commençant par article | `JEREMY Le La Ré Do` | Lieu valide (Le/La/L') |
+| `de Prénom Nom` | `de Claude Bonadonna` | Ignoré (pattern auteur) |
+| `(style)Lieu` collé | `(Th)Th. du passeur` | Lieu extrait |
+| Ville du lieu hors référentiel | `Foyer Rural, Crosmières` | Ville du lieu gardée |
+
+### Erreur fréquente
+
+❌ **Ne pas modifier uniquement `_extract_spectacle_artiste_pattern()`** - cette méthode n'est pas appelée par `populate`.
+
+✅ **Toujours modifier `extract_before_lieu()`** pour que le pattern fonctionne avec `populate`.

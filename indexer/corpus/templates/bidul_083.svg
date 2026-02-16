@@ -26,10 +26,10 @@
      inkscape:cy="1291.4667"
      inkscape:window-width="2576"
      inkscape:window-height="2041"
-     inkscape:window-x="2571"
+     inkscape:window-x="2562"
      inkscape:window-y="0"
      inkscape:window-maximized="0"
-     inkscape:current-layer="svg4" />
+     inkscape:current-layer="page-2" />
   <metadata
      id="metadata1">
     <bidul
@@ -39,7 +39,8 @@
   </metadata>
   <!-- Page 1 -->
   <g
-     id="page-1">
+     id="page-1"
+     style="display:none">
     <image
        id="bg-page-1"
        x="0"
@@ -58,7 +59,7 @@
          width="859"
          height="1215"
          fill="none"
-         stroke="green"
+         stroke="#008000"
          stroke-width="2"
          data-order="1" />
     </g>
@@ -90,7 +91,8 @@
          data-order="2" />
     </g>
     <g
-       id="g3">
+       id="g3"
+       transform="matrix(0.94830592,0,0,1.0000817,85.488523,-0.01376157)">
       <rect
          id="p2-s2"
          x="792.52771"

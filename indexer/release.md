@@ -1,3 +1,114 @@
+# Release Notes - Indexer v1.21
+
+## Vue d'ensemble
+
+Version avec propagation automatique du lieu d'en-tête aux événements et amélioration du heatmap dans le dashboard stats.
+
+## Nouveautés v1.21
+
+### Propagation du lieu d'en-tête
+
+Certains biduls (notamment 71) ont un bloc d'événements précédé d'un en-tête avec le lieu :
+
+```
+Au Palais, café-concert, Le Mans, à 22h et gratuit
+Ve 05: Concert Jazz avec Pascal MAFFEÏ
+Ve 12: Soirée Ambiance avec DJ FRED
+...
+```
+
+Le parser détecte maintenant ces en-têtes et propage le lieu aux événements sans `lieu_raw`.
+
+| Pattern | Exemple | Extraction |
+|---------|---------|------------|
+| `Au X` | `Au Palais, café-concert, Le Mans` | lieu="Le Palais", ville="Le Mans" |
+| `Nom Ville` | `MJC Prévert Le Mans - tél...` | lieu="MJC Prévert", ville="Le Mans" |
+| `Le/La X, Ville` | `Le Passeport, Le Mans` | lieu="Le Passeport", ville="Le Mans" |
+
+### Détection dynamique mid-text
+
+L'en-tête peut apparaître au milieu du texte (après d'autres événements). Le parser détecte dynamiquement ces changements de contexte et met à jour le lieu du bloc courant.
+
+### Sélecteur d'échelle pour le heatmap
+
+Le dashboard stats offre maintenant un sélecteur d'échelle pour le heatmap :
+
+| Échelle | Formule | Usage |
+|---------|---------|-------|
+| **Logarithmique** | `log(n+1) / log(max+1)` | Compresse les valeurs élevées |
+| **Racine carrée** (défaut) | `√n / √max` | Meilleur contraste visuel |
+| **Linéaire** | `n / max` | Proportionnel direct |
+
+L'échelle racine carrée est maintenant par défaut pour mieux distinguer les lieux avec peu vs beaucoup d'événements.
+
+### Modifications techniques
+
+| Fichier | Modification |
+|---------|-------------|
+| `core/parser.py` | Fonction `extract_header_lieu()` pour détecter les en-têtes |
+| `core/parser.py` | Détection dynamique mid-text dans `_parse_inline_with_referentiel()` |
+| `core/parser.py` | Variables `current_block_lieu_*` pour propagation du lieu |
+| `core/stats_generator.py` | Sélecteur d'échelle heatmap (log, sqrt, linear) |
+| `core/stats_generator.py` | Calcul d'intensité selon l'échelle choisie |
+
+### Benchmarks
+
+| Bidul | Score v1.20 | Score v1.21 |
+|-------|-------------|-------------|
+| 184 | 94.7% | 94.7% |
+| 190 | 91.5% | 91.5% |
+| 71 | lieu=None | lieu="Le Palais" ✓ |
+
+### Tests
+
+- 268 tests unitaires passent
+
+---
+
+# Release Notes - Indexer v1.19
+
+## Vue d'ensemble
+
+Version avec amélioration de l'extraction des artistes pour les spectacles de théâtre/magie. Deux nouveaux patterns supportés pour extraire l'artiste associé à un spectacle.
+
+## Nouveautés v1.19
+
+### Nouveaux patterns d'extraction artiste/spectacle
+
+| Pattern | Exemple | Extraction |
+|---------|---------|------------|
+| `"Spectacle" (style) de Auteur` | `"Venezuela" (théâtre) de Guy Helminger` | spectacle + auteur ✓ |
+| `"Spectacle" (style), Artiste` | `"L'instant magique" (illusion), Greg Bagot` | spectacle + artiste ✓ |
+
+Ces patterns supportent les balises HTML (`<b>`, `<i>`) et les différents types de guillemets (`"`, `«`, `"`).
+
+### Modifications techniques
+
+| Fichier | Modification |
+|---------|-------------|
+| `core/parser.py` | Pattern `"Spectacle" (style) de Auteur` dans `extract_before_lieu()` (~ligne 3106) |
+| `core/parser.py` | Pattern `"Spectacle" (style), Artiste` dans `extract_before_lieu()` (~ligne 3133) |
+| `core/parser.py` | Mêmes patterns dans `_extract_spectacle_artiste_pattern()` pour cohérence |
+| `.claude/instructions.md` | Documentation du workflow pour ajouter des patterns |
+
+### Tests ajoutés
+
+- **9 tests** dans `TestSpectacleDeAuteurPattern` (bidul 208)
+- **8 tests** dans `TestSpectacleVirguleArtistePattern` (bidul 219)
+
+### Benchmarks
+
+| Bidul | Score v1.18 | Score v1.19 |
+|-------|-------------|-------------|
+| 184 | 94.7% | 94.7% |
+| 190 | 90.6% | 90.6% |
+
+### Tests
+
+- 179 tests unitaires passent
+
+---
+
 # Release Notes - Indexer v1.18
 
 ## Vue d'ensemble

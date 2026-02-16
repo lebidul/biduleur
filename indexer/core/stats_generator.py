@@ -610,6 +610,7 @@ def get_geo_data(db_path: str) -> Dict[str, Any]:
     # Données agrégées par lieu (tous temps)
     cur.execute("""
         SELECT
+            lr.id,
             lr.nom,
             lr.ville,
             lr.latitude,
@@ -622,17 +623,66 @@ def get_geo_data(db_path: str) -> Dict[str, Any]:
         ORDER BY event_count DESC
     """)
 
+    lieux_data = cur.fetchall()
+    lieu_ids = [row[0] for row in lieux_data]
+
+    # Récupérer TOUS les événements pour chaque lieu (pour filtrage dynamique)
+    events_by_lieu = {}
+    if lieu_ids:
+        placeholders = ','.join('?' * len(lieu_ids))
+        cur.execute(f"""
+            SELECT
+                e.lieu_ref_id,
+                e.date_evenement,
+                e.heure,
+                e.tarif_raw,
+                e.nom as event_nom,
+                GROUP_CONCAT(ce.artiste, ' + ') as artistes,
+                GROUP_CONCAT(ce.nom_spectacle, ' / ') as spectacles
+            FROM evenement e
+            LEFT JOIN contenu_evenement ce ON ce.evenement_id = e.id
+            WHERE e.lieu_ref_id IN ({placeholders})
+            GROUP BY e.id
+            ORDER BY e.lieu_ref_id, e.date_evenement DESC
+        """, lieu_ids)
+
+        for row in cur.fetchall():
+            lieu_id = row[0]
+            if lieu_id not in events_by_lieu:
+                events_by_lieu[lieu_id] = []
+            # Stocker tous les événements avec la date pour filtrage côté JS
+            events_by_lieu[lieu_id].append({
+                'date': row[1],
+                'heure': row[2],
+                'tarif': row[3],
+                'nom': row[4],
+                'artistes': row[5],
+                'spectacles': row[6]
+            })
+
     lats, lngs = [], []
-    for row in cur.fetchall():
+    for row in lieux_data:
+        lieu_id = row[0]
+        lat, lng = row[3], row[4]
+
+        # Valider les coordonnées (filtrer les valeurs aberrantes)
+        # La Sarthe est entre lat 47-49 et lng -1 à 2
+        if lat is None or lng is None:
+            continue
+        if not (-90 <= lat <= 90) or not (-180 <= lng <= 180):
+            # Coordonnées invalides, ignorer ce lieu
+            continue
+
         result['lieux'].append({
-            'nom': row[0],
-            'ville': row[1] or 'Le Mans',
-            'lat': row[2],
-            'lng': row[3],
-            'count': row[4]
+            'nom': row[1],
+            'ville': row[2] or 'Le Mans',
+            'lat': lat,
+            'lng': lng,
+            'count': row[5],
+            'events': events_by_lieu.get(lieu_id, [])
         })
-        lats.append(row[2])
-        lngs.append(row[3])
+        lats.append(lat)
+        lngs.append(lng)
 
     # Calculer les bounds
     if lats and lngs:
@@ -672,13 +722,17 @@ def get_geo_data(db_path: str) -> Dict[str, Any]:
 
     for row in cur.fetchall():
         year = row[0]
+        lat, lng = row[3], row[4]
+        # Valider les coordonnées
+        if lat is None or lng is None or not (-90 <= lat <= 90) or not (-180 <= lng <= 180):
+            continue
         if year not in result['lieux_by_year']:
             result['lieux_by_year'][year] = []
         result['lieux_by_year'][year].append({
             'nom': row[1],
             'ville': row[2] or 'Le Mans',
-            'lat': row[3],
-            'lng': row[4],
+            'lat': lat,
+            'lng': lng,
             'count': row[5]
         })
 
@@ -702,13 +756,17 @@ def get_geo_data(db_path: str) -> Dict[str, Any]:
 
     for row in cur.fetchall():
         month = row[0]
+        lat, lng = row[3], row[4]
+        # Valider les coordonnées
+        if lat is None or lng is None or not (-90 <= lat <= 90) or not (-180 <= lng <= 180):
+            continue
         if month not in result['lieux_by_month']:
             result['lieux_by_month'][month] = []
         result['lieux_by_month'][month].append({
             'nom': row[1],
             'ville': row[2] or 'Le Mans',
-            'lat': row[3],
-            'lng': row[4],
+            'lat': lat,
+            'lng': lng,
             'count': row[5]
         })
 
@@ -735,14 +793,18 @@ def get_geo_data(db_path: str) -> Dict[str, Any]:
 
     for row in cur.fetchall():
         week = row[0]
+        lat, lng = row[3], row[4]
+        # Valider les coordonnées
+        if lat is None or lng is None or not (-90 <= lat <= 90) or not (-180 <= lng <= 180):
+            continue
         if week and week not in result['lieux_by_week']:
             result['lieux_by_week'][week] = []
         if week:
             result['lieux_by_week'][week].append({
                 'nom': row[1],
                 'ville': row[2] or 'Le Mans',
-                'lat': row[3],
-                'lng': row[4],
+                'lat': lat,
+                'lng': lng,
                 'count': row[5]
             })
 
@@ -771,14 +833,18 @@ def get_geo_data(db_path: str) -> Dict[str, Any]:
 
     for row in cur.fetchall():
         day = row[0]
+        lat, lng = row[3], row[4]
+        # Valider les coordonnées
+        if lat is None or lng is None or not (-90 <= lat <= 90) or not (-180 <= lng <= 180):
+            continue
         if day and day not in result['lieux_by_day']:
             result['lieux_by_day'][day] = []
         if day:
             result['lieux_by_day'][day].append({
                 'nom': row[1],
                 'ville': row[2] or 'Le Mans',
-                'lat': row[3],
-                'lng': row[4],
+                'lat': lat,
+                'lng': lng,
                 'count': row[5]
             })
 
@@ -913,6 +979,7 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
         .btn.active { background: #4f46e5; }
         .btn.purple.active { background: #7c3aed; }
         .btn.teal.active { background: #0d9488; }
+        .btn.green.active { background: #059669; }
 
         /* Axis selector */
         .axis-selector {
@@ -1307,6 +1374,7 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
         <button class="btn" onclick="setView('local')">Locaux</button>
         <button class="btn" onclick="setView('regional')">Regionaux</button>
         <button class="btn" onclick="setView('content')">Contenus</button>
+        <button class="btn green active" id="cumulativeBtn" onclick="toggleCumulative()">Total cumule</button>
         <button class="btn purple" id="qualityBtn" onclick="toggleQuality()">Qualite</button>
         <button class="btn teal" id="kpiBtn" onclick="toggleKPI()">KPI Avances</button>
     </div>
@@ -1375,6 +1443,12 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
                     <button class="btn active" id="btnMarkers" onclick="setMapView('markers')">Marqueurs</button>
                     <button class="btn" id="btnHeat" onclick="setMapView('heat')">Heatmap</button>
                     <button class="btn" id="btnBoth" onclick="setMapView('both')">Les deux</button>
+                    <span style="margin-left:15px;color:#9ca3af;font-size:12px">Echelle:</span>
+                    <select id="heatmapScaleSelect" onchange="setHeatmapScale(this.value)" style="background:#374151;color:#f3f4f6;border:1px solid #4b5563;border-radius:4px;padding:4px 8px;font-size:12px">
+                        <option value="log">Logarithmique</option>
+                        <option value="sqrt" selected>Racine carree</option>
+                        <option value="linear">Lineaire</option>
+                    </select>
                 </div>
                 <div class="map-stats">
                     <span>Lieux: <span class="count" id="mapLieuxCount">-</span></span>
@@ -1508,6 +1582,19 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
 
         // Top 10
         const top10 = [...existing].sort((a, b) => b.events - a.events).slice(0, 10);
+
+        // Calcul du total cumulé (courbe d'évolution)
+        // Fonction pour calculer le cumulatif à partir d'un array
+        function computeCumulative(arr) {
+            let total = 0;
+            return arr.map(v => {
+                total += v;
+                return total;
+            });
+        }
+
+        // Cumulatif initial basé sur les données par bidul
+        let cumulativeData = computeCumulative(data.map(d => d.events));
 
         // Mise a jour stats
         document.getElementById('totalEvents').textContent = eventsTotal.toLocaleString();
@@ -1656,6 +1743,20 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
             });
         }
 
+        // Add cumulative total dataset
+        datasets.push({
+            label: 'Total cumule',
+            data: cumulativeData,
+            type: 'line',
+            borderColor: '#10b981',
+            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+            borderWidth: 2,
+            pointRadius: 0,
+            fill: true,
+            yAxisID: 'y2',
+            hidden: false
+        });
+
         let chart = new Chart(ctx, {
             type: 'bar',
             data: {
@@ -1676,19 +1777,24 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
                         titleColor: '#f3f4f6',
                         bodyColor: '#9ca3af',
                         callbacks: {
-                            title: (items) => `Bidul ${items[0].label}`,
+                            title: (items) => items[0].label,
                             label: (item) => {
-                                const d = data[item.dataIndex];
-                                if (d.missing) return 'PDF MANQUANT';
                                 if (item.dataset.label === 'Score Qualite') return `Qualite: ${item.raw}%`;
+                                if (item.dataset.label === 'Total cumule') return `Total cumule: ${item.raw.toLocaleString()}`;
                                 return `${item.dataset.label}: ${item.raw}`;
                             },
                             afterBody: (items) => {
-                                const d = data[items[0].dataIndex];
-                                if (d.missing || d.events === 0) return '';
+                                const idx = items[0].dataIndex;
+                                // Get local and regional values from their datasets
+                                const localVal = chart.data.datasets[0].data[idx] || 0;
+                                const regionalVal = chart.data.datasets[1].data[idx] || 0;
+                                const contentVal = chart.data.datasets[2].data[idx] || 0;
+                                const totalEvents = localVal + regionalVal;
+                                if (totalEvents === 0) return '';
                                 const lines = [];
-                                lines.push(`Total: ${d.events} (${d.events_local || 0} local + ${d.events_regional || 0} regional)`);
-                                lines.push(`Ratio: ${(d.content / d.events).toFixed(2)}`);
+                                lines.push(`Total: ${totalEvents} (${localVal} local + ${regionalVal} regional)`);
+                                if (contentVal > 0) lines.push(`Ratio: ${(contentVal / totalEvents).toFixed(2)}`);
+                                lines.push(`Cumul: ${cumulativeData[idx].toLocaleString()} evenements`);
                                 return lines;
                             }
                         }
@@ -1717,6 +1823,22 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
                         ticks: {
                             color: '#8b5cf6',
                             callback: v => v + '%'
+                        }
+                    },
+                    y2: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        min: 0,
+                        grid: { drawOnChartArea: false },
+                        ticks: {
+                            color: '#10b981',
+                            callback: v => v >= 1000 ? (v/1000).toFixed(0) + 'k' : v
+                        },
+                        title: {
+                            display: true,
+                            text: 'Total cumule',
+                            color: '#10b981'
                         }
                     }
                 }
@@ -1819,6 +1941,22 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
             chart.update();
         }
 
+        // Toggle cumulative view
+        let cumulativeVisible = true;
+        function toggleCumulative() {
+            cumulativeVisible = !cumulativeVisible;
+            const btn = document.getElementById('cumulativeBtn');
+            btn.classList.toggle('active', cumulativeVisible);
+
+            // Find cumulative dataset (last one added)
+            const cumulativeIndex = chart.data.datasets.findIndex(ds => ds.label === 'Total cumule');
+            if (cumulativeIndex >= 0) {
+                chart.data.datasets[cumulativeIndex].hidden = !cumulativeVisible;
+                chart.options.scales.y2.display = cumulativeVisible;
+                chart.update();
+            }
+        }
+
         // Toggle quality view
         let qualityVisible = false;
         function toggleQuality() {
@@ -1894,6 +2032,17 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
             chart.data.datasets[0].backgroundColor = Array(len).fill('#06b6d4');
             chart.data.datasets[1].backgroundColor = Array(len).fill('#a78bfa');
             chart.data.datasets[2].backgroundColor = Array(len).fill('#f59e0b');
+
+            // Recalculate cumulative data for the new axis
+            // Sum local + regional to get total events for cumulative
+            const eventsForCumul = newData.local.map((v, i) => v + (newData.regional[i] || 0));
+            cumulativeData = computeCumulative(eventsForCumul);
+
+            // Update cumulative dataset
+            const cumulativeIndex = chart.data.datasets.findIndex(ds => ds.label === 'Total cumule');
+            if (cumulativeIndex >= 0) {
+                chart.data.datasets[cumulativeIndex].data = cumulativeData;
+            }
 
             // Update x-axis tick callback
             if (axis === 'numero_bidul') {
@@ -2207,6 +2356,10 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
         let heatLayer = null;
         let currentMapView = 'markers';
         let currentMapData = null;
+        let allLieuxWithEvents = null;  // Store full lieu data with events
+        let currentFilterType = null;   // 'year', 'month', 'week', 'day' or null
+        let currentFilterValue = null;  // The selected filter value
+        let currentHeatmapScale = 'sqrt'; // 'log', 'sqrt' or 'linear'
 
         function initMap() {
             if (!geoData || !geoData.lieux || geoData.lieux.length === 0) {
@@ -2229,6 +2382,9 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
             markersLayer = L.layerGroup().addTo(map);
             // Tooltip layer (invisible markers for tooltips, always visible)
             tooltipLayer = L.layerGroup().addTo(map);
+
+            // Store full lieu data with events for popup filtering
+            allLieuxWithEvents = geoData.lieux;
 
             // Initial map update
             currentMapData = geoData.lieux;
@@ -2272,6 +2428,15 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
 
                 totalEvents += lieu.count;
 
+                // Find full lieu data with events (for popup)
+                let lieuWithEvents = lieu;
+                if (allLieuxWithEvents) {
+                    const fullLieu = allLieuxWithEvents.find(l => l.nom === lieu.nom && l.ville === lieu.ville);
+                    if (fullLieu) {
+                        lieuWithEvents = {...lieu, events: fullLieu.events};
+                    }
+                }
+
                 // Circle marker with popup and tooltip (visible)
                 const radius = Math.min(5 + (lieu.count / maxCount) * 15, 20);
                 const marker = L.circleMarker([lieu.lat, lieu.lng], {
@@ -2282,14 +2447,12 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
                     color: '#fff',
                     weight: 1
                 });
+
+                // Build popup content with event details (filtered by current time filter)
+                const popupContent = buildLieuPopup(lieuWithEvents, currentFilterType, currentFilterValue);
+
                 // Popup with details on click
-                marker.bindPopup(
-                    '<div style="font-family:system-ui;min-width:150px">' +
-                    '<b style="font-size:14px">' + lieu.nom + '</b><br>' +
-                    '<span style="color:#9ca3af">' + lieu.ville + '</span><br>' +
-                    '<span style="color:#f59e0b;font-weight:600">' + lieu.count + ' événement(s)</span>' +
-                    '</div>'
-                );
+                marker.bindPopup(popupContent, {maxWidth: 350, maxHeight: 400});
                 // Tooltip with name on hover
                 marker.bindTooltip(lieu.nom, {
                     permanent: false,
@@ -2304,13 +2467,7 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
                     fillOpacity: 0,
                     stroke: false
                 });
-                tooltipMarker.bindPopup(
-                    '<div style="font-family:system-ui;min-width:150px">' +
-                    '<b style="font-size:14px">' + lieu.nom + '</b><br>' +
-                    '<span style="color:#9ca3af">' + lieu.ville + '</span><br>' +
-                    '<span style="color:#f59e0b;font-weight:600">' + lieu.count + ' événement(s)</span>' +
-                    '</div>'
-                );
+                tooltipMarker.bindPopup(popupContent, {maxWidth: 350, maxHeight: 400});
                 tooltipMarker.bindTooltip(lieu.nom, {
                     permanent: false,
                     direction: 'top',
@@ -2318,8 +2475,20 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
                 });
                 tooltipLayer.addLayer(tooltipMarker);
 
-                // Heatmap point (with intensity based on count)
-                heatPoints.push([lieu.lat, lieu.lng, lieu.count / maxCount]);
+                // Heatmap point intensity depends on selected scale
+                let intensity;
+                if (currentHeatmapScale === 'log') {
+                    // Log scale: log(count+1) / log(maxCount+1) - compresses high values
+                    intensity = Math.log(lieu.count + 1) / Math.log(maxCount + 1);
+                } else if (currentHeatmapScale === 'sqrt') {
+                    // Square root scale: sqrt(count) / sqrt(maxCount) - best contrast
+                    // Expands differences between low/medium values while compressing extremes
+                    intensity = Math.sqrt(lieu.count) / Math.sqrt(maxCount);
+                } else {
+                    // Linear scale: direct proportion - high values dominate
+                    intensity = lieu.count / maxCount;
+                }
+                heatPoints.push([lieu.lat, lieu.lng, intensity]);
             });
 
             // Create heatmap layer
@@ -2327,7 +2496,9 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
                 radius: 25,
                 blur: 15,
                 maxZoom: 15,
+                max: 1.0,
                 gradient: {
+                    0.0: '#1e3a5f',
                     0.2: '#22c55e',
                     0.4: '#84cc16',
                     0.6: '#f59e0b',
@@ -2342,6 +2513,115 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
 
             // Apply current view
             applyMapView();
+        }
+
+        function buildLieuPopup(lieu, filterType, filterValue) {
+            // Filtrer les événements selon le filtre actif
+            let filteredEvents = lieu.events || [];
+            let filterLabel = 'Tous les événements';
+
+            if (filterType && filterValue && filteredEvents.length > 0) {
+                filteredEvents = filteredEvents.filter(function(evt) {
+                    if (!evt.date) return false;
+                    if (filterType === 'year') {
+                        return evt.date.substring(0, 4) === filterValue;
+                    } else if (filterType === 'month') {
+                        return evt.date.substring(0, 7) === filterValue;
+                    } else if (filterType === 'week') {
+                        // filterValue format: YYYY-WNN
+                        const evtDate = new Date(evt.date);
+                        const evtWeek = getWeekString(evtDate);
+                        return evtWeek === filterValue;
+                    } else if (filterType === 'day') {
+                        return evt.date === filterValue;
+                    }
+                    return true;
+                });
+
+                // Label du filtre
+                if (filterType === 'year') filterLabel = 'Année ' + filterValue;
+                else if (filterType === 'month') filterLabel = filterValue;
+                else if (filterType === 'week') filterLabel = 'Semaine ' + filterValue;
+                else if (filterType === 'day') filterLabel = filterValue;
+            }
+
+            // Limiter à 15 événements pour l'affichage
+            const displayEvents = filteredEvents.slice(0, 15);
+            const totalFiltered = filteredEvents.length;
+
+            let html = '<div style="font-family:system-ui;min-width:200px;max-width:320px">';
+            html += '<b style="font-size:14px;color:#f8fafc">' + escapeHtml(lieu.nom) + '</b><br>';
+            html += '<span style="color:#9ca3af">' + escapeHtml(lieu.ville) + '</span><br>';
+            html += '<span style="color:#f59e0b;font-weight:600">' + totalFiltered + ' événement(s)</span>';
+            if (filterType && filterValue) {
+                html += '<span style="color:#6b7280;font-size:11px"> (' + filterLabel + ')</span>';
+            }
+
+            if (displayEvents.length > 0) {
+                html += '<div style="margin-top:8px;border-top:1px solid #374151;padding-top:8px;max-height:280px;overflow-y:auto">';
+
+                displayEvents.forEach(function(evt) {
+                    html += '<div style="margin-bottom:8px;padding:6px;background:#1f2937;border-radius:4px;font-size:12px">';
+
+                    // Date et heure
+                    if (evt.date) {
+                        html += '<div style="color:#60a5fa;font-weight:500">';
+                        html += escapeHtml(evt.date);
+                        if (evt.heure) html += ' - ' + escapeHtml(evt.heure);
+                        html += '</div>';
+                    }
+
+                    // Nom de l'événement
+                    if (evt.nom) {
+                        html += '<div style="color:#fbbf24;font-style:italic">' + escapeHtml(evt.nom) + '</div>';
+                    }
+
+                    // Artistes
+                    if (evt.artistes) {
+                        html += '<div style="color:#f8fafc">' + escapeHtml(evt.artistes) + '</div>';
+                    }
+
+                    // Spectacles
+                    if (evt.spectacles) {
+                        html += '<div style="color:#a78bfa">« ' + escapeHtml(evt.spectacles) + ' »</div>';
+                    }
+
+                    // Tarif
+                    if (evt.tarif) {
+                        html += '<div style="color:#34d399;font-size:11px">' + escapeHtml(evt.tarif) + '</div>';
+                    }
+
+                    html += '</div>';
+                });
+
+                if (totalFiltered > 15) {
+                    html += '<div style="color:#6b7280;font-size:11px;text-align:center">... et ' + (totalFiltered - 15) + ' autres</div>';
+                }
+
+                html += '</div>';
+            } else if (filterType && filterValue) {
+                html += '<div style="margin-top:8px;color:#6b7280;font-size:12px;font-style:italic">Aucun événement pour cette période</div>';
+            }
+
+            html += '</div>';
+            return html;
+        }
+
+        function getWeekString(date) {
+            // Retourne YYYY-WNN format
+            const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+            const dayNum = d.getUTCDay() || 7;
+            d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+            const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+            const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+            return d.getUTCFullYear() + '-W' + String(weekNo).padStart(2, '0');
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         }
 
         function getHeatColor(count, max) {
@@ -2361,6 +2641,14 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
             document.getElementById('btnBoth').classList.toggle('active', view === 'both');
 
             applyMapView();
+        }
+
+        function setHeatmapScale(scale) {
+            currentHeatmapScale = scale;
+            // Rebuild heatmap with new scale
+            if (currentMapData) {
+                updateMap(currentMapData);
+            }
         }
 
         function applyMapView() {
@@ -2404,6 +2692,8 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
             dayContainer.style.display = 'none';
 
             if (type === 'all') {
+                currentFilterType = null;
+                currentFilterValue = null;
                 updateMap(geoData.lieux);
             } else if (type === 'year') {
                 yearContainer.style.display = 'flex';
@@ -2443,6 +2733,8 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
 
             if (year) {
                 label.textContent = year;
+                currentFilterType = 'year';
+                currentFilterValue = year;
 
                 if (geoData.lieux_by_year && geoData.lieux_by_year[year]) {
                     updateMap(geoData.lieux_by_year[year]);
@@ -2505,6 +2797,8 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
                 const monthNames = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin',
                                    'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
                 label.textContent = `${monthNames[parseInt(m) - 1]} ${year}`;
+                currentFilterType = 'month';
+                currentFilterValue = month;
 
                 if (geoData.lieux_by_month && geoData.lieux_by_month[month]) {
                     updateMap(geoData.lieux_by_month[month]);
@@ -2575,6 +2869,8 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
                 // Format YYYY-WNN to "Semaine NN, YYYY"
                 const [year, w] = week.split('-W');
                 label.textContent = `Sem. ${parseInt(w)}, ${year}`;
+                currentFilterType = 'week';
+                currentFilterValue = week;
 
                 if (geoData.lieux_by_week && geoData.lieux_by_week[week]) {
                     updateMap(geoData.lieux_by_week[week]);
@@ -2643,6 +2939,8 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
                 const monthNames = ['jan', 'fév', 'mar', 'avr', 'mai', 'juin',
                                    'juil', 'août', 'sep', 'oct', 'nov', 'déc'];
                 label.textContent = `${parseInt(d)} ${monthNames[parseInt(m) - 1]} ${year}`;
+                currentFilterType = 'day';
+                currentFilterValue = day;
 
                 if (geoData.lieux_by_day && geoData.lieux_by_day[day]) {
                     updateMap(geoData.lieux_by_day[day]);
