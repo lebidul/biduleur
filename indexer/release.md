@@ -59,6 +59,25 @@ bidul_type = get_bidul_type(306)  # Retourne 'xlsx'
 | `core/ocr.py` | Nouvelle fonction `get_bidul_type()`, `is_scan_from_csv()` utilise cette fonction |
 | `cli.py` | Logique `cmd_populate()` simplifiée avec filtrage par type |
 
+### Export au format XLSX 2025+
+
+L'export utilise maintenant le format XLSX 2025+ avec les colonnes exactes du fichier source :
+
+| Colonne export | Description |
+|----------------|-------------|
+| `FESTOCHE\nEVENEMENT ` | Nom du festival/événement |
+| `STYLE \nFESTOCHE / EVENEMENT ` | Style du festival |
+| `DATE` | Date formatée (ex: "Mardi 2") |
+| `HEURE` | Horaire |
+| `LIEU` | Nom du lieu |
+| `VILLE` | Ville |
+| `PRIX` | Tarif |
+| `GENRE 1` | Type (concert, sv) |
+| `NOM SPECTACLE 1 ( SV )` | Nom du spectacle |
+| `COMPAGNIE 1 ( SV ) ou\nGROUPE 1 / ARTISTE 1 ( C )` | Artiste/compagnie |
+| `STYLE \nSPECTACLE 1 (SV) / CONCERT 1 (C)` | Style |
+| (répété pour 2, 3, 4) | |
+
 ### Tests
 
 - 238 tests unitaires passent

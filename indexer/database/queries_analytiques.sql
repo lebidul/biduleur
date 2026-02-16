@@ -49,6 +49,46 @@ select raw_text from bidul where numero = 12;
 -- ORDER BY e.date_evenement, e.heure, c.ordre;
 
 -- Teriaki
+--export teriaki
+SELECT
+    e.bidul_numero,
+    -- Date formatée
+    CASE strftime('%w', e.date_evenement)
+        WHEN '0' THEN 'Dimanche'
+        WHEN '1' THEN 'Lundi'
+        WHEN '2' THEN 'Mardi'
+        WHEN '3' THEN 'Mercredi'
+        WHEN '4' THEN 'Jeudi'
+        WHEN '5' THEN 'Vendredi'
+        WHEN '6' THEN 'Samedi'
+    END || ' ' || CAST(strftime('%d', e.date_evenement) AS INTEGER) AS date_format,
+    e.heure,
+    e.lieu_raw AS lieu,
+    e.ville_raw AS ville,
+    e.tarif_raw AS prix,
+    e.nom AS festival,
+    e.genre_evenement AS style_festival,
+    e.type_evenement AS genre,
+    -- Contenu 1
+    (SELECT nom_spectacle FROM contenu_evenement WHERE evenement_id = e.id AND ordre = 1) AS spectacle1,
+    (SELECT artiste FROM contenu_evenement WHERE evenement_id = e.id AND ordre = 1) AS artiste1,
+    (SELECT style FROM contenu_evenement WHERE evenement_id = e.id AND ordre = 1) AS style1,
+    -- Contenu 2
+    (SELECT nom_spectacle FROM contenu_evenement WHERE evenement_id = e.id AND ordre = 2) AS spectacle2,
+    (SELECT artiste FROM contenu_evenement WHERE evenement_id = e.id AND ordre = 2) AS artiste2,
+    (SELECT style FROM contenu_evenement WHERE evenement_id = e.id AND ordre = 2) AS style2,
+    -- Contenu 3
+    (SELECT nom_spectacle FROM contenu_evenement WHERE evenement_id = e.id AND ordre = 3) AS spectacle3,
+    (SELECT artiste FROM contenu_evenement WHERE evenement_id = e.id AND ordre = 3) AS artiste3,
+    (SELECT style FROM contenu_evenement WHERE evenement_id = e.id AND ordre = 3) AS style3,
+    -- Contenu 4
+    (SELECT nom_spectacle FROM contenu_evenement WHERE evenement_id = e.id AND ordre = 4) AS spectacle4,
+    (SELECT artiste FROM contenu_evenement WHERE evenement_id = e.id AND ordre = 4) AS artiste4,
+    (SELECT style FROM contenu_evenement WHERE evenement_id = e.id AND ordre = 4) AS style4
+FROM evenement e
+WHERE e.raw_text LIKE '%teriaki%'
+ORDER BY e.bidul_numero, e.date_evenement;
+
 
 SELECT
     e.id,

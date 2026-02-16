@@ -2,6 +2,7 @@
 Export des événements vers des fichiers CSV/XLSX.
 
 Permet d'exporter les données de la base avec une clause WHERE personnalisable.
+Le format d'export est le format XLSX 2025+ utilisé par les fichiers sources.
 """
 
 import csv
@@ -12,22 +13,60 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
-# Colonnes pour l'export CSV (format 2023+)
-EXPORT_COLUMNS = [
-    'bidul_numero',
-    'date_evenement',
-    'horaire',
-    'lieu',
-    'ville',
-    'prix',
-    'festival',
-    'style_festival',
-    'genre',
-    'spectacle1', 'artiste1', 'style1',
-    'spectacle2', 'artiste2', 'style2',
-    'spectacle3', 'artiste3', 'style3',
-    'spectacle4', 'artiste4', 'style4',
+# Colonnes pour l'export au format XLSX 2025+
+# Ces noms correspondent exactement aux colonnes du format source
+XLSX_EXPORT_COLUMNS = [
+    'FESTOCHE\nEVENEMENT ',
+    'STYLE \nFESTOCHE / EVENEMENT ',
+    'DATE',
+    'HEURE',
+    'LIEU',
+    'VILLE',
+    'PRIX',
+    'GENRE 1',
+    'NOM SPECTACLE 1 ( SV )',
+    'COMPAGNIE 1 ( SV ) ou\nGROUPE 1 / ARTISTE 1 ( C )',
+    'STYLE \nSPECTACLE 1 (SV) / CONCERT 1 (C)',
+    'GENRE 2',
+    'NOM SPECTACLE 2 ( SV )',
+    'COMPAGNIE 2 ( SV ) ou\nGROUPE 2 / ARTISTE 2 ( C )',
+    'STYLE \nSPECTACLE 2 ( SV ) / CONCERT 2 ( C )',
+    'GENRE 3',
+    'NOM SPECTACLE 3 ( SV )',
+    'COMPAGNIE 3 ( SV ) ou\nGROUPE 3 / ARTISTE 3 ( C )',
+    'STYLE \nSPECTACLE 3 ( SV ) / CONCERT 3 ( C )',
+    'GENRE 4',
+    'NOM SPECTACLE 4 ( SV )',
+    'COMPAGNIE 4 ( SV ) ou\nGROUPE 4 / ARTISTE 4 ( C )',
+    'STYLE \nSPECTACLE 4 ( SV ) / CONCERT 4 ( C )',
 ]
+
+# Mapping interne -> colonnes XLSX
+INTERNAL_TO_XLSX = {
+    'festival': 'FESTOCHE\nEVENEMENT ',
+    'style_festival': 'STYLE \nFESTOCHE / EVENEMENT ',
+    'date': 'DATE',
+    'horaire': 'HEURE',
+    'lieu': 'LIEU',
+    'ville': 'VILLE',
+    'prix': 'PRIX',
+    'genre1': 'GENRE 1',
+    'spectacle1': 'NOM SPECTACLE 1 ( SV )',
+    'artiste1': 'COMPAGNIE 1 ( SV ) ou\nGROUPE 1 / ARTISTE 1 ( C )',
+    'style1': 'STYLE \nSPECTACLE 1 (SV) / CONCERT 1 (C)',
+    'genre2': 'GENRE 2',
+    'spectacle2': 'NOM SPECTACLE 2 ( SV )',
+    'artiste2': 'COMPAGNIE 2 ( SV ) ou\nGROUPE 2 / ARTISTE 2 ( C )',
+    'style2': 'STYLE \nSPECTACLE 2 ( SV ) / CONCERT 2 ( C )',
+    'genre3': 'GENRE 3',
+    'spectacle3': 'NOM SPECTACLE 3 ( SV )',
+    'artiste3': 'COMPAGNIE 3 ( SV ) ou\nGROUPE 3 / ARTISTE 3 ( C )',
+    'style3': 'STYLE \nSPECTACLE 3 ( SV ) / CONCERT 3 ( C )',
+    'genre4': 'GENRE 4',
+    'spectacle4': 'NOM SPECTACLE 4 ( SV )',
+    'artiste4': 'COMPAGNIE 4 ( SV ) ou\nGROUPE 4 / ARTISTE 4 ( C )',
+    'style4': 'STYLE \nSPECTACLE 4 ( SV ) / CONCERT 4 ( C )',
+}
 
 
 def export_events(
@@ -128,33 +167,33 @@ def export_events(
 
     conn.close()
 
-    # Transformer en liste avec colonnes spectacle1/artiste1/style1...
+    # Transformer en liste avec colonnes au format XLSX 2025+
     export_rows = []
     for event in events_data.values():
         row = {
-            'bidul_numero': event['bidul_numero'],
-            'date_evenement': event['date_evenement'],
-            'horaire': event['horaire'],
-            'lieu': event['lieu'],
-            'ville': event['ville'],
-            'prix': event['prix'],
-            'festival': event['festival'],
-            'style_festival': event['style_festival'],
-            'genre': event['genre'],
+            INTERNAL_TO_XLSX['festival']: event['festival'],
+            INTERNAL_TO_XLSX['style_festival']: event['style_festival'],
+            INTERNAL_TO_XLSX['date']: event['date_evenement'],
+            INTERNAL_TO_XLSX['horaire']: event['horaire'],
+            INTERNAL_TO_XLSX['lieu']: event['lieu'],
+            INTERNAL_TO_XLSX['ville']: event['ville'],
+            INTERNAL_TO_XLSX['prix']: event['prix'],
         }
 
-        # Remplir les colonnes spectacle1-4, artiste1-4, style1-4
+        # Remplir les colonnes genre1-4, spectacle1-4, artiste1-4, style1-4
         for i in range(4):
             idx = i + 1
             if i < len(event['contents']):
                 content = event['contents'][i]
-                row[f'spectacle{idx}'] = content['spectacle']
-                row[f'artiste{idx}'] = content['artiste']
-                row[f'style{idx}'] = content['style']
+                row[INTERNAL_TO_XLSX[f'genre{idx}']] = event['genre'] if i == 0 else ''
+                row[INTERNAL_TO_XLSX[f'spectacle{idx}']] = content['spectacle']
+                row[INTERNAL_TO_XLSX[f'artiste{idx}']] = content['artiste']
+                row[INTERNAL_TO_XLSX[f'style{idx}']] = content['style']
             else:
-                row[f'spectacle{idx}'] = ''
-                row[f'artiste{idx}'] = ''
-                row[f'style{idx}'] = ''
+                row[INTERNAL_TO_XLSX[f'genre{idx}']] = ''
+                row[INTERNAL_TO_XLSX[f'spectacle{idx}']] = ''
+                row[INTERNAL_TO_XLSX[f'artiste{idx}']] = ''
+                row[INTERNAL_TO_XLSX[f'style{idx}']] = ''
 
         export_rows.append(row)
 
@@ -197,7 +236,7 @@ def format_date(date_str: Optional[str]) -> str:
 
 def write_csv(rows: list[dict], output_path: Path) -> int:
     """
-    Écrit les données en format CSV.
+    Écrit les données en format CSV (format XLSX 2025+).
 
     Args:
         rows: Liste des lignes à écrire
@@ -209,7 +248,7 @@ def write_csv(rows: list[dict], output_path: Path) -> int:
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     with open(output_path, 'w', encoding='utf-8', newline='') as f:
-        writer = csv.DictWriter(f, fieldnames=EXPORT_COLUMNS)
+        writer = csv.DictWriter(f, fieldnames=XLSX_EXPORT_COLUMNS)
         writer.writeheader()
         writer.writerows(rows)
 
@@ -218,7 +257,7 @@ def write_csv(rows: list[dict], output_path: Path) -> int:
 
 def write_xlsx(rows: list[dict], output_path: Path) -> int:
     """
-    Écrit les données en format XLSX.
+    Écrit les données en format XLSX (format 2025+).
 
     Args:
         rows: Liste des lignes à écrire
@@ -227,16 +266,71 @@ def write_xlsx(rows: list[dict], output_path: Path) -> int:
     Returns:
         Nombre de lignes écrites
     """
+    # Essayer xlsxwriter d'abord (meilleure compatibilité Excel)
     try:
-        import pandas as pd
+        import xlsxwriter
+        return _write_xlsx_xlsxwriter(rows, output_path)
     except ImportError:
-        logger.error("pandas requis pour les fichiers XLSX: pip install pandas openpyxl")
+        pass
+
+    # Fallback vers openpyxl
+    try:
+        from openpyxl import Workbook
+        return _write_xlsx_openpyxl(rows, output_path)
+    except ImportError:
+        logger.error("xlsxwriter ou openpyxl requis: pip install xlsxwriter")
         return 0
+
+
+def _write_xlsx_xlsxwriter(rows: list[dict], output_path: Path) -> int:
+    """Écrit un fichier XLSX avec xlsxwriter (meilleure compatibilité)."""
+    import xlsxwriter
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    df = pd.DataFrame(rows, columns=EXPORT_COLUMNS)
-    df.to_excel(output_path, index=False)
+    workbook = xlsxwriter.Workbook(str(output_path))
+    worksheet = workbook.add_worksheet()
+
+    # Format pour les headers (wrap text pour les newlines)
+    header_format = workbook.add_format({
+        'bold': True,
+        'text_wrap': True,
+        'valign': 'top'
+    })
+
+    # Écrire les headers
+    for col_idx, col_name in enumerate(XLSX_EXPORT_COLUMNS):
+        worksheet.write(0, col_idx, col_name, header_format)
+
+    # Écrire les données
+    for row_idx, row_data in enumerate(rows, 1):
+        for col_idx, col_name in enumerate(XLSX_EXPORT_COLUMNS):
+            worksheet.write(row_idx, col_idx, row_data.get(col_name, ''))
+
+    workbook.close()
+
+    return len(rows)
+
+
+def _write_xlsx_openpyxl(rows: list[dict], output_path: Path) -> int:
+    """Écrit un fichier XLSX avec openpyxl (fallback)."""
+    from openpyxl import Workbook
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    wb = Workbook()
+    ws = wb.active
+
+    # Écrire les headers
+    for col_idx, col_name in enumerate(XLSX_EXPORT_COLUMNS, 1):
+        ws.cell(row=1, column=col_idx, value=col_name)
+
+    # Écrire les données
+    for row_idx, row_data in enumerate(rows, 2):
+        for col_idx, col_name in enumerate(XLSX_EXPORT_COLUMNS, 1):
+            ws.cell(row=row_idx, column=col_idx, value=row_data.get(col_name, ''))
+
+    wb.save(output_path)
 
     return len(rows)
 
