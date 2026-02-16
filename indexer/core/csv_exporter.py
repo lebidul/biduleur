@@ -266,16 +266,58 @@ def write_xlsx(rows: list[dict], output_path: Path) -> int:
     Returns:
         Nombre de lignes écrites
     """
+    # Essayer xlsxwriter d'abord (meilleure compatibilité Excel)
     try:
-        import openpyxl
-        from openpyxl import Workbook
+        import xlsxwriter
+        return _write_xlsx_xlsxwriter(rows, output_path)
     except ImportError:
-        logger.error("openpyxl requis pour les fichiers XLSX: pip install openpyxl")
+        pass
+
+    # Fallback vers openpyxl
+    try:
+        from openpyxl import Workbook
+        return _write_xlsx_openpyxl(rows, output_path)
+    except ImportError:
+        logger.error("xlsxwriter ou openpyxl requis: pip install xlsxwriter")
         return 0
+
+
+def _write_xlsx_xlsxwriter(rows: list[dict], output_path: Path) -> int:
+    """Écrit un fichier XLSX avec xlsxwriter (meilleure compatibilité)."""
+    import xlsxwriter
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Créer le workbook avec openpyxl directement
+    workbook = xlsxwriter.Workbook(str(output_path))
+    worksheet = workbook.add_worksheet()
+
+    # Format pour les headers (wrap text pour les newlines)
+    header_format = workbook.add_format({
+        'bold': True,
+        'text_wrap': True,
+        'valign': 'top'
+    })
+
+    # Écrire les headers
+    for col_idx, col_name in enumerate(XLSX_EXPORT_COLUMNS):
+        worksheet.write(0, col_idx, col_name, header_format)
+
+    # Écrire les données
+    for row_idx, row_data in enumerate(rows, 1):
+        for col_idx, col_name in enumerate(XLSX_EXPORT_COLUMNS):
+            worksheet.write(row_idx, col_idx, row_data.get(col_name, ''))
+
+    workbook.close()
+
+    return len(rows)
+
+
+def _write_xlsx_openpyxl(rows: list[dict], output_path: Path) -> int:
+    """Écrit un fichier XLSX avec openpyxl (fallback)."""
+    from openpyxl import Workbook
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
     wb = Workbook()
     ws = wb.active
 
