@@ -121,13 +121,13 @@ def _create_ours_section(parent, app, ui_row):
     r = ui_row['r']
 
     # On utilise un LabelFrame pour un meilleur regroupement visuel
-    ours_frame = ttk.LabelFrame(parent, text="Ours", padding="10")
-    ours_frame.grid(row=r, column=0, columnspan=3, sticky="ew", pady=10)
-    ours_frame.columnconfigure(1, weight=1)
+    app.ours_frame = ttk.LabelFrame(parent, text="Ours", padding="10")
+    app.ours_frame.grid(row=r, column=0, columnspan=3, sticky="ew", pady=10)
+    app.ours_frame.columnconfigure(1, weight=1)
 
     # Ligne 0 : Radio buttons pour le type de source
-    tk.Label(ours_frame, text="Source :").grid(row=0, column=0, sticky="e", padx=5, pady=5)
-    ours_layout_radios = ttk.Frame(ours_frame)
+    tk.Label(app.ours_frame, text="Source :").grid(row=0, column=0, sticky="e", padx=5, pady=5)
+    ours_layout_radios = ttk.Frame(app.ours_frame)
     ours_layout_radios.grid(row=0, column=1, columnspan=2, sticky="w")
     tk.Radiobutton(ours_layout_radios, text="Fichier SVG", variable=app.ours_layout_var, value="svg").pack(
         side=tk.LEFT, padx=5)
@@ -135,17 +135,17 @@ def _create_ours_section(parent, app, ui_row):
         side=tk.LEFT, padx=5)
 
     # Ligne 1 : Widgets SVG (affichés par défaut)
-    app.ours_svg_label = tk.Label(ours_frame, text="Fichier SVG :")
-    app.ours_svg_entry = tk.Entry(ours_frame, textvariable=app.ours_svg_var)
-    app.ours_svg_button = tk.Button(ours_frame, text="Parcourir…")
+    app.ours_svg_label = tk.Label(app.ours_frame, text="Fichier SVG :")
+    app.ours_svg_entry = tk.Entry(app.ours_frame, textvariable=app.ours_svg_var)
+    app.ours_svg_button = tk.Button(app.ours_frame, text="Parcourir…")
 
     # Ligne 1 : Widgets PNG (cachés par défaut)
-    app.ours_png_label = tk.Label(ours_frame, text="Image de fond (PNG) :")
-    app.ours_png_entry = tk.Entry(ours_frame, textvariable=app.ours_png_var)
-    app.ours_png_button = tk.Button(ours_frame, text="Parcourir…")
+    app.ours_png_label = tk.Label(app.ours_frame, text="Image de fond (PNG) :")
+    app.ours_png_entry = tk.Entry(app.ours_frame, textvariable=app.ours_png_var)
+    app.ours_png_button = tk.Button(app.ours_frame, text="Parcourir…")
 
     # Ligne 2 : Widget pour l'aperçu (PNG uniquement)
-    app.ours_preview = tk.Label(ours_frame, text="Aucun aperçu", relief="sunken", padx=5, pady=5)
+    app.ours_preview = tk.Label(app.ours_frame, text="Aucun aperçu", relief="sunken", padx=5, pady=5)
 
     # Stocker la ligne pour le callback
     app.ours_widgets_row = 1
@@ -157,26 +157,26 @@ def _create_ours_section(parent, app, ui_row):
 def _create_logos_section(parent, app, ui_row):
     """Crée la section pour les paramètres des logos."""
     r = ui_row['r']
-    logos_frame = ttk.LabelFrame(parent, text="Paramètres des Logos", padding="10")
-    logos_frame.grid(row=r, column=0, columnspan=3, sticky="ew", pady=10)
-    logos_frame.columnconfigure(1, weight=1)
+    app.logos_frame = ttk.LabelFrame(parent, text="Paramètres des Logos", padding="10")
+    app.logos_frame.grid(row=r, column=0, columnspan=3, sticky="ew", pady=10)
+    app.logos_frame.columnconfigure(1, weight=1)
 
     lr = 0
     # Widgets du dossier logos (affichés seulement pour colonnes/optimise)
-    app.logos_dir_label = tk.Label(logos_frame, text="Dossier logos :")
+    app.logos_dir_label = tk.Label(app.logos_frame, text="Dossier logos :")
     app.logos_dir_label.grid(row=lr, column=0, sticky="e", padx=5, pady=5)
-    app.logos_dir_entry = tk.Entry(logos_frame, textvariable=app.logos_var)
+    app.logos_dir_entry = tk.Entry(app.logos_frame, textvariable=app.logos_var)
     app.logos_dir_entry.grid(row=lr, column=1, sticky="ew", padx=5, pady=5)
-    app.logos_button = tk.Button(logos_frame, text="Parcourir…")
+    app.logos_button = tk.Button(app.logos_frame, text="Parcourir…")
     app.logos_button.grid(row=lr, column=2, padx=5, pady=5)
     lr += 1
 
-    tk.Label(logos_frame, text="Répartition :").grid(row=lr, column=0, sticky="e", padx=5, pady=5)
-    logos_layout_radios = ttk.Frame(logos_frame)
+    tk.Label(app.logos_frame, text="Répartition :").grid(row=lr, column=0, sticky="e", padx=5, pady=5)
+    logos_layout_radios = ttk.Frame(app.logos_frame)
     logos_layout_radios.grid(row=lr, column=1, columnspan=2, sticky="w")
 
-    app.logos_padding_label = tk.Label(logos_frame, text="Marge (mm) :")
-    app.logos_padding_entry = tk.Entry(logos_frame, textvariable=app.logos_padding_var, width=10)
+    app.logos_padding_label = tk.Label(app.logos_frame, text="Marge (mm) :")
+    app.logos_padding_entry = tk.Entry(app.logos_frame, textvariable=app.logos_padding_var, width=10)
 
     # La commande sera ajoutée dans callbacks.py en utilisant .trace_add sur la variable
     tk.Radiobutton(logos_layout_radios, text="2 Colonnes", variable=app.logos_layout_var, value="colonnes").pack(
@@ -188,9 +188,9 @@ def _create_logos_section(parent, app, ui_row):
     lr += 1
 
     # Widgets du fichier SVG (affichés seulement pour svg)
-    app.logos_svg_label = tk.Label(logos_frame, text="Fichier SVG :")
-    app.logos_svg_entry = tk.Entry(logos_frame, textvariable=app.logos_svg_var)
-    app.logos_svg_button = tk.Button(logos_frame, text="Parcourir…")
+    app.logos_svg_label = tk.Label(app.logos_frame, text="Fichier SVG :")
+    app.logos_svg_entry = tk.Entry(app.logos_frame, textvariable=app.logos_svg_var)
+    app.logos_svg_button = tk.Button(app.logos_frame, text="Parcourir…")
 
     # On stocke la ligne pour le callback
     app.logos_padding_row = lr
@@ -270,8 +270,9 @@ def _create_cover_section(parent, app, ui_row):
     cover_frame.columnconfigure(1, weight=1)
 
     # Ligne 0 - Case à cocher
-    tk.Checkbutton(cover_frame, text="Avec couv' (générer la page de couverture)",
-                   variable=app.generate_cover_var).grid(row=0, column=0, columnspan=3, sticky="w", pady=2)
+    app.cover_checkbox = tk.Checkbutton(cover_frame, text="Avec couv' (générer la page de couverture)",
+                                        variable=app.generate_cover_var)
+    app.cover_checkbox.grid(row=0, column=0, columnspan=3, sticky="w", pady=2)
 
     # 1. On crée le cadre qui sert de zone de dépôt.
     cover_drop_zone = ttk.Frame(cover_frame, relief="sunken", borderwidth=2, padding=10)
@@ -335,15 +336,15 @@ def _create_page_layout_section(parent, app, ui_row):
     lr = 0
 
     # --- Marge globale ---
-    margin_label = tk.Label(page_layout_frame, text="Marge globale (mm) :")
-    margin_label.grid(row=lr, column=0, sticky="w", padx=5, pady=5)
+    app.margin_label = tk.Label(page_layout_frame, text="Marge globale (mm) :")
+    app.margin_label.grid(row=lr, column=0, sticky="w", padx=5, pady=5)
 
-    margin_entry = tk.Entry(page_layout_frame, textvariable=app.margin_var, width=10)
-    margin_entry.grid(row=lr, column=1, sticky="w", padx=5, pady=5)
+    app.margin_entry = tk.Entry(page_layout_frame, textvariable=app.margin_var, width=10)
+    app.margin_entry.grid(row=lr, column=1, sticky="w", padx=5, pady=5)
 
-    Tooltip(margin_label,
+    Tooltip(app.margin_label,
             text="Définit la marge en millimètres entre le bord de la page A4 et le contenu.\n\nCette valeur est appliquée à toutes les pages.\nUne valeur typique est entre 1 et 5.")
-    Tooltip(margin_entry,
+    Tooltip(app.margin_entry,
             text="Définit la marge en millimètres entre le bord de la page A4 et le contenu.\n\nCette valeur est appliquée à toutes les pages.\nUne valeur typique est entre 1 et 5.")
 
     lr += 1
@@ -509,9 +510,10 @@ def _create_date_sep_section(parent, app, ui_row):
     date_sep_radios.grid(row=lr, column=1, sticky="w", padx=5, pady=5)
     lr += 1
 
-    tk.Label(date_sep_frame, text="Espace avant/après date (pt) :").grid(row=lr, column=0, sticky="w", padx=5, pady=5)
-    tk.Entry(date_sep_frame, textvariable=app.date_spacing_var, width=10).grid(row=lr, column=1, sticky="w", padx=5,
-                                                                               pady=5)
+    app.date_spacing_label = tk.Label(date_sep_frame, text="Espace avant/après date (pt) :")
+    app.date_spacing_label.grid(row=lr, column=0, sticky="w", padx=5, pady=5)
+    app.date_spacing_entry = tk.Entry(date_sep_frame, textvariable=app.date_spacing_var, width=10)
+    app.date_spacing_entry.grid(row=lr, column=1, sticky="w", padx=5, pady=5)
     lr += 1
 
     # Alignement du texte

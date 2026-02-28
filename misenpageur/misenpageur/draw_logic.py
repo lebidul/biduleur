@@ -683,22 +683,26 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
                 # =========================================================================
 
             poster_frames = [S7["S7_Col1"], S7["S7_Col2_Full"], S7["S7_Col3"]]
-        else:
+        else:  # Design 0 : Image au centre
             if cover_path:
+                # Image recentrée légèrement vers la droite
+                img_sec = S7["S7_CoverImage"]
+                offset_x = 5  # décalage vers la droite (pt)
+                draw_x = img_sec.x + offset_x
+
                 try:
                     if not isinstance(c, SVGCanvas):
-                        img_reader = _load_high_quality_image(cover_path, S7["S7_CoverImage"].w, S7["S7_CoverImage"].h,
-                                                              min_dpi=300)
-                        c.drawImage(img_reader, S7["S7_CoverImage"].x, S7["S7_CoverImage"].y, S7["S7_CoverImage"].w,
-                                    S7["S7_CoverImage"].h, preserveAspectRatio=True, anchor='c', mask='auto')
+                        img_reader = _load_high_quality_image(cover_path, img_sec.w, img_sec.h, min_dpi=300)
+                        c.drawImage(img_reader, draw_x, img_sec.y, img_sec.w, img_sec.h,
+                                    preserveAspectRatio=True, anchor='c', mask='auto')
                     else:
-                        c.drawImage(cover_path, S7["S7_CoverImage"].x, S7["S7_CoverImage"].y, S7["S7_CoverImage"].w,
-                                    S7["S7_CoverImage"].h, preserveAspectRatio=True, anchor='c')
+                        c.drawImage(cover_path, draw_x, img_sec.y, img_sec.w, img_sec.h,
+                                    preserveAspectRatio=True, anchor='c')
                 except Exception as e:
                     log.warning(f"Erreur chargement cover poster: {e}")
                     kwargs = {'mask': 'auto'} if not isinstance(c, SVGCanvas) else {}
-                    c.drawImage(cover_path, S7["S7_CoverImage"].x, S7["S7_CoverImage"].y, S7["S7_CoverImage"].w,
-                                S7["S7_CoverImage"].h, preserveAspectRatio=True, anchor='c', **kwargs)
+                    c.drawImage(cover_path, draw_x, img_sec.y, img_sec.w, img_sec.h,
+                                preserveAspectRatio=True, anchor='c', **kwargs)
             poster_frames = [S7[name] for name in ["S7_Col1", "S7_Col2_Top", "S7_Col2_Bottom", "S7_Col3"]]
 
         # --- Éléments communs ---
