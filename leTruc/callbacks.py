@@ -335,13 +335,48 @@ def on_update_alpha_label(app):
     app.alpha_value_label.config(text=f"{int(app.alpha_var.get() * 100)}%")
 
 
-# ✨ NOUVELLE FONCTION : Toggle des boutons config
+# ✨ NOUVELLE FONCTION : Toggle des boutons config et widgets debug-only
 def on_toggle_config_buttons(app):
-    """Affiche/cache les boutons config selon mode debug"""
-    if app.debug_mode_var.get():
+    """Affiche/cache les boutons config et les widgets avancés selon mode debug.
+
+    En mode normal, les paramètres suivants sont cachés et utilisent
+    les valeurs par défaut de config.yml :
+    - Path ours (section complète)
+    - Path logos (section complète)
+    - Avec couv' (checkbox)
+    - Marge globale (mm)
+    - Espace avant/après dates (pt)
+    """
+    is_debug = app.debug_mode_var.get()
+
+    # --- Boutons import/reset config ---
+    if is_debug:
         app.config_buttons_frame.pack(pady=(5, 0))
     else:
         app.config_buttons_frame.pack_forget()
+
+    # --- Widgets debug-only ---
+    debug_only_frames = [app.ours_frame, app.logos_frame]
+    debug_only_widgets = [
+        app.cover_checkbox,
+        app.margin_label, app.margin_entry,
+        app.date_spacing_label, app.date_spacing_entry,
+    ]
+
+    if is_debug:
+        for frame in debug_only_frames:
+            if frame is not None:
+                frame.grid()
+        for widget in debug_only_widgets:
+            if widget is not None:
+                widget.grid()
+    else:
+        for frame in debug_only_frames:
+            if frame is not None:
+                frame.grid_remove()
+        for widget in debug_only_widgets:
+            if widget is not None:
+                widget.grid_remove()
 
 
 # ✨ NOUVEAU v1.4.2 : Callbacks pour les abréviations

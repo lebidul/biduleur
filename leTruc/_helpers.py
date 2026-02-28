@@ -87,6 +87,11 @@ def _load_cfg_defaults() -> dict:
         "page_margin_mm": 1.0,
         "date_separator_type": "ligne",
         "date_spacing": "4",
+        "body_font_name": "Arial Narrow",
+        "date_font_name": "(Identique au corps)",
+        "date_alignment": "left",
+        "date_bold": False,
+        "date_italic": False,
         "poster_design": 0,
         "font_size_safety_factor": 0.98,
         "background_alpha": 0.85,
@@ -145,6 +150,12 @@ def _load_cfg_defaults() -> dict:
             out["date_separator_type"] = "box"
         else:
             out["date_separator_type"] = "aucun"
+        out["body_font_name"] = getattr(cfg, "font_name", "Arial Narrow")
+        dfn = getattr(cfg, "date_font_name", None)
+        out["date_font_name"] = dfn if dfn else "(Identique au corps)"
+        out["date_alignment"] = getattr(cfg, "date_alignment", "left")
+        out["date_bold"] = getattr(cfg, "date_bold", False)
+        out["date_italic"] = getattr(cfg, "date_italic", False)
         if isinstance(cfg.poster, dict):
             out.update({
                 "poster_design": cfg.poster.get("design", 0),
@@ -214,6 +225,11 @@ def run_pipeline(
         stories_font_name: str, stories_font_size: int, stories_font_color: str,
         stories_bg_type: str, stories_bg_color: str, stories_bg_image: str,
         stories_alpha: float,
+        body_font_name: str = "Arial Narrow",
+        date_font_name: str = "(Identique au corps)",
+        date_bold: bool = False,
+        date_italic: bool = False,
+        date_alignment: str = "left",
         abbreviations_enabled: dict = None,  # v1.4.2 : Abréviations activées
         stop_event: threading.Event = None,  # v1.4.3 : Event pour arrêt
         split_pdf: bool = False  # v1.4.5 : Générer un PDF par page
@@ -352,30 +368,42 @@ def run_pipeline(
         cfg.project_root = project_root
         cfg.input_file = input_file  # Fichier d'entrée Excel/CSV
         cfg.input_html = out_html
-        cfg.skip_cover = not generate_cover
+        cfg.debug_mode = debug_mode
+        cfg.cover_image = cover_image.strip() if cover_image else ""
         if out_pdf: cfg.output_pdf = out_pdf
         cfg.generate_svg = generate_svg  # Générer des SVG éditables
         cfg.output_svg_dir = out_svg_dir  # Dossier de sortie SVG
         cfg.stories_output_dir = stories_output_dir  # Dossier de sortie stories
-        if (cover_image or "").strip(): cfg.cover_image = cover_image.strip()
-        if (ours_background_png or "").strip(): cfg.section_1['ours_background_png'] = ours_background_png.strip()
-        if (logos_dir or "").strip(): cfg.logos_dir = logos_dir.strip()
         if (auteur_couv or "").strip(): cfg.auteur_couv = auteur_couv.strip()
         if (auteur_couv_url or "").strip(): cfg.auteur_couv_url = auteur_couv_url.strip()
-        cfg.pdf_layout['page_margin_mm'] = page_margin_mm
+        cfg.font_name = body_font_name
+        cfg.date_font_name = date_font_name if date_font_name != "(Identique au corps)" else None
         cfg.font_size_mode = font_size_mode
         cfg.font_size_forced = font_size_forced
-        cfg.logos_layout = logos_layout
-        cfg.logos_padding_mm = logos_padding_mm
-        cfg.logos_svg_file = logos_svg_file
-        cfg.ours_layout = ours_layout
-        cfg.ours_svg_file = ours_svg_file
         cfg.date_line['enabled'] = (date_separator_type == "ligne")
         cfg.date_box['enabled'] = (date_separator_type == "box")
         if cfg.date_box['enabled']:
             cfg.date_box['back_color'] = date_box_back_color
-        cfg.date_spaceBefore = date_spacing
-        cfg.date_spaceAfter = date_spacing
+        cfg.date_bold = date_bold
+        cfg.date_italic = date_italic
+        cfg.date_alignment = date_alignment
+
+        # --- Paramètres visibles uniquement en mode debug ---
+        # En mode normal, les valeurs de config.yml (déjà chargées) sont conservées
+        if debug_mode:
+            cfg.skip_cover = not generate_cover
+            if (ours_background_png or "").strip():
+                cfg.section_1['ours_background_png'] = ours_background_png.strip()
+            if (logos_dir or "").strip():
+                cfg.logos_dir = logos_dir.strip()
+            cfg.logos_layout = logos_layout
+            cfg.logos_padding_mm = logos_padding_mm
+            cfg.logos_svg_file = logos_svg_file
+            cfg.ours_layout = ours_layout
+            cfg.ours_svg_file = ours_svg_file
+            cfg.pdf_layout['page_margin_mm'] = page_margin_mm
+            cfg.date_spaceBefore = date_spacing
+            cfg.date_spaceAfter = date_spacing
         cfg.poster['design'] = poster_design
         cfg.poster['font_size_safety_factor'] = font_size_safety_factor
         cfg.poster['background_image_alpha'] = background_alpha
@@ -647,9 +675,20 @@ def load_and_apply_config(app_instance, config_path: str):
     if hasattr(cfg, 'debug_mode'):
         app_instance.debug_mode_var.set(cfg.debug_mode)
 
+    # --- Couverture ---
+    if hasattr(cfg, 'skip_cover'):
+        app_instance.generate_cover_var.set(not cfg.skip_cover)
+
     # --- Images et ressources ---
     if cfg.cover_image:
-        app_instance.cover_var.set(make_abs(cfg.cover_image, config_dir))
+        cover_abs = make_abs(cfg.cover_image, config_dir)
+        app_instance.cover_var.set(cover_abs)
+    else:
+        cover_abs = ""
+        app_instance.cover_var.set("")
+    # Mettre à jour la zone de dépôt visuelle de la couverture
+    from .callbacks import _update_cover_drop_zone
+    _update_cover_drop_zone(app_instance, cover_abs)
     if cfg.logos_dir:
         app_instance.logos_var.set(make_abs(cfg.logos_dir, config_dir))
     if hasattr(cfg, 'auteur_couv') and cfg.auteur_couv:
@@ -682,6 +721,8 @@ def load_and_apply_config(app_instance, config_path: str):
             app_instance.margin_var.set(str(margin))
 
     # Font
+    if hasattr(cfg, 'font_name') and cfg.font_name:
+        app_instance.body_font_name_var.set(cfg.font_name)
     if hasattr(cfg, 'font_size_mode'):
         app_instance.font_size_mode_var.set(cfg.font_size_mode)
     if hasattr(cfg, 'font_size_forced'):
@@ -700,6 +741,19 @@ def load_and_apply_config(app_instance, config_path: str):
     # Date spacing
     if hasattr(cfg, 'date_spaceBefore'):
         app_instance.date_spacing_var.set(str(cfg.date_spaceBefore))
+
+    # Date font
+    if hasattr(cfg, 'date_font_name'):
+        dfn = cfg.date_font_name
+        app_instance.date_font_name_var.set(dfn if dfn else "(Identique au corps)")
+
+    # Date style (alignement, gras, italique)
+    if hasattr(cfg, 'date_alignment'):
+        app_instance.date_align_var.set(cfg.date_alignment)
+    if hasattr(cfg, 'date_bold'):
+        app_instance.date_bold_var.set(cfg.date_bold)
+    if hasattr(cfg, 'date_italic'):
+        app_instance.date_italic_var.set(cfg.date_italic)
 
     # Poster
     if isinstance(cfg.poster, dict):

@@ -60,6 +60,8 @@ pyinstaller bidul.spec --clean --noconfirm
 | `misenpageur/misenpageur/drawing.py` | ReportLab drawing primitives |
 | `misenpageur/misenpageur/textflow.py` | Text wrapping and icon handling |
 | `misenpageur/misenpageur/config.py` | Config dataclass with YAML loading |
+| `misenpageur/misenpageur/font_discovery.py` | Dynamic system font discovery (TTF scanner) |
+| `misenpageur/misenpageur/fonts.py` | Font registration (ReportLab TTFont) |
 | `leTruc/app.py` | Main GUI application class |
 | `leTruc/callbacks.py` | GUI event handlers |
 | `leTruc/widgets.py` | Custom Tkinter widgets |
@@ -82,7 +84,11 @@ All styling via YAML config files:
 @dataclass
 class Config:
     input_html: str = "input.html"
-    font_name: str = "Arial Narrow"
+    font_name: str = "ArialNarrow"      # Body text font
+    date_font_name: str | None = None   # Date font (None = inherit from body)
+    date_bold: bool = False
+    date_italic: bool = False
+    date_alignment: str = "left"        # "left", "center", "right"
     # ...
 
 @classmethod
@@ -90,6 +96,14 @@ def from_yaml(cls, path: str) -> "Config":
     with open(path, "r", encoding="utf-8") as f:
         return cls(**yaml.safe_load(f))
 ```
+
+### Font System
+
+Fonts are discovered dynamically at runtime via `font_discovery.py`:
+- Pure Python TTF name table reader (uses `struct`, no fontTools dependency)
+- Scans `C:\Windows\Fonts`, project `assets/fonts/`, and `BIDUL_FONTS_DIR` env var
+- On-demand registration via `register_font_family_by_name()` in `fonts.py`
+- GUI comboboxes populated with all discovered font families (~85 on typical Windows)
 
 ## Dependencies
 
@@ -116,13 +130,16 @@ python -m pytest misenpageur/tests/
 ## Key Features
 
 - Auto-fitting typography (font size scales to content)
+- **Dynamic font discovery**: scans system fonts (C:\Windows\Fonts, project assets) via pure Python TTF reader (no external dependency)
+- **Independent font selectors** in GUI: body text, dates, cucaracha, Instagram stories
+- **Date styling**: configurable alignment (left/center/right), bold, italic, independent font
 - Intelligent logo packing (rectpack algorithm)
 - SVG logos and "ours" (legal mentions) support
 - Icon replacement (chapeau, free icons)
 - INACTIF column for event filtering
 - Instagram Stories export (1080x1920 PNG)
 - Debug mode with timestamped artifacts
-- Config import/export via JSON
+- Config import/export via JSON (includes font choices, date styling, cover image, debug mode)
 - Drag-and-drop file support in GUI
 
 ## Python Version

@@ -22,7 +22,15 @@ from .textflow import _is_event, _strip_leading_bullet
 # --- Fonctions utilitaires ---
 
 def _get_font(font_name: str, font_size: int) -> ImageFont.FreeTypeFont:
-    # ... (fonction inchangée)
+    # Tenter la résolution via la découverte dynamique
+    try:
+        from .font_discovery import get_ttf_path_for_pil
+        ttf_path = get_ttf_path_for_pil(font_name)
+        if ttf_path:
+            return ImageFont.truetype(ttf_path, font_size)
+    except Exception:
+        pass
+    # Fallback : essayer le nom directement (fonctionne si c'est un chemin ou un nom système)
     try:
         return ImageFont.truetype(font_name, font_size)
     except IOError:

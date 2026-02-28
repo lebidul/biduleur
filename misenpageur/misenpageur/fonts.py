@@ -396,3 +396,41 @@ def register_courier() -> bool:
     if not reg:
         return False
     return _register_family_partial("Courier New", reg, b, i, bi, subset=True)
+
+
+# -------------------- Enregistrement dynamique --------------------
+
+def register_font_family_by_name(name: str) -> bool:
+    """
+    Enregistre une famille de polices par son nom, en utilisant la découverte
+    dynamique (font_discovery) pour trouver les fichiers TTF.
+
+    Retourne True si la police est enregistrée avec succès (ou déjà enregistrée).
+    """
+    if name in _REGISTERED_FONTS:
+        return True
+
+    from .font_discovery import get_font_family
+
+    family = get_font_family(name)
+    if family is None:
+        log.warning(f"Police '{name}' introuvable via la découverte dynamique")
+        return False
+
+    reg = family.variants.get("regular")
+    bold = family.variants.get("bold")
+    italic = family.variants.get("italic")
+    bolditalic = family.variants.get("bolditalic")
+
+    if not reg:
+        log.warning(f"Police '{name}' : pas de variante regular trouvée")
+        return False
+
+    return _register_family_partial(
+        name,
+        reg.path,
+        bold.path if bold else None,
+        italic.path if italic else None,
+        bolditalic.path if bolditalic else None,
+        subset=True,
+    )

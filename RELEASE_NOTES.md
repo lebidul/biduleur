@@ -1,3 +1,37 @@
+# Bidul v1.5.0 - Mode debug, polices et poster
+
+Cette version améliore l'interface utilisateur en masquant les paramètres avancés en mode normal, corrige l'import de la couverture et recentre l'image du poster.
+
+## ✨ Nouveautés
+
+### Paramètres avancés réservés au mode debug
+*   Les paramètres suivants sont désormais **visibles et éditables uniquement en mode debug** :
+    *   Path ours (section complète)
+    *   Path logos (section complète)
+    *   Avec couv' (checkbox)
+    *   Marge globale (mm)
+    *   Espace avant/après dates (pt)
+*   En mode normal, ces paramètres utilisent les **valeurs par défaut de config.yml**
+
+### Poster : image recentrée (Design 0)
+*   L'image de couverture du poster ("Image au centre") est **recentrée légèrement vers la droite** pour un meilleur rendu visuel
+*   Les colonnes 1 et 3 conservent leur largeur et hauteur d'origine
+
+## 🐛 Corrections
+
+### Import de la couverture
+*   La **zone de dépôt visuelle** de l'image de couverture est désormais mise à jour lors de l'import d'une config (le chemin était correctement chargé, mais l'aperçu et le texte de la drop zone n'étaient pas rafraîchis)
+
+## 🔧 Détails techniques
+
+*   `leTruc/widgets.py` : références aux widgets debug-only stockées sur `app` pour le toggle
+*   `leTruc/callbacks.py` : `on_toggle_config_buttons()` gère `grid()`/`grid_remove()` des widgets avancés
+*   `leTruc/_helpers.py` : surcharges ours/logos/marge/espacement déplacées dans le bloc `if debug_mode:`
+*   `leTruc/_helpers.py` : appel `_update_cover_drop_zone()` après import config
+*   `misenpageur/misenpageur/draw_logic.py` : décalage de 5pt vers la droite pour l'image poster design 0
+
+---
+
 # Bidul v1.4.5 - Menu Aide et PDF par page
 
 Cette version ajoute un menu Aide complet dans le GUI et la possibilité de générer un PDF par page.
