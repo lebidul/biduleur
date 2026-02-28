@@ -14,12 +14,13 @@ import logging  # Ajouter cet import
 
 log = logging.getLogger(__name__)  # Obtenir le logger pour ce module
 
-from .config import Config, BulletConfig, PosterConfig, DateBoxConfig, DateLineConfig
+from .config import Config, BulletConfig, PosterConfig, DateBoxConfig, DateLineConfig, DateStyleConfig
 from .layout import Layout, Section
 from .html_utils import extract_paragraphs_from_html
 from .drawing import draw_s1, draw_s2_cover, list_images, paragraph_style, draw_poster_logos, _load_high_quality_image
 from .fonts import (register_arial_narrow, register_dejavu_sans, register_dsnet_stamped,
-                    register_arial, register_helvetica, register_times, register_courier)
+                    register_arial, register_helvetica, register_times, register_courier,
+                    register_font_family_by_name)
 from .spacing import SpacingConfig, SpacingPolicy
 from .textflow import (
     measure_fit_at_fs, draw_section_fixed_fs_with_prelude, draw_section_fixed_fs_with_tail,
@@ -336,6 +337,7 @@ def _simulate_allocation_at_fs(
         spacing_policy: SpacingPolicy,
         bullet_cfg: BulletConfig,
         date_box: DateBoxConfig,
+        date_style: DateStyleConfig | None = None,
 ) -> Tuple[dict, int]:
     remaining = list(paras)
     used_by = {}
@@ -344,7 +346,7 @@ def _simulate_allocation_at_fs(
         k = measure_fit_at_fs(
             c, S[name], remaining, font_name, font_size, leading_ratio, inner_pad,
             section_name=name, spacing_policy=spacing_policy,
-            bullet_cfg=bullet_cfg, date_box=date_box
+            bullet_cfg=bullet_cfg, date_box=date_box, date_style=date_style
         )
         used_by[name] = remaining[:k]
         total += k
@@ -456,6 +458,16 @@ def _read_date_line_config(cfg: Config) -> DateLineConfig:
     return DateLineConfig()  # Fallback
 
 
+def _read_date_style_config(cfg: Config) -> DateStyleConfig:
+    """Lit les paramètres de style des dates (bold, italic, alignement, police)."""
+    return DateStyleConfig(
+        font_name=getattr(cfg, "date_font_name", None),
+        bold=getattr(cfg, "date_bold", False),
+        italic=getattr(cfg, "date_italic", False),
+        alignment=getattr(cfg, "date_alignment", "left"),
+    )
+
+
 def _create_poster_story(
         paras_text: List[str], font_name: str, font_size: float,
         leading_ratio: float, bullet_cfg: BulletConfig
@@ -478,18 +490,36 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
     """
     report = {"unused_paragraphs": 0}
 
-    # --- Polices ---
+    # --- Polices de base (nécessaires pour les références hardcodées dans config.yml) ---
     register_dsnet_stamped()
+    register_arial_narrow()
     register_arial()
     register_helvetica()
     register_times()
     register_courier()
-    if register_arial_narrow():
+    register_dejavu_sans()
+
+    # --- Police du corps sélectionnée par l'utilisateur ---
+    user_font = cfg.font_name
+    if register_font_family_by_name(user_font):
+        cfg.font_name = user_font
+        log.info(f"Police du corps enregistrée : '{user_font}'")
+    elif "ArialNarrow" in {user_font, "Arial Narrow"}:
         cfg.font_name = "ArialNarrow"
     else:
-        print("[WARN] Police Arial Narrow introuvable - fallback sur Helvetica.")
-        cfg.font_name = "Helvetica"
-    register_dejavu_sans()
+        log.warning(f"Police '{user_font}' introuvable - fallback sur ArialNarrow")
+        cfg.font_name = "ArialNarrow"
+
+    # --- Police des dates (si différente du corps) ---
+    if cfg.date_font_name and cfg.date_font_name != cfg.font_name:
+        if not register_font_family_by_name(cfg.date_font_name):
+            log.warning(f"Police des dates '{cfg.date_font_name}' introuvable - hérite du corps")
+            cfg.date_font_name = None
+
+    # --- Police cucaracha ---
+    cucaracha_font = cfg.cucaracha_box.get("text_font_name")
+    if cucaracha_font:
+        register_font_family_by_name(cucaracha_font)
 
     def resolve_path(path_from_config: str, config_path: str) -> str:
         """
@@ -539,6 +569,7 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
     bullet_cfg = _read_bullet_config(cfg)
     date_box = _read_date_box_config(cfg)
     date_line = _read_date_line_config(cfg)
+    date_style = _read_date_style_config(cfg)
 
     # --- Calcul taille de police & Planification du texte pour pages 1 & 2 ---
     best_fs = 0.0
@@ -556,7 +587,7 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
             style_mid = paragraph_style(cfg.font_name, mid, cfg.leading_ratio)
             spacing_mid = SpacingPolicy(spacing_cfg, style_mid.leading)
             _, tot = _simulate_allocation_at_fs(c, S, order_fs, paras, cfg.font_name, mid, cfg.leading_ratio,
-                                                cfg.inner_padding, spacing_mid, bullet_cfg, date_box)
+                                                cfg.inner_padding, spacing_mid, bullet_cfg, date_box, date_style)
             if tot >= len(paras):
                 best_fs, lo = mid, mid
             else:
@@ -567,11 +598,11 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
     spacing_policy = SpacingPolicy(spacing_cfg, paragraph_style(cfg.font_name, best_fs, cfg.leading_ratio).leading)
     s5_full, s5_tail, s6_prelude, s6_full, rest_after_p2 = plan_pair_with_split(
         c, S["S5"], S["S6"], "S5", "S6", paras, cfg.font_name, best_fs, cfg.leading_ratio, cfg.inner_padding,
-        cfg.split_min_gain_ratio, spacing_policy, bullet_cfg, date_box
+        cfg.split_min_gain_ratio, spacing_policy, bullet_cfg, date_box, date_style
     )
     s3_full, s3_tail, s4_prelude, s4_full, rest_after_p1 = plan_pair_with_split(
         c, S["S3"], S["S4"], "S3", "S4", rest_after_p2, cfg.font_name, best_fs, cfg.leading_ratio, cfg.inner_padding,
-        cfg.split_min_gain_ratio, spacing_policy, bullet_cfg, date_box
+        cfg.split_min_gain_ratio, spacing_policy, bullet_cfg, date_box, date_style
     )
     report["unused_paragraphs"] = len(rest_after_p1)
     report["font_size_main"] = best_fs
@@ -594,14 +625,14 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
         prepped_cover = _prepare_cover_for_print(cover_path, S["S2"].w, S["S2"].h, cfg)  # cover_path est déjà absolu
         draw_s2_cover(c, S["S2"], prepped_cover, cfg.inner_padding)
     draw_section_fixed_fs_with_tail(c, S["S3"], s3_full, s3_tail, cfg.font_name, best_fs, cfg.leading_ratio,
-                                    cfg.inner_padding, "S3", spacing_policy, bullet_cfg, date_box, date_line)
+                                    cfg.inner_padding, "S3", spacing_policy, bullet_cfg, date_box, date_line, date_style)
     draw_section_fixed_fs_with_prelude(c, S["S4"], s4_prelude, s4_full, cfg.font_name, best_fs, cfg.leading_ratio,
-                                       cfg.inner_padding, "S4", spacing_policy, bullet_cfg, date_box, date_line)
+                                       cfg.inner_padding, "S4", spacing_policy, bullet_cfg, date_box, date_line, date_style)
     c.showPage()
     draw_section_fixed_fs_with_tail(c, S["S5"], s5_full, s5_tail, cfg.font_name, best_fs, cfg.leading_ratio,
-                                    cfg.inner_padding, "S5", spacing_policy, bullet_cfg, date_box, date_line)
+                                    cfg.inner_padding, "S5", spacing_policy, bullet_cfg, date_box, date_line, date_style)
     draw_section_fixed_fs_with_prelude(c, S["S6"], s6_prelude, s6_full, cfg.font_name, best_fs, cfg.leading_ratio,
-                                       cfg.inner_padding, "S6", spacing_policy, bullet_cfg, date_box, date_line)
+                                       cfg.inner_padding, "S6", spacing_policy, bullet_cfg, date_box, date_line, date_style)
 
     # --- RENDU PAGE 3 (POSTER) ---
     poster_cfg = _read_poster_config(cfg)

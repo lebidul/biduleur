@@ -110,13 +110,18 @@ class Application(TkinterDnD.Tk):
         self.logos_layout_var = tk.StringVar(value="svg")
         self.logos_svg_var = tk.StringVar(value="misenpageur/assets/logos.svg")
         self.logos_padding_var = tk.StringVar(value="1.0")
+        self.body_font_name_var = tk.StringVar(value=self.cfg_defaults.get("body_font_name", "Arial Narrow"))
         self.font_size_mode_var = tk.StringVar(value=self.cfg_defaults.get("font_size_mode", "auto"))
         self.font_size_forced_var = tk.StringVar(value=str(self.cfg_defaults.get("font_size_forced", "10.0")))
 
-        # --- Variables pour les séparateurs de dates ---
+        # --- Variables pour la configuration des dates ---
         self.date_separator_var = tk.StringVar(value=self.cfg_defaults.get("date_separator_type", "ligne"))
         self.date_spacing_var = tk.StringVar(value=self.cfg_defaults.get("date_spacing", "4"))
         self.date_box_back_color_var = tk.StringVar(value="#FFFFFF")
+        self.date_font_name_var = tk.StringVar(value=self.cfg_defaults.get("date_font_name", "(Identique au corps)"))
+        self.date_align_var = tk.StringVar(value=self.cfg_defaults.get("date_alignment", "left"))
+        self.date_bold_var = tk.BooleanVar(value=self.cfg_defaults.get("date_bold", False))
+        self.date_italic_var = tk.BooleanVar(value=self.cfg_defaults.get("date_italic", False))
 
         # --- Variables pour le poster ---
         self.poster_title_var = tk.StringVar(value=self.cfg_defaults.get("poster_title", ""))
@@ -298,8 +303,13 @@ class Application(TkinterDnD.Tk):
             out_svg_dir=self.svg_output_var.get().strip(),
             generate_stories=self.generate_stories_var.get(),
             stories_output_dir=self.stories_output_var.get().strip(),
+            body_font_name=self.body_font_name_var.get(),
             date_separator_type=self.date_separator_var.get(),
             date_spacing=validated_args['date_spacing_val'],
+            date_font_name=self.date_font_name_var.get(),
+            date_bold=self.date_bold_var.get(),
+            date_italic=self.date_italic_var.get(),
+            date_alignment=self.date_align_var.get(),
             poster_design=self.poster_design_var.get(),
             font_size_safety_factor=validated_args['safety_factor_val'],
             background_alpha=self.alpha_var.get(),

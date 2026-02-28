@@ -12,7 +12,7 @@ from reportlab.pdfgen import canvas
 from reportlab.platypus import Paragraph, Frame, Spacer
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.colors import HexColor
-from reportlab.lib.enums import TA_JUSTIFY
+from reportlab.lib.enums import TA_JUSTIFY, TA_LEFT, TA_CENTER, TA_RIGHT
 from reportlab.pdfbase.pdfmetrics import stringWidth
 
 from .layout import Section
@@ -21,7 +21,7 @@ from .html_utils import sanitize_inline_markup
 from .glyphs import apply_glyph_fallbacks
 from .spacing import SpacingPolicy
 
-from .config import BulletConfig, DateBoxConfig, DateLineConfig, PosterConfig  # Importer les configs
+from .config import BulletConfig, DateBoxConfig, DateLineConfig, DateStyleConfig, PosterConfig
 
 PT_PER_INCH = 72.0
 MM_PER_INCH = 25.4
@@ -261,14 +261,20 @@ def _strip_head_tail_breaks(s: str) -> str:
     return s.strip()
 
 
+_ALIGNMENT_MAP = {"left": TA_LEFT, "center": TA_CENTER, "right": TA_RIGHT}
+
+
 def _mk_style_for_kind(base: ParagraphStyle, kind: str,
                        bullet_cfg: BulletConfig,
                        date_box: DateBoxConfig,
-                       font_size: float = 10.0) -> ParagraphStyle:
+                       font_size: float = 10.0,
+                       date_style: DateStyleConfig | None = None) -> ParagraphStyle:
     # Créer une clé de cache basée sur les paramètres qui influencent le style
+    # NB: on inclut base.fontName pour invalider le cache quand la police du corps change
+    base_font = getattr(base, 'fontName', '')
     if kind == "EVENT":
         cache_key = (
-            "EVENT", base.name, font_size,
+            "EVENT", base_font, font_size,
             bullet_cfg.event_hanging_indent,
             bullet_cfg.bullet_text_indent,
             bullet_cfg.bullet_size_ratio,
@@ -287,23 +293,36 @@ def _mk_style_for_kind(base: ParagraphStyle, kind: str,
         _STYLE_CACHE[cache_key] = style
         return style
 
-    if kind == "DATE" and date_box.enabled:
+    if kind == "DATE":
+        ds = date_style or DateStyleConfig()
+        ta = _ALIGNMENT_MAP.get(ds.alignment, TA_LEFT)
         cache_key = (
-            "DATE", base.name, font_size,
+            "DATE", base_font, font_size,
+            date_box.enabled,
             date_box.border_width,
             date_box.border_color,
             date_box.back_color,
             date_box.padding,
+            ta,
+            ds.font_name,
         )
         if cache_key in _STYLE_CACHE:
             return _STYLE_CACHE[cache_key]
 
+        kwargs = {"alignment": ta}
+        if ds.font_name:
+            kwargs["fontName"] = ds.font_name
+        if date_box.enabled:
+            kwargs.update(
+                borderWidth=date_box.border_width,
+                borderColor=HexColor(date_box.border_color) if date_box.border_color else None,
+                backColor=HexColor(date_box.back_color) if date_box.back_color else None,
+                borderPadding=date_box.padding,
+            )
+
         style = ParagraphStyle(
             name=f"{base.name}_date", parent=base,
-            borderWidth=date_box.border_width,
-            borderColor=HexColor(date_box.border_color) if date_box.border_color else None,
-            backColor=HexColor(date_box.back_color) if date_box.back_color else None,
-            borderPadding=date_box.padding,
+            **kwargs,
         )
         _STYLE_CACHE[cache_key] = style
         return style
@@ -312,7 +331,8 @@ def _mk_style_for_kind(base: ParagraphStyle, kind: str,
 
 
 def _mk_text_for_kind(
-        raw: str, kind: str, bullet_cfg: BulletConfig, font_size: float = 10.0
+        raw: str, kind: str, bullet_cfg: BulletConfig, font_size: float = 10.0,
+        date_style: DateStyleConfig | None = None
 ) -> Tuple[str, Optional[str]]:
     txt = _strip_head_tail_breaks(sanitize_inline_markup(raw))
     bullet_text = None
@@ -325,6 +345,13 @@ def _mk_text_for_kind(
     # Remplacer tous les placeholders d'icônes par les images
     txt = _replace_all_placeholders(txt, font_size)
 
+    # Appliquer bold/italic pour les dates
+    if kind == "DATE" and date_style:
+        if date_style.italic:
+            txt = f"<i>{txt}</i>"
+        if date_style.bold:
+            txt = f"<b>{txt}</b>"
+
     return apply_glyph_fallbacks(txt), bullet_text
 
 
@@ -332,7 +359,8 @@ def measure_fit_at_fs(
         c: canvas.Canvas, section: Section, paras_text: List[str],
         font_name: str, font_size: float, leading_ratio: float, inner_pad: float,
         section_name: str, spacing_policy: SpacingPolicy,
-        bullet_cfg: BulletConfig, date_box: DateBoxConfig
+        bullet_cfg: BulletConfig, date_box: DateBoxConfig,
+        date_style: DateStyleConfig | None = None
 ) -> int:
     x0, y0 = section.x + inner_pad, section.y + inner_pad
     w, h = max(1.0, section.w - 2 * inner_pad), max(1.0, section.h - 2 * inner_pad)
@@ -343,8 +371,8 @@ def measure_fit_at_fs(
 
     for i, raw in enumerate(paras_text):
         kind = "EVENT" if _is_event(raw) else "DATE"
-        st = _mk_style_for_kind(base, kind, bullet_cfg, date_box, font_size)
-        txt, bullet = _mk_text_for_kind(raw, kind, bullet_cfg, font_size)
+        st = _mk_style_for_kind(base, kind, bullet_cfg, date_box, font_size, date_style)
+        txt, bullet = _mk_text_for_kind(raw, kind, bullet_cfg, font_size, date_style)
         p = Paragraph(txt, st, bulletText=bullet)
         _w, ph = p.wrap(w, 1e6)
         sb = spacing_policy.space_before(kind, section_name, first_non_event_seen_in_S5)
@@ -369,8 +397,8 @@ def measure_fit_at_fs(
                 # Calculer la valeur qu'aura first_non_event_seen_in_S5 APRÈS avoir placé la DATE actuelle
                 first_non_event_after_current = first_non_event_seen_in_S5
 
-                next_st = _mk_style_for_kind(base, next_kind, bullet_cfg, date_box, font_size)
-                next_txt, next_bullet = _mk_text_for_kind(next_raw, next_kind, bullet_cfg, font_size)
+                next_st = _mk_style_for_kind(base, next_kind, bullet_cfg, date_box, font_size, date_style)
+                next_txt, next_bullet = _mk_text_for_kind(next_raw, next_kind, bullet_cfg, font_size, date_style)
                 next_p = Paragraph(next_txt, next_st, bulletText=next_bullet)
                 _next_w, next_ph = next_p.wrap(w, 1e6)
                 next_sb = spacing_policy.space_before(next_kind, section_name, first_non_event_after_current)
@@ -392,7 +420,8 @@ def draw_section_fixed_fs_with_prelude(
         c: canvas.Canvas, section: Section, prelude_flows: List[Paragraph],
         paras_text: List[str], font_name: str, font_size: float, leading_ratio: float, inner_pad: float,
         section_name: str, spacing_policy: SpacingPolicy, bullet_cfg: BulletConfig,
-        date_box: DateBoxConfig, date_line: DateLineConfig
+        date_box: DateBoxConfig, date_line: DateLineConfig,
+        date_style: DateStyleConfig | None = None
 ) -> None:
     x0, y0 = section.x + inner_pad, section.y + inner_pad
     w, h = max(1.0, section.w - 2 * inner_pad), max(1.0, section.h - 2 * inner_pad)
@@ -414,8 +443,8 @@ def draw_section_fixed_fs_with_prelude(
     # Dessiner les paragraphes principaux
     for i, raw in enumerate(paras_text or []):
         kind = "EVENT" if _is_event(raw) else "DATE"
-        st = _mk_style_for_kind(base, kind, bullet_cfg, date_box, font_size)
-        txt, bullet = _mk_text_for_kind(raw, kind, bullet_cfg, font_size)
+        st = _mk_style_for_kind(base, kind, bullet_cfg, date_box, font_size, date_style)
+        txt, bullet = _mk_text_for_kind(raw, kind, bullet_cfg, font_size, date_style)
         p = Paragraph(txt, st, bulletText=bullet)
         _w, ph = p.wrap(w, h)
         sb = spacing_policy.space_before(kind, section_name, first_non_event_seen_in_S5)
@@ -437,8 +466,8 @@ def draw_section_fixed_fs_with_prelude(
                 # Calculer la valeur qu'aura first_non_event_seen_in_S5 APRÈS avoir placé la DATE actuelle
                 first_non_event_after_current = first_non_event_seen_in_S5
 
-                next_st = _mk_style_for_kind(base, next_kind, bullet_cfg, date_box, font_size)
-                next_txt, next_bullet = _mk_text_for_kind(next_raw, next_kind, bullet_cfg, font_size)
+                next_st = _mk_style_for_kind(base, next_kind, bullet_cfg, date_box, font_size, date_style)
+                next_txt, next_bullet = _mk_text_for_kind(next_raw, next_kind, bullet_cfg, font_size, date_style)
                 next_p = Paragraph(next_txt, next_st, bulletText=next_bullet)
                 _next_w, next_ph = next_p.wrap(w, h)
                 next_sb = spacing_policy.space_before(next_kind, section_name, first_non_event_after_current)
@@ -473,7 +502,8 @@ def draw_section_fixed_fs_with_tail(
         c: canvas.Canvas, section: Section, paras_text: List[str],
         tail_flows: List[Paragraph], font_name: str, font_size: float, leading_ratio: float, inner_pad: float,
         section_name: str, spacing_policy: SpacingPolicy, bullet_cfg: BulletConfig,
-        date_box: DateBoxConfig, date_line: DateLineConfig
+        date_box: DateBoxConfig, date_line: DateLineConfig,
+        date_style: DateStyleConfig | None = None
 ) -> None:
     x0, y0 = section.x + inner_pad, section.y + inner_pad
     w, h = max(1.0, section.w - 2 * inner_pad), max(1.0, section.h - 2 * inner_pad)
@@ -486,8 +516,8 @@ def draw_section_fixed_fs_with_tail(
     # Dessiner les paragraphes principaux
     for i, raw in enumerate(paras_text or []):
         kind = "EVENT" if _is_event(raw) else "DATE"
-        st = _mk_style_for_kind(base, kind, bullet_cfg, date_box, font_size)
-        txt, bullet = _mk_text_for_kind(raw, kind, bullet_cfg, font_size)
+        st = _mk_style_for_kind(base, kind, bullet_cfg, date_box, font_size, date_style)
+        txt, bullet = _mk_text_for_kind(raw, kind, bullet_cfg, font_size, date_style)
         p = Paragraph(txt, st, bulletText=bullet)
         _w, ph = p.wrap(w, h)
         sb = spacing_policy.space_before(kind, section_name, first_non_event_seen_in_S5)
@@ -510,8 +540,8 @@ def draw_section_fixed_fs_with_tail(
                 # Calculer la valeur qu'aura first_non_event_seen_in_S5 APRÈS avoir placé la DATE actuelle
                 first_non_event_after_current = first_non_event_seen_in_S5
 
-                next_st = _mk_style_for_kind(base, next_kind, bullet_cfg, date_box, font_size)
-                next_txt, next_bullet = _mk_text_for_kind(next_raw, next_kind, bullet_cfg, font_size)
+                next_st = _mk_style_for_kind(base, next_kind, bullet_cfg, date_box, font_size, date_style)
+                next_txt, next_bullet = _mk_text_for_kind(next_raw, next_kind, bullet_cfg, font_size, date_style)
                 next_p = Paragraph(next_txt, next_st, bulletText=next_bullet)
                 _next_w, next_ph = next_p.wrap(w, h)
                 next_sb = spacing_policy.space_before(next_kind, section_name, first_non_event_after_current)
@@ -556,7 +586,8 @@ def plan_pair_with_split(
         nameA: str, nameB: str, paras_text: List[str],
         font_name: str, font_size: float, leading_ratio: float, inner_pad: float,
         split_min_gain_ratio: float, spacing_policy: SpacingPolicy,
-        bullet_cfg: BulletConfig, date_box: DateBoxConfig
+        bullet_cfg: BulletConfig, date_box: DateBoxConfig,
+        date_style: DateStyleConfig | None = None
 ) -> Tuple[List[str], List[Paragraph], List[Paragraph], List[str], List[str]]:
     wA, hA = max(1.0, secA.w - 2 * inner_pad), max(1.0, secA.h - 2 * inner_pad)
     wB, hB = max(1.0, secB.w - 2 * inner_pad), max(1.0, secB.h - 2 * inner_pad)
@@ -569,8 +600,8 @@ def plan_pair_with_split(
     while i < n and remA > 0:
         raw = paras_text[i]
         kind = "EVENT" if _is_event(raw) else "DATE"
-        stA = _mk_style_for_kind(base, kind, bullet_cfg, date_box, font_size)
-        txtA, bulletA = _mk_text_for_kind(raw, kind, bullet_cfg, font_size)
+        stA = _mk_style_for_kind(base, kind, bullet_cfg, date_box, font_size, date_style)
+        txtA, bulletA = _mk_text_for_kind(raw, kind, bullet_cfg, font_size, date_style)
         p = Paragraph(txtA, stA, bulletText=bulletA)
         _w, ph = p.wrap(wA, 1e6)
         sbA = spacing_policy.space_before(kind, nameA, first_non_event_seen_in_S5_A)
@@ -587,8 +618,8 @@ def plan_pair_with_split(
                 if next_kind == "EVENT":
                     # Calculer si le prochain EVENT peut rentrer dans A
                     first_non_event_after_current = first_non_event_seen_in_S5_A
-                    next_st = _mk_style_for_kind(base, next_kind, bullet_cfg, date_box, font_size)
-                    next_txt, next_bullet = _mk_text_for_kind(next_raw, next_kind, bullet_cfg, font_size)
+                    next_st = _mk_style_for_kind(base, next_kind, bullet_cfg, date_box, font_size, date_style)
+                    next_txt, next_bullet = _mk_text_for_kind(next_raw, next_kind, bullet_cfg, font_size, date_style)
                     next_p = Paragraph(next_txt, next_st, bulletText=next_bullet)
                     _next_w, next_ph = next_p.wrap(wA, 1e6)
                     next_sb = spacing_policy.space_before(next_kind, nameA, first_non_event_after_current)
@@ -625,8 +656,8 @@ def plan_pair_with_split(
     while i < n and remB > 0:
         raw = paras_text[i]
         kind = "EVENT" if _is_event(raw) else "DATE"
-        stB = _mk_style_for_kind(base, kind, bullet_cfg, date_box, font_size)
-        txtB, bulletB = _mk_text_for_kind(raw, kind, bullet_cfg, font_size)
+        stB = _mk_style_for_kind(base, kind, bullet_cfg, date_box, font_size, date_style)
+        txtB, bulletB = _mk_text_for_kind(raw, kind, bullet_cfg, font_size, date_style)
         q = Paragraph(txtB, stB, bulletText=bulletB)
         _w, hq = q.wrap(wB, 1e6)
         sbB = spacing_policy.space_before(kind, nameB, first_non_event_seen_in_S5_B)
@@ -643,8 +674,8 @@ def plan_pair_with_split(
                 if next_kind == "EVENT":
                     # Calculer si le prochain EVENT peut rentrer dans B
                     first_non_event_after_current = first_non_event_seen_in_S5_B
-                    next_st = _mk_style_for_kind(base, next_kind, bullet_cfg, date_box, font_size)
-                    next_txt, next_bullet = _mk_text_for_kind(next_raw, next_kind, bullet_cfg, font_size)
+                    next_st = _mk_style_for_kind(base, next_kind, bullet_cfg, date_box, font_size, date_style)
+                    next_txt, next_bullet = _mk_text_for_kind(next_raw, next_kind, bullet_cfg, font_size, date_style)
                     next_p = Paragraph(next_txt, next_st, bulletText=next_bullet)
                     _next_w, next_ph = next_p.wrap(wB, 1e6)
                     next_sb = spacing_policy.space_before(next_kind, nameB, first_non_event_after_current)

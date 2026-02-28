@@ -88,6 +88,12 @@ class Config:
     event_spaceBefore: float = 1.0
     event_spaceAfter: float = 1.0
 
+    # --- Date style ---
+    date_font_name: str | None = None  # None = hériter du corps
+    date_bold: bool = False
+    date_italic: bool = False
+    date_alignment: str = "left"  # "left", "center", "right"
+
     # --- Bullets ---
     show_event_bullet: bool = True
     event_bullet_replacement: Optional[str] = None
@@ -163,6 +169,14 @@ class Config:
         known_fields = {f.name for f in cls.__dataclass_fields__.values()}
         kwargs = {k: v for k, v in d.items() if k in known_fields}
         return cls(**kwargs)
+
+
+@dataclass
+class DateStyleConfig:
+    font_name: str | None = None  # None = hériter du corps
+    bold: bool = False
+    italic: bool = False
+    alignment: str = "left"  # "left", "center", "right"
 
 
 @dataclass

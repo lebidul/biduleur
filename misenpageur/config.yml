@@ -48,6 +48,9 @@ text_sections_order:
   - "S3"
   - "S4"
 
+# Police des dates (null = identique au corps)
+date_font_name: null
+
 # Espacement (pt)
 date_spaceBefore: 4
 date_spaceAfter: 4
@@ -137,6 +140,9 @@ section_1:
       rect_mm: [30, 87, 16, 5]
     - href: "http://www.lebidul.com"
       rect_mm: [6, 81, 16, 5]
+    - href: "http://www.lebidul.com"
+      rect_mm: [ 6, 81, 16, 5 ]
+
 
 cucaracha_box:
   content_type: "text"
