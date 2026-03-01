@@ -637,7 +637,7 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
     # --- RENDU PAGE 3 (POSTER) ---
     poster_cfg = _read_poster_config(cfg)
     poster_cfg_dict = cfg.poster  # On récupère le dictionnaire
-    best_fs_poster = poster_cfg.font_size_min
+    best_fs_poster = 3.0  # Sera recalculé par la recherche binaire si le poster est activé
 
     if poster_cfg.enabled:
         c.showPage()
@@ -833,24 +833,40 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
 
         # --- Calcul de la taille de police ---
         poster_paras = s5_full + s6_full + s3_full + s4_full
-        lo, hi = poster_cfg.font_size_min, poster_cfg.font_size_max
-        for _ in range(10):
+        num_dates = sum(1 for p in poster_paras if not _is_event(p))
+        num_events = sum(1 for p in poster_paras if _is_event(p))
+        log.info(f"Poster: {len(poster_paras)} paragraphes ({num_dates} dates, {num_events} événements)")
+        log.info(f"Poster: {len(poster_frames)} colonnes, hauteurs = {[f.h for f in poster_frames]}")
+
+        # Plancher absolu : on descend autant que nécessaire pour tout afficher
+        _POSTER_FONT_FLOOR = 3.0
+        lo, hi = _POSTER_FONT_FLOOR, poster_cfg.font_size_max
+        best_fs_poster = _POSTER_FONT_FLOOR
+        for i in range(15):
             mid = (lo + hi) / 2.0
             if mid <= lo or mid >= hi: break
 
-            if measure_poster_fit_at_fs(
+            fits = measure_poster_fit_at_fs(
                     c, poster_frames, poster_paras,
                     cfg.font_name, mid, cfg.leading_ratio, bullet_cfg,
                     poster_cfg,
                     poster_text_color
-            ):
+            )
+            log.info(f"  Poster recherche iter {i}: fs={mid:.2f}pt → {'TIENT' if fits else 'DEBORDE'}")
+            if fits:
                 best_fs_poster, lo = mid, mid
             else:
                 hi = mid
-            if abs(hi - lo) < 0.1: break
+            if abs(hi - lo) < 0.05: break
+
+        if best_fs_poster < poster_cfg.font_size_min:
+            log.warning(
+                f"Poster: la police ({best_fs_poster:.1f}pt) est inférieure au minimum "
+                f"configuré ({poster_cfg.font_size_min}pt) — contenu très dense"
+            )
 
         # --- Dessin du texte ---
-        final_fs_poster = best_fs_poster * poster_cfg.font_size_safety_factor
+        final_fs_poster = best_fs_poster
 
         report["font_size_poster_optimal"] = best_fs_poster
         report["font_size_poster_final"] = final_fs_poster
@@ -867,7 +883,7 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
     print(f"Taille de police (pages 1-2): {best_fs:.2f} pt")
     if poster_cfg.enabled:
         print(
-            f"Taille de police (poster)    : {best_fs_poster * poster_cfg.font_size_safety_factor:.2f} pt (optimale: {best_fs_poster:.2f})")
+            f"Taille de police (poster)    : {final_fs_poster:.2f} pt")
     print(f"Paragraphes non placés      : {len(rest_after_p1)}")
     print("-" * 20)
 

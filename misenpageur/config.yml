@@ -173,7 +173,7 @@ poster:
   font_size_title: 34.0
   font_size_min: 6.0
   font_size_max: 10.0
-  font_size_safety_factor: 0.951
+  font_size_safety_factor: 1.0
   date_spaceBefore: 3
   date_spaceAfter: 3
   text_color_auto: true

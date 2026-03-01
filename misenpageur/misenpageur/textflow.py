@@ -695,6 +695,41 @@ def plan_pair_with_split(
     return A_full, A_tail, B_prelude, B_full, paras_text[i:]
 
 
+def _build_poster_story(
+        paras_text: List[str],
+        base_style: ParagraphStyle,
+        bullet_cfg: BulletConfig,
+        poster_cfg: PosterConfig,
+        font_size: float,
+) -> list:
+    """
+    Construit la liste de flowables (Paragraphs) pour le poster.
+    L'espacement des dates est intégré au style (spaceBefore/spaceAfter)
+    plutôt qu'en Spacer séparés, ce qui évite le gaspillage d'espace
+    aux transitions entre colonnes et permet à Frame de gérer
+    correctement l'espacement (ignoré en haut de colonne, etc.).
+    Utilisée à la fois par la mesure et le rendu pour garantir un résultat identique.
+    """
+    story: list = []
+    for raw in paras_text:
+        kind = "EVENT" if _is_event(raw) else "DATE"
+        st = _mk_style_for_kind(base_style, kind, bullet_cfg, DateBoxConfig(), font_size)
+        txt, bullet = _mk_text_for_kind(raw, kind, bullet_cfg, font_size)
+
+        if kind == "DATE":
+            # Intégrer l'espacement dans le style (pas de Spacer séparés)
+            st = ParagraphStyle(
+                name=f"{st.name}_poster",
+                parent=st,
+                spaceBefore=poster_cfg.date_spaceBefore,
+                spaceAfter=poster_cfg.date_spaceAfter,
+            )
+
+        story.append(Paragraph(txt, st, bulletText=bullet))
+
+    return story
+
+
 def measure_poster_fit_at_fs(
         c: canvas.Canvas, frames: List[Section], paras_text: List[str],
         font_name: str, font_size: float, leading_ratio: float,
@@ -703,37 +738,26 @@ def measure_poster_fit_at_fs(
         text_color: str = "#000000"
 ) -> bool:
     """
-    Simule le remplissage des cadres en calculant la hauteur de chaque paragraphe,
-    en incluant l'espacement spécifique du poster pour les dates.
+    Teste si tout le contenu tient dans les cadres à la taille de police donnée.
+    Utilise le même pipeline Frame que le rendu réel (canvas jetable) pour
+    éliminer toute divergence de mesure (padding Frame, gestion des Spacers, etc.).
     """
+    from io import BytesIO
+
     base_style = paragraph_style(font_name, font_size, leading_ratio)
     base_style.textColor = HexColor(text_color)
-    para_idx = 0
-    num_paras = len(paras_text)
+    story = _build_poster_story(paras_text, base_style, bullet_cfg, poster_cfg, font_size)
+
+    # Canvas jetable pour la mesure (on ne veut pas dessiner sur le vrai canvas)
+    dummy_c = canvas.Canvas(BytesIO())
+
     for section in frames:
-        if para_idx >= num_paras: break
-        remaining_height = section.h
-        while remaining_height > 0 and para_idx < num_paras:
-            raw = paras_text[para_idx]
-            kind = "EVENT" if _is_event(raw) else "DATE"
-            st = _mk_style_for_kind(base_style, kind, bullet_cfg, DateBoxConfig(), font_size)
-            txt, bullet = _mk_text_for_kind(raw, kind, bullet_cfg, font_size)
-            p = Paragraph(txt, st, bulletText=bullet)
+        if not story:
+            break
+        frame = Frame(section.x, section.y, section.w, section.h, showBoundary=0)
+        frame.addFromList(story, dummy_c)
 
-            _w, p_h = p.wrapOn(c, section.w, section.h)
-
-            # ==================== LA CORRECTION EST ICI ====================
-            # Si c'est une date, on ajoute l'espacement du poster au calcul
-            if kind == "DATE":
-                p_h += poster_cfg.date_spaceBefore + poster_cfg.date_spaceAfter
-            # =============================================================
-
-            if p_h <= remaining_height:
-                remaining_height -= p_h
-                para_idx += 1
-            else:
-                remaining_height = 0
-    return para_idx >= num_paras
+    return len(story) == 0
 
 
 def draw_poster_text_in_frames(
@@ -749,22 +773,10 @@ def draw_poster_text_in_frames(
     """
     base_style = paragraph_style(font_name, font_size, leading_ratio)
     base_style.textColor = HexColor(text_color)
-    story = []
-    for raw in paras_text:
-        kind = "EVENT" if _is_event(raw) else "DATE"
-        st = _mk_style_for_kind(base_style, kind, bullet_cfg, DateBoxConfig(), font_size)
-        txt, bullet = _mk_text_for_kind(raw, kind, bullet_cfg, font_size)
-
-        # Si c'est une date, on ajoute des objets Spacer à la story
-        if kind == "DATE":
-            story.append(Spacer(1, poster_cfg.date_spaceBefore))
-
-        story.append(Paragraph(txt, st, bulletText=bullet))
-
-        if kind == "DATE":
-            story.append(Spacer(1, poster_cfg.date_spaceAfter))
+    story = _build_poster_story(paras_text, base_style, bullet_cfg, poster_cfg, font_size)
 
     for section in frames:
-        if not story: break
+        if not story:
+            break
         frame = Frame(section.x, section.y, section.w, section.h, showBoundary=0)
         frame.addFromList(story, c)

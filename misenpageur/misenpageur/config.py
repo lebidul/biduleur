@@ -33,7 +33,7 @@ class PosterConfig:
     font_size_title: float = 36.0
     font_size_min: float = 6.0
     font_size_max: float = 10.0
-    font_size_safety_factor: float = 0.98
+    font_size_safety_factor: float = 1.0
     background_image_alpha: float = 0.85
     date_spaceBefore: float = 2.0
     date_spaceAfter: float = 2.0

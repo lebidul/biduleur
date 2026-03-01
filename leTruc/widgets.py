@@ -622,9 +622,10 @@ def _create_poster_section(parent, app, ui_row):
     tk.Radiobutton(design_frame, text="Image en fond", variable=app.poster_design_var, value=1).pack(side=tk.LEFT,
                                                                                                      padx=5)
 
-    tk.Label(layout_frame, text="Facteur de sécurité police :").grid(row=3, column=0, sticky="w", padx=5, pady=5)
-    tk.Entry(layout_frame, textvariable=app.safety_factor_var, width=10).grid(row=3, column=1, sticky="w", padx=5,
-                                                                              pady=5)
+    app.safety_factor_label = tk.Label(layout_frame, text="Facteur de sécurité police :")
+    app.safety_factor_label.grid(row=3, column=0, sticky="w", padx=5, pady=5)
+    app.safety_factor_entry = tk.Entry(layout_frame, textvariable=app.safety_factor_var, width=10)
+    app.safety_factor_entry.grid(row=3, column=1, sticky="w", padx=5, pady=5)
 
     r += 1
     ui_row['r'] = r

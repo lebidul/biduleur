@@ -93,7 +93,7 @@ def _load_cfg_defaults() -> dict:
         "date_bold": False,
         "date_italic": False,
         "poster_design": 0,
-        "font_size_safety_factor": 0.98,
+        "font_size_safety_factor": 1.0,
         "background_alpha": 0.85,
         "poster_title": "",
         "cucaracha_type": "none",
