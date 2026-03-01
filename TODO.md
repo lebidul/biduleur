@@ -67,6 +67,7 @@
 - [ ] Mettre nouveau logo les arts services (Gëelle) dans ours
 - [ ] config dans GUI: champs pas dans export/import: paths input g
 - [ ] Enlever du GUI les paramètres qu'on ne change jamais (ou les mettre dans un onglet config)
+- [ ] Ajouter abbréviations (Sablé-sur-Sarthe, sur -> /s)
 
 ## Documentation
 - [x] Rédiger un guide utilisateur pour expliquer comment utiliser le module.
