@@ -555,7 +555,7 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
         log.info(f"Remplacement icônes activé (chapeau={chapeau_enabled}, free={free_enabled})")
 
     logos = list_images(os.path.join(project_root, cfg.logos_dir))
-    cover_path = os.path.join(project_root, cfg.cover_image)
+    cover_path = os.path.join(project_root, cfg.cover_image) if cfg.cover_image else ""
 
     S = layout.sections
 

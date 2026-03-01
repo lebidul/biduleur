@@ -84,6 +84,7 @@ class Application(TkinterDnD.Tk):
         self.ours_svg_var = tk.StringVar(value="misenpageur/assets/ours/ours.svg")
         self.logos_var = tk.StringVar(value=self.cfg_defaults.get("logos_dir", ""))
         self.cover_var = tk.StringVar()
+        self.generate_html_var = tk.BooleanVar(value=False)
         self.html_var = tk.StringVar()
         self.agenda_var = tk.StringVar()
         self.pdf_var = tk.StringVar()
@@ -142,6 +143,8 @@ class Application(TkinterDnD.Tk):
         # --- Variables de sortie et de statut ---
         self.generate_svg_var = tk.BooleanVar(value=True)
         self.split_pdf_var = tk.BooleanVar(value=self.cfg_defaults.get("split_pdf", False))
+        self.print_pdf_var = tk.BooleanVar(value=self.cfg_defaults.get("print_pdf", False))
+        self.logos_print_svg_var = tk.StringVar(value="misenpageur/assets/logos.impression.svg")
         self.status_var = tk.StringVar(value="Prêt.")
 
         self.debug_mode_var = tk.BooleanVar(value=self.cfg_defaults.get("debug_mode", False))
@@ -330,7 +333,10 @@ class Application(TkinterDnD.Tk):
             stories_alpha=self.stories_alpha_var.get(),
             abbreviations_enabled=abbreviations_enabled,
             stop_event=self.stop_event,  # v1.4.3 : Passer l'event d'arrêt
-            split_pdf=self.split_pdf_var.get()  # v1.4.5 : Générer un PDF par page
+            split_pdf=self.split_pdf_var.get(),  # v1.4.5 : Générer un PDF par page
+            print_pdf=self.print_pdf_var.get(),  # v1.5.0 : Fichiers d'impression
+            logos_print_svg_file=self.logos_print_svg_var.get().strip(),
+            generate_html=self.generate_html_var.get(),  # v1.5.2 : Génération HTML optionnelle
         )
 
     def _check_thread_for_results(self):

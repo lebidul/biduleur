@@ -5,7 +5,7 @@ import tkinter as tk
 from tkinter import ttk
 
 from tkinterdnd2 import DND_FILES
-from .callbacks import on_drop_input_file, on_drop_cover_file
+from .callbacks import on_drop_input_file, on_drop_cover_file, _on_font_selected
 from .tooltips import Tooltip
 
 _FONT_OPTIONS_CACHE = None
@@ -24,6 +24,11 @@ def _get_font_options():
             "Helvetica", "Times New Roman",
         ]
     return _FONT_OPTIONS_CACHE
+
+
+def _create_font_preview_label(parent) -> tk.Label:
+    """Crée un label de prévisualisation pour un sélecteur de police."""
+    return tk.Label(parent, text="", anchor="w", width=25, relief="groove", padx=5)
 
 
 # Ce fichier a une responsabilité unique : créer et placer tous les widgets de l'interface. Il ne contiendra aucune logique d'action (pas de command=... qui font des choses compliquées).
@@ -195,6 +200,13 @@ def _create_logos_section(parent, app, ui_row):
     # On stocke la ligne pour le callback
     app.logos_padding_row = lr
     app.logos_svg_row = lr
+    lr += 1
+
+    # Widgets du fichier SVG impression (debug-only, même visibilité que la section logos)
+    app.logos_print_svg_label = tk.Label(app.logos_frame, text="SVG Impression :")
+    app.logos_print_svg_entry = tk.Entry(app.logos_frame, textvariable=app.logos_print_svg_var)
+    app.logos_print_svg_button = tk.Button(app.logos_frame, text="Parcourir…")
+    app.logos_print_svg_row = lr
 
     r += 1
     ui_row['r'] = r
@@ -248,6 +260,11 @@ def _create_cucaracha_section(parent, app, ui_row):
     # Organisation des widgets de police
     app.cucaracha_font_label.pack(side=tk.LEFT)
     app.cucaracha_font_combo.pack(side=tk.LEFT, padx=(0, 10))
+    app.cucaracha_font_preview = _create_font_preview_label(app.cucaracha_font_frame)
+    app.cucaracha_font_preview.pack(side=tk.LEFT, padx=(0, 10))
+    app.cucaracha_font_combo.bind("<<ComboboxSelected>>",
+                                  lambda e: _on_font_selected(app, app.cucaracha_font_var, app.cucaracha_font_preview))
+    _on_font_selected(app, app.cucaracha_font_var, app.cucaracha_font_preview)
     app.cucaracha_font_size_label.pack(side=tk.LEFT)
     app.cucaracha_font_size_entry.pack(side=tk.LEFT)
 
@@ -356,6 +373,11 @@ def _create_page_layout_section(parent, app, ui_row):
     body_font_combo = ttk.Combobox(page_layout_frame, textvariable=app.body_font_name_var,
                                    values=_get_font_options(), width=30)
     body_font_combo.grid(row=lr, column=1, sticky="w", padx=5, pady=5)
+    app.body_font_preview = _create_font_preview_label(page_layout_frame)
+    app.body_font_preview.grid(row=lr, column=2, sticky="w", padx=5, pady=5)
+    body_font_combo.bind("<<ComboboxSelected>>",
+                         lambda e: _on_font_selected(app, app.body_font_name_var, app.body_font_preview))
+    _on_font_selected(app, app.body_font_name_var, app.body_font_preview)
     Tooltip(body_font_label,
             text="Police utilisée pour le corps du texte (événements et dates par défaut).")
     lr += 1
@@ -528,8 +550,14 @@ def _create_date_sep_section(parent, app, ui_row):
     # Police des dates
     tk.Label(date_sep_frame, text="Police des dates :").grid(row=lr, column=0, sticky="w", padx=5, pady=5)
     date_font_values = ["(Identique au corps)"] + _get_font_options()
-    ttk.Combobox(date_sep_frame, textvariable=app.date_font_name_var,
-                 values=date_font_values, width=30).grid(row=lr, column=1, sticky="w", padx=5, pady=5)
+    date_font_combo = ttk.Combobox(date_sep_frame, textvariable=app.date_font_name_var,
+                                   values=date_font_values, width=30)
+    date_font_combo.grid(row=lr, column=1, sticky="w", padx=5, pady=5)
+    app.date_font_preview = _create_font_preview_label(date_sep_frame)
+    app.date_font_preview.grid(row=lr, column=2, sticky="w", padx=5, pady=5)
+    date_font_combo.bind("<<ComboboxSelected>>",
+                         lambda e: _on_font_selected(app, app.date_font_name_var, app.date_font_preview))
+    _on_font_selected(app, app.date_font_name_var, app.date_font_preview)
     lr += 1
 
     # Style du texte (gras / italique)
@@ -615,8 +643,14 @@ def _create_stories_section(parent, app, ui_row):
     tk.Label(stories_frame, text="Police :").grid(row=lr, column=0, sticky="w", padx=5, pady=5)
     font_frame = ttk.Frame(stories_frame)
     font_frame.grid(row=lr, column=1, sticky="w")
-    ttk.Combobox(font_frame, textvariable=app.stories_font_name_var,
-                 values=_get_font_options(), width=30).pack(side=tk.LEFT, padx=5)
+    stories_font_combo = ttk.Combobox(font_frame, textvariable=app.stories_font_name_var,
+                                      values=_get_font_options(), width=30)
+    stories_font_combo.pack(side=tk.LEFT, padx=5)
+    app.stories_font_preview = _create_font_preview_label(font_frame)
+    app.stories_font_preview.pack(side=tk.LEFT, padx=(0, 10))
+    stories_font_combo.bind("<<ComboboxSelected>>",
+                            lambda e: _on_font_selected(app, app.stories_font_name_var, app.stories_font_preview))
+    _on_font_selected(app, app.stories_font_name_var, app.stories_font_preview)
     tk.Label(font_frame, text="Taille (pt) :").pack(side=tk.LEFT, padx=(10, 5))
     tk.Entry(font_frame, textvariable=app.stories_font_size_var, width=5).pack(side=tk.LEFT)
     lr += 1
@@ -680,45 +714,60 @@ def _create_output_section(parent, app, ui_row):
     output_frame.grid(row=r, column=0, columnspan=3, sticky="ew", pady=10)
     output_frame.columnconfigure(1, weight=1)
 
-    # HTML
-    tk.Label(output_frame, text="HTML (biduleur) :").grid(row=0, column=0, sticky="e", padx=5, pady=5)
-    tk.Entry(output_frame, textvariable=app.html_var).grid(row=0, column=1, sticky="ew", padx=5, pady=5)
+    # Checkbox pour générer HTML (row 0)
+    app.generate_html_checkbox = tk.Checkbutton(
+        output_frame, text="Générer les fichiers HTML (biduleur et agenda)",
+        variable=app.generate_html_var)
+    app.generate_html_checkbox.grid(row=0, column=0, columnspan=3, sticky="w", padx=5, pady=5)
+
+    # HTML (debug-only, visible quand checkbox cochée, row 1)
+    app.html_label = tk.Label(output_frame, text="HTML (biduleur) :")
+    app.html_label.grid(row=1, column=0, sticky="e", padx=5, pady=5)
+    app.html_entry = tk.Entry(output_frame, textvariable=app.html_var)
+    app.html_entry.grid(row=1, column=1, sticky="ew", padx=5, pady=5)
     app.html_save_button = tk.Button(output_frame, text="…", width=3)
-    app.html_save_button.grid(row=0, column=2, padx=5, pady=5)
+    app.html_save_button.grid(row=1, column=2, padx=5, pady=5)
 
-    # HTML Agenda
-    tk.Label(output_frame, text="HTML Agenda :").grid(row=1, column=0, sticky="e", padx=5, pady=5)
-    tk.Entry(output_frame, textvariable=app.agenda_var).grid(row=1, column=1, sticky="ew", padx=5, pady=5)
+    # HTML Agenda (debug-only, visible quand checkbox cochée, row 2)
+    app.agenda_label = tk.Label(output_frame, text="HTML Agenda :")
+    app.agenda_label.grid(row=2, column=0, sticky="e", padx=5, pady=5)
+    app.agenda_entry = tk.Entry(output_frame, textvariable=app.agenda_var)
+    app.agenda_entry.grid(row=2, column=1, sticky="ew", padx=5, pady=5)
     app.agenda_save_button = tk.Button(output_frame, text="…", width=3)
-    app.agenda_save_button.grid(row=1, column=2, padx=5, pady=5)
+    app.agenda_save_button.grid(row=2, column=2, padx=5, pady=5)
 
-    # PDF
-    tk.Label(output_frame, text="PDF (misenpageur) :").grid(row=2, column=0, sticky="e", padx=5, pady=5)
-    tk.Entry(output_frame, textvariable=app.pdf_var).grid(row=2, column=1, sticky="ew", padx=5, pady=5)
+    # PDF (row 3)
+    tk.Label(output_frame, text="PDF (misenpageur) :").grid(row=3, column=0, sticky="e", padx=5, pady=5)
+    tk.Entry(output_frame, textvariable=app.pdf_var).grid(row=3, column=1, sticky="ew", padx=5, pady=5)
     app.pdf_save_button = tk.Button(output_frame, text="…", width=3)
-    app.pdf_save_button.grid(row=2, column=2, padx=5, pady=5)
+    app.pdf_save_button.grid(row=3, column=2, padx=5, pady=5)
 
-    # Split PDF
+    # Split PDF (row 4)
     tk.Checkbutton(output_frame, text="Générer un PDF par page (en plus du PDF complet)",
                    variable=app.split_pdf_var).grid(
-        row=3, column=0, columnspan=3, sticky="w", padx=5, pady=5)
-
-    # SVG
-    tk.Checkbutton(output_frame, text="Générer des SVG éditables (pour Inkscape)", variable=app.generate_svg_var).grid(
         row=4, column=0, columnspan=3, sticky="w", padx=5, pady=5)
-    tk.Label(output_frame, text="Dossier SVG :").grid(row=5, column=0, sticky="e", padx=5, pady=5)
-    tk.Entry(output_frame, textvariable=app.svg_output_var).grid(row=5, column=1, sticky="ew", padx=5, pady=5)
-    app.svg_output_button = tk.Button(output_frame, text="…", width=3)
-    app.svg_output_button.grid(row=5, column=2, padx=5, pady=5)
 
-    # Stories
+    # Fichiers d'impression (row 5)
+    tk.Checkbutton(output_frame, text="Créer fichiers d'impression (logos optimisés pour impression)",
+                   variable=app.print_pdf_var).grid(
+        row=5, column=0, columnspan=3, sticky="w", padx=5, pady=5)
+
+    # SVG (row 6-7)
+    tk.Checkbutton(output_frame, text="Générer des SVG éditables (pour Inkscape)", variable=app.generate_svg_var).grid(
+        row=6, column=0, columnspan=3, sticky="w", padx=5, pady=5)
+    tk.Label(output_frame, text="Dossier SVG :").grid(row=7, column=0, sticky="e", padx=5, pady=5)
+    tk.Entry(output_frame, textvariable=app.svg_output_var).grid(row=7, column=1, sticky="ew", padx=5, pady=5)
+    app.svg_output_button = tk.Button(output_frame, text="…", width=3)
+    app.svg_output_button.grid(row=7, column=2, padx=5, pady=5)
+
+    # Stories (row 8-9)
     tk.Checkbutton(output_frame, text="Générer les images pour les Stories Instagram",
                    variable=app.generate_stories_var).grid(
-        row=6, column=0, columnspan=3, sticky="w", padx=5, pady=5)
-    tk.Label(output_frame, text="Dossier Stories :").grid(row=7, column=0, sticky="e", padx=5, pady=5)
-    tk.Entry(output_frame, textvariable=app.stories_output_var).grid(row=7, column=1, sticky="ew", padx=5, pady=5)
+        row=8, column=0, columnspan=3, sticky="w", padx=5, pady=5)
+    tk.Label(output_frame, text="Dossier Stories :").grid(row=9, column=0, sticky="e", padx=5, pady=5)
+    tk.Entry(output_frame, textvariable=app.stories_output_var).grid(row=9, column=1, sticky="ew", padx=5, pady=5)
     app.stories_output_button = tk.Button(output_frame, text="…", width=3)
-    app.stories_output_button.grid(row=7, column=2, padx=5, pady=5)
+    app.stories_output_button.grid(row=9, column=2, padx=5, pady=5)
 
     r += 1
     ui_row['r'] = r

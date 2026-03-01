@@ -31,7 +31,7 @@
 - [x] Lire logos depuis svg (qui contiendrait tous les logos) pareil pour l'ours
 - [ ] Mettre strings des boutons de l'UI dans fichier config séparé pour une meilleure modulairité et adaptabilité
 - [ ] Rendre tout Bidul agnostic
-- [ ] Bouton STOP
+- [x] Bouton STOP
 - [x] Message d'erreur dans le cas ou il n'y a pas de fichier input sélectionné
 - [ ] Fix csv input
 - [x] Output separate pdf pages
@@ -67,6 +67,7 @@
 - [ ] Mettre nouveau logo les arts services (Gëelle) dans ours
 - [ ] config dans GUI: champs pas dans export/import: paths input g
 - [ ] Enlever du GUI les paramètres qu'on ne change jamais (ou les mettre dans un onglet config)
+- [ ] Ajouter abbréviations (Sablé-sur-Sarthe, sur -> /s)
 
 ## Documentation
 - [x] Rédiger un guide utilisateur pour expliquer comment utiliser le module.

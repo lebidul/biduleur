@@ -5,6 +5,7 @@
 
 import os
 import tkinter as tk
+import tkinter.font as tkfont
 from tkinter import filedialog, messagebox, colorchooser, ttk
 from PIL import Image, ImageTk
 import re
@@ -36,6 +37,8 @@ def assign_all(app):
     app.logos_button.config(command=lambda: on_pick_directory(app.logos_var, "Dossier des logos"))
     app.logos_svg_button.config(command=lambda: on_pick_file(app.logos_svg_var, "Fichier SVG des logos",
                                                              [("SVG", "*.svg"), ("Tous", "*.*")]))
+    app.logos_print_svg_button.config(command=lambda: on_pick_file(app.logos_print_svg_var, "Fichier SVG des logos (impression)",
+                                                                   [("SVG", "*.svg"), ("Tous", "*.*")]))
 
     app.cucaracha_image_button.config(command=lambda: on_pick_image_with_preview(app, app.cucaracha_value_var,
                                                                                  app.cucaracha_preview,
@@ -87,6 +90,9 @@ def assign_all(app):
     # ✨ NOUVEAU : Toggle des boutons config quand debug mode change
     app.debug_mode_var.trace_add("write", lambda *args: on_toggle_config_buttons(app))
 
+    # v1.5.2 : Toggle des widgets HTML quand la checkbox change
+    app.generate_html_var.trace_add("write", lambda *args: on_toggle_html_widgets(app))
+
     # ✨ NOUVEAU v1.4.2 : Callbacks pour les boutons d'abréviations
     if hasattr(app, 'abbrev_select_all_btn'):
         app.abbrev_select_all_btn.config(command=lambda: on_abbrev_select_all(app))
@@ -104,6 +110,7 @@ def assign_all(app):
     on_toggle_alpha_slider(app)
     on_update_alpha_label(app)
     on_toggle_config_buttons(app)  # ✨ NOUVEAU : Initialiser l'état des boutons config
+    on_toggle_html_widgets(app)  # v1.5.2 : Initialiser l'état des widgets HTML
     _update_drop_zone_text(app, app.input_var.get())
     _update_cover_drop_zone(app, app.cover_var.get())
 
@@ -195,8 +202,10 @@ def on_toggle_padding_widget(app):
     layout = app.logos_layout_var.get()
     lr = app.logos_padding_row
 
+    plr = app.logos_print_svg_row
+
     if layout == "svg":
-        # Mode SVG : cacher dossier logos et marge, afficher fichier SVG
+        # Mode SVG : cacher dossier logos et marge, afficher fichiers SVG
         app.logos_dir_label.grid_remove()
         app.logos_dir_entry.grid_remove()
         app.logos_button.grid_remove()
@@ -205,8 +214,11 @@ def on_toggle_padding_widget(app):
         app.logos_svg_label.grid(row=lr, column=0, sticky="e", padx=5, pady=5)
         app.logos_svg_entry.grid(row=lr, column=1, sticky="ew", padx=5, pady=5)
         app.logos_svg_button.grid(row=lr, column=2, padx=5, pady=5)
+        app.logos_print_svg_label.grid(row=plr, column=0, sticky="e", padx=5, pady=5)
+        app.logos_print_svg_entry.grid(row=plr, column=1, sticky="ew", padx=5, pady=5)
+        app.logos_print_svg_button.grid(row=plr, column=2, padx=5, pady=5)
     elif layout == "optimise":
-        # Mode optimisé : afficher dossier logos et marge, cacher fichier SVG
+        # Mode optimisé : afficher dossier logos et marge, cacher fichiers SVG
         app.logos_dir_label.grid(row=0, column=0, sticky="e", padx=5, pady=5)
         app.logos_dir_entry.grid(row=0, column=1, sticky="ew", padx=5, pady=5)
         app.logos_button.grid(row=0, column=2, padx=5, pady=5)
@@ -215,8 +227,11 @@ def on_toggle_padding_widget(app):
         app.logos_svg_label.grid_remove()
         app.logos_svg_entry.grid_remove()
         app.logos_svg_button.grid_remove()
+        app.logos_print_svg_label.grid_remove()
+        app.logos_print_svg_entry.grid_remove()
+        app.logos_print_svg_button.grid_remove()
     else:
-        # Mode colonnes : afficher dossier logos, cacher marge et fichier SVG
+        # Mode colonnes : afficher dossier logos, cacher marge et fichiers SVG
         app.logos_dir_label.grid(row=0, column=0, sticky="e", padx=5, pady=5)
         app.logos_dir_entry.grid(row=0, column=1, sticky="ew", padx=5, pady=5)
         app.logos_button.grid(row=0, column=2, padx=5, pady=5)
@@ -225,6 +240,9 @@ def on_toggle_padding_widget(app):
         app.logos_svg_label.grid_remove()
         app.logos_svg_entry.grid_remove()
         app.logos_svg_button.grid_remove()
+        app.logos_print_svg_label.grid_remove()
+        app.logos_print_svg_entry.grid_remove()
+        app.logos_print_svg_button.grid_remove()
 
 
 def on_toggle_ours_widgets(app):
@@ -335,6 +353,20 @@ def on_update_alpha_label(app):
     app.alpha_value_label.config(text=f"{int(app.alpha_var.get() * 100)}%")
 
 
+# ✨ Prévisualisation des polices dans les sélecteurs
+def _on_font_selected(app, font_var, preview_label):
+    """Met à jour le label de prévisualisation avec la police sélectionnée."""
+    font_name = font_var.get()
+    # Cas spécial : date "(Identique au corps)" → utiliser la police du corps
+    if font_name == "(Identique au corps)":
+        font_name = app.body_font_name_var.get()
+    try:
+        preview_font = tkfont.Font(family=font_name, size=12)
+        preview_label.config(text=font_name, font=preview_font)
+    except Exception:
+        preview_label.config(text=font_name, font=("TkDefaultFont", 12))
+
+
 # ✨ NOUVELLE FONCTION : Toggle des boutons config et widgets debug-only
 def on_toggle_config_buttons(app):
     """Affiche/cache les boutons config et les widgets avancés selon mode debug.
@@ -377,6 +409,27 @@ def on_toggle_config_buttons(app):
         for widget in debug_only_widgets:
             if widget is not None:
                 widget.grid_remove()
+
+    # v1.5.2 : Mettre à jour la visibilité des widgets HTML
+    on_toggle_html_widgets(app)
+
+
+# v1.5.2 : Toggle des widgets HTML (chemins de sortie)
+def on_toggle_html_widgets(app):
+    """Affiche/cache les widgets de chemin HTML selon l'option générer HTML."""
+    gen_html = app.generate_html_var.get()
+
+    html_widgets = [
+        app.html_label, app.html_entry, app.html_save_button,
+        app.agenda_label, app.agenda_entry, app.agenda_save_button,
+    ]
+
+    if gen_html:
+        for widget in html_widgets:
+            widget.grid()
+    else:
+        for widget in html_widgets:
+            widget.grid_remove()
 
 
 # ✨ NOUVEAU v1.4.2 : Callbacks pour les abréviations

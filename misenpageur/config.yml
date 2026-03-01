@@ -16,10 +16,14 @@ template_pdf: "misenpageur/templates/bidul_template.pdf"
 output_pdf: "misenpageur/bidul/bidul_print.pdf"
 
 logos_dir: "misenpageur/assets/logos.svg"
+logos_layout: "svg"
+logos_svg_file: "misenpageur/assets/logos.svg"
+logos_print_svg_file: "misenpageur/assets/logos.impression.svg"
 cover_image: "misenpageur/assets/couv/couverture.png"
 nobr_file: "misenpageur/assets/textes/nobr.txt"
 ours_md: "misenpageur/assets/ours/ours.md"
 ours_svg: "misenpageur/assets/ours/ours_template.svg"
+ours_svg_file: "misenpageur/assets/ours/ours.svg"
 
 # ======================  ===
 # Paramètres typographiques
