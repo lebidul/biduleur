@@ -139,13 +139,14 @@ section_1:
   logo_box_bottom_margin_mm: 0
   ours_hyperlinks:
     - href: "https://www.facebook.com/LeBidul"
-      rect_mm: [6, 87, 12, 5]
+      rect_mm: [5, 87, 11, 5]
     - href: "https://www.instagram.com/le_bidul_72"
-      rect_mm: [30, 87, 16, 5]
+      rect_mm: [29, 87, 16, 5]
     - href: "https://radioalpa.com/emissions/le-biduloscope/"
-      rect_mm: [30, 81, 16, 5]
+      rect_mm: [5, 81, 19, 5]
     - href: "http://www.lebidul.com"
-      rect_mm: [ 6, 81, 16, 5 ]
+      rect_mm: [29, 81, 14, 5]
+
 
 
 cucaracha_box:
