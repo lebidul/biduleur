@@ -142,10 +142,10 @@ section_1:
       rect_mm: [6, 87, 12, 5]
     - href: "https://www.instagram.com/le_bidul_72"
       rect_mm: [30, 87, 16, 5]
-    - href: "https://radioalpa.com/emissions/le-biduloscope/"
+    - href: "http://www.lebidul.com"
       rect_mm: [6, 81, 16, 5]
     - href: "http://www.lebidul.com"
-      rect_mm: [ 30, 81, 12, 5 ]
+      rect_mm: [ 6, 81, 16, 5 ]
 
 
 cucaracha_box:
