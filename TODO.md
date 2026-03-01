@@ -31,7 +31,7 @@
 - [x] Lire logos depuis svg (qui contiendrait tous les logos) pareil pour l'ours
 - [ ] Mettre strings des boutons de l'UI dans fichier config séparé pour une meilleure modulairité et adaptabilité
 - [ ] Rendre tout Bidul agnostic
-- [ ] Bouton STOP
+- [x] Bouton STOP
 - [x] Message d'erreur dans le cas ou il n'y a pas de fichier input sélectionné
 - [ ] Fix csv input
 - [x] Output separate pdf pages
