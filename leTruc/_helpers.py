@@ -235,6 +235,7 @@ def run_pipeline(
         split_pdf: bool = False,  # v1.4.5 : Générer un PDF par page
         print_pdf: bool = False,  # v1.5.0 : Fichiers d'impression
         logos_print_svg_file: str = "",  # v1.5.0 : SVG logos impression
+        generate_html: bool = False,  # v1.5.2 : Génération HTML optionnelle
 ) -> tuple[bool, str]:
     debug_dir = None
     if debug_mode:
@@ -261,6 +262,7 @@ def run_pipeline(
     final_layout_path = None
     report = {}
     abbreviation_stats = {}  # v1.4.2 : Stats des remplacements
+    _temp_html_files = []  # v1.5.2 : Fichiers HTML temporaires à nettoyer
 
     try:
         check_stop_requested(stop_event)  # v1.4.3 : Vérifier avant de commencer
@@ -279,6 +281,16 @@ def run_pipeline(
         status_queue.put(('start', total_steps, None))
         current_step = 0
 
+        # v1.5.2 : Utiliser des fichiers temporaires pour le HTML si on ne le génère pas
+        if not generate_html:
+            import tempfile
+            fd1, out_html = tempfile.mkstemp(suffix='.html')
+            os.close(fd1)
+            _temp_html_files.append(out_html)
+            fd2, out_agenda_html = tempfile.mkstemp(suffix='.html')
+            os.close(fd2)
+            _temp_html_files.append(out_agenda_html)
+
         for p in (out_html, out_agenda_html, out_pdf, out_svg_dir):
             if p: _ensure_parent_dir(p)
 
@@ -295,7 +307,10 @@ def run_pipeline(
 
         check_stop_requested(stop_event)  # v1.4.3
         current_step += 1
-        status_queue.put(('status', f"Étape {current_step}/{total_steps} : Génération des HTML...", current_step, None))
+        if generate_html:
+            status_queue.put(('status', f"Étape {current_step}/{total_steps} : Génération des HTML...", current_step, None))
+        else:
+            status_queue.put(('status', f"Étape {current_step}/{total_steps} : Préparation des données...", current_step, None))
         output_html_file(html_body_bidul, original_file_name=input_file, output_filename=out_html)
         output_html_file(html_body_agenda, original_file_name=input_file, output_filename=out_agenda_html)
 
@@ -503,8 +518,9 @@ def run_pipeline(
         summary_lines = [
             f"Fichier d'entrée : {os.path.basename(input_file)}", "-" * 40, "Fichiers de sortie créés :"
         ]
-        if out_html: summary_lines.append(f"  - HTML: {out_html}")
-        if out_agenda_html: summary_lines.append(f"  - HTML (Agenda): {out_agenda_html}")
+        if generate_html:
+            if out_html: summary_lines.append(f"  - HTML: {out_html}")
+            if out_agenda_html: summary_lines.append(f"  - HTML (Agenda): {out_agenda_html}")
         if out_pdf: summary_lines.append(f"  - PDF: {out_pdf}")
         if split_pdf_files:
             summary_lines.append(f"  - PDF par page: {len(split_pdf_files)} fichiers")
@@ -553,6 +569,7 @@ def run_pipeline(
                 config_data["_abbreviations_enabled"] = abbreviations_enabled or {}
                 config_data["_split_pdf"] = split_pdf  # v1.4.5
                 config_data["_print_pdf"] = print_pdf  # v1.5.0
+                config_data["_generate_html"] = generate_html  # v1.5.2
                 with open(config_path, 'w', encoding='utf-8') as f:
                     json.dump(config_data, f, indent=2, default=json_converter, ensure_ascii=False)
             except Exception as e:
@@ -613,6 +630,13 @@ def run_pipeline(
         if final_layout_path and os.path.exists(final_layout_path) and Path(final_layout_path).name.endswith(".yml"):
             try:
                 os.remove(final_layout_path)
+            except OSError:
+                pass
+        # v1.5.2 : Nettoyer les fichiers HTML temporaires
+        for tf in _temp_html_files:
+            try:
+                if os.path.exists(tf):
+                    os.remove(tf)
             except OSError:
                 pass
 
@@ -900,6 +924,11 @@ def load_and_apply_config(app_instance, config_path: str):
     logos_print_svg = raw_data.get('logos_print_svg_file', '')
     if logos_print_svg and hasattr(app_instance, 'logos_print_svg_var'):
         app_instance.logos_print_svg_var.set(make_abs(logos_print_svg, config_dir))
+
+    # v1.5.2 : Importer l'option generate_html
+    gen_html = raw_data.get('_generate_html', False)
+    if hasattr(app_instance, 'generate_html_var'):
+        app_instance.generate_html_var.set(gen_html)
 
     # Forcer le rafraîchissement du GUI
     app_instance.update_idletasks()

@@ -84,6 +84,7 @@ class Application(TkinterDnD.Tk):
         self.ours_svg_var = tk.StringVar(value="misenpageur/assets/ours/ours.svg")
         self.logos_var = tk.StringVar(value=self.cfg_defaults.get("logos_dir", ""))
         self.cover_var = tk.StringVar()
+        self.generate_html_var = tk.BooleanVar(value=False)
         self.html_var = tk.StringVar()
         self.agenda_var = tk.StringVar()
         self.pdf_var = tk.StringVar()
@@ -335,6 +336,7 @@ class Application(TkinterDnD.Tk):
             split_pdf=self.split_pdf_var.get(),  # v1.4.5 : Générer un PDF par page
             print_pdf=self.print_pdf_var.get(),  # v1.5.0 : Fichiers d'impression
             logos_print_svg_file=self.logos_print_svg_var.get().strip(),
+            generate_html=self.generate_html_var.get(),  # v1.5.2 : Génération HTML optionnelle
         )
 
     def _check_thread_for_results(self):

@@ -1179,8 +1179,11 @@ def draw_s2_cover(c: canvas.Canvas, S2_coords, image_path: str, inner_pad: float
         log.debug(f"Image de couverture insérée: {w:.1f}x{h:.1f}pt (300 DPI)")
     except Exception as e:
         log.error(f"Erreur lors du chargement de l'image de couverture: {e}")
-        # Fallback: méthode originale
-        c.drawImage(image_path, x, y, w, h, preserveAspectRatio=True, anchor='c', mask='auto')
+        # Fallback: méthode originale (seulement si le fichier existe)
+        if os.path.exists(image_path):
+            c.drawImage(image_path, x, y, w, h, preserveAspectRatio=True, anchor='c', mask='auto')
+        else:
+            log.warning(f"Image de couverture introuvable : {image_path}")
 
 
 def draw_poster_logos(c: canvas.Canvas, s_coords: Section, logos: List[str], cfg: Config = None):

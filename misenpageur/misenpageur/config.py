@@ -59,7 +59,7 @@ class Config:
     auteur_couv: Optional[str] = None
     auteur_couv_url: Optional[str] = None
     logos_dir: str = "assets/logos"
-    logos_layout: str = "colonnes"
+    logos_layout: str = "svg"
     logos_padding_mm: float = 1.0
     logos_svg_file: Optional[str] = "misenpageur/assets/logos.svg"
     logos_print_svg_file: Optional[str] = "misenpageur/assets/logos.impression.svg"

@@ -1,3 +1,46 @@
+# Bidul v1.5.2 - Génération HTML optionnelle, corrections logos et build
+
+Cette version rend la génération des fichiers HTML optionnelle, corrige le rendu des logos SVG en mode normal, et raccourcit les noms d'artifacts du build GitHub.
+
+## ✨ Nouveautés
+
+### Génération HTML optionnelle
+*   **Nouvelle option "Générer les fichiers HTML (biduleur et agenda)"** dans la section Sortie
+    *   Par défaut désactivée : les fichiers HTML intermédiaires sont créés en temporaire puis nettoyés
+    *   Lorsqu'activée, les fichiers HTML sont générés aux chemins configurés (comme avant)
+    *   L'option est visible en mode normal et en mode debug
+    *   Les champs de chemin HTML ne s'affichent que si l'option est activée
+
+### Build GitHub Actions : nommage court
+*   Les builds manuels utilisent désormais le **hash court du commit** (`DEV-abc1234`) au lieu du nom de branche
+*   Corrige les erreurs "path too long" sous Windows lors de la décompression d'artifacts issus de branches au nom long
+
+## 🐛 Corrections
+
+### Logos SVG non rendus en mode normal
+*   Le mode de rendu par défaut des logos (`logos_layout`) était `"colonnes"` (PNG) dans le dataclass Config, alors que le GUI proposait `"svg"`
+*   En mode non-debug, la valeur du GUI n'était jamais appliquée → les logos SVG n'étaient pas rendus
+*   Corrigé : le défaut est désormais `"svg"` dans le dataclass et dans `config.yml`
+
+### Crash couverture absente
+*   Corrigé un `OSError` quand `cover_image` est `None` ou vide dans la config
+*   Le pipeline ne plante plus si aucune image de couverture n'est configurée
+*   Un message d'avertissement est loggé si le fichier est introuvable
+
+## 🔧 Détails techniques
+
+*   `leTruc/app.py` : variable `generate_html_var` (BooleanVar)
+*   `leTruc/widgets.py` : checkbox HTML en row 0, réorganisation des rows de la section Sortie
+*   `leTruc/callbacks.py` : `on_toggle_html_widgets()` pour afficher/masquer les champs de chemin HTML
+*   `leTruc/_helpers.py` : paramètre `generate_html`, fichiers temporaires via `tempfile.mkstemp()`, nettoyage en `finally`
+*   `misenpageur/misenpageur/config.py` : `logos_layout` default changé de `"colonnes"` à `"svg"`
+*   `misenpageur/config.yml` : ajout de `logos_layout: "svg"`
+*   `misenpageur/misenpageur/draw_logic.py` : guard `if cfg.cover_image` avant `os.path.join()`
+*   `misenpageur/misenpageur/drawing.py` : vérification d'existence du fichier dans le fallback de `draw_s2_cover`
+*   `.github/workflows/bidul.release.yml` : version manuelle `DEV-<sha>` au lieu de `MANUAL-<branch>-<sha>`
+
+---
+
 # Bidul v1.5.1 - Fichiers d'impression et prévisualisation polices
 
 Cette version ajoute la génération de fichiers d'impression avec logos optimisés, la prévisualisation des polices dans les sélecteurs, et des corrections d'import de config.

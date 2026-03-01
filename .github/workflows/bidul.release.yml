@@ -40,9 +40,8 @@ jobs:
           } 
           # Sinon (déclenchement manuel)...
           else {
-            $branch = "${{ github.ref_name }}".Replace('/', '-') # Nettoie les noms de branche
             $sha = "${{ github.sha }}".Substring(0, 7)
-            $version = "MANUAL-$branch-$sha"
+            $version = "DEV-$sha"
             echo "Version de build manuel détectée : $version"
           }
           echo "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append

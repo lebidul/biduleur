@@ -90,6 +90,9 @@ def assign_all(app):
     # ✨ NOUVEAU : Toggle des boutons config quand debug mode change
     app.debug_mode_var.trace_add("write", lambda *args: on_toggle_config_buttons(app))
 
+    # v1.5.2 : Toggle des widgets HTML quand la checkbox change
+    app.generate_html_var.trace_add("write", lambda *args: on_toggle_html_widgets(app))
+
     # ✨ NOUVEAU v1.4.2 : Callbacks pour les boutons d'abréviations
     if hasattr(app, 'abbrev_select_all_btn'):
         app.abbrev_select_all_btn.config(command=lambda: on_abbrev_select_all(app))
@@ -107,6 +110,7 @@ def assign_all(app):
     on_toggle_alpha_slider(app)
     on_update_alpha_label(app)
     on_toggle_config_buttons(app)  # ✨ NOUVEAU : Initialiser l'état des boutons config
+    on_toggle_html_widgets(app)  # v1.5.2 : Initialiser l'état des widgets HTML
     _update_drop_zone_text(app, app.input_var.get())
     _update_cover_drop_zone(app, app.cover_var.get())
 
@@ -405,6 +409,27 @@ def on_toggle_config_buttons(app):
         for widget in debug_only_widgets:
             if widget is not None:
                 widget.grid_remove()
+
+    # v1.5.2 : Mettre à jour la visibilité des widgets HTML
+    on_toggle_html_widgets(app)
+
+
+# v1.5.2 : Toggle des widgets HTML (chemins de sortie)
+def on_toggle_html_widgets(app):
+    """Affiche/cache les widgets de chemin HTML selon l'option générer HTML."""
+    gen_html = app.generate_html_var.get()
+
+    html_widgets = [
+        app.html_label, app.html_entry, app.html_save_button,
+        app.agenda_label, app.agenda_entry, app.agenda_save_button,
+    ]
+
+    if gen_html:
+        for widget in html_widgets:
+            widget.grid()
+    else:
+        for widget in html_widgets:
+            widget.grid_remove()
 
 
 # ✨ NOUVEAU v1.4.2 : Callbacks pour les abréviations

@@ -714,50 +714,60 @@ def _create_output_section(parent, app, ui_row):
     output_frame.grid(row=r, column=0, columnspan=3, sticky="ew", pady=10)
     output_frame.columnconfigure(1, weight=1)
 
-    # HTML
-    tk.Label(output_frame, text="HTML (biduleur) :").grid(row=0, column=0, sticky="e", padx=5, pady=5)
-    tk.Entry(output_frame, textvariable=app.html_var).grid(row=0, column=1, sticky="ew", padx=5, pady=5)
+    # Checkbox pour générer HTML (row 0)
+    app.generate_html_checkbox = tk.Checkbutton(
+        output_frame, text="Générer les fichiers HTML (biduleur et agenda)",
+        variable=app.generate_html_var)
+    app.generate_html_checkbox.grid(row=0, column=0, columnspan=3, sticky="w", padx=5, pady=5)
+
+    # HTML (debug-only, visible quand checkbox cochée, row 1)
+    app.html_label = tk.Label(output_frame, text="HTML (biduleur) :")
+    app.html_label.grid(row=1, column=0, sticky="e", padx=5, pady=5)
+    app.html_entry = tk.Entry(output_frame, textvariable=app.html_var)
+    app.html_entry.grid(row=1, column=1, sticky="ew", padx=5, pady=5)
     app.html_save_button = tk.Button(output_frame, text="…", width=3)
-    app.html_save_button.grid(row=0, column=2, padx=5, pady=5)
+    app.html_save_button.grid(row=1, column=2, padx=5, pady=5)
 
-    # HTML Agenda
-    tk.Label(output_frame, text="HTML Agenda :").grid(row=1, column=0, sticky="e", padx=5, pady=5)
-    tk.Entry(output_frame, textvariable=app.agenda_var).grid(row=1, column=1, sticky="ew", padx=5, pady=5)
+    # HTML Agenda (debug-only, visible quand checkbox cochée, row 2)
+    app.agenda_label = tk.Label(output_frame, text="HTML Agenda :")
+    app.agenda_label.grid(row=2, column=0, sticky="e", padx=5, pady=5)
+    app.agenda_entry = tk.Entry(output_frame, textvariable=app.agenda_var)
+    app.agenda_entry.grid(row=2, column=1, sticky="ew", padx=5, pady=5)
     app.agenda_save_button = tk.Button(output_frame, text="…", width=3)
-    app.agenda_save_button.grid(row=1, column=2, padx=5, pady=5)
+    app.agenda_save_button.grid(row=2, column=2, padx=5, pady=5)
 
-    # PDF
-    tk.Label(output_frame, text="PDF (misenpageur) :").grid(row=2, column=0, sticky="e", padx=5, pady=5)
-    tk.Entry(output_frame, textvariable=app.pdf_var).grid(row=2, column=1, sticky="ew", padx=5, pady=5)
+    # PDF (row 3)
+    tk.Label(output_frame, text="PDF (misenpageur) :").grid(row=3, column=0, sticky="e", padx=5, pady=5)
+    tk.Entry(output_frame, textvariable=app.pdf_var).grid(row=3, column=1, sticky="ew", padx=5, pady=5)
     app.pdf_save_button = tk.Button(output_frame, text="…", width=3)
-    app.pdf_save_button.grid(row=2, column=2, padx=5, pady=5)
+    app.pdf_save_button.grid(row=3, column=2, padx=5, pady=5)
 
-    # Split PDF
+    # Split PDF (row 4)
     tk.Checkbutton(output_frame, text="Générer un PDF par page (en plus du PDF complet)",
                    variable=app.split_pdf_var).grid(
-        row=3, column=0, columnspan=3, sticky="w", padx=5, pady=5)
-
-    # Fichiers d'impression
-    tk.Checkbutton(output_frame, text="Créer fichiers d'impression (logos optimisés pour impression)",
-                   variable=app.print_pdf_var).grid(
         row=4, column=0, columnspan=3, sticky="w", padx=5, pady=5)
 
-    # SVG
-    tk.Checkbutton(output_frame, text="Générer des SVG éditables (pour Inkscape)", variable=app.generate_svg_var).grid(
+    # Fichiers d'impression (row 5)
+    tk.Checkbutton(output_frame, text="Créer fichiers d'impression (logos optimisés pour impression)",
+                   variable=app.print_pdf_var).grid(
         row=5, column=0, columnspan=3, sticky="w", padx=5, pady=5)
-    tk.Label(output_frame, text="Dossier SVG :").grid(row=6, column=0, sticky="e", padx=5, pady=5)
-    tk.Entry(output_frame, textvariable=app.svg_output_var).grid(row=6, column=1, sticky="ew", padx=5, pady=5)
-    app.svg_output_button = tk.Button(output_frame, text="…", width=3)
-    app.svg_output_button.grid(row=6, column=2, padx=5, pady=5)
 
-    # Stories
+    # SVG (row 6-7)
+    tk.Checkbutton(output_frame, text="Générer des SVG éditables (pour Inkscape)", variable=app.generate_svg_var).grid(
+        row=6, column=0, columnspan=3, sticky="w", padx=5, pady=5)
+    tk.Label(output_frame, text="Dossier SVG :").grid(row=7, column=0, sticky="e", padx=5, pady=5)
+    tk.Entry(output_frame, textvariable=app.svg_output_var).grid(row=7, column=1, sticky="ew", padx=5, pady=5)
+    app.svg_output_button = tk.Button(output_frame, text="…", width=3)
+    app.svg_output_button.grid(row=7, column=2, padx=5, pady=5)
+
+    # Stories (row 8-9)
     tk.Checkbutton(output_frame, text="Générer les images pour les Stories Instagram",
                    variable=app.generate_stories_var).grid(
-        row=7, column=0, columnspan=3, sticky="w", padx=5, pady=5)
-    tk.Label(output_frame, text="Dossier Stories :").grid(row=8, column=0, sticky="e", padx=5, pady=5)
-    tk.Entry(output_frame, textvariable=app.stories_output_var).grid(row=8, column=1, sticky="ew", padx=5, pady=5)
+        row=8, column=0, columnspan=3, sticky="w", padx=5, pady=5)
+    tk.Label(output_frame, text="Dossier Stories :").grid(row=9, column=0, sticky="e", padx=5, pady=5)
+    tk.Entry(output_frame, textvariable=app.stories_output_var).grid(row=9, column=1, sticky="ew", padx=5, pady=5)
     app.stories_output_button = tk.Button(output_frame, text="…", width=3)
-    app.stories_output_button.grid(row=8, column=2, padx=5, pady=5)
+    app.stories_output_button.grid(row=9, column=2, padx=5, pady=5)
 
     r += 1
     ui_row['r'] = r
