@@ -127,7 +127,7 @@ class Application(TkinterDnD.Tk):
         # --- Variables pour le poster ---
         self.poster_title_var = tk.StringVar(value=self.cfg_defaults.get("poster_title", ""))
         self.poster_design_var = tk.IntVar(value=self.cfg_defaults.get("poster_design", 0))
-        self.safety_factor_var = tk.StringVar(value=str(self.cfg_defaults.get("font_size_safety_factor", "0.98")))
+        self.safety_factor_var = tk.StringVar(value=str(self.cfg_defaults.get("font_size_safety_factor", "1.0")))
         self.alpha_var = tk.DoubleVar(value=self.cfg_defaults.get("background_alpha", 0.85))
 
         # --- Variables pour la boîte Cucaracha ---

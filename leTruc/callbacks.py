@@ -393,6 +393,7 @@ def on_toggle_config_buttons(app):
         app.cover_checkbox,
         app.margin_label, app.margin_entry,
         app.date_spacing_label, app.date_spacing_entry,
+        app.safety_factor_label, app.safety_factor_entry,
     ]
 
     if is_debug:

@@ -1,3 +1,31 @@
+# Bidul v1.5.3 - Poster automatique : remplissage fiable et complet
+
+Cette version refond entièrement le calcul de la taille de police du poster pour que **tout le contenu soit toujours affiché**, sans aucun réglage manuel.
+
+## ✨ Nouveautés
+
+### Poster entièrement automatique
+*   La mesure de texte du poster utilise désormais **exactement le même pipeline Frame** que le rendu réel (ReportLab), éliminant les divergences entre estimation et affichage
+*   L'espacement des dates est intégré directement dans le style des paragraphes (`spaceBefore`/`spaceAfter`) au lieu de `Spacer` séparés, ce qui optimise l'utilisation de l'espace aux transitions de colonnes
+*   La recherche binaire descend automatiquement jusqu'à **3pt** si nécessaire pour afficher la totalité du contenu (auparavant bloquée à 6pt)
+*   Le **facteur de sécurité police** n'est plus appliqué (défaut = 1.0) — il reste accessible en mode debug si besoin
+*   Un avertissement est loggé si la taille de police descend sous le minimum configuré
+
+### Widget "Facteur de sécurité police" masqué en mode normal
+*   Le champ est désormais réservé au mode debug (il ne devrait plus être nécessaire)
+
+## 🔧 Détails techniques
+
+*   `misenpageur/misenpageur/textflow.py` : nouvelle fonction `_build_poster_story()` partagée entre mesure et rendu ; `measure_poster_fit_at_fs()` réécrite avec Frame + canvas jetable ; `draw_poster_text_in_frames()` simplifiée
+*   `misenpageur/misenpageur/draw_logic.py` : plancher de recherche abaissé à 3pt, suppression du facteur de sécurité, logs de diagnostic détaillés
+*   `misenpageur/misenpageur/config.py` : `font_size_safety_factor` default = 1.0
+*   `misenpageur/config.yml` : `font_size_safety_factor: 1.0`
+*   `leTruc/widgets.py` : widget facteur de sécurité stocké sur `app` pour toggle debug
+*   `leTruc/callbacks.py` : ajouté aux `debug_only_widgets`
+*   `leTruc/app.py`, `leTruc/_helpers.py` : défaut du facteur mis à 1.0
+
+---
+
 # Bidul v1.5.2 - Génération HTML optionnelle, corrections logos et build
 
 Cette version rend la génération des fichiers HTML optionnelle, corrige le rendu des logos SVG en mode normal, et raccourcit les noms d'artifacts du build GitHub.
