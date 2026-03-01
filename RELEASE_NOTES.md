@@ -1,3 +1,41 @@
+# Bidul v1.5.1 - Fichiers d'impression et prévisualisation polices
+
+Cette version ajoute la génération de fichiers d'impression avec logos optimisés, la prévisualisation des polices dans les sélecteurs, et des corrections d'import de config.
+
+## ✨ Nouveautés
+
+### Fichiers d'impression (logos optimisés)
+*   **Nouvelle option "Créer fichiers d'impression"** dans la section Sortie
+    *   Génère un second jeu de fichiers (PDF, PDF par page, SVG) avec le suffixe `.impression`
+    *   Utilise un fichier SVG logos spécifique pour l'impression (`logos.impression.svg`)
+    *   Le chemin du SVG logos impression est configurable en mode debug (section Paramètres des Logos)
+    *   Compatible avec "Générer un PDF par page" et "Générer des SVG éditables"
+
+### Prévisualisation des polices
+*   **Labels de prévisualisation** à côté des 4 sélecteurs de polices (corps, dates, cucaracha, stories)
+*   Chaque label affiche le nom de la police **rendu dans sa propre typographie**
+*   Mise à jour instantanée au changement de sélection
+
+### Chemins par défaut pour les SVG logos et ours
+*   Les fichiers `logos.svg`, `logos.impression.svg` et `ours.svg` ont désormais des **chemins par défaut** dans le dataclass Config et config.yml
+*   Corrige le problème où les logos/ours n'étaient pas trouvés dans le build GitHub
+
+## 🐛 Corrections
+
+### Import de config : vignette cucaracha
+*   La **vignette de l'image cucaracha** est désormais générée lors de l'import d'une config (comme c'est déjà le cas pour la couverture)
+
+## 🔧 Détails techniques
+
+*   `misenpageur/assets/logos.impression.svg` : nouveau fichier SVG logos pour impression (inclus dans le build)
+*   `misenpageur/misenpageur/config.py` : champ `logos_print_svg_file` avec valeur par défaut
+*   `leTruc/widgets.py` : checkbox "Créer fichiers d'impression" + champ SVG impression + labels preview polices
+*   `leTruc/callbacks.py` : `_on_font_selected()` pour les previews + toggle du champ SVG impression + bouton Parcourir
+*   `leTruc/_helpers.py` : 2e passe pipeline avec substitution logos SVG, export/import config `_print_pdf`
+*   `leTruc/app.py` : variables `print_pdf_var` et `logos_print_svg_var`
+
+---
+
 # Bidul v1.5.0 - Mode debug, polices et poster
 
 Cette version améliore l'interface utilisateur en masquant les paramètres avancés en mode normal, corrige l'import de la couverture et recentre l'image du poster.
@@ -12,6 +50,11 @@ Cette version améliore l'interface utilisateur en masquant les paramètres avan
     *   Marge globale (mm)
     *   Espace avant/après dates (pt)
 *   En mode normal, ces paramètres utilisent les **valeurs par défaut de config.yml**
+
+### Sélecteurs de polices indépendants
+*   **Polices distinctes** pour le corps de texte, les dates et les stories Instagram
+*   Chaque sélecteur propose toutes les polices système découvertes dynamiquement (~85 sur un Windows typique)
+*   Les choix de polices sont sauvegardés/restaurés via l'export/import config
 
 ### Poster : image recentrée (Design 0)
 *   L'image de couverture du poster ("Image au centre") est **recentrée légèrement vers la droite** pour un meilleur rendu visuel

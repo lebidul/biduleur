@@ -61,11 +61,12 @@ class Config:
     logos_dir: str = "assets/logos"
     logos_layout: str = "colonnes"
     logos_padding_mm: float = 1.0
-    logos_svg_file: Optional[str] = None
+    logos_svg_file: Optional[str] = "misenpageur/assets/logos.svg"
+    logos_print_svg_file: Optional[str] = "misenpageur/assets/logos.impression.svg"
     logos_svg_fill_height: bool = False
     logo_hyperlinks: List[Dict[str, str]] = field(default_factory=list)
     ours_layout: str = "svg"
-    ours_svg_file: Optional[str] = None
+    ours_svg_file: Optional[str] = "misenpageur/assets/ours/ours.svg"
     chapeau_icon_enabled: bool = False
     free_icon_enabled: bool = False
     ours_md: str = "assets/ours/ours.md"
