@@ -1,3 +1,11 @@
+# Bidul v1.6.1 - Le Biduloscope ajouté à l'ours
+
+Icône de Radio Alpa et texte ajouté à ours.svg. Hyperlink box ajoutée aà config.yml.
+
+# Bidul v1.6.0 - Première version complète prête pour l'utilisateur
+
+Tag créé sans changement de code pour marquer un changement de version majeur.
+
 # Bidul v1.5.3 - Poster automatique : remplissage fiable et complet
 
 Cette version refond entièrement le calcul de la taille de police du poster pour que **tout le contenu soit toujours affiché**, sans aucun réglage manuel.
