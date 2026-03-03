@@ -1,6 +1,7 @@
-# Bidul v1.6.1 - Le Biduloscope ajouté à l'ours
+# Bidul v1.6.1 - Le Biduloscope ajouté à l'ours et améliorations des dates du poster
 
-Icône de Radio Alpa et texte ajouté à ours.svg. Hyperlink box ajoutée à config.yml.
+Icône de Radio Alpa et texte ajouté à ours.svg. Hyperlink box ajoutée à config.yml. 
+Dates du poster suivant le même style que celui du coprs de texte.
 
 ## ✨ Nouveautés
 
