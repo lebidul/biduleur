@@ -1,6 +1,13 @@
-# Bidul v1.6.1 - Le Biduloscope ajouté à l'ours
+# Bidul v1.6.1 - Le Biduloscope ajouté à l'ours et améliorations des dates du poster
 
-Icône de Radio Alpa et texte ajouté à ours.svg. Hyperlink box ajoutée aà config.yml.
+Icône de Radio Alpa et texte ajouté à ours.svg. Hyperlink box ajoutée à config.yml. 
+Dates du poster suivant le même style que celui du coprs de texte.
+
+## ✨ Nouveautés
+
+### Style des dates unifié dans le poster
+*   Les dates du poster (page 3) utilisent désormais le **même style que le corps principal** : police, gras/italique, alignement et boîte de fond
+*   Les paramètres `date_box` et `date_style` de la config sont appliqués au poster (auparavant ignorés)
 
 # Bidul v1.6.0 - Première version complète prête pour l'utilisateur
 

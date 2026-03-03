@@ -850,7 +850,8 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
                     c, poster_frames, poster_paras,
                     cfg.font_name, mid, cfg.leading_ratio, bullet_cfg,
                     poster_cfg,
-                    poster_text_color
+                    poster_text_color,
+                    date_box=date_box, date_style=date_style
             )
             log.info(f"  Poster recherche iter {i}: fs={mid:.2f}pt → {'TIENT' if fits else 'DEBORDE'}")
             if fits:
@@ -875,7 +876,8 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
             c, poster_frames, poster_paras,
             cfg.font_name, final_fs_poster, cfg.leading_ratio, bullet_cfg,
             poster_cfg,
-            poster_text_color
+            poster_text_color,
+            date_box=date_box, date_style=date_style
         )
 
     # --- Affichage final ---

@@ -701,6 +701,8 @@ def _build_poster_story(
         bullet_cfg: BulletConfig,
         poster_cfg: PosterConfig,
         font_size: float,
+        date_box: DateBoxConfig | None = None,
+        date_style: "DateStyleConfig | None" = None,
 ) -> list:
     """
     Construit la liste de flowables (Paragraphs) pour le poster.
@@ -710,11 +712,12 @@ def _build_poster_story(
     correctement l'espacement (ignoré en haut de colonne, etc.).
     Utilisée à la fois par la mesure et le rendu pour garantir un résultat identique.
     """
+    _date_box = date_box or DateBoxConfig()
     story: list = []
     for raw in paras_text:
         kind = "EVENT" if _is_event(raw) else "DATE"
-        st = _mk_style_for_kind(base_style, kind, bullet_cfg, DateBoxConfig(), font_size)
-        txt, bullet = _mk_text_for_kind(raw, kind, bullet_cfg, font_size)
+        st = _mk_style_for_kind(base_style, kind, bullet_cfg, _date_box, font_size, date_style=date_style)
+        txt, bullet = _mk_text_for_kind(raw, kind, bullet_cfg, font_size, date_style=date_style)
 
         if kind == "DATE":
             # Intégrer l'espacement dans le style (pas de Spacer séparés)
@@ -735,7 +738,9 @@ def measure_poster_fit_at_fs(
         font_name: str, font_size: float, leading_ratio: float,
         bullet_cfg: BulletConfig,
         poster_cfg: PosterConfig,
-        text_color: str = "#000000"
+        text_color: str = "#000000",
+        date_box: DateBoxConfig | None = None,
+        date_style: "DateStyleConfig | None" = None,
 ) -> bool:
     """
     Teste si tout le contenu tient dans les cadres à la taille de police donnée.
@@ -746,7 +751,8 @@ def measure_poster_fit_at_fs(
 
     base_style = paragraph_style(font_name, font_size, leading_ratio)
     base_style.textColor = HexColor(text_color)
-    story = _build_poster_story(paras_text, base_style, bullet_cfg, poster_cfg, font_size)
+    story = _build_poster_story(paras_text, base_style, bullet_cfg, poster_cfg, font_size,
+                                date_box=date_box, date_style=date_style)
 
     # Canvas jetable pour la mesure (on ne veut pas dessiner sur le vrai canvas)
     dummy_c = canvas.Canvas(BytesIO())
@@ -765,15 +771,18 @@ def draw_poster_text_in_frames(
         font_name: str, font_size: float, leading_ratio: float,
         bullet_cfg: BulletConfig,
         poster_cfg: PosterConfig,
-        text_color: str = "#000000"
+        text_color: str = "#000000",
+        date_box: DateBoxConfig | None = None,
+        date_style: "DateStyleConfig | None" = None,
 ):
     """
-    Dessine le texte dans une série de cadres, en insérant des espaces
-    verticaux (Spacers) avant et après les dates.
+    Dessine le texte dans une série de cadres avec le style des dates
+    identique au corps principal (police, gras/italique, alignement, boîte).
     """
     base_style = paragraph_style(font_name, font_size, leading_ratio)
     base_style.textColor = HexColor(text_color)
-    story = _build_poster_story(paras_text, base_style, bullet_cfg, poster_cfg, font_size)
+    story = _build_poster_story(paras_text, base_style, bullet_cfg, poster_cfg, font_size,
+                                date_box=date_box, date_style=date_style)
 
     for section in frames:
         if not story:
