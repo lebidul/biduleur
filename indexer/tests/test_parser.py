@@ -1973,5 +1973,130 @@ class TestBidul183SpecificCases:
         assert events[0]['lieu_raw'] == "Le Passeport"
 
 
+class TestInlineMultiLineLieuContinuation:
+    """Tests pour les lieux qui s'étendent sur plusieurs lignes dans le texte OCR.
+
+    Quand un lieu comme "Théâtre de" est coupé en fin de ligne, la ligne suivante
+    (ex: "l'Ephémère, Le Mans, 20h30") doit être jointe à l'événement en cours
+    plutôt que traitée comme un en-tête de lieu séparé.
+    """
+
+    @pytest.fixture
+    def parser(self):
+        return EventParser(bidul_mois=10, bidul_annee=1999, date_format='inline')
+
+    @pytest.fixture
+    def lieu_ref_list(self):
+        return [
+            (1, "Théâtre de l'Ephémère", "Le Mans", False),
+            (2, "Théâtre de Chaoué", "Allonnes", False),
+            (3, "Théâtre de l'Acthalia", "Le Mans", False),
+            (4, "Théâtre de la Halle au Blé", "La Flèche", False),
+        ]
+
+    @pytest.fixture
+    def ville_ref_list(self):
+        return [
+            (1, "Le Mans"),
+            (2, "Allonnes"),
+            (3, "La Flèche"),
+        ]
+
+    def test_theatre_de_continuation_ephemere(self, parser, lieu_ref_list, ville_ref_list):
+        """Bidul 61: 'Théâtre de\\nl'Ephémère' doit être joint."""
+        text = (
+            'Ma 01/Me 02: <<Donc>> (théâtre), de Jean-Yves Picq, Théâtre de\n'
+            "l'Ephémère, Le Mans, 20h30, 6-10-15€"
+        )
+        events = parser.parse_with_referentiel(text, lieu_ref_list, ville_ref_list)
+        assert len(events) >= 1
+        assert events[0].lieu_raw is not None
+        assert "Théâtre de l'" in events[0].lieu_raw or "phémère" in events[0].lieu_raw.lower()
+        assert events[0].lieu_raw != "Théâtre de"
+
+    def test_theatre_de_continuation_acthalia(self, parser, lieu_ref_list, ville_ref_list):
+        """Bidul 86: 'Théâtre de\\nL'Acthalia' doit être joint."""
+        text = (
+            'Du 21 au 23: ROUMANIA ATHANASSOVA (récital piano), Théâtre de\n'
+            "L'Acthalia, Le Mans, Ve+Sa: 21h, Di 17h, 9€ à 12€"
+        )
+        events = parser.parse_with_referentiel(text, lieu_ref_list, ville_ref_list)
+        assert len(events) >= 1
+        assert events[0].lieu_raw is not None
+        assert events[0].lieu_raw != "Théâtre de"
+        assert "Acthalia" in events[0].lieu_raw or "acthalia" in events[0].lieu_raw.lower()
+
+    def test_theatre_de_continuation_halle_au_ble(self, parser, lieu_ref_list, ville_ref_list):
+        """Bidul 128: 'Théâtre de\\nLa Halle au Blé' doit être joint."""
+        text = (
+            'Je 06/Ve 07: <<Le Discours de Traineux" (spectacle chanson), Théâtre de\n'
+            'La Halle au Blé, La Flèche, 20h30, de 7 à 15€'
+        )
+        events = parser.parse_with_referentiel(text, lieu_ref_list, ville_ref_list)
+        assert len(events) >= 1
+        assert events[0].lieu_raw is not None
+        assert events[0].lieu_raw != "Théâtre de"
+
+    def test_theatre_de_continuation_chaoue(self, parser, lieu_ref_list, ville_ref_list):
+        """Bidul 150: 'Théâtre de\\nChaoué' doit être joint."""
+        text = (
+            'Sa 13 à 20h30 et Di 14 à 17h: "SOLIDARITE PALESTINE>> (th.), Théâtre de\n'
+            'Chaoué, Allonnes entrée au chapeau'
+        )
+        events = parser.parse_with_referentiel(text, lieu_ref_list, ville_ref_list)
+        assert len(events) >= 1
+        assert events[0].lieu_raw is not None
+        assert events[0].lieu_raw != "Théâtre de"
+
+    def test_no_false_positive_real_header(self, parser, lieu_ref_list, ville_ref_list):
+        """Un vrai en-tête de lieu ne doit PAS être joint à l'événement précédent."""
+        text = (
+            'Ve 05: Concert Jazz, Salle des fêtes, Le Mans, 21h, 5€\n'
+            "Théâtre de l'Ephémère, Le Mans\n"
+            'Sa 06: Récital piano, 20h30'
+        )
+        events = parser.parse_with_referentiel(text, lieu_ref_list, ville_ref_list)
+        # Le premier événement ne doit PAS avoir Théâtre de l'Ephémère
+        assert len(events) >= 1
+        if events[0].lieu_raw:
+            assert "Ephémère" not in events[0].lieu_raw
+
+    def test_bar_continuation(self, parser, lieu_ref_list, ville_ref_list):
+        """Bidul 19: 'Bar\\nLe Mackeson LE MANS' doit être joint."""
+        lieu_ref_list_ext = lieu_ref_list + [
+            (10, "Le Mackeson", "Le Mans", False),
+        ]
+        text = (
+            'Ma 06: MANU SO OUATE (blues rock), Bar\n'
+            'Le Mackeson LE MANS'
+        )
+        events = parser.parse_with_referentiel(text, lieu_ref_list_ext, ville_ref_list)
+        assert len(events) >= 1
+        assert "Bar" in events[0].raw_text and "Mackeson" in events[0].raw_text
+
+    def test_comma_continuation(self, parser, lieu_ref_list, ville_ref_list):
+        """Bidul 88: 'Cie,\\nThéâtre de Chaoué' doit être joint."""
+        text = (
+            'Ve 04/Sa 05/Di 06: "Plus ou Moins Zéro Degré" (théâtre), Créatures Cie,\n'
+            'Théâtre de Chaoué Allonnes Ve/Sa 20h30 & Di 17h, au chapeau'
+        )
+        events = parser.parse_with_referentiel(text, lieu_ref_list, ville_ref_list)
+        assert len(events) >= 1
+        assert "Chaoué" in (events[0].lieu_raw or "") or "Chaoué" in events[0].raw_text
+
+    def test_studio_continuation(self, parser, lieu_ref_list, ville_ref_list):
+        """Bidul 172: 'Studio Marie\\nLenfant' doit être joint."""
+        lieu_ref_list_ext = lieu_ref_list + [
+            (11, "Studio Marie Lenfant", "Le Mans", False),
+        ]
+        text = (
+            'Du Je 01 au Di 04: "Thuyas révolvers et langues de chats" (théâtre), Studio Marie\n'
+            'Lenfant, Le Mans, 01 et 04 à 17h / 02 et 03 à 20h30, au chapeau'
+        )
+        events = parser.parse_with_referentiel(text, lieu_ref_list_ext, ville_ref_list)
+        assert len(events) >= 1
+        assert "Studio Marie" in events[0].raw_text and "Lenfant" in events[0].raw_text
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

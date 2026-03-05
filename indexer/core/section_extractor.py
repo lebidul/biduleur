@@ -29,6 +29,7 @@ class Orientation(Enum):
     """Orientation du PDF ou du texte."""
     PORTRAIT = 'portrait'
     PAYSAGE = 'paysage'
+    RETOURNE = 'retourne'  # Page physiquement retournée à 180°
 
 
 class Section(Enum):
@@ -84,7 +85,12 @@ class PageSectionConfig:
 
         # Parser l'orientation du PDF (défaut = même que texte)
         orientation_pdf_str = (row.get(orientation_pdf_key) or orientation_str).lower().strip()
-        orientation_pdf = Orientation.PAYSAGE if orientation_pdf_str == 'paysage' else Orientation.PORTRAIT
+        if orientation_pdf_str == 'paysage':
+            orientation_pdf = Orientation.PAYSAGE
+        elif orientation_pdf_str == 'retourne':
+            orientation_pdf = Orientation.RETOURNE
+        else:
+            orientation_pdf = Orientation.PORTRAIT
 
         # Parser les sections
         sections_str = row.get(sections_key, '') or ''
@@ -111,13 +117,17 @@ class PageSectionConfig:
             colonnes_par_section=colonnes
         )
 
-    def needs_rotation(self) -> bool:
-        """True si le texte nécessite une rotation pour être lu.
+    def get_rotation_degrees(self) -> int:
+        """Retourne l'angle de rotation nécessaire (0, 90, ou 180)."""
+        if self.orientation_pdf == Orientation.RETOURNE:
+            return 180
+        elif self.orientation_pdf != self.orientation_texte:
+            return 90
+        return 0
 
-        Rotation nécessaire quand l'orientation du PDF diffère de celle du texte.
-        Ex: PDF portrait + texte paysage = rotation 90° nécessaire.
-        """
-        return self.orientation_pdf != self.orientation_texte
+    def needs_rotation(self) -> bool:
+        """True si le texte nécessite une rotation pour être lu."""
+        return self.get_rotation_degrees() != 0
 
     def get_section_order(self) -> list[Section]:
         """Retourne l'ordre de lecture des sections selon l'orientation du texte."""
@@ -439,17 +449,20 @@ class SectionCropper:
         """
         return {s: self.crop_section(image, s) for s in sections}
 
-    def rotate_for_text(self, image: np.ndarray, clockwise: bool = False) -> np.ndarray:
+    def rotate_for_text(self, image: np.ndarray, clockwise: bool = False, degrees: int = 90) -> np.ndarray:
         """
-        Applique une rotation de 90° pour un texte en paysage.
+        Applique une rotation pour aligner le texte.
 
         Args:
             image: Image à faire pivoter
-            clockwise: Si True, rotation horaire; sinon anti-horaire
+            clockwise: Si True, rotation horaire; sinon anti-horaire (pour 90°)
+            degrees: Angle de rotation (90 ou 180)
 
         Returns:
             Image pivotée
         """
+        if degrees == 180:
+            return cv2.rotate(image, cv2.ROTATE_180)
         if clockwise:
             return cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
         return cv2.rotate(image, cv2.ROTATE_90_COUNTERCLOCKWISE)
@@ -535,18 +548,18 @@ class SectionOCRExtractor:
 
         # 1. Appliquer la rotation si nécessaire
         # Priorité: config CSV > métadonnées du template
-        needs_rotation = False
+        rotation_degrees = 0
         if section_config:
             page_config = section_config.get_page_config(page_num)
             if page_config:
-                needs_rotation = page_config.needs_rotation()
+                rotation_degrees = page_config.get_rotation_degrees()
         else:
-            needs_rotation = template.needs_rotation()
+            rotation_degrees = 90 if template.needs_rotation() else 0
 
         page_image = image
-        if needs_rotation:
-            page_image = self.cropper.rotate_for_text(image, clockwise=True)
-            logger.debug(f"Page {page_num}: rotation 90° horaire appliquée (template SVG)")
+        if rotation_degrees:
+            page_image = self.cropper.rotate_for_text(image, clockwise=True, degrees=rotation_degrees)
+            logger.debug(f"Page {page_num}: rotation {rotation_degrees}° appliquée (template SVG)")
 
         # 2. Obtenir les zones pour cette page, triées par ordre
         zones = template.get_zones_for_page(page_num)
@@ -650,11 +663,11 @@ class SectionOCRExtractor:
         result = PageSectionsOCRResult(page_num=page_num)
 
         # 1. Appliquer la rotation à la page entière AVANT de découper les sections
-        # PDF portrait + texte paysage = rotation 90° horaire pour lire le texte
         page_image = image
-        if page_config.needs_rotation():
-            page_image = self.cropper.rotate_for_text(image, clockwise=True)
-            logger.debug(f"Page {page_num}: rotation 90° horaire appliquée (PDF portrait, texte paysage)")
+        rotation_degrees = page_config.get_rotation_degrees()
+        if rotation_degrees:
+            page_image = self.cropper.rotate_for_text(image, clockwise=True, degrees=rotation_degrees)
+            logger.debug(f"Page {page_num}: rotation {rotation_degrees}° appliquée")
 
         # 2. Obtenir l'ordre de lecture des sections (basé sur l'orientation du texte)
         section_order = page_config.get_section_order()

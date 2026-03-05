@@ -7529,7 +7529,27 @@ class EventParser:
                 test_lieu_id, test_lieu_nom, test_ville = extract_header_lieu(
                     line, lieu_ref_list, ville_ref_list
                 )
-                if test_lieu_nom:
+
+                # Vérifier si la ligne est une continuation de l'événement
+                # en cours plutôt qu'un vrai en-tête de lieu autonome.
+                # Cas détectés :
+                # 1. Dernière ligne finit par préposition/article (ex: "Théâtre de")
+                # 2. Dernière ligne finit par un nom de lieu incomplet (ex: "Bar", "Studio Marie")
+                # 3. Dernière ligne finit par une virgule (continuation naturelle)
+                is_continuation = False
+                if test_lieu_nom and current_event_lines and current_date:
+                    last_line = current_event_lines[-1].rstrip()
+                    # Cas 1: finit par préposition/article
+                    if re.search(r'\b(?:de|du|des|la|le|l\'|à|au|aux)\s*$', last_line, re.IGNORECASE):
+                        is_continuation = True
+                    # Cas 2: finit par un nom de lieu partiel connu (Bar, Pub, Café, Studio X, etc.)
+                    elif re.search(r'(?:,\s*|\s)(?:[Bb]ar|[Pp]ub|[Cc]afé|[Ss]tudio\s+\w+|[Cc]ie)\s*,?\s*$', last_line):
+                        is_continuation = True
+                    # Cas 3: finit par une virgule (la suite est sur la ligne suivante)
+                    elif last_line.endswith(','):
+                        is_continuation = True
+
+                if test_lieu_nom and not is_continuation:
                     # C'est un en-tête de lieu - traiter l'événement précédent
                     # et mémoriser ce lieu pour les prochains événements
                     if current_event_lines and current_date:
