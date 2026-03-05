@@ -71,9 +71,10 @@ Ve 12: Soirée Ambiance avec DJ FRED
 ```
 
 La fonction `extract_header_lieu()` détecte ces patterns :
-- `Au X, Ville` → lieu="Le X" (conversion Au→Le)
-- `Nom Ville - tél...` → lieu="Nom", ville="Ville"
-- `Le/La X, Ville` → lieu="Le/La X", ville="Ville"
+- Pattern 1: `Au X, Ville` → lieu="Le X" (conversion Au→Le)
+- Pattern 2: `Nom Ville - tél...` → lieu="Nom", ville="Ville" (nécessite majuscule initiale, lieu ≥ 3 chars)
+- Pattern 3: `Le/La X, Ville` → lieu="Le/La X", ville="Ville"
+- Pattern 4: `Festival NOM à/au/à l' LIEU` → cherche le lieu via `find_lieu_in_text_v2()` (avec aliases)
 
 Le lieu est propagé via `current_block_lieu_*` aux événements sans `lieu_raw`.
 
@@ -287,6 +288,8 @@ Le mapping est défini dans `corpus/biduls.description.csv` (nouveau format) :
 
 **Rotation automatique** : Si `orientation_pdf != orientation` (ex: PDF portrait + texte paysage), une rotation 90° est appliquée automatiquement. Cas typique : biduls 2-11 où le PDF est portrait mais le texte est imprimé en paysage.
 
+**Rotation 180°** : La valeur `retourne` pour `p{n}_orientation_pdf` indique une page physiquement retournée à 180° dans le PDF. Cas typique : bidul 15 page 2.
+
 ### Modules OCR
 
 | Module | Fichier | Usage |
@@ -377,7 +380,7 @@ L'extraction suit ce workflow :
 | `ocr_mode` | classic, sections, auto | Mode OCR |
 | `p1_sections` | S1 S2 S3 S4 | Sections page 1 |
 | `p1_orientation` | portrait, paysage | Orientation du texte page 1 |
-| `p1_orientation_pdf` | portrait, paysage | Orientation du PDF page 1 (défaut = p1_orientation) |
+| `p1_orientation_pdf` | portrait, paysage, retourne | Orientation du PDF page 1 (défaut = p1_orientation) |
 | `p1_colonnes` | 1, 2 | Colonnes par section page 1 |
 | `source_file` | nom(s) fichier(s) | Fichier(s) source CSV/XLSX (séparés par `\|` pour multi-fichiers) |
 
@@ -409,8 +412,15 @@ NICOLAS ET TOMY, pub Le Terminus               <- hérite de Je 05
 ```
 
 La fonction `_parse_inline_inherited_date()` gère ce format avec :
-1. Première passe : jointure des lignes de continuation (villes, heures)
+1. Première passe : jointure des lignes de continuation (villes, heures, lieux partiels)
 2. Deuxième passe : attribution des dates héritées aux événements
+
+**Cas de continuation** (lignes jointes à l'événement précédent) :
+1. Ligne commençant par ville, heure, prix, parenthèse ou minuscule (`continuation_pattern`)
+2. Ligne commençant par un mot-clé de lieu (Salle, Théâtre, Bar, etc.)
+3. (dans `_parse_inline_with_referentiel`) Cas 1-4 : préposition/article, lieu partiel, virgule, abréviation
+4. (dans `_parse_inline_with_referentiel`) Cas 5 : type de lieu + début de nom propre (ex: "bar Le", "théâtre Paul", "Collégiale St", "Péniche")
+5. (dans `_parse_inline_inherited_date`) Cas 5 : même détection de lieu partiel en fin de ligne
 
 ## Templates SVG pour zones d'extraction
 

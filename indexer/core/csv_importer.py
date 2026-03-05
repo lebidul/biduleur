@@ -487,6 +487,68 @@ def parse_date(date_text: str, annee: int, mois: int) -> Optional[str]:
     return None
 
 
+def _build_column_map(fieldnames: list[str]) -> dict[str, str]:
+    """
+    Construit un mapping colonne_originale → colonne_normalisée.
+
+    Gère le format alternatif (avril 2023) avec colonnes MAJUSCULES et
+    noms verbeux multi-lignes.
+
+    Returns:
+        Dict vide si les colonnes sont déjà au format standard.
+    """
+    # Si les colonnes standard existent déjà, pas de mapping nécessaire
+    if 'date' in fieldnames and 'horaire' in fieldnames:
+        return {}
+
+    column_map = {}
+    for col in fieldnames:
+        col_clean = col.strip().replace('\n', ' ')
+        col_upper = col_clean.upper()
+
+        # Colonnes simples
+        if col_upper == 'DATE':
+            column_map[col] = 'date'
+        elif col_upper == 'HEURE':
+            column_map[col] = 'horaire'
+        elif col_upper == 'LIEU':
+            column_map[col] = 'lieu'
+        elif col_upper == 'VILLE':
+            column_map[col] = 'ville'
+        elif col_upper == 'PRIX':
+            column_map[col] = 'prix'
+        elif col_upper == 'GENRE':
+            column_map[col] = 'genre'
+        elif col_upper == 'AUTRE':
+            column_map[col] = 'autre'
+        # Festival / événement
+        elif 'FESTOCHE' in col_upper and 'EVENEMENT' in col_upper:
+            if 'STYLE' in col_upper:
+                column_map[col] = 'style_festival'
+            else:
+                column_map[col] = 'festival'
+        # Spectacles et artistes (1-4)
+        elif 'SPECTACLE' in col_upper:
+            import re
+            m = re.search(r'(\d)', col_upper)
+            if m:
+                num = m.group(1)
+                if 'NOM' in col_upper:
+                    column_map[col] = f'spectacle{num}'
+                elif 'STYLE' in col_upper:
+                    column_map[col] = f'style{num}'
+        elif 'ARTISTE' in col_upper or 'GROUPE' in col_upper or 'COMPAGNIE' in col_upper:
+            import re
+            m = re.search(r'(\d)', col_upper)
+            if m:
+                column_map[col] = f'artiste{m.group(1)}'
+
+    if column_map:
+        logger.debug(f"Mapping colonnes appliqué: {column_map}")
+
+    return column_map
+
+
 def import_csv(csv_path: Path, bidul_numero: int,
                annee: int, mois: int) -> list[dict]:
     """
@@ -521,7 +583,15 @@ def import_csv(csv_path: Path, bidul_numero: int,
     import io
     reader = csv.DictReader(io.StringIO(content))
 
+    # Normaliser les noms de colonnes pour gérer les formats alternatifs
+    # (ex: avril 2023 avec colonnes MAJUSCULES et noms verbeux)
+    column_map = _build_column_map(reader.fieldnames or [])
+
     for row in reader:
+        # Normaliser la row si un mapping existe
+        if column_map:
+            row = {column_map.get(k, k): v for k, v in row.items()}
+
         # Parser les champs
         artistes, spectacles, genres = parse_artists_from_csv(row)
         prix_min, prix_max, gratuit, tarif_raw = parse_price(row.get('prix', ''))

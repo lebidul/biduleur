@@ -4055,39 +4055,47 @@ def extract_header_lieu(
     m = pattern_au.match(header)
     if m:
         lieu_candidate = m.group(1).strip()
-        # Normaliser "Au Palais" → "Le Palais"
-        if not lieu_candidate.lower().startswith(('le ', 'la ', "l'")):
-            # Essayer avec "Le " devant
-            lieu_with_article = f"Le {lieu_candidate}"
+        # Rejeter les noms de lieu trop courts (artefacts OCR)
+        if len(lieu_candidate) >= 3:
+            # Normaliser "Au Palais" → "Le Palais"
+            if not lieu_candidate.lower().startswith(('le ', 'la ', "l'")):
+                # Essayer avec "Le " devant
+                lieu_with_article = f"Le {lieu_candidate}"
+                # Chercher dans le référentiel
+                for lieu_tuple in lieu_ref_list:
+                    lieu_id, lieu_nom = lieu_tuple[0], lieu_tuple[1]
+                    lieu_ville = lieu_tuple[2] if len(lieu_tuple) > 2 else None
+                    if lieu_nom.lower() == lieu_with_article.lower():
+                        return lieu_id, lieu_nom, lieu_ville
+                # Sinon garder le nom tel quel
+                lieu_candidate = lieu_with_article
+
             # Chercher dans le référentiel
             for lieu_tuple in lieu_ref_list:
                 lieu_id, lieu_nom = lieu_tuple[0], lieu_tuple[1]
                 lieu_ville = lieu_tuple[2] if len(lieu_tuple) > 2 else None
-                if lieu_nom.lower() == lieu_with_article.lower():
+                if lieu_nom.lower() == lieu_candidate.lower():
                     return lieu_id, lieu_nom, lieu_ville
-            # Sinon garder le nom tel quel
-            lieu_candidate = lieu_with_article
 
-        # Chercher dans le référentiel
-        for lieu_tuple in lieu_ref_list:
-            lieu_id, lieu_nom = lieu_tuple[0], lieu_tuple[1]
-            lieu_ville = lieu_tuple[2] if len(lieu_tuple) > 2 else None
-            if lieu_nom.lower() == lieu_candidate.lower():
-                return lieu_id, lieu_nom, lieu_ville
-
-        # Pas trouvé dans le référentiel, retourner le nom brut
-        return None, lieu_candidate, None
+            # Pas trouvé dans le référentiel, retourner le nom brut
+            return None, lieu_candidate, None
 
     # Pattern 2: "NomLieu Ville" (lieu suivi directement de ville sans virgule)
     # Ex: "MJC Prévert Le Mans - tél ..." → "MJC Prévert"
+    # Note: pas de re.IGNORECASE pour le début du lieu car on veut
+    # une majuscule initiale (sinon "ur Le Mans" matche avec ur=lieu)
     pattern_lieu_ville = re.compile(
-        rf'^([A-ZÀ-Ÿ][a-zA-ZÀ-ÿ\'\-\s]+?)\s+({villes_pattern})\b',
-        re.IGNORECASE
+        rf'^([A-ZÀ-Ÿ][a-zA-ZÀ-ÿ\'\-\s]+?)\s+({villes_pattern})\b'
     )
     m = pattern_lieu_ville.match(header)
     if m:
         lieu_candidate = m.group(1).strip()
         ville_from_header = m.group(2).strip()
+
+        # Rejeter les noms de lieu trop courts (< 3 caractères)
+        # car ce sont probablement des artefacts OCR (ex: "ur" de "Sur Le Mans")
+        if len(lieu_candidate) < 3:
+            return None, None, None
 
         # Chercher dans le référentiel
         for lieu_tuple in lieu_ref_list:
@@ -4119,6 +4127,21 @@ def extract_header_lieu(
 
         # Pas trouvé dans le référentiel, retourner le nom brut
         return None, lieu_candidate, ville_from_header
+
+    # Pattern 4: "Festival NOM à/au/à l' LIEU (DETAILS)"
+    # Ex: "Festival ELECTRIK CAMPUS à l'Espace de Vie Etudiante (Université)"
+    # Utilise find_lieu_in_text_v2 pour chercher le lieu (supporte aliases)
+    if re.match(r'^Festival\b', header, re.IGNORECASE):
+        # Extraire le texte après la préposition "à/au/à l'"
+        m_prep = re.search(r"\b(?:à\s+l['\u2019]|au\s+|à\s+)(.*)", header)
+        if m_prep:
+            lieu_text = m_prep.group(1).strip()
+            # Charger les patterns de lieu (avec aliases) et chercher
+            lieu_patterns = load_lieu_patterns(lieu_ref_list)
+            result = find_lieu_in_text_v2(lieu_text, lieu_patterns, ville_ref_list)
+            if result:
+                lieu_nom, lieu_id, _, _, lieu_ville = result
+                return lieu_id, lieu_nom, lieu_ville
 
     return None, None, None
 
@@ -7537,6 +7560,7 @@ class EventParser:
                 # 2. Dernière ligne finit par un nom de lieu incomplet (ex: "Bar", "Studio Marie")
                 # 3. Dernière ligne finit par une virgule (continuation naturelle)
                 # 4. Dernière ligne finit par une abréviation (ex: "Th P.")
+                # 5. Dernière ligne finit par un type de lieu + début de nom (ex: "bar Le", "théâtre Paul", "Collégiale St")
                 is_continuation = False
                 if test_lieu_nom and current_event_lines and current_date:
                     last_line = current_event_lines[-1].rstrip()
@@ -7544,13 +7568,23 @@ class EventParser:
                     if re.search(r'\b(?:de|du|des|la|le|l\'|à|au|aux)\s*$', last_line, re.IGNORECASE):
                         is_continuation = True
                     # Cas 2: finit par un nom de lieu partiel connu (Bar, Pub, Café, Studio X, etc.)
-                    elif re.search(r'(?:,\s*|\s)(?:[Bb]ar|[Pp]ub|[Cc]afé|[Ss]tudio\s+\w+|[Cc]ie)\s*,?\s*$', last_line):
+                    elif re.search(r'(?:,\s*|\s)(?:[Bb]ar|[Pp]ub|[Cc]afé|[Cc]afe|[Ss]tudio\s+\w+|[Cc]ie)\s*,?\s*$', last_line):
                         is_continuation = True
                     # Cas 3: finit par une virgule (la suite est sur la ligne suivante)
                     elif last_line.endswith(','):
                         is_continuation = True
                     # Cas 4: finit par une abréviation (lettre majuscule + point, ex: "Th P.")
                     elif re.search(r'\b[A-Z]\.\s*$', last_line):
+                        is_continuation = True
+                    # Cas 5: finit par un type de lieu + début de nom propre
+                    # (ex: "bar Le", "théâtre Paul", "Collégiale St", "Péniche")
+                    elif re.search(
+                        r'(?:'
+                        r'(?:,\s*|\s)(?:[Bb]ar|[Pp]ub|[Cc]afé|[Cc]afe|[Cc]ollégiale|[Cc]ollegiale|[Pp][eé]niche|[Tt]h[eé][aâ]tre|[Ss]alle)\s+[A-ZÀ-Ý]\w*'
+                        r'|(?:,\s*|\s)(?:[Bb]ar|[Pp]ub|[Cc]afé|[Cc]afe|[Cc]ollégiale|[Cc]ollegiale|[Pp][eé]niche|[Tt]h[eé][aâ]tre|[Ss]alle)\s*$'
+                        r')\s*$',
+                        last_line
+                    ):
                         is_continuation = True
 
                 if test_lieu_nom and not is_continuation:
@@ -7727,15 +7761,30 @@ class EventParser:
             is_continuation = continuation_pattern.match(line) is not None
             is_new_event = is_new_event_line(line)
 
-            if is_new_date:
+            # Cas 5: la ligne précédente finit par un nom de lieu partiel
+            # (bar Le, pub Le, Collégiale St, Péniche, théâtre Paul, etc.)
+            # La ligne suivante est forcément une continuation même si elle
+            # ressemble à un nouvel événement (ex: "Mackeson, Le Mans, 22h15")
+            prev_ends_with_partial_lieu = False
+            if current_line:
+                prev_ends_with_partial_lieu = bool(re.search(
+                    r'(?:'
+                    r'(?:,\s*|\s)(?:[Bb]ar|[Pp]ub|[Cc]afé|[Cc]afe|[Cc]ollégiale|[Cc]ollegiale|[Pp][eé]niche|[Tt]h[eé][aâ]tre|[Ss]alle)\s+[A-ZÀ-Ý]\w*'  # type de lieu + début de nom (bar Le, théâtre Paul)
+                    r'|(?:,\s*|\s)(?:[Bb]ar|[Pp]ub|[Cc]afé|[Cc]afe|[Cc]ollégiale|[Cc]ollegiale|[Pp][eé]niche|[Tt]h[eé][aâ]tre|[Ss]alle)\s*$'  # type de lieu seul en fin de ligne (bar, Péniche)
+                    r'|(?:,\s*|\s)(?:[Bb]ar|[Pp]ub|[Cc]afé|[Cc]afe)\s*,?\s*$'  # "DUO FLAMENCO, bar"
+                    r')\s*$',
+                    current_line
+                ))
+
+            if is_new_date and not prev_ends_with_partial_lieu:
                 # Nouvelle date - sauvegarder la ligne précédente
                 if current_line:
                     joined_lines.append(current_line)
                 current_line = line
-            elif is_continuation and current_line:
+            elif (is_continuation or prev_ends_with_partial_lieu) and current_line:
                 # Joindre à la ligne précédente
                 current_line = current_line + ' ' + line
-            elif is_new_event:
+            elif is_new_event and not prev_ends_with_partial_lieu:
                 # Nouvel événement - sauvegarder la ligne précédente
                 if current_line:
                     joined_lines.append(current_line)

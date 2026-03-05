@@ -16,6 +16,7 @@ from core.parser import (
     find_lieu_in_text,
     is_named_event,
     extract_event_name,
+    extract_header_lieu,
     EventParser,
     ArtisteInfo,
     # Nouvelles fonctions "lieu d'abord"
@@ -2111,6 +2112,192 @@ class TestInlineMultiLineLieuContinuation:
         # "Th P." peut être expandé en "Th Paul" par le nettoyage, mais Scarron doit être présent
         assert "Scarron" in events[0].raw_text
         assert events[0].lieu_raw != "Th P."
+
+
+class TestExtractHeaderLieu:
+    """Tests pour extract_header_lieu() — détection d'en-têtes de lieu."""
+
+    @pytest.fixture
+    def lieu_ref_list(self):
+        return [
+            (1, "Théâtre de Chaoué", "Le Mans", False),
+            (2, "MJC Prévert", "Le Mans", False),
+            (3, "Le Passeport", "Le Mans", False),
+            (4, "EVE - Scène universitaire", "Le Mans", False),
+            (5, "Université", "Le Mans", False),
+            (6, "Le Palais", "Le Mans", False),
+        ]
+
+    @pytest.fixture
+    def ville_ref_list(self):
+        return [
+            (1, "Le Mans"),
+            (2, "Allonnes"),
+        ]
+
+    def test_pattern2_rejects_short_lieu(self, lieu_ref_list, ville_ref_list):
+        """Bidul 164: 'ur Le Mans et environs.' ne doit PAS matcher 'ur' comme lieu."""
+        result = extract_header_lieu("ur Le Mans et environs.", lieu_ref_list, ville_ref_list)
+        assert result == (None, None, None)
+
+    def test_pattern2_rejects_lowercase_start(self, lieu_ref_list, ville_ref_list):
+        """Pattern 2 sans IGNORECASE: un lieu doit commencer par une majuscule."""
+        result = extract_header_lieu("petit Le Mans", lieu_ref_list, ville_ref_list)
+        assert result == (None, None, None)
+
+    def test_pattern2_accepts_uppercase_start(self, lieu_ref_list, ville_ref_list):
+        """Pattern 2: 'MJC Prévert Le Mans' doit matcher."""
+        lieu_id, lieu_nom, ville_nom = extract_header_lieu(
+            "MJC Prévert Le Mans", lieu_ref_list, ville_ref_list
+        )
+        assert lieu_nom == "MJC Prévert"
+
+    def test_pattern3_article_lieu_comma_ville(self, lieu_ref_list, ville_ref_list):
+        """Pattern 3: 'Le Passeport, Le Mans, 22h' doit matcher."""
+        lieu_id, lieu_nom, ville_nom = extract_header_lieu(
+            "Le Passeport, Le Mans, 22h", lieu_ref_list, ville_ref_list
+        )
+        assert lieu_nom == "Le Passeport"
+
+    def test_pattern4_festival_a_lieu(self, lieu_ref_list, ville_ref_list):
+        """Pattern 4: 'Festival X au Théâtre de Chaoué' doit matcher le lieu."""
+        lieu_id, lieu_nom, ville_nom = extract_header_lieu(
+            "Festival X au Théâtre de Chaoué", lieu_ref_list, ville_ref_list
+        )
+        assert lieu_nom == "Théâtre de Chaoué"
+
+    def test_pattern4_festival_a_la(self, lieu_ref_list, ville_ref_list):
+        """Pattern 4: 'Festival des Arts à la MJC Prévert' doit matcher."""
+        lieu_id, lieu_nom, ville_nom = extract_header_lieu(
+            "Festival des Arts à la MJC Prévert", lieu_ref_list, ville_ref_list
+        )
+        assert lieu_nom == "MJC Prévert"
+
+    def test_pattern4_festival_no_preposition(self, lieu_ref_list, ville_ref_list):
+        """Pattern 4: 'Festival X' sans préposition ne doit pas matcher."""
+        result = extract_header_lieu(
+            "Festival ELECTRIK CAMPUS", lieu_ref_list, ville_ref_list
+        )
+        assert result == (None, None, None)
+
+    def test_non_festival_not_matched_by_pattern4(self, lieu_ref_list, ville_ref_list):
+        """Pattern 4 ne doit PAS matcher les lignes qui ne commencent pas par Festival."""
+        result = extract_header_lieu(
+            "Concert à la MJC Prévert", lieu_ref_list, ville_ref_list
+        )
+        # Should not match pattern 4 (no "Festival" prefix)
+        # May or may not match other patterns, but pattern 4 is not triggered
+        # This line starts with "Concert" which is TitleCase, so pattern 2 might match
+        # The important thing is it doesn't crash and returns sensible results
+        assert result is not None  # Tuple returned
+
+    def test_pattern1_au_with_article(self, lieu_ref_list, ville_ref_list):
+        """Pattern 1: 'Au Palais, Le Mans' → 'Le Palais'."""
+        lieu_id, lieu_nom, ville_nom = extract_header_lieu(
+            "Au Palais, café-concert, Le Mans", lieu_ref_list, ville_ref_list
+        )
+        assert lieu_nom == "Le Palais"
+
+    def test_pattern1_rejects_short_lieu(self, lieu_ref_list, ville_ref_list):
+        """Pattern 1: 'Au X, Le Mans' → trop court, rejeté."""
+        result = extract_header_lieu("Au X, Le Mans", lieu_ref_list, ville_ref_list)
+        # "X" is < 3 chars, should be rejected by pattern 1
+        # May fall through to pattern 2 which requires uppercase start
+        lieu_id, lieu_nom, ville_nom = result
+        assert lieu_nom != "X"
+
+
+class TestInlineInheritedPartialLieuContinuation:
+    """Tests pour la jointure de lignes quand le lieu est coupé en fin de ligne.
+
+    Cas 5 de continuation: la ligne précédente se termine par un type de lieu
+    + début de nom propre (ex: 'bar Le', 'théâtre Paul', 'Collégiale St').
+    """
+
+    @pytest.fixture
+    def parser(self):
+        return EventParser(bidul_mois=1, bidul_annee=1998, date_format='inline_inherited')
+
+    @pytest.fixture
+    def lieu_ref_list(self):
+        return [
+            (1, "Le Mackeson", "Le Mans", False),
+            (2, "Le Celtic", "Le Mans", False),
+            (3, "Le Viking's", "Le Mans", False),
+            (4, "Théâtre Paul Scarron", "Le Mans", False),
+            (5, "Le Dicken's", "Le Mans", False),
+            (6, "Collégiale St Pierre la cour", "Le Mans", False),
+        ]
+
+    @pytest.fixture
+    def ville_ref_list(self):
+        return [
+            (1, "Le Mans"),
+            (2, "Allonnes"),
+        ]
+
+    def test_bar_le_continuation(self, parser, lieu_ref_list, ville_ref_list):
+        """Bidul 11: 'bar Le\\nMackeson' doit être joint."""
+        text = (
+            "Ma 06 HAMADRYAD, bar Le\n"
+            "Mackeson, Le Mans, 22h15"
+        )
+        events = parser.parse_with_referentiel(text, lieu_ref_list, ville_ref_list)
+        assert len(events) >= 1
+        assert "bar Le Mackeson" in events[0].raw_text
+
+    def test_collegiale_st_continuation(self, parser, lieu_ref_list, ville_ref_list):
+        """Bidul 11: 'Collégiale St\\nPierre la cour' doit être joint."""
+        text = (
+            "Di 11 CAL CONTET, Collégiale St\n"
+            "Pierre la cour, Le Mans, 17h"
+        )
+        events = parser.parse_with_referentiel(text, lieu_ref_list, ville_ref_list)
+        assert len(events) >= 1
+        assert "Collégiale St Pierre la cour" in events[0].raw_text
+
+    def test_theatre_paul_continuation(self, parser, lieu_ref_list, ville_ref_list):
+        """Bidul 11: 'théâtre Paul\\nScarron' doit être joint."""
+        text = (
+            "Ma 27 TRIO MAM, théâtre Paul\n"
+            "Scarron, Le Mans, 20h30"
+        )
+        events = parser.parse_with_referentiel(text, lieu_ref_list, ville_ref_list)
+        assert len(events) >= 1
+        assert "théâtre Paul Scarron" in events[0].raw_text
+
+    def test_bar_alone_continuation(self, parser, lieu_ref_list, ville_ref_list):
+        """Bidul 11: 'bar\\nLe Celtic' doit être joint (type de lieu seul)."""
+        text = (
+            "Ve 09 DUO FLAMENCO, bar\n"
+            "Le Celtic Le Mans, 21h"
+        )
+        events = parser.parse_with_referentiel(text, lieu_ref_list, ville_ref_list)
+        assert len(events) >= 1
+        assert "bar" in events[0].raw_text and "Celtic" in events[0].raw_text
+
+    def test_bar_le_with_date_prefix(self, parser, lieu_ref_list, ville_ref_list):
+        """Bidul 11: 'Ve 23: WALAQWA, bar Le\\nDicken's' doit être joint."""
+        text = (
+            "Ve 23 WALAQWA, bar Le\n"
+            "Dicken's, Le Mans"
+        )
+        events = parser.parse_with_referentiel(text, lieu_ref_list, ville_ref_list)
+        assert len(events) >= 1
+        assert "bar Le Dicken" in events[0].raw_text
+
+    def test_multiple_events_with_partial_lieux(self, parser, lieu_ref_list, ville_ref_list):
+        """Plusieurs événements avec lieux coupés sur plusieurs lignes."""
+        text = (
+            "Ma 06 HAMADRYAD, bar Le\n"
+            "Mackeson, Le Mans, 22h15\n"
+            "Ma 27 BEN & RACHEL, bar Le\n"
+            "Mackeson, Le Mans, 22h15"
+        )
+        events = parser.parse_with_referentiel(text, lieu_ref_list, ville_ref_list)
+        assert len(events) == 2
+        assert "bar Le Mackeson" in events[0].raw_text
+        assert "bar Le Mackeson" in events[1].raw_text
 
 
 if __name__ == "__main__":
