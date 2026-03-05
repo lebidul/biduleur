@@ -2097,6 +2097,21 @@ class TestInlineMultiLineLieuContinuation:
         assert len(events) >= 1
         assert "Studio Marie" in events[0].raw_text and "Lenfant" in events[0].raw_text
 
+    def test_abbreviation_continuation(self, parser, lieu_ref_list, ville_ref_list):
+        """Bidul 143: 'Th P.\\nScarron' doit être joint (abréviation avec point)."""
+        lieu_ref_list_ext = lieu_ref_list + [
+            (12, "Théâtre Paul Scarron", "Le Mans", False),
+        ]
+        text = (
+            'Du Ma 09 au Ve 12: "Pendant que Marianne dort " (Théâtre), Th P.\n'
+            'Scarron, 20h30 sf Je: 18h30, 7€'
+        )
+        events = parser.parse_with_referentiel(text, lieu_ref_list_ext, ville_ref_list)
+        assert len(events) >= 1
+        # "Th P." peut être expandé en "Th Paul" par le nettoyage, mais Scarron doit être présent
+        assert "Scarron" in events[0].raw_text
+        assert events[0].lieu_raw != "Th P."
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

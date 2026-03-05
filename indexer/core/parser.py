@@ -7536,6 +7536,7 @@ class EventParser:
                 # 1. Dernière ligne finit par préposition/article (ex: "Théâtre de")
                 # 2. Dernière ligne finit par un nom de lieu incomplet (ex: "Bar", "Studio Marie")
                 # 3. Dernière ligne finit par une virgule (continuation naturelle)
+                # 4. Dernière ligne finit par une abréviation (ex: "Th P.")
                 is_continuation = False
                 if test_lieu_nom and current_event_lines and current_date:
                     last_line = current_event_lines[-1].rstrip()
@@ -7547,6 +7548,9 @@ class EventParser:
                         is_continuation = True
                     # Cas 3: finit par une virgule (la suite est sur la ligne suivante)
                     elif last_line.endswith(','):
+                        is_continuation = True
+                    # Cas 4: finit par une abréviation (lettre majuscule + point, ex: "Th P.")
+                    elif re.search(r'\b[A-Z]\.\s*$', last_line):
                         is_continuation = True
 
                 if test_lieu_nom and not is_continuation:
