@@ -3931,7 +3931,7 @@ def find_lieu_position_heuristic(text: str) -> Optional[int]:
         r",\s*(L'[A-ZÀ-Ÿ][a-zà-ÿ]+)",  # L'Epicerie, L'Oasis
         r",\s*(Le\s+[A-ZÀ-Ÿ][a-zà-ÿA-ZÀ-Ÿ\s\-]+)",  # Le Circuit, Le Mans
         r",\s*(La\s+[A-ZÀ-Ÿ][a-zà-ÿA-ZÀ-Ÿ\s\-]+)",  # La Fonderie
-        r",\s*((?:Espace|Salle|Centre|Théâtre|Médiathèque|Bar|Café|Pub)\s+[A-Za-zÀ-ÿ\s\-\']+)",
+        r",\s*((?:Espace|Salle|Centre|Théâtre|Médiathèque|Bar|Café|Pub|Cour)\s+[A-Za-zÀ-ÿ\s\-\']+)",
         # Pattern générique mais exclut "Cie" (compagnie de théâtre)
         r",\s*(?!Cie\s)([A-ZÀ-Ÿ][a-zà-ÿ]+(?:\s+[A-ZÀ-Ÿ][a-zà-ÿ]+)*)",  # Jean Carmet, Epicerie
     ]
@@ -4048,8 +4048,12 @@ def extract_header_lieu(
 
     # Pattern 1: "Au NomLieu" ou "A NomLieu"
     # Ex: "Au Palais, café-concert, Le Mans" → "Palais" → normalize → "Le Palais"
+    # Ex: "Au Passeport en août" → "Passeport" → normalize → "Le Passeport"
+    # Ex: "Au Passeport en juillet: gratuit" → "Passeport" → normalize → "Le Passeport"
+    # Terminateurs acceptés: virgule, ville connue, "en <mois>", deux-points, fin de chaîne
+    _mois_pattern = r'(?:janvier|f[eé]vrier|mars|avril|mai|juin|juill?et|juiiiet|ao[uû]t|aout|septembre|octobre|novembre|d[eé]cembre)'
     pattern_au = re.compile(
-        rf'^[AÀ]u?\s+([A-ZÀ-Ÿ][a-zA-ZÀ-ÿ\'\-\s]+?)(?:\s*,|\s+(?:{villes_pattern}))',
+        rf'^[AÀ]u?\s+([A-ZÀ-Ÿ][a-zA-ZÀ-ÿ\'\-\s]+?)(?:\s*,|\s+(?:{villes_pattern})|\s+en\s+{_mois_pattern}|\s*:|$)',
         re.IGNORECASE
     )
     m = pattern_au.match(header)
@@ -4275,8 +4279,8 @@ def extract_lieu_fallback(text: str, ville_ref_list: list) -> tuple[Optional[str
     # Noms d'événements: contient "avec", "invite", ":", "soirée", "concert", "scène ouverte", "apéro", "jam", etc.
     # Ex: "Apéro Jazz Manouche", "Jam Session", "Concert Rock", "Soirée Electro"
     event_name_pattern = re.compile(r'\b(?:avec|featuring|feat\.?|invite)\b|^(?:soirée|concert|carte blanche|sc[èe]ne ouverte|ap[ée]ro|jam|b[oœ]uf)', re.IGNORECASE)
-    # Pattern pour extraire un lieu bar/espace/salle/centre/théâtre/place en fin de chaîne ou avant "de Xh"
-    lieu_in_text_pattern = re.compile(r'\b((?:bar|espace|salle|centre|théâtre|pub|médiathèque|péniche|café|place|parvis|esplanade)\s+(?:le\s+|la\s+|l\'|du\s+|de\s+la\s+|des\s+)?[A-Za-zÀ-ÿ\s\-\']+?)(?:\s+de\s+\d{1,2}h|$)', re.IGNORECASE)
+    # Pattern pour extraire un lieu bar/espace/salle/centre/théâtre/place/cour en fin de chaîne ou avant "de Xh"
+    lieu_in_text_pattern = re.compile(r'\b((?:bar|espace|salle|centre|théâtre|pub|médiathèque|péniche|café|place|parvis|esplanade|cour)\s+(?:le\s+|la\s+|l\'|du\s+|de\s+la\s+|des\s+|de\s+|d\')?[A-Za-zÀ-ÿ\s\-\']+?)(?:\s+de\s+\d{1,2}h|\s+\d+[.,]?\d*\s*[€eE](?:\b|$)|\s+(?:gratuit|au\s+chapeau|prix\s+libre|libre|hnc|tnc)\s*$|$)', re.IGNORECASE)
     # Fragments de parenthèses (genre coupé) - inclut les artistes avec parenthèse non fermée
     fragment_pattern = re.compile(r'^[^(]*\)|\([^)]*$|^[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s\'\-\&\.0-9]+\s*\([^)]*$')
 
@@ -4285,9 +4289,9 @@ def extract_lieu_fallback(text: str, ville_ref_list: list) -> tuple[Optional[str
     # Inclut aussi "L'Epicerie", "L'Oasis", etc. (L' + Nom en Title Case)
     explicit_lieu_pattern = re.compile(
         r'^(?:salle|bar|espace|centre|théâtre|theater|pub|médiathèque|mediatheque|'
-        r'péniche|peniche|café|cafe|place|parvis|esplanade|'
+        r'péniche|peniche|café|cafe|place|parvis|esplanade|cour|'
         r'le\s+(?:bar|café|cafe|théâtre|theater|centre)|'
-        r'la\s+(?:salle|médiathèque|mediatheque|péniche|peniche|place)|'
+        r'la\s+(?:salle|médiathèque|mediatheque|péniche|peniche|place|cour)|'
         r'l\'(?:espace|espal|esplanade|[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][a-zàâäéèêëïîôùûüç]+))\b',
         re.IGNORECASE
     )
@@ -4321,16 +4325,26 @@ def extract_lieu_fallback(text: str, ville_ref_list: list) -> tuple[Optional[str
             lieu_match = lieu_in_text_pattern.search(part)
             if lieu_match and lieu is None:
                 lieu = lieu_match.group(1).strip()
-            # Si pas de match explicite, essayer d'extraire le texte avant l'heure
-            # Pattern: "Lieu/Ville XXh" où Lieu commence par majuscule et n'est pas un artiste
-            elif has_heure:
+            # Si pas de match explicite, essayer d'extraire le texte avant l'heure ou le prix
+            # Pattern: "Lieu/Ville XXh" ou "Lieu 0€" où Lieu commence par majuscule
+            elif has_heure or prix_pattern.search(part):
                 # Extraire le texte avant l'heure (supporte "dès Xh", "de Xh", "Xh")
-                before_hour = re.split(r'\s*(?:dès|de|à)?\s*\d{1,2}h', part)[0].strip()
-                if before_hour and len(before_hour) >= 3:
+                if has_heure:
+                    before_marker = re.split(r'\s*(?:dès|de|à)?\s*\d{1,2}h', part)[0].strip()
+                else:
+                    # Pas d'heure mais un prix: extraire le texte avant le prix
+                    before_marker = re.split(r'\s*\d+[.,]?\d*\s*[€eEfF]\b', part)[0].strip()
+                    # Aussi essayer les tarifs non-numériques
+                    if before_marker == part:
+                        before_marker = re.split(
+                            r'\s*(?:gratuit|au\s+chapeau|prix\s+libre|libre|hnc|tnc)\s*$',
+                            part, flags=re.IGNORECASE
+                        )[0].strip()
+                if before_marker and len(before_marker) >= 3:
                     # Vérifier d'abord si c'est une ville connue
-                    ville_id, ville_norm = normalize_ville(before_hour)
+                    ville_id, ville_norm = normalize_ville(before_marker)
                     from core.normalizer import normalize_for_matching
-                    before_normalized = normalize_for_matching(before_hour)
+                    before_normalized = normalize_for_matching(before_marker)
                     ville_normalized = normalize_for_matching(ville_norm)
                     # C'est une ville si le nom retourné correspond
                     if ville_norm.lower() != 'le mans' or before_normalized == ville_normalized:
@@ -4340,14 +4354,26 @@ def extract_lieu_fallback(text: str, ville_ref_list: list) -> tuple[Optional[str
                         })
                     # Sinon, vérifier si c'est un lieu valide (pas en MAJUSCULES = pas un artiste)
                     elif lieu is None:
+                        # Rejeter les before_marker contenant du contenu événementiel
+                        # - "//" = séparateur nom événement / spectacle
+                        # - "..." ou «...» = titres de spectacles entre guillemets
+                        has_event_content = (
+                            '//' in before_marker
+                            or re.search(r'[""«][^""»]*[""»]|"[^"]*"', before_marker)
+                        )
+                        if has_event_content:
+                            pass  # Ce n'est pas un lieu, c'est du contenu événementiel
                         # Pattern "Le/La/L' + Nom" -> probablement un lieu
-                        if re.match(r'^[Ll][ea\']\s*[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][a-zàâäéèêëïîôùûüç]+', before_hour):
-                            lieu = before_hour
+                        elif re.match(r'^[Ll][ea\']\s*[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][a-zàâäéèêëïîôùûüç]+', before_marker):
+                            lieu = before_marker
                         # Pattern "Nom" avec première maj puis minuscules (pas tout majuscules)
-                        elif re.match(r'^[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][a-zàâäéèêëïîôùûüç]+', before_hour) and not before_hour.isupper():
+                        elif re.match(r'^[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][a-zàâäéèêëïîôùûüç]+', before_marker) and not before_marker.isupper():
                             # Vérifier que ce n'est pas un genre/style entre parenthèses tronqué
-                            if not before_hour.startswith('('):
-                                lieu = before_hour
+                            if not before_marker.startswith('('):
+                                lieu = before_marker
+                        # Pattern lieu explicite (Cour de, Salle, etc.)
+                        elif explicit_lieu_pattern.match(before_marker):
+                            lieu = before_marker
             continue
 
         # Ignorer les genres seuls entre parenthèses

@@ -602,6 +602,7 @@ Square Montreuil,Bouloire,squaremontreuil,,Square Montreuil,72440,47.9721857,0.5
 Square rue Galilée,Le Mans,squareruegalilee,,,72000,47.9888587579404,0.217123151640304,manuel,exact,,
 Stade,Louplande,stade,,,,47.945295,0.042006,nominatim,exact,Stade,1
 Stade,Sillé-le-Philippe,stade,,,,48.1057637,0.3520143,nominatim,exact,Rue du Stade,1
+Stade,Courgains,,,,72260,48.2867741152859,0.276512367611568,manuel,exact,,
 Stade du collège,Le Mans,stadecollege,,,,48.0073849,0.1967849,nominatim,city,Le Mans,
 Stade Léon Bollée,Le Mans,stadeleonbollee,2,All. Jeanne Deroin,72000,48.0152366244213,0.193774641069806,manuel,exact,,
 Studio 101,Coulaines,studio101,,Rue de Belle-Île,72190,48.0275835,0.1998299,nominatim,exact,Studio 101,
@@ -754,3 +755,4 @@ place St Damien,Saint-Cosme-en-Vairais,,,,72110,48.2737460239035,0.4601043563072
 Arche de la Nature - Maison de la Prairie,Yvré-l'Évêque,,,,72530,47.997929033271,0.25613219639293,manuel,exact,,
 Centre Culturel Athéna,La Ferté-Bernard,,,Av. du Général de Gaulle,72400,48.1827124401152,0.649546850769337,manuel,exact,,
 Église Saint-Liboire,Le Mans,,157,Av. Rhin et Danube,72000,48.0175823181417,0.185024495983614,manuel,exact,,
+Service Jeunesse,Le Mans,,13,Rue de l'Étoile,72000,48.0055495529776,0.199423580563275,manuel,exact,,

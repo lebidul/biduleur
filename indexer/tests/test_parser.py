@@ -2206,6 +2206,41 @@ class TestExtractHeaderLieu:
         lieu_id, lieu_nom, ville_nom = result
         assert lieu_nom != "X"
 
+    def test_pattern1_au_en_mois_juillet(self, lieu_ref_list, ville_ref_list):
+        """Pattern 1: 'Au Passeport en juillet' → 'Le Passeport'."""
+        lieu_id, lieu_nom, ville_nom = extract_header_lieu(
+            "Au Passeport en juillet", lieu_ref_list, ville_ref_list
+        )
+        assert lieu_nom == "Le Passeport"
+
+    def test_pattern1_au_en_mois_aout(self, lieu_ref_list, ville_ref_list):
+        """Pattern 1: 'Au Passeport en août' → 'Le Passeport'."""
+        lieu_id, lieu_nom, ville_nom = extract_header_lieu(
+            "Au Passeport en août", lieu_ref_list, ville_ref_list
+        )
+        assert lieu_nom == "Le Passeport"
+
+    def test_pattern1_au_en_mois_ocr_juiiiet(self, lieu_ref_list, ville_ref_list):
+        """Pattern 1: 'Au Passeport en juiiiet' (OCR) → 'Le Passeport'."""
+        lieu_id, lieu_nom, ville_nom = extract_header_lieu(
+            "Au Passeport en juiiiet", lieu_ref_list, ville_ref_list
+        )
+        assert lieu_nom == "Le Passeport"
+
+    def test_pattern1_au_en_mois_with_colon_gratuit(self, lieu_ref_list, ville_ref_list):
+        """Pattern 1: 'Au Passeport en juillet: gratuit' → 'Le Passeport'."""
+        lieu_id, lieu_nom, ville_nom = extract_header_lieu(
+            "Au Passeport en juillet: gratuit", lieu_ref_list, ville_ref_list
+        )
+        assert lieu_nom == "Le Passeport"
+
+    def test_pattern1_au_with_colon(self, lieu_ref_list, ville_ref_list):
+        """Pattern 1: 'Au Passeport:' → 'Le Passeport' (deux-points comme terminateur)."""
+        lieu_id, lieu_nom, ville_nom = extract_header_lieu(
+            "Au Passeport:", lieu_ref_list, ville_ref_list
+        )
+        assert lieu_nom == "Le Passeport"
+
 
 class TestInlineInheritedPartialLieuContinuation:
     """Tests pour la jointure de lignes quand le lieu est coupé en fin de ligne.
@@ -2369,6 +2404,59 @@ class TestAuChapeauNotLieu:
         text = 'SYL & THE BLUES SPIRIT (blues), Sablé-sur-Sarthe, 19h, au chapeau'
         lieu, ville = extract_lieu_fallback(text, [])
         assert lieu != 'au chapeau', f"'au chapeau' ne doit pas être le lieu, got lieu={lieu!r}"
+
+
+class TestEventContentNotLieu:
+    """Contenu événementiel (// et guillemets) ne doit pas être extrait comme lieu.
+
+    Le parser doit rejeter les textes contenant des séparateurs d'événements
+    (//) ou des titres de spectacles entre guillemets ("...") comme candidats lieu.
+    Bidul 256: 'Les soirs d'été // "Chut" Kaboum (cirque)' n'est pas un lieu.
+    """
+
+    def test_before_marker_with_double_slash_rejected(self):
+        """before_marker contenant '//' ne doit pas être un lieu."""
+        from core.parser import extract_lieu_fallback
+        text = 'Les soirs d\'été // "Chut" Kaboum (cirque) à 20h + "Capuche" Cie Luz (cirque) à 21h, Cour de École Jean Mermoz 0€'
+        lieu, ville = extract_lieu_fallback(text, [])
+        assert '//' not in (lieu or ''), f"lieu ne doit pas contenir '//', got lieu={lieu!r}"
+
+    def test_before_marker_with_quotes_rejected(self):
+        """before_marker contenant des guillemets ne doit pas être un lieu."""
+        from core.parser import extract_lieu_fallback
+        text = 'Les soirs d\'été // "Chut" Kaboum (cirque) à 20h + "Capuche" Cie Luz (cirque) à 21h, Cour de École Jean Mermoz 0€'
+        lieu, ville = extract_lieu_fallback(text, [])
+        assert '"' not in (lieu or ''), f"lieu ne doit pas contenir de guillemets, got lieu={lieu!r}"
+
+    def test_bidul_256_cour_de_ecole_lieu(self):
+        """Bidul 256: lieu doit être 'Cour de École Jean Mermoz', pas le nom d'événement."""
+        from core.parser import extract_lieu_fallback
+        text = 'Les soirs d\'été // "Chut" Kaboum (cirque) à 20h + "Capuche" Cie Luz (cirque) à 21h, Cour de École Jean Mermoz 0€'
+        lieu, ville = extract_lieu_fallback(text, [])
+        assert lieu is not None, "Un lieu devrait être extrait"
+        assert 'Cour' in lieu, f"lieu doit contenir 'Cour', got lieu={lieu!r}"
+        assert 'Mermoz' in lieu, f"lieu doit contenir 'Mermoz', got lieu={lieu!r}"
+
+    def test_lieu_prix_stripped_from_cour(self):
+        """Le prix '0€' ne doit pas faire partie du lieu extrait."""
+        from core.parser import extract_lieu_fallback
+        text = 'Les soirs d\'été // "Chut" Kaboum (cirque) à 20h + "Capuche" Cie Luz (cirque) à 21h, Cour de École Jean Mermoz 0€'
+        lieu, ville = extract_lieu_fallback(text, [])
+        assert lieu is not None and '€' not in lieu, f"lieu ne doit pas contenir '€', got lieu={lieu!r}"
+
+    def test_cour_keyword_recognized(self):
+        """'Cour de...' doit être reconnu comme un lieu explicite."""
+        from core.parser import extract_lieu_fallback
+        text = 'Concert de jazz, Cour de l\'école Voltaire, 20h, gratuit'
+        lieu, ville = extract_lieu_fallback(text, [])
+        assert lieu is not None and 'Cour' in lieu, f"lieu doit contenir 'Cour', got lieu={lieu!r}"
+
+    def test_cour_with_prix_stripped(self):
+        """Le prix après un lieu 'Cour de...' doit être strippé."""
+        from core.parser import extract_lieu_fallback
+        text = 'Concert, Cour du château 5€'
+        lieu, ville = extract_lieu_fallback(text, [])
+        assert lieu is not None and '€' not in lieu, f"lieu ne doit pas contenir '€', got lieu={lieu!r}"
 
 
 if __name__ == "__main__":
