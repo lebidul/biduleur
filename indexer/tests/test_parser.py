@@ -2300,5 +2300,76 @@ class TestInlineInheritedPartialLieuContinuation:
         assert "bar Le Mackeson" in events[1].raw_text
 
 
+class TestAuChapeauNotLieu:
+    """'au chapeau' est un tarif, pas un lieu.
+
+    Le parser doit reconnaitre 'au chapeau' comme tarif et ne jamais
+    l'extraire comme lieu_raw.
+    """
+
+    def test_extract_lieu_fallback_au_chapeau_skipped(self):
+        """extract_lieu_fallback ne doit PAS retourner 'au chapeau' comme lieu."""
+        from core.parser import extract_lieu_fallback
+        text = 'Syndrome de l\'Hippopotame (th.), Moncé en Belin, 20h, au chapeau'
+        lieu, ville = extract_lieu_fallback(text, [])
+        assert lieu != 'au chapeau', f"'au chapeau' ne doit pas être un lieu, got lieu={lieu!r}"
+
+    def test_extract_lieu_fallback_gratuit_skipped(self):
+        """extract_lieu_fallback ne doit PAS retourner 'gratuit' comme lieu."""
+        from core.parser import extract_lieu_fallback
+        text = 'ARTISTE (rock), Le Zoo, 21h, gratuit'
+        lieu, ville = extract_lieu_fallback(text, [])
+        assert lieu != 'gratuit', f"'gratuit' ne doit pas être un lieu, got lieu={lieu!r}"
+
+    def test_extract_lieu_fallback_prix_libre_skipped(self):
+        """extract_lieu_fallback ne doit PAS retourner 'prix libre' comme lieu."""
+        from core.parser import extract_lieu_fallback
+        text = 'ARTISTE (rock), Le Zoo, 21h, prix libre'
+        lieu, ville = extract_lieu_fallback(text, [])
+        assert lieu != 'prix libre', f"'prix libre' ne doit pas être un lieu, got lieu={lieu!r}"
+
+    def test_extract_lieu_fallback_hnc_skipped(self):
+        """extract_lieu_fallback ne doit PAS retourner 'hnc' comme lieu."""
+        from core.parser import extract_lieu_fallback
+        text = 'ARTISTE (rock), Le Zoo, 21h, hnc'
+        lieu, ville = extract_lieu_fallback(text, [])
+        assert lieu != 'hnc', f"'hnc' ne doit pas être un lieu, got lieu={lieu!r}"
+
+    def test_bidul_175_cine_poche_lieu(self):
+        """Bidul 175: lieu doit être 'Ciné Poche', pas 'au chapeau'."""
+        from core.parser import extract_lieu_fallback
+        text = '<<Documentaire Zucco" (th.), Ciné Poche, 19h, au chapeau'
+        lieu, ville = extract_lieu_fallback(text, [])
+        assert lieu != 'au chapeau', f"'au chapeau' ne doit pas être le lieu, got lieu={lieu!r}"
+
+    def test_bidul_169_festival_circo_loco(self):
+        """Bidul 169: lieu ne doit PAS être 'au chapeau' pour Festival Circo Loco."""
+        from core.parser import extract_lieu_fallback
+        text = 'Festival Circo Loco: ZX Break Show (th. de rue) + Ronan/Ronan (ch. bricolées), Moncé-en-Belin 21h30, au chapeau'
+        lieu, ville = extract_lieu_fallback(text, [])
+        assert lieu != 'au chapeau', f"'au chapeau' ne doit pas être le lieu, got lieu={lieu!r}"
+
+    def test_bidul_274_vb_lieu(self):
+        """Bidul 274: lieu doit être extrait correctement, pas 'au chapeau'."""
+        from core.parser import extract_lieu_fallback
+        text = 'LES HABITS DU DIMANCHE (chanson swing), V & B, Allonnes, 19h, au chapeau'
+        lieu, ville = extract_lieu_fallback(text, [])
+        assert lieu != 'au chapeau', f"'au chapeau' ne doit pas être le lieu, got lieu={lieu!r}"
+
+    def test_bidul_292_fete_musique_lieu(self):
+        """Bidul 292: 'Bistro Broc Café' comme lieu, pas 'au chapeau'."""
+        from core.parser import extract_lieu_fallback
+        text = 'Fête de la musique // Bistro Broc Café, Changé, 20h, au chapeau'
+        lieu, ville = extract_lieu_fallback(text, [])
+        assert lieu != 'au chapeau', f"'au chapeau' ne doit pas être le lieu, got lieu={lieu!r}"
+
+    def test_bidul_303_syl_blues(self):
+        """Bidul 303: lieu ne doit pas être 'au chapeau'."""
+        from core.parser import extract_lieu_fallback
+        text = 'SYL & THE BLUES SPIRIT (blues), Sablé-sur-Sarthe, 19h, au chapeau'
+        lieu, ville = extract_lieu_fallback(text, [])
+        assert lieu != 'au chapeau', f"'au chapeau' ne doit pas être le lieu, got lieu={lieu!r}"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

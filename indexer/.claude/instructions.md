@@ -148,6 +148,15 @@ Le pattern `Organisateur // ARTISTES` permet d'extraire le nom de l'événement.
 - Exemple : `Orga Garage5 // 6RME (bass)` → nom="Orga Garage5", artiste="6RME"
 - Le flag `re.DOTALL` est essentiel car le texte peut contenir des newlines
 
+### Tarifs non-numériques exclus du lieu
+
+Les tarifs textuels ne sont **jamais** des lieux. Les fonctions `extract_lieu_fallback()` et `_extract_lieu_ville()` ignorent ces patterns :
+- `au chapeau`, `gratuit`, `prix libre`, `libre`, `hnc`, `tnc`
+
+**Deux points de filtrage :**
+- `extract_lieu_fallback()` : `prix_pattern` inclut tous les tarifs non-numériques
+- `_extract_lieu_ville()` : check explicite avant la logique de split prix/heure
+
 ### Validation du lieu (éviter faux positifs)
 Le parser vérifie que le lieu détecté est bien un lieu et non partie du nom d'événement :
 - Si le lieu est précédé d'une **virgule** ou **parenthèse fermante** → lieu valide
@@ -248,14 +257,14 @@ python cli.py extract --numero XXX
 ### Statistiques HTML
 ```bash
 # Générer le dashboard HTML avec KPIs local/régional
-python cli.py stats --html
-# Fichier généré : stats/bidul_stats.html
+python cli.py stats --html stats.html
 ```
 Le dashboard inclut :
 - KPIs séparés : événements totaux, locaux, régionaux, contenus
 - Graphique avec barres empilées (cyan=local, violet=régional)
 - Boutons de filtre : Tous, Événements, Locaux, Régionaux, Contenus
 - Score qualité par type (local/régional)
+- Borne supérieure dynamique (tous les biduls existants sont inclus)
 
 ### Accès au texte OCR stocké
 Le texte OCR brut est stocké dans la table `bidul`, attribut `raw_text`:
@@ -620,7 +629,7 @@ La colonne `source_file` dans `biduls.description.csv` définit les fichiers sou
 **Formats supportés :**
 - **CSV 2022** (biduls 265-275) : `tapage_biduleur_janvier_2022.csv`
 - **CSV 2023+** (biduls 276-291) : `202301_tapage_biduleur_janvier_2023.csv`
-- **XLSX 2025+** (biduls 306-310) : `202510_tapage_biduleur_Octobre_2025.xlsx`
+- **XLSX 2025+** (biduls 306-311) : `202510_tapage_biduleur_Octobre_2025.xlsx`
 
 **Multi-fichiers pour biduls d'été :**
 Les biduls de juillet couvrent juillet ET août. Utiliser `|` comme séparateur :
@@ -637,7 +646,8 @@ source_file: tapage_biduleur_juillet_2022.csv|tapage_biduleur_aout_2022.csv
 | `import_bidul_from_source()` | Importe depuis un ou plusieurs fichiers CSV/XLSX |
 | `find_source_files()` | Trouve les fichiers sources pour un bidul |
 | `normalize_xlsx_column()` | Normalise un nom de colonne XLSX |
-| `find_xlsx_column()` | Trouve une colonne par patterns |
+| `find_xlsx_column()` | Trouve une colonne par patterns (préfère le match le plus court) |
+| `is_valid_event_date()` | Filtre les dates invalides (requiert jour de semaine + numéro) |
 
 ### Mapping des colonnes XLSX
 
@@ -658,6 +668,14 @@ XLSX_COLUMN_PATTERNS = {
     # ... répété pour 2, 3, 4
 }
 ```
+
+**`find_xlsx_column()` préfère le match le plus court** : quand plusieurs colonnes matchent un pattern (ex: "DATE" et "DATE TAPAGE" pour `['date']`), la colonne la plus courte est retournée (match le plus spécifique).
+
+### Filtrage des dates CSV/XLSX
+
+Les événements CSV/XLSX sans date valide sont ignorés à l'import. La fonction `is_valid_event_date()` vérifie que le champ date contient un jour de semaine suivi d'un numéro de jour :
+- **Valide** : `Dimanche 12`, `Lundi 1`, `Ma 3`, `Ven 31`
+- **Invalide** : `Coups de coeur et en bref`, `12` (jour seul), texte vide
 
 ### Export avec clause WHERE (`core/csv_exporter.py`)
 

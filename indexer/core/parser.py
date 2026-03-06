@@ -4252,7 +4252,7 @@ def extract_lieu_fallback(text: str, ville_ref_list: list) -> tuple[Optional[str
     # Dans ce cas, ce n'est pas une heure d'événement mais partie du nom
     # Note: "des XXh" est typique d'un nom (Circuit des 24h), tandis que "de XXh" est typiquement une plage horaire
     heure_in_lieu_name_pattern = re.compile(r'\bdes\s+\d{1,2}h\b', re.IGNORECASE)
-    prix_pattern = re.compile(r'\d+[.,]?\d*\s*€|gratuit|libre|prix libre|participation libre', re.IGNORECASE)
+    prix_pattern = re.compile(r'\d+[.,]?\d*\s*€|gratuit|au chapeau|prix libre|libre|participation libre|hnc|tnc', re.IGNORECASE)
     genre_pattern = re.compile(r'^\([^)]+\)$')
     # Spectacles entre guillemets (avec ou sans genre)
     spectacle_pattern = re.compile(r'^[«""„\"].*[»""\"]')
@@ -6752,6 +6752,14 @@ class EventParser:
         # Collecter les candidats lieu/ville
         for part in parts[start_idx:]:
             if not part:
+                continue
+
+            # Ignorer les tarifs non-numériques entiers
+            # Ex: "au chapeau", "gratuit", "prix libre" ne sont PAS des lieux
+            if re.match(
+                r'^(?:au\s+chapeau|gratuit|prix\s+libre|libre|hnc|tnc)\s*$',
+                part, re.IGNORECASE
+            ):
                 continue
 
             # Si c'est une heure ou un prix, essayer d'extraire la partie avant

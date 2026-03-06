@@ -234,12 +234,22 @@ def get_stats_data(db_path: str) -> List[Dict[str, Any]]:
     cur.execute("SELECT numero FROM bidul ORDER BY numero")
     existing_biduls = set(row[0] for row in cur.fetchall())
 
-    # Récupérer les stats avec CTE récursive - incluant local/regional
+    # Borne supérieure dynamique: max des biduls existants (dans bidul ou evenement)
     cur.execute("""
+        SELECT MAX(n) FROM (
+            SELECT MAX(numero) AS n FROM bidul
+            UNION ALL
+            SELECT MAX(bidul_numero) AS n FROM evenement
+        )
+    """)
+    max_numero = cur.fetchone()[0] or 308
+
+    # Récupérer les stats avec CTE récursive - incluant local/regional
+    cur.execute(f"""
         WITH RECURSIVE all_numeros(numero) AS (
             SELECT 1
             UNION ALL
-            SELECT numero + 1 FROM all_numeros WHERE numero < 308
+            SELECT numero + 1 FROM all_numeros WHERE numero < {max_numero}
         )
         SELECT
             a.numero as bidul_numero,
