@@ -1,21 +1,20 @@
 from biduleur.format_utils import format_evenement, format_info, format_lieu, fmt_prix, fmt_heure, format_artists_styles, fmt_link, capfirst, fmt_virgule
-from biduleur.constants import DATE, COLONNE_INFO, FESTIVAL, STYLE_FESTIVAL, VILLE, LIEU, PRIX, HORAIRE, GENRE1, SPECTACLE1, ARTISTE1, STYLE1, GENRE2, SPECTACLE2, ARTISTE2, STYLE2, GENRE3, SPECTACLE3, ARTISTE3, STYLE3, GENRE4, SPECTACLE4, ARTISTE4, STYLE4, LIEN1, LIEN2, LIEN3, LIEN4, P_MD_OPEN_DATE, P_MD_CLOSE_DATE, P_MD_OPEN_DATE_AGENDA, P_MD_CLOSE, P_MD_OPEN, P_MD_POST_OPEN
+from biduleur.constants import DATE, COLONNE_INFO, FESTIVAL, STYLE_FESTIVAL, VILLE, LIEU, PRIX, HORAIRE, P_MD_OPEN_DATE, P_MD_CLOSE_DATE, P_MD_OPEN_DATE_AGENDA, P_MD_CLOSE, P_MD_OPEN, P_MD_POST_OPEN
 from typing import Dict, Tuple
 
 def parse_bidul_event(event: Dict, current_date: str = None) -> Tuple[str, str, str, str]:
-    # Liste de toutes les clés requises dans cette fonction
+    # Liste des clés de base requises
     required_keys = [
         DATE, FESTIVAL, STYLE_FESTIVAL, VILLE, LIEU, PRIX, HORAIRE,
-        GENRE1, SPECTACLE1, ARTISTE1, STYLE1,
-        GENRE2, SPECTACLE2, ARTISTE2, STYLE2,
-        GENRE3, SPECTACLE3, ARTISTE3, STYLE3,
-        GENRE4, SPECTACLE4, ARTISTE4, STYLE4,
     ]
 
-    # Vérifie que toutes les clés requises sont présentes
+    # Vérifie que les clés de base sont présentes
     missing_keys = [key for key in required_keys if key not in event]
     if missing_keys:
         raise KeyError(f"Colonne manquante : {', '.join(missing_keys)}")
+
+    # Récupérer les sets de colonnes spectacle détectés dynamiquement
+    spectacle_col_sets = event.get('_spectacle_col_sets', [])
 
     # Nettoyage des valeurs
     event = {key: (value.strip() if isinstance(value, str) else value if value is not None else "")
@@ -32,8 +31,12 @@ def parse_bidul_event(event: Dict, current_date: str = None) -> Tuple[str, str, 
         line_agenda = f"{P_MD_OPEN_DATE_AGENDA}{event[DATE]}{P_MD_CLOSE}"
         current_date = event[DATE]
 
+    # Pour la colonne info, on a besoin du premier NOM SPECTACLE
+    first_spectacle_col = spectacle_col_sets[0]['spectacle'] if spectacle_col_sets else None
+
     if event[DATE] == COLONNE_INFO:
-        evenement = format_info(event[FESTIVAL], event[STYLE_FESTIVAL], event[SPECTACLE1])
+        spectacle_val = event.get(first_spectacle_col, '') if first_spectacle_col else ''
+        evenement = format_info(event[FESTIVAL], event[STYLE_FESTIVAL], spectacle_val)
         line_bidul += f"{P_MD_OPEN}{capfirst(evenement)}{P_MD_CLOSE}"
         line_agenda += f"{P_MD_OPEN}{capfirst(evenement)}{P_MD_CLOSE}"
         line_post += f"{P_MD_POST_OPEN}{capfirst(evenement)}{P_MD_CLOSE}"
@@ -47,13 +50,16 @@ def parse_bidul_event(event: Dict, current_date: str = None) -> Tuple[str, str, 
     prix = fmt_prix(event[PRIX])
     heure = fmt_heure(event[HORAIRE])
 
-    # Formatage des artistes/styles
-    artistes_styles = format_artists_styles(
-        (event[GENRE1], event[SPECTACLE1], event[ARTISTE1], event[STYLE1]),
-        (event[GENRE2], event[SPECTACLE2], event[ARTISTE2], event[STYLE2]),
-        (event[GENRE3], event[SPECTACLE3], event[ARTISTE3], event[STYLE3]),
-        (event[GENRE4], event[SPECTACLE4], event[ARTISTE4], event[STYLE4]),
-    )
+    # Formatage dynamique des artistes/styles à partir des colonnes détectées
+    triplets = []
+    for col_set in spectacle_col_sets:
+        triplets.append((
+            event.get(col_set['genre'], ''),
+            event.get(col_set['spectacle'], '') if col_set['spectacle'] else '',
+            event.get(col_set['artiste'], '') if col_set['artiste'] else '',
+            event.get(col_set['style'], '') if col_set['style'] else '',
+        ))
+    artistes_styles = format_artists_styles(*triplets)
 
     # liens = fmt_link(event[LIEN1], event[LIEN2], event[LIEN3], event[LIEN4])
 

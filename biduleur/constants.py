@@ -29,6 +29,69 @@ LIEN2 = 'LIEN2'
 LIEN3 = 'LIEN3'
 LIEN4 = 'LIEN4'
 
+
+# --- Colonnes spectacle dynamiques ---
+import re
+
+# Préfixes de regex pour détecter les colonnes spectacle par numéro
+_GENRE_PATTERN = re.compile(r'^GENRE\s+(\d+)$', re.IGNORECASE)
+_SPECTACLE_PATTERN = re.compile(r'^NOM\s+SPECTACLE\s+(\d+)', re.IGNORECASE)
+_ARTISTE_PATTERN = re.compile(r'^COMPAGNIE\s+(\d+)', re.IGNORECASE)
+_STYLE_PATTERN = re.compile(r'^STYLE\s+.*SPECTACLE\s+(\d+)', re.IGNORECASE | re.DOTALL)
+
+
+def detect_spectacle_columns(columns):
+    """
+    Détecte dynamiquement les sets de colonnes spectacle (GENRE N, NOM SPECTACLE N,
+    COMPAGNIE N, STYLE N) présents dans la liste de colonnes du fichier.
+
+    Returns:
+        list[dict]: Liste triée par numéro, chaque dict contient les clés
+                    'genre', 'spectacle', 'artiste', 'style' mappées aux noms
+                    réels des colonnes du fichier.
+    """
+    # Collecter les numéros et noms de colonnes détectés
+    genre_cols = {}
+    spectacle_cols = {}
+    artiste_cols = {}
+    style_cols = {}
+
+    for col in columns:
+        col_str = str(col)
+        m = _GENRE_PATTERN.match(col_str)
+        if m:
+            genre_cols[int(m.group(1))] = col_str
+            continue
+        m = _SPECTACLE_PATTERN.match(col_str)
+        if m:
+            spectacle_cols[int(m.group(1))] = col_str
+            continue
+        m = _ARTISTE_PATTERN.match(col_str)
+        if m:
+            artiste_cols[int(m.group(1))] = col_str
+            continue
+        m = _STYLE_PATTERN.match(col_str)
+        if m:
+            style_cols[int(m.group(1))] = col_str
+            continue
+
+    # Construire les sets complets (un set = les 4 colonnes pour un numéro donné)
+    all_nums = sorted(set(genre_cols.keys()) | set(spectacle_cols.keys())
+                      | set(artiste_cols.keys()) | set(style_cols.keys()))
+
+    result = []
+    for n in all_nums:
+        if n in genre_cols:
+            result.append({
+                'num': n,
+                'genre': genre_cols.get(n),
+                'spectacle': spectacle_cols.get(n),
+                'artiste': artiste_cols.get(n),
+                'style': style_cols.get(n),
+            })
+
+    return result
+
 # OUTPUT_FOLDER_NAME = './outputs/'
 # P_MD_OPEN_DATE = '<p class="date">'
 # P_MD_CLOSE_DATE = '</p>'

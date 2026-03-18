@@ -1,4 +1,5 @@
 from biduleur.csv_utils import parse_bidul_event
+from biduleur.constants import detect_spectacle_columns
 from instagram import post_to_instagram, get_post_text
 import numpy as np
 from datetime import datetime
@@ -19,9 +20,12 @@ def publish_daily_post(instagram_post=False, local_env=False, facebook_post=Fals
     sorted_data = data_from_tapage.sort_values([constants.GENRE_EVT, constants.HORAIRE])
     cleaned_data_data_frame = sorted_data.replace({np.nan: None})
 
+    spectacle_col_sets = detect_spectacle_columns(cleaned_data_data_frame.columns)
     html_text = ""
     for index, row in cleaned_data_data_frame.iterrows():
-        _, _, formatted_event, _ = parse_bidul_event(row)
+        row_dict = row.to_dict()
+        row_dict['_spectacle_col_sets'] = spectacle_col_sets
+        _, _, formatted_event, _ = parse_bidul_event(row_dict)
         html_text += f"""{formatted_event}\n\n"""
 
     # parsed_event = parse_bidul_event(data_from_tapage)
