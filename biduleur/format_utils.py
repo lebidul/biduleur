@@ -1,5 +1,6 @@
 import os.path
 import datetime
+import math
 from typing import Dict, Any
 
 import logging
@@ -12,9 +13,11 @@ from biduleur.constants import GENRE_EVT_SV, GENRE_EVT_CONCERT, OUTPUT_FOLDER_NA
 def _to_str(value: Any) -> str:
     """
     Convertit une valeur en string de manière robuste.
-    Gère les types Excel : datetime.time, datetime.datetime, int, float, None.
+    Gère les types Excel : datetime.time, datetime.datetime, int, float, None, NaN.
     """
     if value is None:
+        return ""
+    if isinstance(value, float) and math.isnan(value):
         return ""
     if isinstance(value, datetime.time):
         return value.strftime("%Hh%M")
