@@ -1,3 +1,4 @@
+import math
 from biduleur.format_utils import format_evenement, format_info, format_lieu, fmt_prix, fmt_heure, format_artists_styles, fmt_link, capfirst, fmt_virgule
 from biduleur.constants import DATE, COLONNE_INFO, FESTIVAL, STYLE_FESTIVAL, VILLE, LIEU, PRIX, HORAIRE, P_MD_OPEN_DATE, P_MD_CLOSE_DATE, P_MD_OPEN_DATE_AGENDA, P_MD_CLOSE, P_MD_OPEN, P_MD_POST_OPEN
 from typing import Dict, Tuple
@@ -16,9 +17,17 @@ def parse_bidul_event(event: Dict, current_date: str = None) -> Tuple[str, str, 
     # Récupérer les sets de colonnes spectacle détectés dynamiquement
     spectacle_col_sets = event.get('_spectacle_col_sets', [])
 
-    # Nettoyage des valeurs
-    event = {key: (value.strip() if isinstance(value, str) else value if value is not None else "")
-             for key, value in event.items()}
+    # Nettoyage des valeurs (None ET float NaN -> "")
+    def _clean(v):
+        if v is None:
+            return ""
+        if isinstance(v, float) and math.isnan(v):
+            return ""
+        if isinstance(v, str):
+            return v.strip()
+        return v
+
+    event = {key: _clean(value) for key, value in event.items()}
 
     # Initialisation des lignes
     line_bidul = ""

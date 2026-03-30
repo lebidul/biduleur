@@ -14,6 +14,7 @@ def _to_str(value: Any) -> str:
     """
     Convertit une valeur en string de manière robuste.
     Gère les types Excel : datetime.time, datetime.datetime, int, float, None, NaN.
+    Filtre aussi la chaîne "nan" qui peut apparaître lors de conversions pandas.
     """
     if value is None:
         return ""
@@ -25,7 +26,10 @@ def _to_str(value: Any) -> str:
         return value.strftime("%d/%m/%Y %Hh%M")
     if isinstance(value, (int, float)):
         return str(value)
-    return str(value)
+    s = str(value)
+    if s.strip().lower() == "nan":
+        return ""
+    return s
 
 
 def format_artists_styles(*triplets) -> str:
