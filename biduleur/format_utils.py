@@ -87,12 +87,30 @@ def fmt_virgule(champ: str) -> str:
     return f"{champ}, "
 
 
+def _normalize_url(url: str) -> str:
+    """Ajoute https:// si l'URL n'a pas de protocole."""
+    url = url.strip()
+    if not url:
+        return url
+    if not url.startswith(('http://', 'https://', 'mailto:')):
+        return f"https://{url}"
+    return url
+
+
 def fmt_link(*links: str) -> str:
     formatted_links = ""
     for link in links:
         link = _to_str(link)
         if link:
-            formatted_links += f" - <a href=\"{link}\" target=\"_blank\">{link}</a>"
+            # Séparer URL et texte d'affichage si format "url|display"
+            if '|' in link:
+                url, display = link.split('|', 1)
+            else:
+                url, display = link, link
+            url = _normalize_url(url)
+            # Raccourcir le texte d'affichage (enlever protocole)
+            display_short = display.replace('https://', '').replace('http://', '').rstrip('/')
+            formatted_links += f" - <a href=\"{url}\">{display_short}</a>"
     return formatted_links
 
 

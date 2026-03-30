@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import List, Dict, Optional, Any
 
 import pandas as pd
+import openpyxl
 
 from biduleur.constants import (
     DATE, HORAIRE, FESTIVAL, STYLE_FESTIVAL, VILLE, LIEU, PRIX,
@@ -246,6 +247,49 @@ def _parse_date(date_str: Any) -> tuple[str, str]:
 
 
 # -----------------------------
+# Extraction des hyperlinks Excel
+# -----------------------------
+
+def _extract_hyperlinks(filename: str, df: pd.DataFrame) -> Dict[tuple, str]:
+    """
+    Extrait les hyperlinks d'un fichier Excel via openpyxl.
+    Retourne un dict {(row_idx, col_name): target_url}.
+    row_idx est l'index 0-based du DataFrame (correspondant à la ligne Excel - 2).
+    """
+    hyperlinks = {}
+    try:
+        wb = openpyxl.load_workbook(filename, read_only=True)
+        ws = wb.active
+
+        # Mapper les indices de colonnes Excel aux noms de colonnes du DataFrame
+        col_map = {}  # excel_col_idx (1-based) -> df_col_name
+        for col_idx, cell in enumerate(next(ws.iter_rows(min_row=1, max_row=1)), 1):
+            if cell.value and str(cell.value).strip() in df.columns:
+                col_map[col_idx] = str(cell.value).strip()
+
+        # Relire le fichier en mode non read_only pour accéder aux hyperlinks
+        wb.close()
+        wb = openpyxl.load_workbook(filename, read_only=False)
+        ws = wb.active
+
+        for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
+            for cell in row:
+                if cell.hyperlink and cell.hyperlink.target:
+                    col_name = col_map.get(cell.column)
+                    if col_name:
+                        df_row_idx = cell.row - 2  # Excel row 2 = DataFrame index 0
+                        hyperlinks[(df_row_idx, col_name)] = cell.hyperlink.target
+
+        wb.close()
+        if hyperlinks:
+            log.info(f"[HYPERLINKS] {len(hyperlinks)} hyperlink(s) extraits du fichier Excel")
+    except Exception as e:
+        log.warning(f"[HYPERLINKS] Impossible d'extraire les hyperlinks: {e}")
+
+    return hyperlinks
+
+
+# -----------------------------
 # Lecture + tri
 # -----------------------------
 
@@ -307,6 +351,20 @@ def read_and_sort_file(filename: str) -> Optional[List[Dict]]:
             )
         log.info(f"[COLONNES] {len(spectacle_col_sets)} set(s) de colonnes spectacle détecté(s) : "
                  f"{[s['num'] for s in spectacle_col_sets]}")
+
+        # --- Extraction des hyperlinks depuis Excel ---
+        hyperlinks = {}
+        if file_extension in ['.xls', '.xlsx']:
+            hyperlinks = _extract_hyperlinks(filename, df)
+
+        # --- Injecter les hyperlinks dans le DataFrame ---
+        # Pour les cellules avec un hyperlink, formater en "url|display_text"
+        if hyperlinks:
+            for (row_idx, col_name), target_url in hyperlinks.items():
+                if row_idx < len(df) and col_name in df.columns:
+                    cell_value = df.at[df.index[row_idx], col_name]
+                    display_text = str(cell_value).strip() if pd.notna(cell_value) and cell_value else target_url
+                    df.at[df.index[row_idx], col_name] = f"{target_url}|{display_text}"
 
         # --- Filtrage des lignes inactives ---
         df = _filter_inactive_rows(df)
