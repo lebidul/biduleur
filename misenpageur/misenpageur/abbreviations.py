@@ -278,24 +278,26 @@ def apply_abbreviations_to_paragraphs(
 
         # Protection des expressions nobr
         protected_zones = []
+        _nobr_counter = 0
         if nobr_expressions:
             # Créer des placeholders pour chaque expression nobr
             for i, nobr_expr in enumerate(nobr_expressions):
                 # Normaliser l'expression nobr aussi
                 nobr_normalized = unicodedata.normalize('NFC', nobr_expr)
-                placeholder = f"___NOBR_{i}___"
 
                 # Remplacer l'expression nobr par un placeholder (insensible à la casse)
                 pattern = re.compile(re.escape(nobr_normalized), re.IGNORECASE)
-                matches = pattern.findall(modified)
 
-                if matches:
-                    # Sauvegarder les matches originaux (avec leur casse)
-                    for match in matches:
-                        protected_zones.append((placeholder, match))
+                # Utiliser un placeholder UNIQUE par occurrence pour préserver
+                # la casse de chaque match individuellement (ex: "BEAUFAY" vs "Beaufay")
+                def _nobr_replacer(match):
+                    nonlocal _nobr_counter
+                    placeholder = f"___NOBR_{i}_{_nobr_counter}___"
+                    _nobr_counter += 1
+                    protected_zones.append((placeholder, match.group(0)))
+                    return placeholder
 
-                    # Remplacer par le placeholder
-                    modified = pattern.sub(placeholder, modified)
+                modified = pattern.sub(_nobr_replacer, modified)
 
         # Appliquer les abréviations (les nobr sont protégés par les placeholders)
         for abbr in sorted_abbrevs:
@@ -313,10 +315,9 @@ def apply_abbreviations_to_paragraphs(
 
         # Restaurer les expressions nobr protégées
         if protected_zones:
-            # Trier par placeholder pour restaurer dans l'ordre inverse
-            protected_zones.sort(reverse=True)
-            for placeholder, original_text in protected_zones:
-                # Restaurer TOUTES les occurrences du placeholder
+            # Chaque placeholder est unique, donc on restaure simplement
+            # dans l'ordre inverse pour éviter les conflits de noms de placeholders
+            for placeholder, original_text in reversed(protected_zones):
                 modified = modified.replace(placeholder, original_text, 1)
 
         result.append(modified)
