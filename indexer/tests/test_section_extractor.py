@@ -323,6 +323,75 @@ class TestSectionCropperRotation:
         assert np.all(rotated[25:50, 0:25] == [255, 0, 0])
 
 
+class TestOrientation180:
+    """Tests pour le support de la rotation 180° (retourne)."""
+
+    def test_orientation_retourne_enum(self):
+        """L'enum Orientation a la valeur RETOURNE."""
+        assert Orientation.RETOURNE.value == 'retourne'
+
+    def test_get_rotation_degrees_retourne(self):
+        """get_rotation_degrees() retourne 180 quand orientation_pdf == RETOURNE."""
+        config = PageSectionConfig(
+            orientation_pdf=Orientation.RETOURNE,
+            orientation_texte=Orientation.PORTRAIT
+        )
+        assert config.get_rotation_degrees() == 180
+        assert config.needs_rotation()
+
+    def test_get_rotation_degrees_90(self):
+        """get_rotation_degrees() retourne 90 quand PDF != texte (portrait vs paysage)."""
+        config = PageSectionConfig(
+            orientation_pdf=Orientation.PORTRAIT,
+            orientation_texte=Orientation.PAYSAGE
+        )
+        assert config.get_rotation_degrees() == 90
+
+    def test_get_rotation_degrees_0(self):
+        """get_rotation_degrees() retourne 0 quand pas de rotation nécessaire."""
+        config = PageSectionConfig(
+            orientation_pdf=Orientation.PORTRAIT,
+            orientation_texte=Orientation.PORTRAIT
+        )
+        assert config.get_rotation_degrees() == 0
+        assert not config.needs_rotation()
+
+    def test_from_csv_row_retourne(self):
+        """PageSectionConfig.from_csv_row() parse correctement 'retourne'."""
+        row = {
+            'p2_sections': 'S1 S2 S4',
+            'p2_orientation': 'portrait',
+            'p2_orientation_pdf': 'retourne',
+            'p2_colonnes': '1'
+        }
+        config = PageSectionConfig.from_csv_row(row, 2)
+        assert config is not None
+        assert config.orientation_pdf == Orientation.RETOURNE
+        assert config.orientation_texte == Orientation.PORTRAIT
+        assert config.get_rotation_degrees() == 180
+
+    def test_rotate_for_text_180(self):
+        """SectionCropper.rotate_for_text(degrees=180) applique une rotation 180°."""
+        image = np.zeros((100, 50, 3), dtype=np.uint8)
+        image[0:25, 0:25] = [255, 0, 0]  # Rouge en haut-gauche
+
+        cropper = SectionCropper()
+        rotated = cropper.rotate_for_text(image, degrees=180)
+
+        # Après rotation 180°, mêmes dimensions
+        assert rotated.shape == (100, 50, 3)
+        # Le coin haut-gauche devient bas-droite
+        assert np.all(rotated[75:100, 25:50] == [255, 0, 0])
+
+    def test_bidul_15_config_retourne(self):
+        """Bidul 15 page2 a orientation_pdf=retourne dans le CSV."""
+        config = load_section_config(15)
+        assert config is not None
+        assert config.page2 is not None
+        assert config.page2.orientation_pdf == Orientation.RETOURNE
+        assert config.page2.get_rotation_degrees() == 180
+
+
 class TestBidulSectionConfigOrientationPdf:
     """Tests pour BidulSectionConfig avec orientation_pdf."""
 

@@ -14,7 +14,7 @@ try:
     from publisher.utils import get_post_text
     from publisher import image_generator, instagram_poster
     from biduleur.csv_utils import parse_bidul_event
-    from biduleur.constants import GENRE1, HORAIRE
+    from biduleur.constants import HORAIRE, detect_spectacle_columns
 except (ModuleNotFoundError, ImportError):
     # Fallback
     from . import email_notifier
@@ -22,7 +22,7 @@ except (ModuleNotFoundError, ImportError):
     from .utils import get_post_text
     from . import image_generator, instagram_poster
     from biduleur.csv_utils import parse_bidul_event
-    from biduleur.constants import GENRE1, HORAIRE
+    from biduleur.constants import HORAIRE, detect_spectacle_columns
 
 def execute_publication_workflow(format_choice="classique", date_str=None):
     """
@@ -37,9 +37,13 @@ def execute_publication_workflow(format_choice="classique", date_str=None):
         print(f"Aucune entrée à publier pour la date sélectionnée ({display_date}). Le processus s'arrête.")
         return
 
+    # Détection dynamique des colonnes spectacle
+    spectacle_col_sets = detect_spectacle_columns(entries_df.columns)
+    first_genre_col = spectacle_col_sets[0]['genre'] if spectacle_col_sets else HORAIRE
+
     try:
-        sorted_entries_df = entries_df.sort_values(by=[GENRE1, HORAIRE])
-        print(f"DataFrame trié avec succès par '{GENRE1}' puis '{HORAIRE}'.")
+        sorted_entries_df = entries_df.sort_values(by=[first_genre_col, HORAIRE])
+        print(f"DataFrame trié avec succès par '{first_genre_col}' puis '{HORAIRE}'.")
     except KeyError as e:
         raise Exception(f"Erreur de tri : la colonne {e} est introuvable. Vérifiez votre fichier constants.py et les en-têtes du Google Sheet.") from e
     cleaned_sorted_entries = sorted_entries_df.replace({np.nan: None})
@@ -51,7 +55,9 @@ def execute_publication_workflow(format_choice="classique", date_str=None):
     # 2. Mettre en forme les données en HTML
     html_content = ""
     for index, row in cleaned_sorted_entries.iterrows():
-        _, _, formatted_event, _ = parse_bidul_event(row)
+        row_dict = row.to_dict()
+        row_dict['_spectacle_col_sets'] = spectacle_col_sets
+        _, _, formatted_event, _ = parse_bidul_event(row_dict)
         html_content += f"""{formatted_event}\n\n"""
 
     # 3. Générer une image à partir du HTML

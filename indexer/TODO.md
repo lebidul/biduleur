@@ -37,3 +37,5 @@
 * centraliser patterns
 * skip reparse si bidul csv
 * chercher villages de sarthe où il n'y a pas le lieu ref chercher ensuite dans raw_text les entrées de ces villages puis comprendre pourquoi ce n'est pas parsé
+* skip evenements csv/xlsx ou date = "En bref"
+* * stocker prix en francs

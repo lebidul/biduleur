@@ -159,25 +159,32 @@ def get_quality_data(db_path: str) -> Dict[str, Any]:
             COUNT(*) as total,
             ROUND(SUM(CASE WHEN e.lieu_ref_id IS NOT NULL THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 1),
             ROUND(SUM(CASE WHEN e.heure IS NOT NULL AND e.heure != '' THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 1),
-            ROUND(SUM(CASE WHEN e.tarif_raw IS NOT NULL AND e.tarif_raw != '' THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 1)
+            ROUND(SUM(CASE WHEN e.tarif_raw IS NOT NULL AND e.tarif_raw != '' THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 1),
+            ROUND(SUM(CASE WHEN e.ville_ref_id IS NOT NULL THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 1)
         FROM evenement e
         JOIN bidul b ON b.numero = e.bidul_numero
         GROUP BY periode
         ORDER BY periode
     """)
     result['evolution'] = [
-        {'periode': r[0], 'total': r[1], 'lieu': r[2] or 0, 'heure': r[3] or 0, 'tarif': r[4] or 0}
+        {'periode': r[0], 'total': r[1], 'lieu': r[2] or 0, 'heure': r[3] or 0, 'tarif': r[4] or 0, 'ville': r[5] or 0}
         for r in cur.fetchall()
     ]
 
-    # Score par Bidul
+    # Score par Bidul (6 dimensions: lieu, ville, artiste normalisés + heure, tarif, contenu)
     cur.execute("""
         WITH event_quality AS (
             SELECT
                 e.bidul_numero,
                 CASE WHEN e.lieu_ref_id IS NOT NULL THEN 1 ELSE 0 END as lieu_ok,
+                CASE WHEN e.ville_ref_id IS NOT NULL THEN 1 ELSE 0 END as ville_ok,
                 CASE WHEN e.heure IS NOT NULL AND e.heure != '' THEN 1 ELSE 0 END as heure_ok,
                 CASE WHEN e.tarif_raw IS NOT NULL AND e.tarif_raw != '' THEN 1 ELSE 0 END as tarif_ok,
+                CASE
+                    WHEN EXISTS (SELECT 1 FROM contenu_evenement ce WHERE ce.evenement_id = e.id AND ce.artiste_ref_id IS NOT NULL) THEN 1
+                    WHEN NOT EXISTS (SELECT 1 FROM contenu_evenement ce WHERE ce.evenement_id = e.id) AND e.nom IS NOT NULL AND e.nom != '' THEN 1
+                    ELSE 0
+                END as artiste_ok,
                 CASE
                     WHEN EXISTS (SELECT 1 FROM contenu_evenement ce WHERE ce.evenement_id = e.id AND (ce.artiste_ref_id IS NOT NULL OR (ce.style IS NOT NULL AND ce.style != ''))) THEN 1
                     WHEN NOT EXISTS (SELECT 1 FROM contenu_evenement ce WHERE ce.evenement_id = e.id) AND e.nom IS NOT NULL AND e.nom != '' THEN 1
@@ -185,7 +192,7 @@ def get_quality_data(db_path: str) -> Dict[str, Any]:
                 END as contenu_ok
             FROM evenement e
         )
-        SELECT bidul_numero, ROUND((AVG(lieu_ok) + AVG(heure_ok) + AVG(tarif_ok) + AVG(contenu_ok)) / 4 * 100, 1)
+        SELECT bidul_numero, ROUND((AVG(lieu_ok) + AVG(ville_ok) + AVG(artiste_ok) + AVG(heure_ok) + AVG(tarif_ok) + AVG(contenu_ok)) / 6 * 100, 1)
         FROM event_quality
         GROUP BY bidul_numero
         ORDER BY bidul_numero
@@ -234,12 +241,22 @@ def get_stats_data(db_path: str) -> List[Dict[str, Any]]:
     cur.execute("SELECT numero FROM bidul ORDER BY numero")
     existing_biduls = set(row[0] for row in cur.fetchall())
 
-    # Récupérer les stats avec CTE récursive - incluant local/regional
+    # Borne supérieure dynamique: max des biduls existants (dans bidul ou evenement)
     cur.execute("""
+        SELECT MAX(n) FROM (
+            SELECT MAX(numero) AS n FROM bidul
+            UNION ALL
+            SELECT MAX(bidul_numero) AS n FROM evenement
+        )
+    """)
+    max_numero = cur.fetchone()[0] or 308
+
+    # Récupérer les stats avec CTE récursive - incluant local/regional
+    cur.execute(f"""
         WITH RECURSIVE all_numeros(numero) AS (
             SELECT 1
             UNION ALL
-            SELECT numero + 1 FROM all_numeros WHERE numero < 308
+            SELECT numero + 1 FROM all_numeros WHERE numero < {max_numero}
         )
         SELECT
             a.numero as bidul_numero,
@@ -1330,6 +1347,11 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
                 <span class="progress-value" id="valLieu">-</span>
             </div>
             <div class="progress-item">
+                <span class="progress-label">Ville normalise</span>
+                <div class="progress-bar"><div class="progress-fill" id="pctVille"></div></div>
+                <span class="progress-value" id="valVille">-</span>
+            </div>
+            <div class="progress-item">
                 <span class="progress-label">Lieu raw</span>
                 <div class="progress-bar"><div class="progress-fill" id="pctLieuRaw"></div></div>
                 <span class="progress-value" id="valLieuRaw">-</span>
@@ -1631,6 +1653,7 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
             }
 
             setProgress('Lieu', quality.completude.lieu_normalise);
+            setProgress('Ville', quality.completude.ville_normalise);
             setProgress('LieuRaw', quality.completude.lieu_raw);
             setProgress('Heure', quality.completude.heure);
             setProgress('Tarif', quality.completude.tarif);
@@ -1858,6 +1881,11 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
                             label: 'Lieu norm.',
                             data: quality.evolution.map(e => e.lieu),
                             backgroundColor: '#06b6d4',
+                        },
+                        {
+                            label: 'Ville norm.',
+                            data: quality.evolution.map(e => e.ville),
+                            backgroundColor: '#8b5cf6',
                         },
                         {
                             label: 'Heure',

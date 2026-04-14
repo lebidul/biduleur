@@ -1,5 +1,6 @@
 import os.path
 import datetime
+import math
 from typing import Dict, Any
 
 import logging
@@ -12,9 +13,12 @@ from biduleur.constants import GENRE_EVT_SV, GENRE_EVT_CONCERT, OUTPUT_FOLDER_NA
 def _to_str(value: Any) -> str:
     """
     Convertit une valeur en string de manière robuste.
-    Gère les types Excel : datetime.time, datetime.datetime, int, float, None.
+    Gère les types Excel : datetime.time, datetime.datetime, int, float, None, NaN.
+    Filtre aussi la chaîne "nan" qui peut apparaître lors de conversions pandas.
     """
     if value is None:
+        return ""
+    if isinstance(value, float) and math.isnan(value):
         return ""
     if isinstance(value, datetime.time):
         return value.strftime("%Hh%M")
@@ -22,7 +26,10 @@ def _to_str(value: Any) -> str:
         return value.strftime("%d/%m/%Y %Hh%M")
     if isinstance(value, (int, float)):
         return str(value)
-    return str(value)
+    s = str(value)
+    if s.strip().lower() == "nan":
+        return ""
+    return s
 
 
 def format_artists_styles(*triplets) -> str:
@@ -80,12 +87,30 @@ def fmt_virgule(champ: str) -> str:
     return f"{champ}, "
 
 
+def _normalize_url(url: str) -> str:
+    """Ajoute https:// si l'URL n'a pas de protocole."""
+    url = url.strip()
+    if not url:
+        return url
+    if not url.startswith(('http://', 'https://', 'mailto:')):
+        return f"https://{url}"
+    return url
+
+
 def fmt_link(*links: str) -> str:
     formatted_links = ""
     for link in links:
         link = _to_str(link)
         if link:
-            formatted_links += f" - <a href=\"{link}\" target=\"_blank\">{link}</a>"
+            # Séparer URL et texte d'affichage si format "url|display"
+            if '|' in link:
+                url, display = link.split('|', 1)
+            else:
+                url, display = link, link
+            url = _normalize_url(url)
+            # Raccourcir le texte d'affichage (enlever protocole)
+            display_short = display.replace('https://', '').replace('http://', '').rstrip('/')
+            formatted_links += f" - <a href=\"{url}\">{display_short}</a>"
     return formatted_links
 
 

@@ -160,15 +160,23 @@ class ScanConfig:
             return None
 
     def needs_rotation(self, page_num: int) -> bool:
-        """Vérifie si une page nécessite une rotation de 90°.
+        """Vérifie si une page nécessite une rotation.
 
-        Rotation nécessaire quand l'orientation du PDF diffère de celle du texte.
-        Ex: PDF portrait + texte paysage = rotation 90° nécessaire.
+        Rotation nécessaire quand l'orientation du PDF diffère de celle du texte,
+        ou quand la page est retournée à 180°.
         """
+        return self.get_rotation_degrees(page_num) != 0
+
+    def get_rotation_degrees(self, page_num: int) -> int:
+        """Retourne l'angle de rotation nécessaire (0, 90, ou 180)."""
         if page_num == 1:
-            return self.page1_orientation_pdf != self.page1_orientation_texte
+            if self.page1_orientation_pdf == 'retourne':
+                return 180
+            return 90 if self.page1_orientation_pdf != self.page1_orientation_texte else 0
         else:
-            return self.page2_orientation_pdf != self.page2_orientation_texte
+            if self.page2_orientation_pdf == 'retourne':
+                return 180
+            return 90 if self.page2_orientation_pdf != self.page2_orientation_texte else 0
 
     def get_sections(self, page_num: int) -> list[str]:
         """Retourne les sections à extraire pour une page."""

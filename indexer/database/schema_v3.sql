@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS bidul (
     annee INTEGER CHECK (annee BETWEEN 1997 AND 2030),
     pdf_filename TEXT,                       -- "2018-02 Bidul 230.pdf"
     type_source TEXT CHECK(type_source IN ('scan', 'texte')),
-    source TEXT CHECK(source IN ('csv', 'pdf', 'scan')),  -- Source d'extraction
+    source TEXT CHECK(source IN ('csv', 'xlsx', 'pdf', 'scan')),  -- Source d'extraction
     raw_text TEXT,                           -- Texte brut extrait du PDF (OCR ou texte natif)
     config_extraction TEXT,                  -- JSON snapshot config utilisée
     extraction_status TEXT DEFAULT 'pending',

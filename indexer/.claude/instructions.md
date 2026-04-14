@@ -71,9 +71,10 @@ Ve 12: Soirée Ambiance avec DJ FRED
 ```
 
 La fonction `extract_header_lieu()` détecte ces patterns :
-- `Au X, Ville` → lieu="Le X" (conversion Au→Le)
-- `Nom Ville - tél...` → lieu="Nom", ville="Ville"
-- `Le/La X, Ville` → lieu="Le/La X", ville="Ville"
+- Pattern 1: `Au X, Ville` → lieu="Le X" (conversion Au→Le)
+- Pattern 2: `Nom Ville - tél...` → lieu="Nom", ville="Ville" (nécessite majuscule initiale, lieu ≥ 3 chars)
+- Pattern 3: `Le/La X, Ville` → lieu="Le/La X", ville="Ville"
+- Pattern 4: `Festival NOM à/au/à l' LIEU` → cherche le lieu via `find_lieu_in_text_v2()` (avec aliases)
 
 Le lieu est propagé via `current_block_lieu_*` aux événements sans `lieu_raw`.
 
@@ -146,6 +147,15 @@ Le pattern `Organisateur // ARTISTES` permet d'extraire le nom de l'événement.
 - Pattern : `^(.+?)\s*//\s*(.+)` avec `re.DOTALL` pour le texte multiline
 - Exemple : `Orga Garage5 // 6RME (bass)` → nom="Orga Garage5", artiste="6RME"
 - Le flag `re.DOTALL` est essentiel car le texte peut contenir des newlines
+
+### Tarifs non-numériques exclus du lieu
+
+Les tarifs textuels ne sont **jamais** des lieux. Les fonctions `extract_lieu_fallback()` et `_extract_lieu_ville()` ignorent ces patterns :
+- `au chapeau`, `gratuit`, `prix libre`, `libre`, `hnc`, `tnc`
+
+**Deux points de filtrage :**
+- `extract_lieu_fallback()` : `prix_pattern` inclut tous les tarifs non-numériques
+- `_extract_lieu_ville()` : check explicite avant la logique de split prix/heure
 
 ### Validation du lieu (éviter faux positifs)
 Le parser vérifie que le lieu détecté est bien un lieu et non partie du nom d'événement :
@@ -247,14 +257,14 @@ python cli.py extract --numero XXX
 ### Statistiques HTML
 ```bash
 # Générer le dashboard HTML avec KPIs local/régional
-python cli.py stats --html
-# Fichier généré : stats/bidul_stats.html
+python cli.py stats --html stats.html
 ```
 Le dashboard inclut :
 - KPIs séparés : événements totaux, locaux, régionaux, contenus
 - Graphique avec barres empilées (cyan=local, violet=régional)
 - Boutons de filtre : Tous, Événements, Locaux, Régionaux, Contenus
 - Score qualité par type (local/régional)
+- Borne supérieure dynamique (tous les biduls existants sont inclus)
 
 ### Accès au texte OCR stocké
 Le texte OCR brut est stocké dans la table `bidul`, attribut `raw_text`:
@@ -286,6 +296,8 @@ Le mapping est défini dans `corpus/biduls.description.csv` (nouveau format) :
 - `p1_colonnes` / `p2_colonnes` : Nombre de colonnes par section
 
 **Rotation automatique** : Si `orientation_pdf != orientation` (ex: PDF portrait + texte paysage), une rotation 90° est appliquée automatiquement. Cas typique : biduls 2-11 où le PDF est portrait mais le texte est imprimé en paysage.
+
+**Rotation 180°** : La valeur `retourne` pour `p{n}_orientation_pdf` indique une page physiquement retournée à 180° dans le PDF. Cas typique : bidul 15 page 2.
 
 ### Modules OCR
 
@@ -377,7 +389,7 @@ L'extraction suit ce workflow :
 | `ocr_mode` | classic, sections, auto | Mode OCR |
 | `p1_sections` | S1 S2 S3 S4 | Sections page 1 |
 | `p1_orientation` | portrait, paysage | Orientation du texte page 1 |
-| `p1_orientation_pdf` | portrait, paysage | Orientation du PDF page 1 (défaut = p1_orientation) |
+| `p1_orientation_pdf` | portrait, paysage, retourne | Orientation du PDF page 1 (défaut = p1_orientation) |
 | `p1_colonnes` | 1, 2 | Colonnes par section page 1 |
 | `source_file` | nom(s) fichier(s) | Fichier(s) source CSV/XLSX (séparés par `\|` pour multi-fichiers) |
 
@@ -409,8 +421,15 @@ NICOLAS ET TOMY, pub Le Terminus               <- hérite de Je 05
 ```
 
 La fonction `_parse_inline_inherited_date()` gère ce format avec :
-1. Première passe : jointure des lignes de continuation (villes, heures)
+1. Première passe : jointure des lignes de continuation (villes, heures, lieux partiels)
 2. Deuxième passe : attribution des dates héritées aux événements
+
+**Cas de continuation** (lignes jointes à l'événement précédent) :
+1. Ligne commençant par ville, heure, prix, parenthèse ou minuscule (`continuation_pattern`)
+2. Ligne commençant par un mot-clé de lieu (Salle, Théâtre, Bar, etc.)
+3. (dans `_parse_inline_with_referentiel`) Cas 1-4 : préposition/article, lieu partiel, virgule, abréviation
+4. (dans `_parse_inline_with_referentiel`) Cas 5 : type de lieu + début de nom propre (ex: "bar Le", "théâtre Paul", "Collégiale St", "Péniche")
+5. (dans `_parse_inline_inherited_date`) Cas 5 : même détection de lieu partiel en fin de ligne
 
 ## Templates SVG pour zones d'extraction
 
@@ -610,7 +629,7 @@ La colonne `source_file` dans `biduls.description.csv` définit les fichiers sou
 **Formats supportés :**
 - **CSV 2022** (biduls 265-275) : `tapage_biduleur_janvier_2022.csv`
 - **CSV 2023+** (biduls 276-291) : `202301_tapage_biduleur_janvier_2023.csv`
-- **XLSX 2025+** (biduls 306-310) : `202510_tapage_biduleur_Octobre_2025.xlsx`
+- **XLSX 2025+** (biduls 306-311) : `202510_tapage_biduleur_Octobre_2025.xlsx`
 
 **Multi-fichiers pour biduls d'été :**
 Les biduls de juillet couvrent juillet ET août. Utiliser `|` comme séparateur :
@@ -627,7 +646,8 @@ source_file: tapage_biduleur_juillet_2022.csv|tapage_biduleur_aout_2022.csv
 | `import_bidul_from_source()` | Importe depuis un ou plusieurs fichiers CSV/XLSX |
 | `find_source_files()` | Trouve les fichiers sources pour un bidul |
 | `normalize_xlsx_column()` | Normalise un nom de colonne XLSX |
-| `find_xlsx_column()` | Trouve une colonne par patterns |
+| `find_xlsx_column()` | Trouve une colonne par patterns (préfère le match le plus court) |
+| `is_valid_event_date()` | Filtre les dates invalides (requiert jour de semaine + numéro) |
 
 ### Mapping des colonnes XLSX
 
@@ -648,6 +668,14 @@ XLSX_COLUMN_PATTERNS = {
     # ... répété pour 2, 3, 4
 }
 ```
+
+**`find_xlsx_column()` préfère le match le plus court** : quand plusieurs colonnes matchent un pattern (ex: "DATE" et "DATE TAPAGE" pour `['date']`), la colonne la plus courte est retournée (match le plus spécifique).
+
+### Filtrage des dates CSV/XLSX
+
+Les événements CSV/XLSX sans date valide sont ignorés à l'import. La fonction `is_valid_event_date()` vérifie que le champ date contient un jour de semaine suivi d'un numéro de jour :
+- **Valide** : `Dimanche 12`, `Lundi 1`, `Ma 3`, `Ven 31`
+- **Invalide** : `Coups de coeur et en bref`, `12` (jour seul), texte vide
 
 ### Export avec clause WHERE (`core/csv_exporter.py`)
 

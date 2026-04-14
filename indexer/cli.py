@@ -660,6 +660,46 @@ def cmd_populate(args):
                 skipped += 1
                 continue
 
+            # Pour les biduls CSV/XLSX: réimporter depuis le fichier source
+            bidul_type_reparse = get_bidul_type(numero)
+            if bidul_type_reparse in ('csv', 'xlsx'):
+                # Récupérer mois/année
+                mois_r = bidul.get('mois')
+                annee_r = bidul.get('annee')
+                if not mois_r or not annee_r:
+                    pdf_path = find_pdf(numero)
+                    if pdf_path:
+                        _, mois_r, annee_r = extract_bidul_info(pdf_path.name)
+                if not mois_r or not annee_r:
+                    print(f"[{numero}] Impossible de déterminer mois/année - ignoré")
+                    skipped += 1
+                    continue
+
+                csv_paths = find_csv_files(numero, mois_r, annee_r, TAPAGES_DIR)
+                if csv_paths:
+                    existing_count = db.count_evenements(numero)
+                    if not args.dry_run:
+                        db.delete_evenements(numero)
+                    reimported = import_bidul_from_csv(numero, csv_paths, annee_r, mois_r)
+                    if not args.dry_run:
+                        for event in reimported:
+                            db.insert_evenement_from_dict(event)
+                        # Effacer le raw_text résiduel
+                        conn_r = db.connect()
+                        conn_r.execute("UPDATE bidul SET raw_text = NULL, source = ? WHERE numero = ?",
+                                      (bidul_type_reparse, numero))
+                        conn_r.commit()
+                    dry_run_suffix = " (dry-run)" if args.dry_run else ""
+                    timestamp = datetime.now().strftime("%H:%M:%S")
+                    print(f"[{timestamp}] [{numero}] Réimporté depuis {bidul_type_reparse}: "
+                          f"{existing_count} -> {len(reimported)} événements{dry_run_suffix}")
+                    total_reparsed += len(reimported)
+                    reparsed_biduls += 1
+                else:
+                    print(f"[{numero}] Fichier source {bidul_type_reparse} non trouvé - ignoré")
+                    skipped += 1
+                continue
+
             bidul_raw_text = bidul.get('raw_text')
             if not bidul_raw_text:
                 # Pas de raw_text = bidul importé depuis CSV, ne pas supprimer les événements
@@ -1042,7 +1082,7 @@ def cmd_populate(args):
                 })
             pdf_biduls += 1
             total_from_pdf += len(events)
-        else:
+        elif source is None:
             skipped += 1
             continue
 
@@ -1064,6 +1104,13 @@ def cmd_populate(args):
             source=source,
             raw_text=full_text  # None pour CSV, texte extrait pour PDF/scan
         )
+
+        # Pour les imports CSV/XLSX, effacer le raw_text résiduel
+        # d'une éventuelle ancienne extraction PDF (COALESCE le préserve sinon)
+        if source in ('csv', 'xlsx'):
+            conn = db.connect()
+            conn.execute("UPDATE bidul SET raw_text = NULL WHERE numero = ?", (numero,))
+            conn.commit()
 
         # Insérer les événements
         for event in events:
@@ -1247,7 +1294,7 @@ def cmd_migrate(args):
         ("evenement", "review_notes", "TEXT"),
         ("evenement", "style", "TEXT"),  # Style/genre de l'événement (rock, jazz, théâtre, etc.)
         # Nouvelles colonnes sur bidul pour source et raw_text
-        ("bidul", "source", "TEXT CHECK(source IN ('csv', 'pdf', 'scan'))"),
+        ("bidul", "source", "TEXT CHECK(source IN ('csv', 'xlsx', 'pdf', 'scan'))"),
         ("bidul", "raw_text", "TEXT"),
     ]
 

@@ -316,6 +316,32 @@ GROUP BY e.lieu_raw, e.ville_raw
 ORDER BY nb_events DESC
 LIMIT 30;
 
+
+-- Détail des événements pour lieux non résolus:
+
+SELECT
+    e.id,
+	e.bidul_numero,
+    e.raw_text,
+    e.nom,
+	e.genre_evenement,
+    e.date_evenement,
+    e.heure,
+	e.lieu_raw,
+	e.ville_raw,
+    e.tarif_raw,
+    c.nom_spectacle,
+	c.artiste,
+	ar.nom,
+    c.style
+FROM evenement e
+LEFT JOIN lieu_ref lr ON e.lieu_ref_id = lr.id
+LEFT JOIN contenu_evenement c ON e.id = c.evenement_id
+LEFT JOIN artiste_ref ar ON c.artiste_ref_id = ar.id
+WHERE lieu_raw IS NOT NULL and lr.nom is NULL
+ORDER BY e.lieu_raw,e.date_evenement,e.raw_text,e.heure
+
+
 -- Statistiques de matching lieux
 SELECT
     'Total événements avec lieu_raw' AS metrique,

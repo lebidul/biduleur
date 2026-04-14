@@ -4,10 +4,12 @@ from datetime import datetime
 from typing import List, Dict, Optional, Any
 
 import pandas as pd
+import openpyxl
 
-from biduleur.constants import DATE, HORAIRE, FESTIVAL, STYLE_FESTIVAL, VILLE, LIEU, PRIX, GENRE1, SPECTACLE1, ARTISTE1, \
-    STYLE1, GENRE2, SPECTACLE2, ARTISTE2, STYLE2, GENRE3, SPECTACLE3, ARTISTE3, STYLE3, GENRE4, SPECTACLE4, ARTISTE4, \
-    STYLE4, COLONNE_INFO
+from biduleur.constants import (
+    DATE, HORAIRE, FESTIVAL, STYLE_FESTIVAL, VILLE, LIEU, PRIX,
+    COLONNE_INFO, detect_spectacle_columns,
+)
 from biduleur.event_utils import parse_bidul_event
 
 import logging  # Ajouter cet import
@@ -40,12 +42,8 @@ MOIS_FR = {
 # Jours de la semaine complets
 JOURS_SEMAINE = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche']
 
-REQUIRED_COLUMNS = [
+REQUIRED_BASE_COLUMNS = [
     DATE, HORAIRE, FESTIVAL, STYLE_FESTIVAL, VILLE, LIEU, PRIX,
-    GENRE1, SPECTACLE1, ARTISTE1, STYLE1,
-    GENRE2, SPECTACLE2, ARTISTE2, STYLE2,
-    GENRE3, SPECTACLE3, ARTISTE3, STYLE3,
-    GENRE4, SPECTACLE4, ARTISTE4, STYLE4
 ]
 
 
@@ -203,20 +201,31 @@ def _parse_date(date_str: Any) -> tuple[str, str]:
         - sort_key: clé de tri (date ISO complète ou jour paddé)
         - display_date: date formatée pour affichage
     """
-    if not date_str or not isinstance(date_str, str):
-        return ('', str(date_str) if date_str else '')
+    if not date_str:
+        return ('', '')
+
+    # Gérer les objets datetime/Timestamp (ex: depuis Excel)
+    if isinstance(date_str, (datetime, pd.Timestamp)):
+        jour_semaine = JOURS_SEMAINE[date_str.weekday()]
+        mois_nom = MOIS_FR[date_str.month].capitalize()
+        display = f"{jour_semaine} {date_str.day} {mois_nom} {date_str.year}"
+        sort_key = f"{date_str.year:04d}-{date_str.month:02d}-{date_str.day:02d}"
+        return (sort_key, display)
+
+    if not isinstance(date_str, str):
+        return ('', str(date_str))
 
     date_str = str(date_str).strip()
 
-    # Format ISO: 2014-08-31 ou 2014/08/31
-    iso_match = re.match(r'^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$', date_str)
+    # Format ISO: 2014-08-31 ou 2014/08/31 (avec optionnel 00:00:00)
+    iso_match = re.match(r'^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?$', date_str)
     if iso_match:
         year, month, day = int(iso_match.group(1)), int(iso_match.group(2)), int(iso_match.group(3))
         try:
             dt = datetime(year, month, day)
             jour_semaine = JOURS_SEMAINE[dt.weekday()]
-            mois_nom = MOIS_FR[month]
-            # Format complet avec année: "Dimanche 31 août 2014"
+            mois_nom = MOIS_FR[month].capitalize()
+            # Format complet avec année: "Dimanche 31 Août 2014"
             display = f"{jour_semaine} {day} {mois_nom} {year}"
             # Clé de tri: date ISO pour tri chronologique
             sort_key = f"{year:04d}-{month:02d}-{day:02d}"
@@ -235,6 +244,49 @@ def _parse_date(date_str: Any) -> tuple[str, str]:
             pass
 
     return ('', date_str)
+
+
+# -----------------------------
+# Extraction des hyperlinks Excel
+# -----------------------------
+
+def _extract_hyperlinks(filename: str, df: pd.DataFrame) -> Dict[tuple, str]:
+    """
+    Extrait les hyperlinks d'un fichier Excel via openpyxl.
+    Retourne un dict {(row_idx, col_name): target_url}.
+    row_idx est l'index 0-based du DataFrame (correspondant à la ligne Excel - 2).
+    """
+    hyperlinks = {}
+    try:
+        wb = openpyxl.load_workbook(filename, read_only=True)
+        ws = wb.active
+
+        # Mapper les indices de colonnes Excel aux noms de colonnes du DataFrame
+        col_map = {}  # excel_col_idx (1-based) -> df_col_name
+        for col_idx, cell in enumerate(next(ws.iter_rows(min_row=1, max_row=1)), 1):
+            if cell.value and str(cell.value).strip() in df.columns:
+                col_map[col_idx] = str(cell.value).strip()
+
+        # Relire le fichier en mode non read_only pour accéder aux hyperlinks
+        wb.close()
+        wb = openpyxl.load_workbook(filename, read_only=False)
+        ws = wb.active
+
+        for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
+            for cell in row:
+                if cell.hyperlink and cell.hyperlink.target:
+                    col_name = col_map.get(cell.column)
+                    if col_name:
+                        df_row_idx = cell.row - 2  # Excel row 2 = DataFrame index 0
+                        hyperlinks[(df_row_idx, col_name)] = cell.hyperlink.target
+
+        wb.close()
+        if hyperlinks:
+            log.info(f"[HYPERLINKS] {len(hyperlinks)} hyperlink(s) extraits du fichier Excel")
+    except Exception as e:
+        log.warning(f"[HYPERLINKS] Impossible d'extraire les hyperlinks: {e}")
+
+    return hyperlinks
 
 
 # -----------------------------
@@ -282,13 +334,37 @@ def read_and_sort_file(filename: str) -> Optional[List[Dict]]:
             else:
                 raise ValueError(f"Erreur lors de la lecture du fichier :\n\n{read_error}")
 
-        # Validation des colonnes obligatoires
-        missing_cols = [col for col in REQUIRED_COLUMNS if col not in df.columns]
+        # Validation des colonnes de base obligatoires
+        missing_cols = [col for col in REQUIRED_BASE_COLUMNS if col not in df.columns]
         if missing_cols:
             raise ValueError(
                 f"Colonnes manquantes dans le fichier :\n\n" +
                 "\n".join(f"• {col}" for col in missing_cols)
             )
+
+        # Détection dynamique des colonnes spectacle (GENRE N, NOM SPECTACLE N, etc.)
+        spectacle_col_sets = detect_spectacle_columns(df.columns)
+        if not spectacle_col_sets:
+            raise ValueError(
+                "Aucune colonne spectacle détectée (GENRE N, NOM SPECTACLE N, etc.).\n\n"
+                "Le fichier doit contenir au moins un set de colonnes spectacle."
+            )
+        log.info(f"[COLONNES] {len(spectacle_col_sets)} set(s) de colonnes spectacle détecté(s) : "
+                 f"{[s['num'] for s in spectacle_col_sets]}")
+
+        # --- Extraction des hyperlinks depuis Excel ---
+        hyperlinks = {}
+        if file_extension in ['.xls', '.xlsx']:
+            hyperlinks = _extract_hyperlinks(filename, df)
+
+        # --- Injecter les hyperlinks dans le DataFrame ---
+        # Pour les cellules avec un hyperlink, formater en "url|display_text"
+        if hyperlinks:
+            for (row_idx, col_name), target_url in hyperlinks.items():
+                if row_idx < len(df) and col_name in df.columns:
+                    cell_value = df.at[df.index[row_idx], col_name]
+                    display_text = str(cell_value).strip() if pd.notna(cell_value) and cell_value else target_url
+                    df.at[df.index[row_idx], col_name] = f"{target_url}|{display_text}"
 
         # --- Filtrage des lignes inactives ---
         df = _filter_inactive_rows(df)
@@ -305,11 +381,16 @@ def read_and_sort_file(filename: str) -> Optional[List[Dict]]:
         df[DATE] = parsed.apply(lambda x: x[1])   # Date formatée pour affichage
 
         # Tri personnalisé : 'En Bref' (COLONNE_INFO) passe à la fin
+        first_genre_col = spectacle_col_sets[0]['genre']
         df['info_last'] = df[DATE].apply(lambda x: 0 if x == COLONNE_INFO else 1)
-        df_sorted = df.sort_values(by=['info_last', 'Day', GENRE1, HORAIRE])
+        df_sorted = df.sort_values(by=['info_last', 'Day', first_genre_col, HORAIRE])
         df_sorted = df_sorted.drop(columns=['info_last'])
 
-        return df_sorted.to_dict('records')
+        records = df_sorted.to_dict('records')
+        # Attacher les infos de colonnes spectacle aux records pour parse_bidul_event
+        for rec in records:
+            rec['_spectacle_col_sets'] = spectacle_col_sets
+        return records
     except ValueError:
         # Re-lever les erreurs de validation pour qu'elles remontent
         raise

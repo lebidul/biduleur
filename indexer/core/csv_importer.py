@@ -107,6 +107,9 @@ def find_xlsx_column(df_columns: list[str], patterns: list[str]) -> Optional[str
     """
     Trouve une colonne dans le DataFrame par patterns.
 
+    Quand plusieurs colonnes matchent, préfère la plus courte (match le plus
+    spécifique). Ex: "DATE" est préféré à "DATE TAPAGE" pour le pattern ['date'].
+
     Args:
         df_columns: Liste des noms de colonnes du DataFrame
         patterns: Liste de mots-clés à chercher (tous doivent être présents)
@@ -114,11 +117,16 @@ def find_xlsx_column(df_columns: list[str], patterns: list[str]) -> Optional[str
     Returns:
         Nom de la colonne originale ou None
     """
+    matches = []
     for col in df_columns:
         normalized = normalize_xlsx_column(col)
         if all(p.lower() in normalized for p in patterns):
-            return col
-    return None
+            matches.append((col, len(normalized)))
+    if not matches:
+        return None
+    # Préférer le match le plus court (le plus spécifique)
+    matches.sort(key=lambda x: x[1])
+    return matches[0][0]
 
 
 def import_xlsx(xlsx_path: Path, bidul_numero: int,
@@ -238,6 +246,11 @@ def import_xlsx(xlsx_path: Path, bidul_numero: int,
 
         # Ignorer les lignes vides
         if not raw_text or not any([artistes, spectacles, nom]):
+            continue
+
+        # Filtrer les événements sans date valide (jour de semaine + numéro)
+        if not is_valid_event_date(date_text):
+            logger.debug(f"Événement ignoré (date invalide '{date_text}'): {raw_text[:80]}")
             continue
 
         event = {
@@ -487,6 +500,92 @@ def parse_date(date_text: str, annee: int, mois: int) -> Optional[str]:
     return None
 
 
+# Jours de la semaine en français (complet et abrégés)
+_JOURS_SEMAINE_RE = re.compile(
+    r'(?:lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche'
+    r'|lun|mar|mer|jeu|ven|sam|dim'
+    r'|lu|ma|me|je|ve|sa|di)\s+\d{1,2}\b',
+    re.IGNORECASE
+)
+
+
+def is_valid_event_date(date_text: str) -> bool:
+    """
+    Vérifie que le texte de date contient un jour de semaine + numéro de jour.
+
+    Format attendu: [Lundi-Dimanche] [1-31]
+    Accepte les abréviations (Lu, Lun, etc.)
+
+    Returns:
+        True si la date est valide, False sinon
+    """
+    if not date_text:
+        return False
+    return bool(_JOURS_SEMAINE_RE.search(date_text))
+
+
+def _build_column_map(fieldnames: list[str]) -> dict[str, str]:
+    """
+    Construit un mapping colonne_originale → colonne_normalisée.
+
+    Gère le format alternatif (avril 2023) avec colonnes MAJUSCULES et
+    noms verbeux multi-lignes.
+
+    Returns:
+        Dict vide si les colonnes sont déjà au format standard.
+    """
+    # Si les colonnes standard existent déjà, pas de mapping nécessaire
+    if 'date' in fieldnames and 'horaire' in fieldnames:
+        return {}
+
+    column_map = {}
+    for col in fieldnames:
+        col_clean = col.strip().replace('\n', ' ')
+        col_upper = col_clean.upper()
+
+        # Colonnes simples
+        if col_upper == 'DATE':
+            column_map[col] = 'date'
+        elif col_upper == 'HEURE':
+            column_map[col] = 'horaire'
+        elif col_upper == 'LIEU':
+            column_map[col] = 'lieu'
+        elif col_upper == 'VILLE':
+            column_map[col] = 'ville'
+        elif col_upper == 'PRIX':
+            column_map[col] = 'prix'
+        elif col_upper == 'GENRE':
+            column_map[col] = 'genre'
+        elif col_upper == 'AUTRE':
+            column_map[col] = 'autre'
+        # Festival / événement
+        elif 'FESTOCHE' in col_upper and 'EVENEMENT' in col_upper:
+            if 'STYLE' in col_upper:
+                column_map[col] = 'style_festival'
+            else:
+                column_map[col] = 'festival'
+        # Spectacles et artistes (1-4)
+        elif 'SPECTACLE' in col_upper:
+            import re
+            m = re.search(r'(\d)', col_upper)
+            if m:
+                num = m.group(1)
+                if 'NOM' in col_upper:
+                    column_map[col] = f'spectacle{num}'
+                elif 'STYLE' in col_upper:
+                    column_map[col] = f'style{num}'
+        elif 'ARTISTE' in col_upper or 'GROUPE' in col_upper or 'COMPAGNIE' in col_upper:
+            import re
+            m = re.search(r'(\d)', col_upper)
+            if m:
+                column_map[col] = f'artiste{m.group(1)}'
+
+    if column_map:
+        logger.debug(f"Mapping colonnes appliqué: {column_map}")
+
+    return column_map
+
+
 def import_csv(csv_path: Path, bidul_numero: int,
                annee: int, mois: int) -> list[dict]:
     """
@@ -521,7 +620,15 @@ def import_csv(csv_path: Path, bidul_numero: int,
     import io
     reader = csv.DictReader(io.StringIO(content))
 
+    # Normaliser les noms de colonnes pour gérer les formats alternatifs
+    # (ex: avril 2023 avec colonnes MAJUSCULES et noms verbeux)
+    column_map = _build_column_map(reader.fieldnames or [])
+
     for row in reader:
+        # Normaliser la row si un mapping existe
+        if column_map:
+            row = {column_map.get(k, k): v for k, v in row.items()}
+
         # Parser les champs
         artistes, spectacles, genres = parse_artists_from_csv(row)
         prix_min, prix_max, gratuit, tarif_raw = parse_price(row.get('prix', ''))
@@ -550,6 +657,12 @@ def import_csv(csv_path: Path, bidul_numero: int,
             raw_parts.append(', '.join(f'"{s}"' for s in spectacles))
         raw_parts.extend([row.get('lieu', ''), ville, row.get('prix', '')])
         raw_text = ', '.join(p for p in raw_parts if p)
+
+        # Filtrer les événements sans date valide (jour de semaine + numéro)
+        date_text = row.get('date', '')
+        if not is_valid_event_date(date_text):
+            logger.debug(f"Événement ignoré (date invalide '{date_text}'): {raw_text[:80]}")
+            continue
 
         event = {
             'bidul_numero': bidul_numero,
