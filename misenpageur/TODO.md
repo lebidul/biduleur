@@ -26,7 +26,14 @@
 - [x] Améliorer affichage optimisée des logos (plusieurs propals ?)
 - [ ] Trop d'espace perdu avec police automatique (eg. C:\Users\thiba\tibo\bidul\miseEnPage\2601\debug_run_2026-01-02_21-35-22)
 - [ ] "Nan" dans le cas de sv sans nom pour ariste spectacle 2,3,4
+- [ ] style + artiste insécable
+- [ ] normaliser les prix avec fuzzy logic dans colonne prix
+- [ ] remplacer ':' par 'h' dans horaire
+- [ ] colonne evenement à mettre en valeur avec rectangle grisé dessus
 - [ ] remplacer euros pour sigle dans prix
+- [ ] texte cucarcha pas dans config
+- [ ] hyperlinks coups de coeur ne marchent pas
+- [ ] dans build github fichiers svg logos et ours mal configurés en mode débug
 - [ ] Saint pas remplacé si suivi d'un tiret
 - [ ] enlever virgule après horaire si pas de prix
 - [ ] Unit tests
