@@ -2459,5 +2459,101 @@ class TestEventContentNotLieu:
         assert lieu is not None and '€' not in lieu, f"lieu ne doit pas contenir '€', got lieu={lieu!r}"
 
 
+class TestPhoneNumberNotLieu:
+    """Les numéros de téléphone ne doivent pas être extraits comme lieu.
+
+    Formats courants: 06.62.59.58.19, 02.43.79.47.97, 02 43 79 47 97
+    """
+
+    def test_phone_dot_format_not_lieu(self):
+        """Numéro au format XX.XX.XX.XX.XX ne doit pas être un lieu."""
+        from core.parser import extract_lieu_fallback
+        text = 'Concert jazz, Montfort le Gesnois, 14-19h, 06.62.59.58.19'
+        lieu, ville = extract_lieu_fallback(text, [])
+        assert lieu is None or '06.62' not in lieu, f"Téléphone ne doit pas être lieu, got {lieu!r}"
+
+    def test_phone_02_format_not_lieu(self):
+        """Numéro au format 02.XX.XX.XX.XX ne doit pas être un lieu."""
+        from core.parser import extract_lieu_fallback
+        text = 'TRIO JAZZ (swing), au Bar du Coin, 02.43.79.47.97'
+        lieu, ville = extract_lieu_fallback(text, [])
+        assert lieu is None or '02.43' not in lieu, f"Téléphone ne doit pas être lieu, got {lieu!r}"
+
+    def test_bidul_132_no_phone_lieu(self):
+        """Bidul 132: lieu_raw doit être NULL, pas le numéro de téléphone."""
+        raw = 'bal folk fest noz: BLAUZANN + DEUXIEME MOITIE + BERNARD LOFFET + DIALTO + DUO PHILIPPE PLARD, Montfort le Gesnois, 14-19h, 06.62.59.58.19'
+        results = parse_event_line_v2(raw, 6, 2018, [], [])
+        assert len(results) >= 1
+        assert results[0]['lieu_raw'] is None, f"lieu_raw doit être None, got {results[0]['lieu_raw']!r}"
+
+    def test_bidul_50_moulin_lieu(self):
+        """Bidul 50: lieu_raw doit être 'moulin de Coëmont', pas le téléphone."""
+        from core.parser import extract_lieu_fallback
+        text = 'TRIO MAYDA JAZZ (swing bebop), au moulin de Coëmont (près de château du Loir), 02.43.79.47.97'
+        lieu, ville = extract_lieu_fallback(text, [])
+        assert lieu is not None and 'moulin' in lieu.lower(), f"lieu doit contenir 'moulin', got {lieu!r}"
+
+    def test_au_lieu_with_parenthetical_info(self):
+        """'au X (près de Y)' doit extraire X comme lieu, pas rejeter à cause des parenthèses."""
+        from core.parser import extract_lieu_fallback
+        text = 'Concert, au Parc des Loisirs (près de la gare), 20h'
+        lieu, ville = extract_lieu_fallback(text, [])
+        assert lieu is not None and 'Parc' in lieu, f"lieu doit contenir 'Parc', got {lieu!r}"
+
+
+class TestBidul237AutomnalesNom:
+    """Bidul 237: 'Les Automnales #11' doit être reconnu comme événement nommé.
+
+    Le texte '\uf071 Les Automnales #11 festival de classique, jazz, tzigane... / 18 concerts / 9 lieux (Le Mans & en Sarthe)'
+    doit donner nom='Les Automnales #11', lieu_raw=None, ville_raw='Le Mans'.
+    """
+
+    def test_is_named_event_title_case_with_hash(self):
+        """'Les Automnales #11 festival...' doit être reconnu comme événement nommé."""
+        assert is_named_event('Les Automnales #11 festival de classique')
+
+    def test_is_named_event_title_case_with_hash_end(self):
+        """'Les Automnales #11' seul doit être reconnu comme événement nommé."""
+        assert is_named_event('Les Automnales #11')
+
+    def test_is_named_event_mixed_case_with_hash(self):
+        """'Nom MixedCase #3 description' doit être reconnu."""
+        assert is_named_event('Nom MixedCase #3 description lowercase')
+
+    def test_extract_event_name_automnales(self):
+        """extract_event_name doit extraire 'Les Automnales #11'."""
+        name = extract_event_name('Les Automnales #11 festival de classique, jazz')
+        assert name == 'Les Automnales #11'
+
+    def test_extract_event_name_hash_at_end(self):
+        """extract_event_name doit extraire 'Syncope #2' suivi de virgule."""
+        name = extract_event_name('Syncope #2, Le Mans')
+        assert name == 'Syncope #2'
+
+    def test_bidul_237_full_parsing(self):
+        """Bidul 237: parsing complet du texte brut."""
+        raw = '\uf071 Les Automnales #11 festival de classique, jazz, tzigane... / 18 concerts / 9 lieux (Le Mans & en Sarthe), Plus d\'infos sur le net'
+        results = parse_event_line_v2(raw, 10, 2015, [], [])
+        assert len(results) == 1
+        r = results[0]
+        assert r['nom'] == 'Les Automnales #11'
+        assert r['lieu_raw'] is None
+        assert r['ville_raw'] == 'Le Mans'
+
+    def test_extract_lieu_fallback_pua_strip(self):
+        """PUA chars au début ne doivent pas empêcher is_named_event."""
+        from core.parser import extract_lieu_fallback
+        text = '\uf071 Les Automnales #11 festival de classique, jazz'
+        lieu, ville = extract_lieu_fallback(text, [])
+        assert lieu is None, f"lieu doit être None pour un événement nommé, got {lieu!r}"
+
+    def test_extract_lieu_fallback_info_text_rejected(self):
+        """'Plus d'infos sur le net' ne doit pas devenir un lieu."""
+        from core.parser import extract_lieu_fallback
+        text = "Concert, Plus d'infos sur le net"
+        lieu, ville = extract_lieu_fallback(text, [])
+        assert lieu != "Plus d'infos sur le net", f"Texte informatif ne doit pas être lieu, got {lieu!r}"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

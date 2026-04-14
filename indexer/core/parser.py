@@ -1033,8 +1033,9 @@ def is_named_event(text: str) -> bool:
         # NOM CLUB/NIGHT avec ... - Événement type soirée en MAJUSCULES
         r'^[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s]+(?:CLUB|NIGHT|PARTY|SESSION|SHOW)\s+avec\s+',
         # Événement nommé avec numéro d'édition: "Syncope fait de la résistance #2"
-        # Pattern: Nom en Title Case avec #N
-        r'^[«""„]?[A-ZÀ-Ÿ][a-zà-ÿ]+(?:\s+[a-zà-ÿ]+)*\s+#\d+',
+        # ou "Les Automnales #11" (mots en Title Case ou minuscules)
+        # Pattern: Nom en Title/Mixed Case avec #N
+        r'^[«""„]?[A-ZÀ-Ÿ][a-zà-ÿ]+(?:\s+[A-Za-zÀ-ÿ]+)*\s+#\d+',
         # Pattern: "Nom Event #N:" suivi d'artistes (ex: "No Data #2: ARTISTE...")
         # Le ":" indique que ce qui suit sont les artistes, pas le nom de l'événement
         r'^[«""„]?[\w\s]+\s*#\s*\d+\s*:\s*[A-Z]',
@@ -1164,6 +1165,11 @@ def extract_event_name(text: str) -> Optional[str]:
         # Ex: "ROCK NIGHT avec BAND1 + BAND2" → "ROCK NIGHT"
         # Le nom doit contenir au moins 2 mots et se terminer avant "avec"
         r'^([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s]{3,}?(?:CLUB|NIGHT|PARTY|SESSION|SHOW))\s+avec\s+',
+        # Pattern: "Nom Event #N" (Title/Mixed Case) suivi de texte descriptif (lowercase)
+        # Ex: "Les Automnales #11 festival de classique" → "Les Automnales #11"
+        # Ex: "Syncope fait de la résistance #2" → "Syncope fait de la résistance #2"
+        # Le lookahead vérifie que ce qui suit est du texte descriptif (lowercase), une virgule, ou la fin
+        r'^([A-ZÀ-Ÿ][a-zà-ÿ]+(?:\s+[A-Za-zÀ-ÿ\']+)*\s+#\d+)(?:\s+[a-z]|\s*,|\s*$)',
         # Pattern: "Nom Event #N:" suivi d'artistes (ex: "No Data #2: ARTISTE...")
         # Ex: "No Data #2: EUPHORIE PAR 1024..." → "No Data #2"
         r'^([\w\s]+\s*#\s*\d+)\s*:\s*[A-Z]',
@@ -4171,6 +4177,8 @@ def extract_lieu_fallback(text: str, ville_ref_list: list) -> tuple[Optional[str
 
     # Retirer les balises de formatage
     text_clean = strip_formatting_tags(text)
+    # Retirer les puces OCR Unicode (Private Use Area) et ballot box en début de texte
+    text_clean = re.sub(r'^[\ue000-\uf8ff☐☑☒✓✗✘\s]+', '', text_clean)
 
     # Prétraitement: Extraire la ville avec pattern "A Ville" ou "À Ville"
     # Ex: "* A Savigny-sur-Braye, au Parc des Loisirs" -> ville = "Savigny-sur-Braye"
@@ -4376,6 +4384,25 @@ def extract_lieu_fallback(text: str, ville_ref_list: list) -> tuple[Optional[str
                             lieu = before_marker
             continue
 
+        # Ignorer les numéros de téléphone (format XX.XX.XX.XX.XX ou XX XX XX XX XX)
+        # Ex: "06.62.59.58.19", "02 43 79 47 97"
+        if re.match(r'^\d{2}[\.\s]\d{2}[\.\s]\d{2}[\.\s]\d{2}[\.\s]\d{2}$', part):
+            continue
+
+        # Détecter les lieux introduits par "au" (indicateur fort de lieu)
+        # "au moulin de Coëmont (près de château du Loir)" → lieu = "moulin de Coëmont"
+        # "au Parc des Loisirs" → lieu = "Parc des Loisirs"
+        # Doit être traité AVANT le filtre genre-entre-parenthèses qui rejetterait le candidat
+        if re.match(r'^[àa]u\s+', part, re.IGNORECASE) and lieu is None:
+            # Retirer les infos parenthétiques (près de, à côté de, etc.)
+            cleaned = re.sub(r'\s*\([^)]*\)\s*$', '', part).strip()
+            au_match = re.match(r'^[àa]u\s+(.+)', cleaned, re.IGNORECASE)
+            if au_match:
+                candidate = au_match.group(1).strip()
+                if candidate and len(candidate) >= 3:
+                    lieu = candidate
+            continue
+
         # Ignorer les genres seuls entre parenthèses
         if genre_pattern.match(part):
             continue
@@ -4451,6 +4478,11 @@ def extract_lieu_fallback(text: str, ville_ref_list: list) -> tuple[Optional[str
         if description_pattern.search(part):
             continue
 
+        # Ignorer les textes informationnels/promotionnels (pas des lieux)
+        # Ex: "Plus d'infos sur le net", "Renseignements au 02 43...", "Réservation sur..."
+        if re.search(r"\b(?:plus\s+d'infos|infos?\s+sur|renseignements|réservation|billetterie|programmation|sur\s+le\s+net)\b", part, re.IGNORECASE):
+            continue
+
         # Ignorer les segments trop courts (moins de 3 caractères)
         if len(part) < 3:
             continue
@@ -4487,6 +4519,10 @@ def extract_lieu_fallback(text: str, ville_ref_list: list) -> tuple[Optional[str
             if lieu is None or not explicit_lieu_pattern.match(lieu):
                 lieu = part
         elif lieu is None:
+            # Un candidat générique doit commencer par une majuscule (nom propre de lieu)
+            # Rejeter les mots en minuscules comme "jazz", "rock", "tzigane" (genres musicaux)
+            if not re.match(r'^[A-ZÀ-Ÿ]', part):
+                continue
             # Candidat générique - stocker mais peut être remplacé par un lieu explicite
             lieu_candidats_generiques.append(part)
 
