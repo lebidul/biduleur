@@ -483,6 +483,19 @@ def _create_inline_images_section(parent, app, ui_row):
                  "L'image est toujours centrée horizontalement.")
     Tooltip(app.inline_images_scale_entry,
             text="Facteur d'échelle des images (entre 0.1 et 1.0).\nValeur par défaut : 0.85")
+    lr += 1
+
+    # Marge avant/après image
+    app.inline_images_margin_label = tk.Label(app.inline_images_frame, text="Marge (pt) :")
+    app.inline_images_margin_label.grid(row=lr, column=0, sticky="e", padx=5, pady=5)
+    app.inline_images_margin_entry = tk.Entry(app.inline_images_frame, textvariable=app.inline_images_margin_var, width=10)
+    app.inline_images_margin_entry.grid(row=lr, column=1, sticky="w", padx=5, pady=5)
+    Tooltip(app.inline_images_margin_label,
+            text="Espace en points avant et après chaque image inline.\n\n"
+                 "1.0 = marge minimale (valeur par défaut)\n"
+                 "0.0 = aucune marge")
+    Tooltip(app.inline_images_margin_entry,
+            text="Marge en points (pt) avant et après chaque image.\nValeur par défaut : 1.0")
 
     r += 1
     ui_row['r'] = r

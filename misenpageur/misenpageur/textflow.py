@@ -48,13 +48,16 @@ INLINE_IMAGE_SCALE = 0.85
 # Indique si les images inline sont activées (True par défaut pour compatibilité)
 _INLINE_IMAGES_ENABLED = True
 
+# Marge en points avant/après chaque image inline
+_INLINE_IMAGE_MARGIN = 1.0
 
-def configure_inline_images(enabled: bool = True, images_dir: str = "", scale: float = 0.85):
+
+def configure_inline_images(enabled: bool = True, images_dir: str = "", scale: float = 0.85, margin: float = 1.0):
     """Configure les paramètres d'images inline depuis la Config.
 
     Appelé une fois au début du rendu PDF par draw_logic.py.
     """
-    global _INLINE_IMAGES_DIR, INLINE_IMAGE_SCALE, _INLINE_IMAGES_ENABLED
+    global _INLINE_IMAGES_DIR, INLINE_IMAGE_SCALE, _INLINE_IMAGES_ENABLED, _INLINE_IMAGE_MARGIN
     _INLINE_IMAGES_ENABLED = enabled
     if images_dir and os.path.isdir(images_dir):
         _INLINE_IMAGES_DIR = images_dir
@@ -62,6 +65,7 @@ def configure_inline_images(enabled: bool = True, images_dir: str = "", scale: f
         _INLINE_IMAGES_DIR = os.path.join(_PACKAGE_DIR, "assets", "images")
     if 0.0 < scale <= 1.0:
         INLINE_IMAGE_SCALE = scale
+    _INLINE_IMAGE_MARGIN = max(0.0, margin)
 
 # Cache pour les dimensions des images inline {path: (width, height)}
 _INLINE_IMAGE_SIZE_CACHE: dict[str, tuple[int, int] | None] = {}
@@ -461,7 +465,7 @@ def measure_fit_at_fs(
         if kind == "IMAGE":
             image_path = _get_image_path(raw)
             if image_path and os.path.exists(image_path):
-                img_margin = font_size * 0.5  # marge avant/après image
+                img_margin = _INLINE_IMAGE_MARGIN  # marge minimale avant/après image (en points)
                 img_w = w * INLINE_IMAGE_SCALE
                 ph = _calc_image_height_for_width(image_path, img_w)
                 need = ph + 2 * img_margin
@@ -548,7 +552,7 @@ def draw_section_fixed_fs_with_prelude(
         if kind == "IMAGE":
             image_path = _get_image_path(raw)
             if image_path and os.path.exists(image_path):
-                img_margin = font_size * 0.5
+                img_margin = _INLINE_IMAGE_MARGIN
                 img_w = w * INLINE_IMAGE_SCALE
                 ph = _calc_image_height_for_width(image_path, img_w)
                 need = ph + 2 * img_margin
@@ -639,7 +643,7 @@ def draw_section_fixed_fs_with_tail(
         if kind == "IMAGE":
             image_path = _get_image_path(raw)
             if image_path and os.path.exists(image_path):
-                img_margin = font_size * 0.5
+                img_margin = _INLINE_IMAGE_MARGIN
                 img_w = w * INLINE_IMAGE_SCALE
                 ph = _calc_image_height_for_width(image_path, img_w)
                 need = ph + 2 * img_margin
@@ -742,7 +746,7 @@ def plan_pair_with_split(
         if kind == "IMAGE":
             image_path = _get_image_path(raw)
             if image_path and os.path.exists(image_path):
-                img_margin = font_size * 0.5
+                img_margin = _INLINE_IMAGE_MARGIN
                 img_w = wA * INLINE_IMAGE_SCALE
                 ph = _calc_image_height_for_width(image_path, img_w)
                 needA_full = ph + 2 * img_margin
@@ -814,7 +818,7 @@ def plan_pair_with_split(
         if kind == "IMAGE":
             image_path = _get_image_path(raw)
             if image_path and os.path.exists(image_path):
-                img_margin = font_size * 0.5
+                img_margin = _INLINE_IMAGE_MARGIN
                 img_w = wB * INLINE_IMAGE_SCALE
                 ph = _calc_image_height_for_width(image_path, img_w)
                 needB = ph + 2 * img_margin

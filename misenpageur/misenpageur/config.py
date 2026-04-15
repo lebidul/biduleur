@@ -120,6 +120,7 @@ class Config:
     inline_images_enabled: bool = False
     inline_images_dir: str = ""
     inline_images_scale: float = 0.85
+    inline_images_margin: float = 1.0
 
     # --- Debug ---
     debug_mode: bool = False

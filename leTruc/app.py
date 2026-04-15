@@ -153,6 +153,7 @@ class Application(TkinterDnD.Tk):
         self.inline_images_enabled_var = tk.BooleanVar(value=self.cfg_defaults.get("inline_images_enabled", False))
         self.inline_images_dir_var = tk.StringVar(value=self.cfg_defaults.get("inline_images_dir", ""))
         self.inline_images_scale_var = tk.StringVar(value=str(self.cfg_defaults.get("inline_images_scale", "0.85")))
+        self.inline_images_margin_var = tk.StringVar(value=str(self.cfg_defaults.get("inline_images_margin", "1.0")))
 
         # --- Abréviations ---
         self.abbreviations_data = self.cfg_defaults.get("abbreviations", {})
@@ -251,6 +252,7 @@ class Application(TkinterDnD.Tk):
                 'stories_font_size_val': int(self.stories_font_size_var.get().strip()),
                 'cuca_font_size_val': int(self.cucaracha_font_size_var.get().strip()),
                 'inline_images_scale_val': float(self.inline_images_scale_var.get().strip()),
+                'inline_images_margin_val': float(self.inline_images_margin_var.get().strip()),
             })
         except ValueError:
             messagebox.showerror("Erreur", "Les champs numériques (marges, espacement, etc.) doivent être valides.")
@@ -346,6 +348,7 @@ class Application(TkinterDnD.Tk):
             inline_images_enabled=self.inline_images_enabled_var.get(),
             inline_images_dir=self.inline_images_dir_var.get().strip(),
             inline_images_scale=validated_args['inline_images_scale_val'],
+            inline_images_margin=validated_args['inline_images_margin_val'],
         )
 
     def _check_thread_for_results(self):

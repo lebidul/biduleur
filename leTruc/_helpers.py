@@ -175,6 +175,7 @@ def _load_cfg_defaults() -> dict:
         out["inline_images_enabled"] = getattr(cfg, "inline_images_enabled", False)
         out["inline_images_dir"] = getattr(cfg, "inline_images_dir", "")
         out["inline_images_scale"] = getattr(cfg, "inline_images_scale", 0.85)
+        out["inline_images_margin"] = getattr(cfg, "inline_images_margin", 1.0)
 
         if isinstance(cfg.stories, dict):
             out["stories_enabled"] = cfg.stories.get("enabled", True)
@@ -242,6 +243,7 @@ def run_pipeline(
         inline_images_enabled: bool = False,
         inline_images_dir: str = "",
         inline_images_scale: float = 0.85,
+        inline_images_margin: float = 1.0,
 ) -> tuple[bool, str]:
     debug_dir = None
     if debug_mode:
@@ -443,6 +445,7 @@ def run_pipeline(
         cfg.inline_images_enabled = inline_images_enabled
         cfg.inline_images_dir = inline_images_dir
         cfg.inline_images_scale = inline_images_scale
+        cfg.inline_images_margin = inline_images_margin
         cfg.stories['enabled'] = generate_stories
         if stories_output_dir:
             cfg.stories['output_dir'] = stories_output_dir
@@ -582,6 +585,7 @@ def run_pipeline(
                 config_data["_inline_images_enabled"] = inline_images_enabled
                 config_data["_inline_images_dir"] = inline_images_dir
                 config_data["_inline_images_scale"] = inline_images_scale
+                config_data["_inline_images_margin"] = inline_images_margin
                 with open(config_path, 'w', encoding='utf-8') as f:
                     json.dump(config_data, f, indent=2, default=json_converter, ensure_ascii=False)
             except Exception as e:
@@ -965,6 +969,12 @@ def load_and_apply_config(app_instance, config_path: str):
         inline_scale = getattr(cfg, 'inline_images_scale', 0.85)
     if hasattr(app_instance, 'inline_images_scale_var'):
         app_instance.inline_images_scale_var.set(str(inline_scale))
+
+    inline_margin = raw_data.get('_inline_images_margin', None)
+    if inline_margin is None:
+        inline_margin = getattr(cfg, 'inline_images_margin', 1.0)
+    if hasattr(app_instance, 'inline_images_margin_var'):
+        app_instance.inline_images_margin_var.set(str(inline_margin))
 
     # Forcer le rafraîchissement du GUI
     app_instance.update_idletasks()

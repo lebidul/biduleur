@@ -496,6 +496,7 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
         enabled=getattr(cfg, 'inline_images_enabled', True),
         images_dir=getattr(cfg, 'inline_images_dir', ''),
         scale=getattr(cfg, 'inline_images_scale', 0.85),
+        margin=getattr(cfg, 'inline_images_margin', 1.0),
     )
 
     # --- Polices de base (nécessaires pour les références hardcodées dans config.yml) ---
