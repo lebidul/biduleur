@@ -21,6 +21,8 @@ def assign_all(app):
     """
 
     # --- Assignation des commandes aux boutons "Parcourir...", "Enregistrer...", etc. ---
+    app.inline_images_dir_button.config(
+        command=lambda: on_pick_directory(app.inline_images_dir_var, "Choisir le dossier des images inline"))
     app.input_button.config(command=lambda: on_pick_input(app))
     app.csv_template_button.config(
         command=lambda: save_embedded_template('tapage_template.csv', "Enregistrer le modèle CSV"))
@@ -388,7 +390,7 @@ def on_toggle_config_buttons(app):
         app.config_buttons_frame.pack_forget()
 
     # --- Widgets debug-only ---
-    debug_only_frames = [app.ours_frame, app.logos_frame]
+    debug_only_frames = [app.ours_frame, app.logos_frame, app.inline_images_frame]
     debug_only_widgets = [
         app.cover_checkbox,
         app.margin_label, app.margin_entry,

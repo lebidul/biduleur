@@ -25,7 +25,8 @@ from .spacing import SpacingConfig, SpacingPolicy
 from .textflow import (
     measure_fit_at_fs, draw_section_fixed_fs_with_prelude, draw_section_fixed_fs_with_tail,
     plan_pair_with_split, measure_poster_fit_at_fs, draw_poster_text_in_frames,
-    _is_event, _mk_style_for_kind, _mk_text_for_kind
+    _is_event, _is_image, _mk_style_for_kind, _mk_text_for_kind,
+    configure_inline_images
 )
 from .image_builder import generate_story_images
 from .utils import mm_to_pt
@@ -490,6 +491,13 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
     """
     report = {"unused_paragraphs": 0}
 
+    # --- Configuration des images inline ---
+    configure_inline_images(
+        enabled=getattr(cfg, 'inline_images_enabled', True),
+        images_dir=getattr(cfg, 'inline_images_dir', ''),
+        scale=getattr(cfg, 'inline_images_scale', 0.85),
+    )
+
     # --- Polices de base (nécessaires pour les références hardcodées dans config.yml) ---
     register_dsnet_stamped()
     register_arial_narrow()
@@ -608,7 +616,7 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
     report["font_size_main"] = best_fs
 
     def count_events(para_list: List[str]) -> int:
-        return sum(1 for p in para_list if _is_event(p))
+        return sum(1 for p in para_list if _is_event(p) and not _is_image(p))
 
     # On compte les événements pour les pages 1 et 2
     events_p1 = count_events(s3_full) + count_events(s4_full)
@@ -832,7 +840,8 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
         draw_poster_logos(c, S7["S7_Logos"], logos, cfg)
 
         # --- Calcul de la taille de police ---
-        poster_paras = s5_full + s6_full + s3_full + s4_full
+        # Filtrer les images inline du poster (pas de rendu image dans le poster)
+        poster_paras = [p for p in (s5_full + s6_full + s3_full + s4_full) if not _is_image(p)]
         num_dates = sum(1 for p in poster_paras if not _is_event(p))
         num_events = sum(1 for p in poster_paras if _is_event(p))
         log.info(f"Poster: {len(poster_paras)} paragraphes ({num_dates} dates, {num_events} événements)")

@@ -36,6 +36,82 @@ FREE_ICON_PATH = os.path.join(_PACKAGE_DIR, "assets", "icons", "free.png")
 CHAPEAU_PLACEHOLDER = "{{CHAPEAU}}"
 FREE_PLACEHOLDER = "{{FREE}}"
 
+# Pattern pour détecter les placeholders image {{IMG:filename.jpg}}
+_IMG_PLACEHOLDER_RE = re.compile(r'^\{\{IMG:(.+?)\}\}$')
+
+# Dossier par défaut pour les images inline (relatif au dossier package)
+_INLINE_IMAGES_DIR = os.path.join(_PACKAGE_DIR, "assets", "images")
+
+# Facteur de réduction des images inline (0.85 = 85% de la largeur de section, centré)
+INLINE_IMAGE_SCALE = 0.85
+
+# Indique si les images inline sont activées (True par défaut pour compatibilité)
+_INLINE_IMAGES_ENABLED = True
+
+
+def configure_inline_images(enabled: bool = True, images_dir: str = "", scale: float = 0.85):
+    """Configure les paramètres d'images inline depuis la Config.
+
+    Appelé une fois au début du rendu PDF par draw_logic.py.
+    """
+    global _INLINE_IMAGES_DIR, INLINE_IMAGE_SCALE, _INLINE_IMAGES_ENABLED
+    _INLINE_IMAGES_ENABLED = enabled
+    if images_dir and os.path.isdir(images_dir):
+        _INLINE_IMAGES_DIR = images_dir
+    elif not images_dir:
+        _INLINE_IMAGES_DIR = os.path.join(_PACKAGE_DIR, "assets", "images")
+    if 0.0 < scale <= 1.0:
+        INLINE_IMAGE_SCALE = scale
+
+# Cache pour les dimensions des images inline {path: (width, height)}
+_INLINE_IMAGE_SIZE_CACHE: dict[str, tuple[int, int] | None] = {}
+
+
+def _is_image(raw: str) -> bool:
+    """Détecte si un paragraphe est un placeholder image {{IMG:...}}.
+
+    Retourne False si les images inline sont désactivées.
+    """
+    if not _INLINE_IMAGES_ENABLED:
+        return False
+    return bool(_IMG_PLACEHOLDER_RE.match((raw or "").strip()))
+
+
+def _get_image_path(raw: str) -> str | None:
+    """Extrait le chemin complet de l'image depuis un placeholder {{IMG:filename}}."""
+    m = _IMG_PLACEHOLDER_RE.match((raw or "").strip())
+    if not m:
+        return None
+    filename = m.group(1)
+    # Si c'est un chemin absolu, l'utiliser directement
+    if os.path.isabs(filename):
+        return filename
+    # Sinon, chercher dans le dossier images
+    return os.path.join(_INLINE_IMAGES_DIR, filename)
+
+
+def _get_inline_image_size(image_path: str) -> tuple[int, int] | None:
+    """Retourne (width, height) en pixels d'une image, avec cache."""
+    if image_path in _INLINE_IMAGE_SIZE_CACHE:
+        return _INLINE_IMAGE_SIZE_CACHE[image_path]
+    try:
+        with Image.open(image_path) as img:
+            size = img.size  # (width, height)
+            _INLINE_IMAGE_SIZE_CACHE[image_path] = size
+            return size
+    except Exception:
+        _INLINE_IMAGE_SIZE_CACHE[image_path] = None
+        return None
+
+
+def _calc_image_height_for_width(image_path: str, target_width: float) -> float:
+    """Calcule la hauteur d'une image redimensionnée à target_width (en points)."""
+    size = _get_inline_image_size(image_path)
+    if not size or size[0] == 0:
+        return 0.0
+    aspect = size[1] / size[0]  # height / width
+    return target_width * aspect
+
 # Regex compilées au niveau module pour éviter la recompilation à chaque appel
 # Pattern pour "au chapeau" avec espaces normaux, &nbsp; et espaces insécables Unicode
 _CHAPEAU_PATTERN = re.compile(r',?(?:\s|&nbsp;|\u00A0)*au(?:\s|&nbsp;|\u00A0)+chapeau', re.IGNORECASE)
@@ -355,6 +431,15 @@ def _mk_text_for_kind(
     return apply_glyph_fallbacks(txt), bullet_text
 
 
+def _classify_paragraph(raw: str) -> str:
+    """Classifie un paragraphe: IMAGE, EVENT ou DATE."""
+    if _is_image(raw):
+        return "IMAGE"
+    if _is_event(raw):
+        return "EVENT"
+    return "DATE"
+
+
 def measure_fit_at_fs(
         c: canvas.Canvas, section: Section, paras_text: List[str],
         font_name: str, font_size: float, leading_ratio: float, inner_pad: float,
@@ -370,7 +455,22 @@ def measure_fit_at_fs(
     base = paragraph_style(font_name, font_size, leading_ratio)
 
     for i, raw in enumerate(paras_text):
-        kind = "EVENT" if _is_event(raw) else "DATE"
+        kind = _classify_paragraph(raw)
+
+        # Image inline : hauteur calculée à partir du ratio d'aspect
+        if kind == "IMAGE":
+            image_path = _get_image_path(raw)
+            if image_path and os.path.exists(image_path):
+                img_margin = font_size * 0.5  # marge avant/après image
+                img_w = w * INLINE_IMAGE_SCALE
+                ph = _calc_image_height_for_width(image_path, img_w)
+                need = ph + 2 * img_margin
+                if (y - need) < y0:
+                    break
+                y -= need
+                used += 1
+            continue
+
         st = _mk_style_for_kind(base, kind, bullet_cfg, date_box, font_size, date_style)
         txt, bullet = _mk_text_for_kind(raw, kind, bullet_cfg, font_size, date_style)
         p = Paragraph(txt, st, bulletText=bullet)
@@ -390,7 +490,7 @@ def measure_fit_at_fs(
         if kind == "DATE" and i < len(paras_text) - 1:
             # Regarder le prochain paragraphe
             next_raw = paras_text[i + 1]
-            next_kind = "EVENT" if _is_event(next_raw) else "DATE"
+            next_kind = _classify_paragraph(next_raw)
 
             # Si le suivant est un EVENT, vérifier qu'on peut en placer au moins un
             if next_kind == "EVENT":
@@ -442,7 +542,25 @@ def draw_section_fixed_fs_with_prelude(
 
     # Dessiner les paragraphes principaux
     for i, raw in enumerate(paras_text or []):
-        kind = "EVENT" if _is_event(raw) else "DATE"
+        kind = _classify_paragraph(raw)
+
+        # Image inline
+        if kind == "IMAGE":
+            image_path = _get_image_path(raw)
+            if image_path and os.path.exists(image_path):
+                img_margin = font_size * 0.5
+                img_w = w * INLINE_IMAGE_SCALE
+                ph = _calc_image_height_for_width(image_path, img_w)
+                need = ph + 2 * img_margin
+                if (y - need) < y0:
+                    break
+                y -= img_margin
+                img_x = x0 + (w - img_w) / 2  # centrer horizontalement
+                c.drawImage(image_path, img_x, y - ph, width=img_w, height=ph,
+                            preserveAspectRatio=True, anchor='c')
+                y -= ph + img_margin
+            continue
+
         st = _mk_style_for_kind(base, kind, bullet_cfg, date_box, font_size, date_style)
         txt, bullet = _mk_text_for_kind(raw, kind, bullet_cfg, font_size, date_style)
         p = Paragraph(txt, st, bulletText=bullet)
@@ -460,7 +578,7 @@ def draw_section_fixed_fs_with_prelude(
         # CONTRAINTE : Empêcher qu'une DATE se retrouve seule en bas
         if kind == "DATE" and i < len(paras_text) - 1:
             next_raw = paras_text[i + 1]
-            next_kind = "EVENT" if _is_event(next_raw) else "DATE"
+            next_kind = _classify_paragraph(next_raw)
 
             if next_kind == "EVENT":
                 # Calculer la valeur qu'aura first_non_event_seen_in_S5 APRÈS avoir placé la DATE actuelle
@@ -515,7 +633,26 @@ def draw_section_fixed_fs_with_tail(
 
     # Dessiner les paragraphes principaux
     for i, raw in enumerate(paras_text or []):
-        kind = "EVENT" if _is_event(raw) else "DATE"
+        kind = _classify_paragraph(raw)
+
+        # Image inline
+        if kind == "IMAGE":
+            image_path = _get_image_path(raw)
+            if image_path and os.path.exists(image_path):
+                img_margin = font_size * 0.5
+                img_w = w * INLINE_IMAGE_SCALE
+                ph = _calc_image_height_for_width(image_path, img_w)
+                need = ph + 2 * img_margin
+                if (y - need) < y0:
+                    c.restoreState()
+                    return
+                y -= img_margin
+                img_x = x0 + (w - img_w) / 2  # centrer horizontalement
+                c.drawImage(image_path, img_x, y - ph, width=img_w, height=ph,
+                            preserveAspectRatio=True, anchor='c')
+                y -= ph + img_margin
+            continue
+
         st = _mk_style_for_kind(base, kind, bullet_cfg, date_box, font_size, date_style)
         txt, bullet = _mk_text_for_kind(raw, kind, bullet_cfg, font_size, date_style)
         p = Paragraph(txt, st, bulletText=bullet)
@@ -534,7 +671,7 @@ def draw_section_fixed_fs_with_tail(
         # CONTRAINTE : Empêcher qu'une DATE se retrouve seule en bas
         if kind == "DATE" and i < len(paras_text) - 1:
             next_raw = paras_text[i + 1]
-            next_kind = "EVENT" if _is_event(next_raw) else "DATE"
+            next_kind = _classify_paragraph(next_raw)
 
             if next_kind == "EVENT":
                 # Calculer la valeur qu'aura first_non_event_seen_in_S5 APRÈS avoir placé la DATE actuelle
@@ -599,7 +736,23 @@ def plan_pair_with_split(
     first_non_event_seen_in_S5_A, first_non_event_seen_in_S5_B = False, False
     while i < n and remA > 0:
         raw = paras_text[i]
-        kind = "EVENT" if _is_event(raw) else "DATE"
+        kind = _classify_paragraph(raw)
+
+        # Image inline dans section A
+        if kind == "IMAGE":
+            image_path = _get_image_path(raw)
+            if image_path and os.path.exists(image_path):
+                img_margin = font_size * 0.5
+                img_w = wA * INLINE_IMAGE_SCALE
+                ph = _calc_image_height_for_width(image_path, img_w)
+                needA_full = ph + 2 * img_margin
+                if needA_full <= remA:
+                    A_full.append(raw)
+                    remA -= needA_full
+                    i += 1
+                    continue
+            break
+
         stA = _mk_style_for_kind(base, kind, bullet_cfg, date_box, font_size, date_style)
         txtA, bulletA = _mk_text_for_kind(raw, kind, bullet_cfg, font_size, date_style)
         p = Paragraph(txtA, stA, bulletText=bulletA)
@@ -613,7 +766,7 @@ def plan_pair_with_split(
             # CONTRAINTE : Empêcher qu'une DATE se retrouve seule en bas de A
             if kind == "DATE" and i < n - 1:
                 next_raw = paras_text[i + 1]
-                next_kind = "EVENT" if _is_event(next_raw) else "DATE"
+                next_kind = _classify_paragraph(next_raw)
 
                 if next_kind == "EVENT":
                     # Calculer si le prochain EVENT peut rentrer dans A
@@ -655,7 +808,23 @@ def plan_pair_with_split(
         break
     while i < n and remB > 0:
         raw = paras_text[i]
-        kind = "EVENT" if _is_event(raw) else "DATE"
+        kind = _classify_paragraph(raw)
+
+        # Image inline dans section B
+        if kind == "IMAGE":
+            image_path = _get_image_path(raw)
+            if image_path and os.path.exists(image_path):
+                img_margin = font_size * 0.5
+                img_w = wB * INLINE_IMAGE_SCALE
+                ph = _calc_image_height_for_width(image_path, img_w)
+                needB = ph + 2 * img_margin
+                if needB <= remB:
+                    B_full.append(raw)
+                    remB -= needB
+                    i += 1
+                    continue
+            break
+
         stB = _mk_style_for_kind(base, kind, bullet_cfg, date_box, font_size, date_style)
         txtB, bulletB = _mk_text_for_kind(raw, kind, bullet_cfg, font_size, date_style)
         q = Paragraph(txtB, stB, bulletText=bulletB)
@@ -669,7 +838,7 @@ def plan_pair_with_split(
             # CONTRAINTE : Empêcher qu'une DATE se retrouve seule en bas de B
             if kind == "DATE" and i < n - 1:
                 next_raw = paras_text[i + 1]
-                next_kind = "EVENT" if _is_event(next_raw) else "DATE"
+                next_kind = _classify_paragraph(next_raw)
 
                 if next_kind == "EVENT":
                     # Calculer si le prochain EVENT peut rentrer dans B

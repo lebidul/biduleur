@@ -61,6 +61,7 @@ def create_all(app):
     _create_cucaracha_section(main_frame, app, ui_row)
     _create_cover_section(main_frame, app, ui_row)
     _create_page_layout_section(main_frame, app, ui_row)
+    _create_inline_images_section(main_frame, app, ui_row)
     _create_abbreviations_section(main_frame, app, ui_row)  # ✨ NOUVEAU v1.4.2
     _create_date_sep_section(main_frame, app, ui_row)
     _create_poster_section(main_frame, app, ui_row)
@@ -430,6 +431,58 @@ def _create_page_layout_section(parent, app, ui_row):
     free_check.grid(row=lr, column=0, columnspan=2, sticky="w", padx=5, pady=5)
     Tooltip(free_check,
             text='Remplace automatiquement ", 0€" par une icône "gratuit" dans le texte des événements.')
+
+    r += 1
+    ui_row['r'] = r
+
+
+def _create_inline_images_section(parent, app, ui_row):
+    """Crée la section pour les images inline (debug-only)."""
+    r = ui_row['r']
+
+    app.inline_images_frame = ttk.LabelFrame(parent, text="Images inline", padding="10")
+    app.inline_images_frame.grid(row=r, column=0, columnspan=3, sticky="ew", pady=10)
+    app.inline_images_frame.columnconfigure(1, weight=1)
+
+    lr = 0
+
+    # Checkbox pour activer les images inline
+    app.inline_images_checkbox = tk.Checkbutton(
+        app.inline_images_frame,
+        text="Activer les images inline dans le PDF",
+        variable=app.inline_images_enabled_var
+    )
+    app.inline_images_checkbox.grid(row=lr, column=0, columnspan=3, sticky="w", padx=5, pady=5)
+    Tooltip(app.inline_images_checkbox,
+            text="Active l'insertion d'images directement dans le corps de l'agenda.\n\n"
+                 "Les images sont définies dans le fichier Excel avec GENRE = 'img'\n"
+                 "et le nom du fichier dans la colonne NOM SPECTACLE.")
+    lr += 1
+
+    # Dossier des images
+    app.inline_images_dir_label = tk.Label(app.inline_images_frame, text="Dossier images :")
+    app.inline_images_dir_label.grid(row=lr, column=0, sticky="e", padx=5, pady=5)
+    app.inline_images_dir_entry = tk.Entry(app.inline_images_frame, textvariable=app.inline_images_dir_var)
+    app.inline_images_dir_entry.grid(row=lr, column=1, sticky="ew", padx=5, pady=5)
+    app.inline_images_dir_button = tk.Button(app.inline_images_frame, text="Parcourir...")
+    app.inline_images_dir_button.grid(row=lr, column=2, padx=5, pady=5)
+    Tooltip(app.inline_images_dir_label,
+            text="Dossier contenant les fichiers images référencés dans le fichier Excel.\n"
+                 "Si vide, utilise le dossier par défaut : misenpageur/assets/images/")
+    lr += 1
+
+    # Facteur d'échelle
+    app.inline_images_scale_label = tk.Label(app.inline_images_frame, text="Échelle (0.0 - 1.0) :")
+    app.inline_images_scale_label.grid(row=lr, column=0, sticky="e", padx=5, pady=5)
+    app.inline_images_scale_entry = tk.Entry(app.inline_images_frame, textvariable=app.inline_images_scale_var, width=10)
+    app.inline_images_scale_entry.grid(row=lr, column=1, sticky="w", padx=5, pady=5)
+    Tooltip(app.inline_images_scale_label,
+            text="Facteur d'échelle des images par rapport à la largeur de la section.\n\n"
+                 "0.85 = 85% de la largeur (valeur par défaut)\n"
+                 "1.0 = largeur complète de la section\n"
+                 "L'image est toujours centrée horizontalement.")
+    Tooltip(app.inline_images_scale_entry,
+            text="Facteur d'échelle des images (entre 0.1 et 1.0).\nValeur par défaut : 0.85")
 
     r += 1
     ui_row['r'] = r

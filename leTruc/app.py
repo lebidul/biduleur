@@ -149,6 +149,11 @@ class Application(TkinterDnD.Tk):
 
         self.debug_mode_var = tk.BooleanVar(value=self.cfg_defaults.get("debug_mode", False))
 
+        # --- Images inline ---
+        self.inline_images_enabled_var = tk.BooleanVar(value=self.cfg_defaults.get("inline_images_enabled", False))
+        self.inline_images_dir_var = tk.StringVar(value=self.cfg_defaults.get("inline_images_dir", ""))
+        self.inline_images_scale_var = tk.StringVar(value=str(self.cfg_defaults.get("inline_images_scale", "0.85")))
+
         # --- Abréviations ---
         self.abbreviations_data = self.cfg_defaults.get("abbreviations", {})
         self.abbreviation_vars = {}  # Créées dans widgets.py
@@ -244,7 +249,8 @@ class Application(TkinterDnD.Tk):
                 'logos_padding_val': float(self.logos_padding_var.get().strip()),
                 'font_size_forced_val': float(self.font_size_forced_var.get().strip()),
                 'stories_font_size_val': int(self.stories_font_size_var.get().strip()),
-                'cuca_font_size_val': int(self.cucaracha_font_size_var.get().strip())
+                'cuca_font_size_val': int(self.cucaracha_font_size_var.get().strip()),
+                'inline_images_scale_val': float(self.inline_images_scale_var.get().strip()),
             })
         except ValueError:
             messagebox.showerror("Erreur", "Les champs numériques (marges, espacement, etc.) doivent être valides.")
@@ -337,6 +343,9 @@ class Application(TkinterDnD.Tk):
             print_pdf=self.print_pdf_var.get(),  # v1.5.0 : Fichiers d'impression
             logos_print_svg_file=self.logos_print_svg_var.get().strip(),
             generate_html=self.generate_html_var.get(),  # v1.5.2 : Génération HTML optionnelle
+            inline_images_enabled=self.inline_images_enabled_var.get(),
+            inline_images_dir=self.inline_images_dir_var.get().strip(),
+            inline_images_scale=validated_args['inline_images_scale_val'],
         )
 
     def _check_thread_for_results(self):
