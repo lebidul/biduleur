@@ -810,14 +810,21 @@ def load_and_apply_config(app_instance, config_path: str):
         app_instance.font_size_forced_var.set(str(cfg.font_size_forced))
 
     # Date separator
+    date_line_enabled = False
+    date_box_enabled = False
     if hasattr(cfg, 'date_line') and isinstance(cfg.date_line, dict):
-        if cfg.date_line.get("enabled", False):
-            app_instance.date_separator_var.set("ligne")
+        date_line_enabled = cfg.date_line.get("enabled", False)
     if hasattr(cfg, 'date_box') and isinstance(cfg.date_box, dict):
-        if cfg.date_box.get("enabled", False):
-            app_instance.date_separator_var.set("box")
-            if cfg.date_box.get("back_color"):
-                app_instance.date_box_back_color_var.set(cfg.date_box["back_color"])
+        date_box_enabled = cfg.date_box.get("enabled", False)
+
+    if date_line_enabled:
+        app_instance.date_separator_var.set("ligne")
+    elif date_box_enabled:
+        app_instance.date_separator_var.set("box")
+        if cfg.date_box.get("back_color"):
+            app_instance.date_box_back_color_var.set(cfg.date_box["back_color"])
+    else:
+        app_instance.date_separator_var.set("aucun")
 
     # Date spacing
     if hasattr(cfg, 'date_spaceBefore'):
