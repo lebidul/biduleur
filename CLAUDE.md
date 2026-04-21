@@ -89,6 +89,11 @@ class Config:
     date_bold: bool = False
     date_italic: bool = False
     date_alignment: str = "left"        # "left", "center", "right"
+    # Inline images (v1.7.0)
+    inline_images_enabled: bool = False
+    inline_images_dir: str = ""         # default: misenpageur/assets/images/
+    inline_images_scale: float = 0.85   # fraction of section width
+    inline_images_margin: float = 1.0   # pt before/after each image
     # ...
 
 @classmethod
@@ -129,17 +134,21 @@ python -m pytest misenpageur/tests/
 
 ## Key Features
 
-- Auto-fitting typography (font size scales to content)
+- Auto-fitting typography (font size scales to content, accounts for inline images)
 - **Dynamic font discovery**: scans system fonts (C:\Windows\Fonts, project assets) via pure Python TTF reader (no external dependency)
 - **Independent font selectors** in GUI: body text, dates, cucaracha, Instagram stories
 - **Date styling**: configurable alignment (left/center/right), bold, italic, independent font
+- **Flexible date formats** (v1.7.0): ISO (`2014-08-31`), year only (`2005`), month-year (`08-2021` → `Août 2021`), Excel Timestamps
+- **Inline images in agenda body** (v1.7.0): `GENRE = "img"` in Excel with filename, auto-sized and centered
+- **Dynamic spectacle columns**: detects any number of `GENRE N` / `NOM SPECTACLE N` columns (not fixed to 4)
+- **Clickable hyperlinks**: Excel cell hyperlinks extracted via openpyxl and rendered in PDF
 - Intelligent logo packing (rectpack algorithm)
 - SVG logos and "ours" (legal mentions) support
 - Icon replacement (chapeau, free icons)
 - INACTIF column for event filtering
 - Instagram Stories export (1080x1920 PNG)
 - Debug mode with timestamped artifacts
-- Config import/export via JSON (includes font choices, date styling, cover image, debug mode)
+- Config import/export via JSON (includes font choices, date styling, cover image, inline images settings, debug mode)
 - Drag-and-drop file support in GUI
 
 ## Python Version

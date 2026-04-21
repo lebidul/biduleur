@@ -1,3 +1,73 @@
+# Bidul v1.7.0 - Images inline, colonnes spectacles dynamiques et formats de date étendus
+
+Cette version introduit le support des **images inline** dans le PDF, un nombre **dynamique** de colonnes de spectacles dans le fichier Excel, de **nouveaux formats de date** (`YYYY`, `MM-YYYY`) pour l'affichage d'événements historiques, et apporte plusieurs corrections importantes.
+
+## ✨ Nouveautés
+
+### Images inline dans l'agenda
+*   **Nouveau type d'entrée Excel** : en définissant `GENRE 1 = "img"` et en renseignant le **nom du fichier image** dans la colonne `NOM SPECTACLE 1`, l'image est insérée directement dans le corps de l'agenda à sa position chronologique
+*   Les images sont automatiquement **centrées horizontalement** et leur **hauteur est intégrée** au calcul automatique de la taille de police
+*   **Contrôles UI (mode debug)** dans la nouvelle section "Images inline" :
+    *   Checkbox pour activer/désactiver la fonctionnalité (désactivée par défaut)
+    *   Sélecteur de dossier personnalisé pour les images (défaut : `misenpageur/assets/images/`)
+    *   **Facteur d'échelle** (0.0 - 1.0, défaut 0.85) pour ajuster la largeur des images par rapport à la section
+    *   **Marge (pt)** avant/après chaque image (défaut 1.0pt)
+*   Tous ces paramètres sont **importables/exportables** via `config.json`
+
+### Colonnes spectacles dynamiques
+*   Le nombre de colonnes de spectacles n'est plus fixé à 4 : le système détecte automatiquement toutes les colonnes `GENRE N`, `NOM SPECTACLE N`, `COMPAGNIE N`, `STYLE N` présentes dans le fichier Excel
+*   Support vérifié jusqu'à 10 colonnes (utile pour les événements de type festival avec de nombreuses scènes)
+
+### Formats de date étendus (utile pour les archives historiques)
+*   **Format `YYYY`** (ex: `2005`) → rendu tel quel `2005`
+*   **Format `MM-YYYY`** (ex: `08-2021`) → rendu en français `Août 2021`
+*   Les clés de tri sont **normalisées** au format `YYYY-MM-DD` pour un tri chronologique cohérent entre toutes les dates (partielles et complètes)
+*   Les dates partielles (année seule ou mois-année) se placent en début de période, **avant** les dates précises du même mois/année
+
+### Parsing des dates Excel robuste
+*   Les objets `Timestamp`/`datetime` d'Excel sont directement reconnus et formatés en français : `"Mercredi 18 Mars 2026"`
+*   Les valeurs numériques (`int`/`float` comme `2005`) sont correctement interprétées comme des années
+*   Support des formats ISO avec et sans heure (`2014-08-31`, `2014-08-31 00:00:00`)
+
+### Hyperliens Excel cliquables dans le PDF
+*   Les hyperliens définis dans les cellules Excel sont extraits via `openpyxl` et rendus **cliquables** dans le PDF final
+*   Support du format `"url|texte_affiché"` pour un contrôle fin
+*   Les URLs sans protocole sont automatiquement complétées avec `https://`
+
+## 🐛 Corrections
+
+### Chemins SVG corrigés lors de l'import de config
+*   Les fichiers SVG ressources du projet (`logos.svg`, `ours.svg`, `logos.impression.svg`) étaient résolus par rapport au dossier du fichier `config.json` au lieu de la racine du projet
+*   **Résultat** : après import d'une config issue d'un `debug_run_.../`, les chemins pointaient vers `debug_run_.../misenpageur/assets/logos.svg` (introuvables) au lieu de `<projet>/misenpageur/assets/logos.svg`
+*   Corrigé : ces chemins utilisent désormais la racine du projet (`resource_root`)
+
+### Type de séparateur de dates non importé depuis la config
+*   Quand `date_line.enabled=false` et `date_box.enabled=false` dans le fichier config, le séparateur restait à sa valeur précédente (par défaut "ligne") au lieu de passer à "aucun"
+*   Les trois cas (`ligne`, `box`, `aucun`) sont maintenant correctement gérés à l'import
+
+### Bug de casing sur les abréviations nobr
+*   Les occurrences d'un même mot nobr dans des casses différentes (ex: `"BEAUFAY"` et `"Beaufay"`) étaient inversées lors de la restauration
+*   Corrigé : chaque occurrence utilise désormais un placeholder unique `___NOBR_{i}_{counter}___`
+
+### "NAN" affiché pour les champs artistes vides
+*   Les valeurs `float('nan')` de pandas apparaissaient comme `"nan"` (string truthy) dans le texte rendu
+*   Corrigé : `_to_str()` filtre désormais `float('nan')` et la string `"nan"` en chaîne vide
+
+## 🔧 Détails techniques
+
+*   `biduleur/constants.py` : constante `GENRE_EVT_IMAGE = 'img'`, fonction `detect_spectacle_columns()` par regex
+*   `biduleur/csv_utils.py` : `_parse_date()` gère les types `int`, `float`, `datetime`/`Timestamp` ; parsing `YYYY` et `MM-YYYY` ; `_extract_hyperlinks()` via openpyxl
+*   `biduleur/event_utils.py` : colonnes spectacles dynamiques, détection des images (`{{IMG:filename}}`)
+*   `biduleur/format_utils.py` : `_normalize_url()`, filtrage NaN, skip des images dans `format_artists_styles()`
+*   `misenpageur/misenpageur/textflow.py` : classification `IMAGE`/`EVENT`/`DATE`, `_calc_image_height_for_width()`, `configure_inline_images()`, rendu via `c.drawImage()` centré
+*   `misenpageur/misenpageur/draw_logic.py` : appel `configure_inline_images()` au début du rendu, filtrage des images du poster
+*   `misenpageur/misenpageur/abbreviations.py` : placeholders nobr uniques par occurrence
+*   `misenpageur/misenpageur/config.py` : champs `inline_images_enabled`, `inline_images_dir`, `inline_images_scale`, `inline_images_margin`
+*   `leTruc/widgets.py` : nouvelle section `_create_inline_images_section()` (debug-only)
+*   `leTruc/app.py`, `leTruc/callbacks.py`, `leTruc/_helpers.py` : variables Tkinter, toggle debug, validation numérique, câblage run_pipeline, sauvegarde/import config.json
+
+---
+
 # Bidul v1.6.1 - Le Biduloscope ajouté à l'ours et améliorations des dates du poster
 
 Icône de Radio Alpa et texte ajouté à ours.svg. Hyperlink box ajoutée à config.yml. 
