@@ -172,6 +172,10 @@ def _load_cfg_defaults() -> dict:
         out["font_size_mode"] = getattr(cfg, "font_size_mode", "auto")
         out["font_size_forced"] = getattr(cfg, "font_size_forced", 10.0)
         out["debug_mode"] = getattr(cfg, "debug_mode", False)
+        out["inline_images_enabled"] = getattr(cfg, "inline_images_enabled", False)
+        out["inline_images_dir"] = getattr(cfg, "inline_images_dir", "")
+        out["inline_images_scale"] = getattr(cfg, "inline_images_scale", 0.85)
+        out["inline_images_margin"] = getattr(cfg, "inline_images_margin", 1.0)
 
         if isinstance(cfg.stories, dict):
             out["stories_enabled"] = cfg.stories.get("enabled", True)
@@ -236,6 +240,10 @@ def run_pipeline(
         print_pdf: bool = False,  # v1.5.0 : Fichiers d'impression
         logos_print_svg_file: str = "",  # v1.5.0 : SVG logos impression
         generate_html: bool = False,  # v1.5.2 : Génération HTML optionnelle
+        inline_images_enabled: bool = False,
+        inline_images_dir: str = "",
+        inline_images_scale: float = 0.85,
+        inline_images_margin: float = 1.0,
 ) -> tuple[bool, str]:
     debug_dir = None
     if debug_mode:
@@ -434,6 +442,10 @@ def run_pipeline(
         cfg.cucaracha_box['text_font_size'] = cucaracha_font_size
         cfg.chapeau_icon_enabled = chapeau_icon_enabled
         cfg.free_icon_enabled = free_icon_enabled
+        cfg.inline_images_enabled = inline_images_enabled
+        cfg.inline_images_dir = inline_images_dir
+        cfg.inline_images_scale = inline_images_scale
+        cfg.inline_images_margin = inline_images_margin
         cfg.stories['enabled'] = generate_stories
         if stories_output_dir:
             cfg.stories['output_dir'] = stories_output_dir
@@ -570,6 +582,10 @@ def run_pipeline(
                 config_data["_split_pdf"] = split_pdf  # v1.4.5
                 config_data["_print_pdf"] = print_pdf  # v1.5.0
                 config_data["_generate_html"] = generate_html  # v1.5.2
+                config_data["_inline_images_enabled"] = inline_images_enabled
+                config_data["_inline_images_dir"] = inline_images_dir
+                config_data["_inline_images_scale"] = inline_images_scale
+                config_data["_inline_images_margin"] = inline_images_margin
                 with open(config_path, 'w', encoding='utf-8') as f:
                     json.dump(config_data, f, indent=2, default=json_converter, ensure_ascii=False)
             except Exception as e:
@@ -769,7 +785,7 @@ def load_and_apply_config(app_instance, config_path: str):
     if hasattr(cfg, 'logos_layout') and cfg.logos_layout:
         app_instance.logos_layout_var.set(cfg.logos_layout)
     if hasattr(cfg, 'logos_svg_file') and cfg.logos_svg_file:
-        app_instance.logos_svg_var.set(make_abs(cfg.logos_svg_file, config_dir))
+        app_instance.logos_svg_var.set(make_abs(cfg.logos_svg_file, resource_root))
     if hasattr(cfg, 'logos_padding_mm') and cfg.logos_padding_mm is not None:
         app_instance.logos_padding_var.set(str(cfg.logos_padding_mm))
 
@@ -777,7 +793,7 @@ def load_and_apply_config(app_instance, config_path: str):
     if hasattr(cfg, 'ours_layout') and cfg.ours_layout:
         app_instance.ours_layout_var.set(cfg.ours_layout)
     if hasattr(cfg, 'ours_svg_file') and cfg.ours_svg_file:
-        app_instance.ours_svg_var.set(make_abs(cfg.ours_svg_file, config_dir))
+        app_instance.ours_svg_var.set(make_abs(cfg.ours_svg_file, resource_root))
 
     # Section 1 (ours background PNG)
     if isinstance(cfg.section_1, dict) and cfg.section_1.get("ours_background_png"):
@@ -798,14 +814,21 @@ def load_and_apply_config(app_instance, config_path: str):
         app_instance.font_size_forced_var.set(str(cfg.font_size_forced))
 
     # Date separator
+    date_line_enabled = False
+    date_box_enabled = False
     if hasattr(cfg, 'date_line') and isinstance(cfg.date_line, dict):
-        if cfg.date_line.get("enabled", False):
-            app_instance.date_separator_var.set("ligne")
+        date_line_enabled = cfg.date_line.get("enabled", False)
     if hasattr(cfg, 'date_box') and isinstance(cfg.date_box, dict):
-        if cfg.date_box.get("enabled", False):
-            app_instance.date_separator_var.set("box")
-            if cfg.date_box.get("back_color"):
-                app_instance.date_box_back_color_var.set(cfg.date_box["back_color"])
+        date_box_enabled = cfg.date_box.get("enabled", False)
+
+    if date_line_enabled:
+        app_instance.date_separator_var.set("ligne")
+    elif date_box_enabled:
+        app_instance.date_separator_var.set("box")
+        if cfg.date_box.get("back_color"):
+            app_instance.date_box_back_color_var.set(cfg.date_box["back_color"])
+    else:
+        app_instance.date_separator_var.set("aucun")
 
     # Date spacing
     if hasattr(cfg, 'date_spaceBefore'):
@@ -923,12 +946,35 @@ def load_and_apply_config(app_instance, config_path: str):
         app_instance.print_pdf_var.set(print_pdf)
     logos_print_svg = raw_data.get('logos_print_svg_file', '')
     if logos_print_svg and hasattr(app_instance, 'logos_print_svg_var'):
-        app_instance.logos_print_svg_var.set(make_abs(logos_print_svg, config_dir))
+        app_instance.logos_print_svg_var.set(make_abs(logos_print_svg, resource_root))
 
     # v1.5.2 : Importer l'option generate_html
     gen_html = raw_data.get('_generate_html', False)
     if hasattr(app_instance, 'generate_html_var'):
         app_instance.generate_html_var.set(gen_html)
+
+    # Importer les options d'images inline
+    inline_enabled = raw_data.get('_inline_images_enabled', None)
+    if inline_enabled is None:
+        inline_enabled = getattr(cfg, 'inline_images_enabled', False)
+    if hasattr(app_instance, 'inline_images_enabled_var'):
+        app_instance.inline_images_enabled_var.set(inline_enabled)
+
+    inline_dir = raw_data.get('_inline_images_dir', '') or getattr(cfg, 'inline_images_dir', '')
+    if inline_dir and hasattr(app_instance, 'inline_images_dir_var'):
+        app_instance.inline_images_dir_var.set(make_abs(inline_dir, config_dir))
+
+    inline_scale = raw_data.get('_inline_images_scale', None)
+    if inline_scale is None:
+        inline_scale = getattr(cfg, 'inline_images_scale', 0.85)
+    if hasattr(app_instance, 'inline_images_scale_var'):
+        app_instance.inline_images_scale_var.set(str(inline_scale))
+
+    inline_margin = raw_data.get('_inline_images_margin', None)
+    if inline_margin is None:
+        inline_margin = getattr(cfg, 'inline_images_margin', 1.0)
+    if hasattr(app_instance, 'inline_images_margin_var'):
+        app_instance.inline_images_margin_var.set(str(inline_margin))
 
     # Forcer le rafraîchissement du GUI
     app_instance.update_idletasks()

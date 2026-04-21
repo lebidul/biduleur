@@ -7,7 +7,7 @@ import logging
 
 log = logging.getLogger(__name__)
 
-from biduleur.constants import GENRE_EVT_SV, GENRE_EVT_CONCERT, OUTPUT_FOLDER_NAME
+from biduleur.constants import GENRE_EVT_SV, GENRE_EVT_CONCERT, GENRE_EVT_IMAGE, OUTPUT_FOLDER_NAME
 
 
 def _to_str(value: Any) -> str:
@@ -37,6 +37,10 @@ def format_artists_styles(*triplets) -> str:
     for index, (genre, spectacle, artiste, style) in enumerate(triplets, start=1):
         genre_str = _to_str(genre)
         if not genre_str or genre_str.lower().strip() in ("", "nan"):
+            continue
+
+        # Ignorer le genre image (traité séparément dans event_utils)
+        if genre_str.lower() == GENRE_EVT_IMAGE:
             continue
 
         if genre_str.lower() == GENRE_EVT_SV:

@@ -40,6 +40,14 @@ Le projet est articulé autour d'une **interface graphique principale** qui orch
     *   Contrôle total sur la mise en page (marges, polices, couleurs).
     *   Mise en page des logos intelligente avec un algorithme de *packing*.
     *   Ajout de contenu personnalisé via la boîte "Cucaracha".
+    *   **Images inline** : insertion d'images directement dans le corps de l'agenda (mode debug) via `GENRE = "img"` dans le fichier Excel.
+*   **Formats de date flexibles** :
+    *   Dates complètes : `2014-08-31` → `Dimanche 31 Août 2014`.
+    *   Année seule : `2005` → `2005`.
+    *   Mois-année : `08-2021` → `Août 2021`.
+    *   Tri chronologique cohérent entre dates partielles et précises.
+*   **Colonnes spectacles dynamiques** : le système détecte automatiquement le nombre de colonnes `GENRE N` / `NOM SPECTACLE N` présentes dans le fichier Excel.
+*   **Hyperliens cliquables** : les hyperliens des cellules Excel sont extraits et rendus cliquables dans le PDF final.
 *   **Retour Utilisateur en Temps Réel** : Une barre de progression et des messages de statut clairs informent l'utilisateur de l'avancement du processus.
 
 ---

@@ -192,13 +192,15 @@ def _parse_date(date_str: Any) -> tuple[str, str]:
     Parse une date et retourne (sort_key, display_date).
 
     Formats supportés:
-    - ISO: "2014-08-31" -> ("2014-08-31", "Dimanche 31 août 2014")
+    - ISO: "2014-08-31" -> ("2014-08-31", "Dimanche 31 Août 2014")
+    - Année seule: "2021" -> ("2021", "2021")
+    - Mois-Année: "08-2021" -> ("2021-08", "Août 2021")
     - Jour + numéro: "Samedi 3" -> ("03", "Samedi 3")
     - Jour + numéro + mois: "Lun 03 février" -> ("03", "Lun 03 février")
 
     Returns:
         (sort_key, display_date)
-        - sort_key: clé de tri (date ISO complète ou jour paddé)
+        - sort_key: clé de tri (date ISO complète, année-mois ou jour paddé)
         - display_date: date formatée pour affichage
     """
     if not date_str:
@@ -212,10 +214,31 @@ def _parse_date(date_str: Any) -> tuple[str, str]:
         sort_key = f"{date_str.year:04d}-{date_str.month:02d}-{date_str.day:02d}"
         return (sort_key, display)
 
+    # Gérer les entiers et flottants (ex: année seule 2005 ou 2005.0 depuis Excel)
+    if isinstance(date_str, (int, float)):
+        if not pd.isna(date_str) and date_str == int(date_str):
+            date_str = str(int(date_str))
+        else:
+            return ('', str(date_str))
+
     if not isinstance(date_str, str):
         return ('', str(date_str))
 
     date_str = str(date_str).strip()
+
+    # Format année seule: "2021" -> rendu tel quel
+    if re.match(r'^\d{4}$', date_str):
+        return (f"{date_str}-00-00", date_str)
+
+    # Format mois-année: "08-2021" ou "08/2021" -> "Août 2021"
+    mm_yyyy_match = re.match(r'^(\d{1,2})[-/](\d{4})$', date_str)
+    if mm_yyyy_match:
+        month, year = int(mm_yyyy_match.group(1)), int(mm_yyyy_match.group(2))
+        if 1 <= month <= 12:
+            mois_nom = MOIS_FR[month].capitalize()
+            display = f"{mois_nom} {year}"
+            sort_key = f"{year:04d}-{month:02d}-00"
+            return (sort_key, display)
 
     # Format ISO: 2014-08-31 ou 2014/08/31 (avec optionnel 00:00:00)
     iso_match = re.match(r'^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?$', date_str)

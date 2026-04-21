@@ -116,6 +116,12 @@ class Config:
     skip_cover: bool = False
     cucaracha_box: Dict[str, Any] = field(default_factory=dict)
 
+    # --- Images inline ---
+    inline_images_enabled: bool = False
+    inline_images_dir: str = ""
+    inline_images_scale: float = 0.85
+    inline_images_margin: float = 1.0
+
     # --- Debug ---
     debug_mode: bool = False
 

@@ -1,6 +1,6 @@
 import math
 from biduleur.format_utils import format_evenement, format_info, format_lieu, fmt_prix, fmt_heure, format_artists_styles, fmt_link, capfirst, fmt_virgule
-from biduleur.constants import DATE, COLONNE_INFO, FESTIVAL, STYLE_FESTIVAL, VILLE, LIEU, PRIX, HORAIRE, P_MD_OPEN_DATE, P_MD_CLOSE_DATE, P_MD_OPEN_DATE_AGENDA, P_MD_CLOSE, P_MD_OPEN, P_MD_POST_OPEN
+from biduleur.constants import DATE, COLONNE_INFO, FESTIVAL, STYLE_FESTIVAL, VILLE, LIEU, PRIX, HORAIRE, GENRE_EVT_IMAGE, P_MD_OPEN_DATE, P_MD_CLOSE_DATE, P_MD_OPEN_DATE_AGENDA, P_MD_CLOSE, P_MD_OPEN, P_MD_POST_OPEN
 from typing import Dict, Tuple
 
 def parse_bidul_event(event: Dict, current_date: str = None) -> Tuple[str, str, str, str]:
@@ -42,6 +42,21 @@ def parse_bidul_event(event: Dict, current_date: str = None) -> Tuple[str, str, 
 
     # Pour la colonne info, on a besoin du premier NOM SPECTACLE
     first_spectacle_col = spectacle_col_sets[0]['spectacle'] if spectacle_col_sets else None
+
+    # Détection des lignes image (GENRE 1 = "img")
+    first_genre_col = spectacle_col_sets[0]['genre'] if spectacle_col_sets else None
+    first_genre_val = str(event.get(first_genre_col, '')).strip().lower() if first_genre_col else ''
+
+    if first_genre_val == GENRE_EVT_IMAGE:
+        # Ligne image : NOM SPECTACLE 1 contient le nom du fichier
+        # Le placeholder doit être dans un <p> pour être extrait par extract_paragraphs_from_html
+        image_filename = event.get(first_spectacle_col, '') if first_spectacle_col else ''
+        if image_filename:
+            img_tag = f"<p>{{{{IMG:{image_filename}}}}}</p>"
+            line_bidul += img_tag
+            line_agenda += img_tag
+            line_post += img_tag
+        return line_bidul, line_agenda, line_post, current_date
 
     if event[DATE] == COLONNE_INFO:
         spectacle_val = event.get(first_spectacle_col, '') if first_spectacle_col else ''
