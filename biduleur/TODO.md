@@ -1,20 +1,20 @@
 # Liste des TODOs et Améliorations Futures
 
 ## Priorité Élevée
-- [ ] Ajouter une validation des colonnes du CSV dans `read_and_sort_csv`.
-- [ ] Améliorer la gestion des erreurs pour les dates mal formatées (ex: "Mardi 1er").
-- [ ] Corriger le tri des événements lorsque la colonne `DATE` est vide ou invalide.
+- [x] Ajouter une validation des colonnes du CSV dans `read_and_sort_csv`.
+- [x] Améliorer la gestion des erreurs pour les dates mal formatées (ex: "Mardi 1er").
+- [x] Corriger le tri des événements lorsque la colonne `DATE` est vide ou invalide.
 - [x] Rendre le Biduleur comme un éxécutable.
-- [ ] Erreur avec fichier csv créé depuis excel (ex. C:\Users\thiba\Desktop\test.bidul\tapage.mardi.matin.2.csv)
-- [ ] Unit tests
-- [ ] Ajouter une config qui permet de définir le style (police, gras, capitale, minuscule, italique, etc...) pour chaque type d'info (lieu, ville, etc..)
+- [x] Erreur avec fichier csv créé depuis excel (ex. C:\Users\thiba\Desktop\test.bidul\tapage.mardi.matin.2.csv)
+- [x] Unit tests
+- [x] Ajouter une config qui permet de définir le style (police, gras, capitale, minuscule, italique, etc...) pour chaque type d'info (lieu, ville, etc..)
 
 ## Priorité Moyenne
 - [ ] Optimiser les performances du tri pour les fichiers CSV volumineux.
 - [x] Ajouter fichiers templates au gui.
 - [x] Ajouter des logs pour faciliter le débogage.
-- [ ] Pouvoir parser vieux et nouveaux templates
-- [ ] Générer 2 pdfs en sortie, un pour impression et un pdf pour version digitale
+- [x] Pouvoir parser vieux et nouveaux templates
+- [x] Générer 2 pdfs en sortie, un pour impression et un pdf pour version digitale
 - [ ] Documenter les cas d'erreur possibles dans la docstring de `parse_bidul`.
 
 ## Priorité Faible

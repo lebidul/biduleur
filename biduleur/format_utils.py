@@ -1,11 +1,64 @@
 import os.path
 import datetime
 import math
+import re
 from typing import Dict, Any
 
 import logging
 
 log = logging.getLogger(__name__)
+
+
+# Dictionnaire des noms propres connus (villes + pays) — défini dans
+# biduleur/constants.py pour rester accessible par d'autres modules.
+# Aliasé localement comme _PROPER_NOUNS_MAP pour conserver la convention
+# "module-private" dans format_utils.
+from biduleur.constants import PROPER_NOUNS_MAP as _PROPER_NOUNS_MAP
+
+# Compilation d'une regex unique avec alternation, longueur décroissante pour
+# que les noms longs (ex. "Le Mans") matchent avant les courts ("Mans").
+_PROPER_NOUNS_RE = re.compile(
+    r'\b(' + '|'.join(
+        re.escape(k) for k in sorted(_PROPER_NOUNS_MAP.keys(), key=len, reverse=True)
+    ) + r')\b',
+    re.IGNORECASE | re.UNICODE,
+)
+
+
+def _smart_lower(s: str) -> str:
+    """
+    Lowercase la chaîne en :
+    1. Title-Casant les mots intégralement en majuscules (PARIS → Paris,
+       BERLIN → Berlin, LE MANS → Le Mans, etc.)
+    2. Restaurant la casse correcte des noms de ville/pays connus listés
+       dans `_PROPER_NOUNS_MAP` (préserve les majuscules internes type
+       "Le Mans", "New York", "Saint-Pétersbourg").
+
+    Exemples :
+        "concert in PARIS, France" → "concert in Paris, France"
+        "concert à le mans"        → "concert à Le Mans"
+        "festival LE MANS"         → "festival Le Mans"
+        "MILAN-BERLIN tour"        → "Milan-Berlin tour"
+        "Tribute to Mozart"        → "tribute to mozart" (Mozart pas dans le dict)
+    """
+    if not s:
+        return s
+
+    # Étape 1 : Title-Case des mots tout-en-majuscules ; lowercase pour le reste.
+    def _process(match: re.Match) -> str:
+        word = match.group(0)
+        if word.isupper():
+            return word.capitalize()
+        return word.lower()
+
+    s = re.sub(r'[^\W\d_]+', _process, s, flags=re.UNICODE)
+
+    # Étape 2 : restaurer la casse correcte des noms propres connus.
+    def _restore(match: re.Match) -> str:
+        return _PROPER_NOUNS_MAP[match.group(0).lower()]
+
+    s = _PROPER_NOUNS_RE.sub(_restore, s)
+    return s
 
 from biduleur.constants import GENRE_EVT_SV, GENRE_EVT_CONCERT, GENRE_EVT_IMAGE, OUTPUT_FOLDER_NAME
 
@@ -149,7 +202,9 @@ def format_style(style) -> str:
     style_str = _to_str(style)
     if not style_str or style_str.lower().strip() in ("", "nan"):
         return ""
-    return f" <em>({format_string(style_str, replacements, lower=False).lower()})</em>"
+    # _smart_lower : lowercase tout sauf les mots intégralement en majuscules
+    # (préserve les noms de ville en caps comme PARIS, NYC, BERLIN…)
+    return f" <em>({_smart_lower(format_string(style_str, replacements, lower=False))})</em>"
 
 
 def format_string(string, replacement_dictionary: Dict, lower: bool = False) -> str:

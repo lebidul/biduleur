@@ -1,3 +1,109 @@
+# Bidul v1.8.0 - Sous-groupement par festival, plages de dates, couleur, label Bidul, auto-scale images, normalisation des noms propres
+
+Cette version étend considérablement les options de mise en page de l'agenda et du poster : **regroupement chronologique des dates consécutives**, **plages "Du X au Y"** via une nouvelle colonne, **sous-groupement par festival** quand plusieurs événements partagent la même valeur de FESTOCHE EVENEMENT, **couleur de police personnalisable** pour les dates, **étiquette "Bidul #xxx"** côté gauche, **auto-scaling des images inline** trop grandes, et un **dictionnaire de ~580 villes/pays** pour normaliser automatiquement la casse des noms propres dans la colonne STYLE.
+
+## ✨ Nouveautés
+
+### Sous-groupement par festival (`festival_subgroup_enabled`)
+*   Quand plusieurs événements (≥ 2) partagent la **même date** ET la **même valeur de FESTOCHE EVENEMENT**, ils sont regroupés sous un sous-en-tête portant le nom du festival, suivi des événements avec une **puce différente** `▸` alignée avec la 1ère lettre du nom du festival
+*   **Singletons** (1 seul événement avec ce festival ce jour-là) : comportement classique inchangé, festival inline avec ` // ` devant les artistes
+*   Le sous-en-tête apparaît à la **position chronologique** du 1er événement du groupe dans la journée — les autres événements du groupe sont déplacés à sa suite
+*   Le **style FESTOCHE / EVENEMENT** est ajouté en italique entre parenthèses dans le sous-en-tête (`Jazz Tangentes 2026 *(jazz en ville)*`)
+*   Si l'événement en tête du groupe a un STYLE vide alors que d'autres l'ont rempli, le 1er STYLE non-vide trouvé dans le groupe est utilisé
+*   La **même mise en page** est appliquée au poster (page 3)
+*   Activation via la **case "Mise en Page Globale"** de l'UI (mode normal, désactivée par défaut)
+
+### Regroupement des dates consécutives (`date_grouping_enabled`)
+*   Les événements sur des **jours calendaires consécutifs** (ex: Sam 23 + Dim 24 août 2025) sont regroupés sous une date composite : `"Samedi 23 & Dimanche 24 Août 2025"`
+*   Gère 2, 3 ou plus de jours consécutifs : `"Samedi 23, Dimanche 24 & Lundi 25 Août 2025"`
+*   Gère les transitions de mois : `"Dimanche 31 Août & Lundi 1 Septembre 2025"`
+*   Activation via UI en **mode debug** (section "Fonctions expérimentales Teriaki")
+
+### Plage de dates par ligne (colonne `DATE FIN`)
+*   Nouvelle colonne **optionnelle** `DATE FIN` dans le fichier Excel : si renseignée pour une ligne, l'événement est affiché avec une plage `"Du <début> au <fin>"`
+*   Format intelligent selon le contexte :
+    *   Même mois : `"Du Samedi 27 au Dimanche 28 Août 2016"`
+    *   Mois différent : `"Du Dimanche 31 Août au Lundi 1 Septembre 2025"`
+    *   Année différente : `"Du Mardi 31 Décembre 2024 au Mercredi 1 Janvier 2025"`
+*   La colonne est **rétrocompatible** : si elle n'existe pas, aucun impact
+
+### Couleur de police des dates (`date_color`)
+*   Nouveau **sélecteur de couleur** dans la section "Configuration des dates" de l'UI
+*   Aperçu temps réel via un widget de couleur cliquable
+*   Défaut `#000000` (noir)
+*   Importable/exportable via `config.json`
+
+### Étiquette "Bidul #xxx" à gauche de la date (`bidul_label_enabled`)
+*   Affiche **"Bidul #xxx"** en alignement gauche sur la même ligne qu'une date alignée à droite, où `xxx` est la valeur de la colonne `BIDUL`
+*   **Couleur configurable** indépendamment de la couleur des dates
+*   Utile pour les numéros d'archives ou les références éditoriales
+*   Activation via la section "Configuration des dates" (mode normal)
+
+### Festival dans l'en-tête de date (`festival_in_date_header`)
+*   Mode expérimental : déplace la valeur de la colonne FESTOCHE EVENEMENT du 1er événement de la date dans l'en-tête (format `"Date -- Festival"`) au lieu de la préfixer dans chaque ligne
+*   Utile quand 1 seul festival par date (cas non couvert par `festival_subgroup_enabled`)
+*   Activation via UI en mode debug (section "Fonctions expérimentales Teriaki")
+
+### Auto-scaling des images inline (`inline_images_auto_scale`)
+*   Quand activée, une image trop grande pour la section courante (typiquement portrait ne rentrant pas dans S3/S4 hauteur 421pt) est **automatiquement réduite** pour tenir, en préservant le ratio d'aspect
+*   Évite les espaces vides dus aux images droppées et la perte d'événements suivants
+*   Activation via UI en mode debug (section "Images inline")
+
+### Normalisation intelligente des noms propres dans le STYLE
+*   La fonction `format_style` (rendu de la colonne FESTOCHE / EVENEMENT) effectue désormais un **lowercase intelligent** :
+    *   Mots tout-en-majuscules → Title Case (`PARIS` → `Paris`)
+    *   Mots déjà connus comme villes/pays → casse correcte préservée (`paris` → `Paris`, `le mans` → `Le Mans`, `new york` → `New York`)
+    *   Reste du texte en lowercase classique
+*   **Dictionnaire de ~580 noms propres** dans `biduleur/constants.py` (`PROPER_NOUNS_MAP`) :
+    *   Toutes les **préfectures de France** (métropole + DOM-TOM)
+    *   **County towns d'Angleterre** (~48)
+    *   **Capitales européennes** (FR + EN/locale)
+    *   **Capitales des 50 États américains** + grandes villes US
+    *   **Villes locales de la Sarthe** (Le Mans, Sablé-sur-Sarthe, Yvré-l'Évêque, etc.)
+    *   **Pays** (FR + EN, ~80)
+*   L'utilisateur peut **étendre le dictionnaire** directement dans `constants.py`
+
+## 🔧 Améliorations algorithme de mise en page
+
+### Recherche binaire alignée sur le rendu réel
+*   `_simulate_allocation_at_fs` utilise désormais **`plan_pair_with_split`** (paire-aware) au lieu de `measure_fit_at_fs` (par-section), pour aligner la recherche binaire sur le rendu réel et **éviter de sous-estimer ce qui rentre**
+*   La police auto-calculée monte plus haut quand c'est possible
+
+### Contrainte anti-orphelin étendue
+*   Auparavant, une DATE n'était pas placée seule en bas de section uniquement si le paragraphe suivant était un EVENT
+*   Maintenant : la contrainte couvre aussi les paragraphes IMAGE (placeholders d'images inline)
+*   Helper `_compute_next_para_need()` centralise la logique pour les 5 emplacements concernés
+
+### Helper `_compute_image_dimensions()`
+*   Centralise le calcul des dimensions d'image (taille naturelle + auto-scaling éventuel)
+*   Utilisé uniformément par les fonctions de mesure (`measure_fit_at_fs`), de rendu (`draw_section_*`) et de planification (`plan_pair_with_split`)
+
+## 🐛 Corrections
+
+### `pd.NaT` dans `_parse_date`
+*   `pd.NaT` (pandas Not-a-Time) passait l'`isinstance(x, pd.Timestamp)` puis crashait sur `weekday()` (qui retourne `nan` au lieu d'un int)
+*   Avant ce fix, un fichier Excel avec une colonne `DATE FIN` majoritairement vide générait un PDF entièrement vide
+*   Corrigé : détection explicite de NaT/None/NaN scalaires en amont du parsing
+
+### Polices avec variantes manquantes
+*   Documentation : pour qu'une police affiche les styles **Bold** et **Italic** des dates, le fichier de fonte doit posséder les variantes correspondantes
+*   Exemple : Calibri Light n'a pas de variante Bold sur Windows → le gras est silencieusement ignoré (fallback regular)
+*   Préférer Calibri (sans Light) ou Arial pour bénéficier des 4 variantes complètes
+
+## 🔧 Détails techniques
+
+*   `biduleur/constants.py` : constante `BIDUL_COL`, `DATE_FIN`, `SUBFEST_PREFIX` ; nouveau dictionnaire `PROPER_NOUNS_MAP` (~580 entrées)
+*   `biduleur/csv_utils.py` : `_apply_date_range_display()` pour les plages DATE FIN, `_group_consecutive_dates()` pour le regroupement chronologique, `_format_du_au_range()` pour les plages, calcul des comptes (date, festival) et des positions effectives pour le sous-groupement
+*   `biduleur/event_utils.py` : émission du sous-en-tête festival, marker `{{SUBEV}}` pour les événements de sous-groupe, placeholder `{{BIDUL:xxx}}` pour l'étiquette
+*   `biduleur/format_utils.py` : helper `_smart_lower()` avec normalisation des noms propres via `PROPER_NOUNS_MAP`
+*   `misenpageur/misenpageur/config.py` : champs `inline_images_auto_scale`, `date_color`, `bidul_label_enabled`, `bidul_label_color`, `festival_subgroup_enabled`, `date_grouping_enabled`, `festival_in_date_header`
+*   `misenpageur/misenpageur/textflow.py` : classification `SUBEVENT`, helper `_compute_image_dimensions()`, helper `_compute_next_para_need()`, helper `_draw_bidul_label()`, `configure_bidul_label()`, style SUBEVENT (puce ▸ via DejaVuSans, indent aligné, spacing serré)
+*   `misenpageur/misenpageur/draw_logic.py` : `_simulate_allocation_at_fs` utilise `plan_pair_with_split`, `configure_bidul_label()` au début du rendu
+*   `leTruc/widgets.py` : nouvelles sections "Fonctions expérimentales Teriaki" (debug) et options dans "Mise en Page Globale" et "Configuration des dates"
+*   `leTruc/app.py`, `leTruc/callbacks.py`, `leTruc/_helpers.py` : ~10 nouvelles variables Tkinter, plumbing complet, sauvegarde/import config.json
+
+---
+
 # Bidul v1.7.0 - Images inline, colonnes spectacles dynamiques et formats de date étendus
 
 Cette version introduit le support des **images inline** dans le PDF, un nombre **dynamique** de colonnes de spectacles dans le fichier Excel, de **nouveaux formats de date** (`YYYY`, `MM-YYYY`) pour l'affichage d'événements historiques, et apporte plusieurs corrections importantes.
