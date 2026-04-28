@@ -147,6 +147,8 @@ SELECT
     COALESCE(ar.nom, c.artiste) AS artiste_normalise,
     COUNT(DISTINCT e.id) AS nb_concerts,
     COUNT(DISTINCT e.bidul_numero) AS nb_biduls,
+    MIN(e.bidul_numero) AS premier_bidul,
+    MAX(e.bidul_numero) AS dernier_bidul,
     MIN(strftime('%Y', e.date_evenement)) AS premiere_annee,
     MAX(strftime('%Y', e.date_evenement)) AS derniere_annee,
     GROUP_CONCAT(DISTINCT c.style) AS styles,

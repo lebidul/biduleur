@@ -92,6 +92,7 @@ def _load_cfg_defaults() -> dict:
         "date_alignment": "left",
         "date_bold": False,
         "date_italic": False,
+        "date_color": "#000000",
         "poster_design": 0,
         "font_size_safety_factor": 1.0,
         "background_alpha": 0.85,
@@ -156,6 +157,9 @@ def _load_cfg_defaults() -> dict:
         out["date_alignment"] = getattr(cfg, "date_alignment", "left")
         out["date_bold"] = getattr(cfg, "date_bold", False)
         out["date_italic"] = getattr(cfg, "date_italic", False)
+        out["date_color"] = getattr(cfg, "date_color", "#000000")
+        out["bidul_label_enabled"] = getattr(cfg, "bidul_label_enabled", False)
+        out["bidul_label_color"] = getattr(cfg, "bidul_label_color", "#000000")
         if isinstance(cfg.poster, dict):
             out.update({
                 "poster_design": cfg.poster.get("design", 0),
@@ -176,6 +180,9 @@ def _load_cfg_defaults() -> dict:
         out["inline_images_dir"] = getattr(cfg, "inline_images_dir", "")
         out["inline_images_scale"] = getattr(cfg, "inline_images_scale", 0.85)
         out["inline_images_margin"] = getattr(cfg, "inline_images_margin", 1.0)
+        out["inline_images_auto_scale"] = getattr(cfg, "inline_images_auto_scale", False)
+        out["date_grouping_enabled"] = getattr(cfg, "date_grouping_enabled", False)
+        out["festival_in_date_header"] = getattr(cfg, "festival_in_date_header", False)
 
         if isinstance(cfg.stories, dict):
             out["stories_enabled"] = cfg.stories.get("enabled", True)
@@ -234,6 +241,9 @@ def run_pipeline(
         date_bold: bool = False,
         date_italic: bool = False,
         date_alignment: str = "left",
+        date_color: str = "#000000",
+        bidul_label_enabled: bool = False,
+        bidul_label_color: str = "#000000",
         abbreviations_enabled: dict = None,  # v1.4.2 : Abréviations activées
         stop_event: threading.Event = None,  # v1.4.3 : Event pour arrêt
         split_pdf: bool = False,  # v1.4.5 : Générer un PDF par page
@@ -244,6 +254,9 @@ def run_pipeline(
         inline_images_dir: str = "",
         inline_images_scale: float = 0.85,
         inline_images_margin: float = 1.0,
+        inline_images_auto_scale: bool = False,
+        date_grouping_enabled: bool = False,
+        festival_in_date_header: bool = False,
 ) -> tuple[bool, str]:
     debug_dir = None
     if debug_mode:
@@ -307,7 +320,12 @@ def run_pipeline(
         status_queue.put(('status', f"Étape {current_step}/{total_steps} : Analyse du fichier...", current_step, None))
 
         try:
-            html_body_bidul, html_body_agenda, number_of_lines = parse_bidul(input_file)
+            html_body_bidul, html_body_agenda, number_of_lines = parse_bidul(
+                input_file,
+                date_grouping_enabled=date_grouping_enabled,
+                festival_in_date_header=festival_in_date_header,
+                bidul_label_enabled=bidul_label_enabled,
+            )
         except ValueError as e:
             # Erreur de validation (colonnes manquantes ou fichier corrompu)
             status_queue.put(('final', False, str(e)))
@@ -414,6 +432,9 @@ def run_pipeline(
         cfg.date_bold = date_bold
         cfg.date_italic = date_italic
         cfg.date_alignment = date_alignment
+        cfg.date_color = date_color
+        cfg.bidul_label_enabled = bidul_label_enabled
+        cfg.bidul_label_color = bidul_label_color
 
         # --- Paramètres visibles uniquement en mode debug ---
         # En mode normal, les valeurs de config.yml (déjà chargées) sont conservées
@@ -446,6 +467,9 @@ def run_pipeline(
         cfg.inline_images_dir = inline_images_dir
         cfg.inline_images_scale = inline_images_scale
         cfg.inline_images_margin = inline_images_margin
+        cfg.inline_images_auto_scale = inline_images_auto_scale
+        cfg.date_grouping_enabled = date_grouping_enabled
+        cfg.festival_in_date_header = festival_in_date_header
         cfg.stories['enabled'] = generate_stories
         if stories_output_dir:
             cfg.stories['output_dir'] = stories_output_dir
@@ -586,6 +610,9 @@ def run_pipeline(
                 config_data["_inline_images_dir"] = inline_images_dir
                 config_data["_inline_images_scale"] = inline_images_scale
                 config_data["_inline_images_margin"] = inline_images_margin
+                config_data["_inline_images_auto_scale"] = inline_images_auto_scale
+                config_data["_date_grouping_enabled"] = date_grouping_enabled
+                config_data["_festival_in_date_header"] = festival_in_date_header
                 with open(config_path, 'w', encoding='utf-8') as f:
                     json.dump(config_data, f, indent=2, default=json_converter, ensure_ascii=False)
             except Exception as e:
@@ -846,6 +873,12 @@ def load_and_apply_config(app_instance, config_path: str):
         app_instance.date_bold_var.set(cfg.date_bold)
     if hasattr(cfg, 'date_italic'):
         app_instance.date_italic_var.set(cfg.date_italic)
+    if hasattr(cfg, 'date_color') and cfg.date_color:
+        app_instance.date_color_var.set(cfg.date_color)
+    if hasattr(cfg, 'bidul_label_enabled'):
+        app_instance.bidul_label_enabled_var.set(bool(cfg.bidul_label_enabled))
+    if hasattr(cfg, 'bidul_label_color') and cfg.bidul_label_color:
+        app_instance.bidul_label_color_var.set(cfg.bidul_label_color)
 
     # Poster
     if isinstance(cfg.poster, dict):
@@ -975,6 +1008,25 @@ def load_and_apply_config(app_instance, config_path: str):
         inline_margin = getattr(cfg, 'inline_images_margin', 1.0)
     if hasattr(app_instance, 'inline_images_margin_var'):
         app_instance.inline_images_margin_var.set(str(inline_margin))
+
+    inline_auto_scale = raw_data.get('_inline_images_auto_scale', None)
+    if inline_auto_scale is None:
+        inline_auto_scale = getattr(cfg, 'inline_images_auto_scale', False)
+    if hasattr(app_instance, 'inline_images_auto_scale_var'):
+        app_instance.inline_images_auto_scale_var.set(bool(inline_auto_scale))
+
+    # Fonctions expérimentales Teriaki
+    grouping_enabled = raw_data.get('_date_grouping_enabled', None)
+    if grouping_enabled is None:
+        grouping_enabled = getattr(cfg, 'date_grouping_enabled', False)
+    if hasattr(app_instance, 'date_grouping_enabled_var'):
+        app_instance.date_grouping_enabled_var.set(bool(grouping_enabled))
+
+    festival_in_header = raw_data.get('_festival_in_date_header', None)
+    if festival_in_header is None:
+        festival_in_header = getattr(cfg, 'festival_in_date_header', False)
+    if hasattr(app_instance, 'festival_in_date_header_var'):
+        app_instance.festival_in_date_header_var.set(bool(festival_in_header))
 
     # Forcer le rafraîchissement du GUI
     app_instance.update_idletasks()

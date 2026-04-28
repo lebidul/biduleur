@@ -1,9 +1,39 @@
 import math
 from biduleur.format_utils import format_evenement, format_info, format_lieu, fmt_prix, fmt_heure, format_artists_styles, fmt_link, capfirst, fmt_virgule
-from biduleur.constants import DATE, COLONNE_INFO, FESTIVAL, STYLE_FESTIVAL, VILLE, LIEU, PRIX, HORAIRE, GENRE_EVT_IMAGE, P_MD_OPEN_DATE, P_MD_CLOSE_DATE, P_MD_OPEN_DATE_AGENDA, P_MD_CLOSE, P_MD_OPEN, P_MD_POST_OPEN
+from biduleur.constants import DATE, COLONNE_INFO, FESTIVAL, STYLE_FESTIVAL, VILLE, LIEU, PRIX, HORAIRE, GENRE_EVT_IMAGE, BIDUL_COL, P_MD_OPEN_DATE, P_MD_CLOSE_DATE, P_MD_OPEN_DATE_AGENDA, P_MD_CLOSE, P_MD_OPEN, P_MD_POST_OPEN
 from typing import Dict, Tuple
 
-def parse_bidul_event(event: Dict, current_date: str = None) -> Tuple[str, str, str, str]:
+
+def _format_bidul_num(val) -> str:
+    """Formate la valeur de la colonne BIDUL en chaîne (entier si possible)."""
+    if val is None:
+        return ""
+    if isinstance(val, float):
+        import math
+        if math.isnan(val):
+            return ""
+        if val == int(val):
+            return str(int(val))
+        return str(val)
+    s = str(val).strip()
+    if not s or s.lower() == 'nan':
+        return ""
+    # Si c'est une chaîne numérique style "23.0", simplifier
+    try:
+        f = float(s)
+        if f == int(f):
+            return str(int(f))
+    except ValueError:
+        pass
+    return s
+
+
+def parse_bidul_event(
+        event: Dict,
+        current_date: str = None,
+        festival_in_date_header: bool = False,
+        bidul_label_enabled: bool = False,
+) -> Tuple[str, str, str, str]:
     # Liste des clés de base requises
     required_keys = [
         DATE, FESTIVAL, STYLE_FESTIVAL, VILLE, LIEU, PRIX, HORAIRE,
@@ -36,8 +66,23 @@ def parse_bidul_event(event: Dict, current_date: str = None) -> Tuple[str, str, 
 
     # Gestion de la date
     if not current_date or current_date != event[DATE]:
-        line_bidul = f"{P_MD_OPEN_DATE}{event[DATE]}{P_MD_CLOSE_DATE}"
-        line_agenda = f"{P_MD_OPEN_DATE_AGENDA}{event[DATE]}{P_MD_CLOSE}"
+        date_display = event[DATE]
+
+        # Mode expérimental Teriaki : déplacer le festival dans l'en-tête de date
+        if festival_in_date_header:
+            from biduleur.format_utils import _to_str
+            fest_raw = _to_str(event.get(FESTIVAL, '')).strip()
+            if fest_raw and fest_raw.lower() != 'nan' and date_display != COLONNE_INFO:
+                date_display = f"{date_display} -- {fest_raw}"
+
+        # Placeholder "Bidul #xxx" pour rendu côté misenpageur (à gauche de la date)
+        if bidul_label_enabled and date_display != COLONNE_INFO:
+            bidul_num = _format_bidul_num(event.get(BIDUL_COL))
+            if bidul_num:
+                date_display = f"{{{{BIDUL:{bidul_num}}}}}{date_display}"
+
+        line_bidul = f"{P_MD_OPEN_DATE}{date_display}{P_MD_CLOSE_DATE}"
+        line_agenda = f"{P_MD_OPEN_DATE_AGENDA}{date_display}{P_MD_CLOSE}"
         current_date = event[DATE]
 
     # Pour la colonne info, on a besoin du premier NOM SPECTACLE
@@ -68,7 +113,12 @@ def parse_bidul_event(event: Dict, current_date: str = None) -> Tuple[str, str, 
 
 
     # Formatage des éléments
-    evenement = format_evenement(event[FESTIVAL], event[STYLE_FESTIVAL])
+    # En mode festival_in_date_header, le festival est déjà affiché dans l'en-tête de date
+    # → on omet le prefixe "Festival //" de chaque ligne événement
+    if festival_in_date_header:
+        evenement = ""
+    else:
+        evenement = format_evenement(event[FESTIVAL], event[STYLE_FESTIVAL])
     ville = format_lieu(event[VILLE])
     lieu = format_lieu(event[LIEU])
     prix = fmt_prix(event[PRIX])

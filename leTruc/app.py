@@ -123,6 +123,9 @@ class Application(TkinterDnD.Tk):
         self.date_align_var = tk.StringVar(value=self.cfg_defaults.get("date_alignment", "left"))
         self.date_bold_var = tk.BooleanVar(value=self.cfg_defaults.get("date_bold", False))
         self.date_italic_var = tk.BooleanVar(value=self.cfg_defaults.get("date_italic", False))
+        self.date_color_var = tk.StringVar(value=self.cfg_defaults.get("date_color", "#000000"))
+        self.bidul_label_enabled_var = tk.BooleanVar(value=self.cfg_defaults.get("bidul_label_enabled", False))
+        self.bidul_label_color_var = tk.StringVar(value=self.cfg_defaults.get("bidul_label_color", "#000000"))
 
         # --- Variables pour le poster ---
         self.poster_title_var = tk.StringVar(value=self.cfg_defaults.get("poster_title", ""))
@@ -154,6 +157,11 @@ class Application(TkinterDnD.Tk):
         self.inline_images_dir_var = tk.StringVar(value=self.cfg_defaults.get("inline_images_dir", ""))
         self.inline_images_scale_var = tk.StringVar(value=str(self.cfg_defaults.get("inline_images_scale", "0.85")))
         self.inline_images_margin_var = tk.StringVar(value=str(self.cfg_defaults.get("inline_images_margin", "1.0")))
+        self.inline_images_auto_scale_var = tk.BooleanVar(value=self.cfg_defaults.get("inline_images_auto_scale", False))
+
+        # --- Fonctions expérimentales Teriaki ---
+        self.date_grouping_enabled_var = tk.BooleanVar(value=self.cfg_defaults.get("date_grouping_enabled", False))
+        self.festival_in_date_header_var = tk.BooleanVar(value=self.cfg_defaults.get("festival_in_date_header", False))
 
         # --- Abréviations ---
         self.abbreviations_data = self.cfg_defaults.get("abbreviations", {})
@@ -321,6 +329,9 @@ class Application(TkinterDnD.Tk):
             date_bold=self.date_bold_var.get(),
             date_italic=self.date_italic_var.get(),
             date_alignment=self.date_align_var.get(),
+            date_color=self.date_color_var.get(),
+            bidul_label_enabled=self.bidul_label_enabled_var.get(),
+            bidul_label_color=self.bidul_label_color_var.get(),
             poster_design=self.poster_design_var.get(),
             font_size_safety_factor=validated_args['safety_factor_val'],
             background_alpha=self.alpha_var.get(),
@@ -349,6 +360,9 @@ class Application(TkinterDnD.Tk):
             inline_images_dir=self.inline_images_dir_var.get().strip(),
             inline_images_scale=validated_args['inline_images_scale_val'],
             inline_images_margin=validated_args['inline_images_margin_val'],
+            inline_images_auto_scale=self.inline_images_auto_scale_var.get(),
+            date_grouping_enabled=self.date_grouping_enabled_var.get(),
+            festival_in_date_header=self.festival_in_date_header_var.get(),
         )
 
     def _check_thread_for_results(self):
