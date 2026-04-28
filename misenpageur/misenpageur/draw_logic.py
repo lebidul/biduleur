@@ -25,7 +25,7 @@ from .spacing import SpacingConfig, SpacingPolicy
 from .textflow import (
     measure_fit_at_fs, draw_section_fixed_fs_with_prelude, draw_section_fixed_fs_with_tail,
     plan_pair_with_split, measure_poster_fit_at_fs, draw_poster_text_in_frames,
-    _is_event, _is_image, _mk_style_for_kind, _mk_text_for_kind,
+    _is_event, _is_image, _is_subfestival, _is_subevent, _mk_style_for_kind, _mk_text_for_kind,
     configure_inline_images, configure_bidul_label
 )
 from .image_builder import generate_story_images
@@ -903,10 +903,14 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
         draw_poster_logos(c, S7["S7_Logos"], logos, cfg)
 
         # --- Calcul de la taille de police ---
-        # Filtrer les images inline du poster (pas de rendu image dans le poster)
-        poster_paras = [p for p in (s5_full + s6_full + s3_full + s4_full) if not _is_image(p)]
-        num_dates = sum(1 for p in poster_paras if not _is_event(p))
-        num_events = sum(1 for p in poster_paras if _is_event(p))
+        # Filtrer images inline (pas de rendu image dans le poster) et legacy SUBFEST.
+        # Les SUBEV (events de sous-groupe) sont conservés tels quels pour que le
+        # poster reproduise la même mise en page que les pages 1-2 (sous-en-tête
+        # festival + sub-events avec puce ▸).
+        poster_paras = [p for p in (s5_full + s6_full + s3_full + s4_full)
+                        if not _is_image(p) and not _is_subfestival(p)]
+        num_events = sum(1 for p in poster_paras if _is_event(p) or _is_subevent(p))
+        num_dates = len(poster_paras) - num_events
         log.info(f"Poster: {len(poster_paras)} paragraphes ({num_dates} dates, {num_events} événements)")
         log.info(f"Poster: {len(poster_frames)} colonnes, hauteurs = {[f.h for f in poster_frames]}")
 

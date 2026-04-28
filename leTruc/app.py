@@ -126,6 +126,7 @@ class Application(TkinterDnD.Tk):
         self.date_color_var = tk.StringVar(value=self.cfg_defaults.get("date_color", "#000000"))
         self.bidul_label_enabled_var = tk.BooleanVar(value=self.cfg_defaults.get("bidul_label_enabled", False))
         self.bidul_label_color_var = tk.StringVar(value=self.cfg_defaults.get("bidul_label_color", "#000000"))
+        self.festival_subgroup_enabled_var = tk.BooleanVar(value=self.cfg_defaults.get("festival_subgroup_enabled", False))
 
         # --- Variables pour le poster ---
         self.poster_title_var = tk.StringVar(value=self.cfg_defaults.get("poster_title", ""))
@@ -332,6 +333,7 @@ class Application(TkinterDnD.Tk):
             date_color=self.date_color_var.get(),
             bidul_label_enabled=self.bidul_label_enabled_var.get(),
             bidul_label_color=self.bidul_label_color_var.get(),
+            festival_subgroup_enabled=self.festival_subgroup_enabled_var.get(),
             poster_design=self.poster_design_var.get(),
             font_size_safety_factor=validated_args['safety_factor_val'],
             background_alpha=self.alpha_var.get(),

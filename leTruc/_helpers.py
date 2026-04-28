@@ -160,6 +160,7 @@ def _load_cfg_defaults() -> dict:
         out["date_color"] = getattr(cfg, "date_color", "#000000")
         out["bidul_label_enabled"] = getattr(cfg, "bidul_label_enabled", False)
         out["bidul_label_color"] = getattr(cfg, "bidul_label_color", "#000000")
+        out["festival_subgroup_enabled"] = getattr(cfg, "festival_subgroup_enabled", False)
         if isinstance(cfg.poster, dict):
             out.update({
                 "poster_design": cfg.poster.get("design", 0),
@@ -244,6 +245,7 @@ def run_pipeline(
         date_color: str = "#000000",
         bidul_label_enabled: bool = False,
         bidul_label_color: str = "#000000",
+        festival_subgroup_enabled: bool = False,
         abbreviations_enabled: dict = None,  # v1.4.2 : Abréviations activées
         stop_event: threading.Event = None,  # v1.4.3 : Event pour arrêt
         split_pdf: bool = False,  # v1.4.5 : Générer un PDF par page
@@ -325,6 +327,7 @@ def run_pipeline(
                 date_grouping_enabled=date_grouping_enabled,
                 festival_in_date_header=festival_in_date_header,
                 bidul_label_enabled=bidul_label_enabled,
+                festival_subgroup_enabled=festival_subgroup_enabled,
             )
         except ValueError as e:
             # Erreur de validation (colonnes manquantes ou fichier corrompu)
@@ -435,6 +438,7 @@ def run_pipeline(
         cfg.date_color = date_color
         cfg.bidul_label_enabled = bidul_label_enabled
         cfg.bidul_label_color = bidul_label_color
+        cfg.festival_subgroup_enabled = festival_subgroup_enabled
 
         # --- Paramètres visibles uniquement en mode debug ---
         # En mode normal, les valeurs de config.yml (déjà chargées) sont conservées
@@ -879,6 +883,8 @@ def load_and_apply_config(app_instance, config_path: str):
         app_instance.bidul_label_enabled_var.set(bool(cfg.bidul_label_enabled))
     if hasattr(cfg, 'bidul_label_color') and cfg.bidul_label_color:
         app_instance.bidul_label_color_var.set(cfg.bidul_label_color)
+    if hasattr(cfg, 'festival_subgroup_enabled'):
+        app_instance.festival_subgroup_enabled_var.set(bool(cfg.festival_subgroup_enabled))
 
     # Poster
     if isinstance(cfg.poster, dict):

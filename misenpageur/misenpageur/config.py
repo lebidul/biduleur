@@ -101,6 +101,9 @@ class Config:
     bidul_label_color: str = "#000000"
     bidul_label_format: str = "Bidul #{num}"
 
+    # --- Sous-groupement par festival (date + festival -> sous-en-tête) ---
+    festival_subgroup_enabled: bool = False
+
     # --- Bullets ---
     show_event_bullet: bool = True
     event_bullet_replacement: Optional[str] = None

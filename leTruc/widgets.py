@@ -432,6 +432,24 @@ def _create_page_layout_section(parent, app, ui_row):
     free_check.grid(row=lr, column=0, columnspan=2, sticky="w", padx=5, pady=5)
     Tooltip(free_check,
             text='Remplace automatiquement ", 0€" par une icône "gratuit" dans le texte des événements.')
+    lr += 1
+
+    # --- Option : sous-groupement par festival ---
+    fest_subgroup_check = tk.Checkbutton(
+        page_layout_frame,
+        text="Regrouper les événements partageant la même valeur de \"FESTOCHE EVENEMENT\"",
+        variable=app.festival_subgroup_enabled_var,
+    )
+    fest_subgroup_check.grid(row=lr, column=0, columnspan=3, sticky="w", padx=5, pady=5)
+    Tooltip(fest_subgroup_check,
+            text="Quand plusieurs événements partagent la même date et la même valeur\n"
+                 "de la colonne FESTOCHE EVENEMENT, ils sont regroupés sous un\n"
+                 "sous-en-tête (italique + bold) portant le nom du festival.\n\n"
+                 "Le préfixe 'Festival // ' est alors omis dans chaque ligne événement,\n"
+                 "ce qui économise de la place horizontalement.\n\n"
+                 "Exemple : 9 événements \"Jazz Tangentes 2026\" sur le même jour\n"
+                 "afficheront un seul sous-en-tête \"Jazz Tangentes 2026\" suivi\n"
+                 "des 9 événements (sans répétition du nom du festival).")
 
     r += 1
     ui_row['r'] = r

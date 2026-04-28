@@ -116,3 +116,6 @@ P_MD_OPEN_DATE_AGENDA = f"""<p style="font-family: Arial Narrow;line-height:{LIN
 P_MD_CLOSE = f"""</p>"""
 P_MD_CLOSE_DATE = f"""</spanp></p>"""
 P_MD_POST_OPEN = f"""<p style="font-family: Lucida Console">"""
+
+# Préfixe placeholder pour les sous-en-têtes festival (rendus séparément)
+SUBFEST_PREFIX = "{{SUBFEST}}"

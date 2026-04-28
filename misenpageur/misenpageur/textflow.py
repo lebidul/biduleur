@@ -18,7 +18,7 @@ from reportlab.pdfbase.pdfmetrics import stringWidth
 from .layout import Section
 from .drawing import paragraph_style
 from .html_utils import sanitize_inline_markup
-from .glyphs import apply_glyph_fallbacks
+from .glyphs import apply_glyph_fallbacks, FALLBACK_FONT
 from .spacing import SpacingPolicy
 
 from .config import BulletConfig, DateBoxConfig, DateLineConfig, DateStyleConfig, PosterConfig
@@ -41,6 +41,18 @@ _IMG_PLACEHOLDER_RE = re.compile(r'^\{\{IMG:(.+?)\}\}$')
 
 # Pattern pour détecter le préfixe {{BIDUL:xxx}} en début de date
 _BIDUL_PREFIX_RE = re.compile(r'^\{\{BIDUL:([^\}]+)\}\}')
+
+# Pattern pour détecter le préfixe {{SUBFEST}} (legacy, sous-en-tête festival)
+_SUBFEST_PREFIX = "{{SUBFEST}}"
+_SUBFEST_PREFIX_RE = re.compile(r'^\{\{SUBFEST\}\}(.*)$', re.DOTALL)
+
+# Pattern pour détecter le préfixe {{SUBEV}} (event d'un sous-groupe festival)
+_SUBEV_PREFIX = "{{SUBEV}}"
+_SUBEV_PREFIX_RE = re.compile(r'^\{\{SUBEV\}\}(.*)$', re.DOTALL)
+
+# Caractère de puce pour les sous-events (alignée avec la 1re lettre du festival)
+# ▸ = U+25B8 (black right-pointing small triangle), rendu via DejaVuSans
+_SUBEVENT_BULLET = "▸"
 
 # Dossier par défaut pour les images inline (relatif au dossier package)
 _INLINE_IMAGES_DIR = os.path.join(_PACKAGE_DIR, "assets", "images")
@@ -536,6 +548,46 @@ def _mk_style_for_kind(base: ParagraphStyle, kind: str,
         _STYLE_CACHE[cache_key] = style
         return style
 
+    if kind == "SUBFEST":
+        # (Legacy) Sous-en-tête festival : italique + bold, sans puce, indent réduit, gauche
+        cache_key = ("SUBFEST", base_font, font_size,
+                     bullet_cfg.event_hanging_indent)
+        if cache_key in _STYLE_CACHE:
+            return _STYLE_CACHE[cache_key]
+        style = ParagraphStyle(
+            name=f"{base.name}_subfest", parent=base,
+            leftIndent=max(0.0, bullet_cfg.event_hanging_indent * 0.3),
+            alignment=TA_LEFT,
+        )
+        _STYLE_CACHE[cache_key] = style
+        return style
+
+    if kind == "SUBEVENT":
+        # Event de sous-groupe festival.
+        # La puce ▸ doit s'aligner avec la 1re lettre du nom du festival au-dessus.
+        # Si EVENT a leftIndent=event_hanging_indent (texte à x=10), alors
+        # SUBEVENT veut sa puce à x=10 → bulletIndent=10.
+        # Pour réduire l'espace puce-texte, leftIndent juste un peu plus loin
+        # (≈ 4pt après le bullet character).
+        ev_indent = bullet_cfg.event_hanging_indent
+        cache_key = (
+            "SUBEVENT", base_font, font_size,
+            ev_indent, bullet_cfg.bullet_size_ratio,
+        )
+        if cache_key in _STYLE_CACHE:
+            return _STYLE_CACHE[cache_key]
+        bullet_font_size = font_size * bullet_cfg.bullet_size_ratio
+        style = ParagraphStyle(
+            name=f"{base.name}_subevent", parent=base,
+            leftIndent=ev_indent + 4.0,         # texte ~4pt après bullet → tight
+            bulletFontSize=bullet_font_size,
+            bulletFontName=FALLBACK_FONT,        # DejaVuSans pour rendre ▸
+            bulletIndent=ev_indent,              # bullet aligné avec 1re lettre du festival
+            alignment=TA_JUSTIFY,
+        )
+        _STYLE_CACHE[cache_key] = style
+        return style
+
     return base
 
 
@@ -547,6 +599,16 @@ def _mk_text_for_kind(
     # (il sera rendu séparément à gauche de la date)
     if kind == "DATE":
         raw, _bidul_num = _extract_bidul_prefix(raw)
+    if kind == "SUBFEST":
+        # Retirer le préfixe {{SUBFEST}}
+        m = _SUBFEST_PREFIX_RE.match(raw or "")
+        if m:
+            raw = m.group(1)
+    if kind == "SUBEVENT":
+        # Retirer le préfixe {{SUBEV}} (le bullet sera ajouté séparément)
+        m = _SUBEV_PREFIX_RE.match(raw or "")
+        if m:
+            raw = m.group(1)
     txt = _strip_head_tail_breaks(sanitize_inline_markup(raw))
     bullet_text = None
     if kind == "EVENT":
@@ -554,6 +616,9 @@ def _mk_text_for_kind(
             bullet_char = bullet_cfg.event_bullet_replacement or "❑"
             bullet_text = bullet_char
         txt = _strip_leading_bullet(txt)
+    elif kind == "SUBEVENT":
+        # Sous-event : puce différente, alignée avec la 1re lettre du festival
+        bullet_text = _SUBEVENT_BULLET
 
     # Remplacer tous les placeholders d'icônes par les images
     txt = _replace_all_placeholders(txt, font_size)
@@ -565,13 +630,37 @@ def _mk_text_for_kind(
         if date_style.bold:
             txt = f"<b>{txt}</b>"
 
+    # Sous-en-tête festival : style italique + bold (fixe)
+    if kind == "SUBFEST":
+        txt = f"<b><i>{txt}</i></b>"
+
     return apply_glyph_fallbacks(txt), bullet_text
 
 
+def _is_subfestival(raw: str) -> bool:
+    """(Legacy) Détecte un sous-en-tête festival via le préfixe {{SUBFEST}}."""
+    if not raw:
+        return False
+    s = raw.lstrip()
+    return s.startswith(_SUBFEST_PREFIX)
+
+
+def _is_subevent(raw: str) -> bool:
+    """Détecte un event de sous-groupe festival via le préfixe {{SUBEV}}."""
+    if not raw:
+        return False
+    s = raw.lstrip()
+    return s.startswith(_SUBEV_PREFIX)
+
+
 def _classify_paragraph(raw: str) -> str:
-    """Classifie un paragraphe: IMAGE, EVENT ou DATE."""
+    """Classifie un paragraphe: IMAGE, SUBEVENT, SUBFEST, EVENT ou DATE."""
     if _is_image(raw):
         return "IMAGE"
+    if _is_subevent(raw):
+        return "SUBEVENT"
+    if _is_subfestival(raw):
+        return "SUBFEST"
     if _is_event(raw):
         return "EVENT"
     return "DATE"
@@ -1013,7 +1102,10 @@ def _build_poster_story(
     _date_box = date_box or DateBoxConfig()
     story: list = []
     for raw in paras_text:
-        kind = "EVENT" if _is_event(raw) else "DATE"
+        kind = _classify_paragraph(raw)
+        # IMAGE et SUBFEST sont normalement filtrés en amont ; sécurité ici
+        if kind in ("IMAGE", "SUBFEST"):
+            continue
         st = _mk_style_for_kind(base_style, kind, bullet_cfg, _date_box, font_size, date_style=date_style)
         txt, bullet = _mk_text_for_kind(raw, kind, bullet_cfg, font_size, date_style=date_style)
 

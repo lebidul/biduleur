@@ -506,7 +506,7 @@ def _apply_date_range_display(df: pd.DataFrame) -> None:
         log.info(f"[DATES] {nb_ranges} plage(s) DATE→DATE FIN formatée(s)")
 
 
-def read_and_sort_file(filename: str, date_grouping_enabled: bool = False) -> Optional[List[Dict]]:
+def read_and_sort_file(filename: str, date_grouping_enabled: bool = False, festival_subgroup_enabled: bool = False) -> Optional[List[Dict]]:
     """
     Lit et trie un fichier (CSV, XLS, ou XLSX).
     Args:
@@ -600,6 +600,10 @@ def read_and_sort_file(filename: str, date_grouping_enabled: bool = False) -> Op
         # Tri personnalisé : 'En Bref' (COLONNE_INFO) passe à la fin
         first_genre_col = spectacle_col_sets[0]['genre']
         df['info_last'] = df[DATE].apply(lambda x: 0 if x == COLONNE_INFO else 1)
+
+        # Tri chronologique standard. Le réordonnancement par sous-groupe festival
+        # (pour que les events d'un même festival soient contigus à la position du
+        # 1er d'entre eux dans l'ordre chronologique) est fait dans parse_bidul.
         df_sorted = df.sort_values(by=['info_last', 'Day', first_genre_col, HORAIRE])
         df_sorted = df_sorted.drop(columns=['info_last'])
 
@@ -629,6 +633,7 @@ def parse_bidul(
         date_grouping_enabled: bool = False,
         festival_in_date_header: bool = False,
         bidul_label_enabled: bool = False,
+        festival_subgroup_enabled: bool = False,
 ) -> tuple:
     """
     Traite le fichier d'entrée (CSV, XLS, ou XLSX) et génère les données nécessaires.
@@ -647,17 +652,95 @@ def parse_bidul(
     if sorted_events is None:
         return body_content, body_content_agenda, 0
 
+    # Pré-calculer les comptes (date, festival) pour ne déclencher le sous-en-tête
+    # QUE quand 2+ événements partagent la même paire.
+    # ET réordonner les événements pour que les sous-groupes apparaissent à la
+    # position chronologique de leur 1er événement.
+    datefest_counts = {}
+    group_styles = {}  # (date, festival) -> 1er STYLE_FESTIVAL non-vide du groupe
+    if festival_subgroup_enabled:
+        from collections import Counter
+        from biduleur.format_utils import _to_str as _to_str_helper
+        from biduleur.constants import STYLE_FESTIVAL as STYLE_FESTIVAL_COL
+
+        def _fest_key_for_count(r):
+            raw = _to_str_helper(r.get(FESTIVAL, '')).strip()
+            if not raw or raw.lower() == 'nan':
+                return ''
+            return raw
+
+        cnt = Counter()
+        for r in sorted_events:
+            d = r.get(DATE, '') or ''
+            f = _fest_key_for_count(r)
+            cnt[(d, f)] += 1
+            # Capturer le 1er STYLE non-vide du groupe (au cas où l'event en
+            # tête de groupe ait un STYLE vide alors que d'autres l'ont rempli)
+            if f:
+                st = _to_str_helper(r.get(STYLE_FESTIVAL_COL, '')).strip()
+                if st and st.lower() != 'nan':
+                    key = (d, f)
+                    if key not in group_styles:
+                        group_styles[key] = st
+        datefest_counts = cnt
+
+        # Calcul de la "position effective" pour chaque event :
+        # - Si dans un groupe (count ≥ 2) : position du 1er event du groupe
+        # - Sinon : sa propre position
+        first_pos = {}
+        for i, r in enumerate(sorted_events):
+            d = r.get(DATE, '') or ''
+            f = _fest_key_for_count(r)
+            key = (d, f)
+            if key not in first_pos:
+                first_pos[key] = i
+
+        eff_pos = []
+        for i, r in enumerate(sorted_events):
+            d = r.get(DATE, '') or ''
+            f = _fest_key_for_count(r)
+            key = (d, f)
+            if f and datefest_counts.get(key, 0) >= 2:
+                eff_pos.append(first_pos[key])
+            else:
+                eff_pos.append(i)
+
+        order = sorted(range(len(sorted_events)), key=lambda i: (eff_pos[i], i))
+        sorted_events = [sorted_events[i] for i in order]
+
     current_date = None
+    current_subfest = None
     number_of_lines = 0
 
     for row in sorted_events:
         # strip des chaînes
         row = {key: (value.strip() if isinstance(value, str) else value) for key, value in row.items()}
 
-        formatted_line_bidul, formatted_line_agenda, formatted_line_post, current_date = parse_bidul_event(
+        # Déterminer si CET événement participe à un sous-groupe (≥2 événements
+        # partageant la même paire date+festival). Sinon, comportement classique :
+        # festival inline avec " // ".
+        use_subgroup_for_event = False
+        subhead_style_for_event = ''
+        if festival_subgroup_enabled:
+            d_val = row.get(DATE, '') or ''
+            from biduleur.format_utils import _to_str as _to_str_helper
+            f_raw = _to_str_helper(row.get(FESTIVAL, '')).strip()
+            f_key = '' if not f_raw or f_raw.lower() == 'nan' else f_raw
+            if f_key:
+                use_subgroup_for_event = datefest_counts.get((d_val, f_key), 0) >= 2
+                if use_subgroup_for_event:
+                    # Style "représentatif" du groupe (le 1er non-vide trouvé)
+                    subhead_style_for_event = group_styles.get((d_val, f_key), '')
+                    # Injecte dans la row pour que parse_bidul_event puisse le
+                    # récupérer lors de la 1re émission du sous-en-tête.
+                    row['_subhead_style'] = subhead_style_for_event
+
+        formatted_line_bidul, formatted_line_agenda, formatted_line_post, current_date, current_subfest = parse_bidul_event(
             row, current_date,
             festival_in_date_header=festival_in_date_header,
             bidul_label_enabled=bidul_label_enabled,
+            festival_subgroup_enabled=use_subgroup_for_event,
+            current_subfest=current_subfest,
         )
         body_content += formatted_line_bidul + "\n\n"
         body_content_agenda += formatted_line_agenda + "\n\n"
