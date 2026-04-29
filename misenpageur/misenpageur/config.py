@@ -94,6 +94,15 @@ class Config:
     date_bold: bool = False
     date_italic: bool = False
     date_alignment: str = "left"  # "left", "center", "right"
+    date_color: str = "#000000"   # Couleur de police des dates (hex)
+
+    # --- Étiquette "Bidul #xxx" à gauche de la date (si alignement droite) ---
+    bidul_label_enabled: bool = False
+    bidul_label_color: str = "#000000"
+    bidul_label_format: str = "Bidul #{num}"
+
+    # --- Sous-groupement par festival (date + festival -> sous-en-tête) ---
+    festival_subgroup_enabled: bool = False
 
     # --- Bullets ---
     show_event_bullet: bool = True
@@ -121,6 +130,11 @@ class Config:
     inline_images_dir: str = ""
     inline_images_scale: float = 0.85
     inline_images_margin: float = 1.0
+    inline_images_auto_scale: bool = False
+
+    # --- Fonctions expérimentales Teriaki ---
+    date_grouping_enabled: bool = False
+    festival_in_date_header: bool = False
 
     # --- Debug ---
     debug_mode: bool = False
@@ -184,6 +198,7 @@ class DateStyleConfig:
     bold: bool = False
     italic: bool = False
     alignment: str = "left"  # "left", "center", "right"
+    color: str = "#000000"  # Couleur de police hex (default noir)
 
 
 @dataclass

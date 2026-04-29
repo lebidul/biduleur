@@ -40,12 +40,17 @@ Le projet est articulé autour d'une **interface graphique principale** qui orch
     *   Contrôle total sur la mise en page (marges, polices, couleurs).
     *   Mise en page des logos intelligente avec un algorithme de *packing*.
     *   Ajout de contenu personnalisé via la boîte "Cucaracha".
-    *   **Images inline** : insertion d'images directement dans le corps de l'agenda (mode debug) via `GENRE = "img"` dans le fichier Excel.
+    *   **Images inline** : insertion d'images directement dans le corps de l'agenda (mode debug) via `GENRE = "img"` dans le fichier Excel, avec **auto-scaling** optionnel.
+    *   **Couleur des dates** configurable + **étiquette "Bidul #xxx"** sur la même ligne (à gauche) avec couleur dédiée.
 *   **Formats de date flexibles** :
     *   Dates complètes : `2014-08-31` → `Dimanche 31 Août 2014`.
     *   Année seule : `2005` → `2005`.
     *   Mois-année : `08-2021` → `Août 2021`.
+    *   **Plages** via colonne optionnelle `DATE FIN` : `2016-08-27 → 2016-08-28` rend `Du Samedi 27 au Dimanche 28 Août 2016`.
+    *   **Regroupement chronologique** des jours consécutifs : `Samedi 23 & Dimanche 24 Août 2025` (mode debug).
     *   Tri chronologique cohérent entre dates partielles et précises.
+*   **Sous-groupement par festival** : les événements partageant la même date et la même valeur de la colonne FESTOCHE EVENEMENT sont automatiquement regroupés sous un sous-en-tête (puce ❑ + nom du festival), avec sub-events à puce `▸` indentée. Activable depuis l'UI section "Mise en Page Globale".
+*   **Normalisation intelligente des noms propres** : la colonne STYLE (FESTOCHE / EVENEMENT) est rendue en lowercase intelligent avec préservation automatique de la casse pour ~580 villes et pays connus (préfectures de France, capitales européennes, capitales d'États américains, county towns anglais, etc.).
 *   **Colonnes spectacles dynamiques** : le système détecte automatiquement le nombre de colonnes `GENRE N` / `NOM SPECTACLE N` présentes dans le fichier Excel.
 *   **Hyperliens cliquables** : les hyperliens des cellules Excel sont extraits et rendus cliquables dans le PDF final.
 *   **Retour Utilisateur en Temps Réel** : Une barre de progression et des messages de statut clairs informent l'utilisateur de l'avancement du processus.

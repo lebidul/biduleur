@@ -25,8 +25,8 @@ from .spacing import SpacingConfig, SpacingPolicy
 from .textflow import (
     measure_fit_at_fs, draw_section_fixed_fs_with_prelude, draw_section_fixed_fs_with_tail,
     plan_pair_with_split, measure_poster_fit_at_fs, draw_poster_text_in_frames,
-    _is_event, _is_image, _mk_style_for_kind, _mk_text_for_kind,
-    configure_inline_images
+    _is_event, _is_image, _is_subfestival, _is_subevent, _mk_style_for_kind, _mk_text_for_kind,
+    configure_inline_images, configure_bidul_label
 )
 from .image_builder import generate_story_images
 from .utils import mm_to_pt
@@ -339,19 +339,71 @@ def _simulate_allocation_at_fs(
         bullet_cfg: BulletConfig,
         date_box: DateBoxConfig,
         date_style: DateStyleConfig | None = None,
+        split_min_gain_ratio: float = 0.10,
 ) -> Tuple[dict, int]:
+    """
+    Simule la répartition des paragraphes pour une taille de police donnée.
+
+    Utilise `plan_pair_with_split` pour les paires de sections (S5,S6) puis
+    (S3,S4), afin de rester aligné avec le rendu réel. Cela évite la
+    sous-estimation qui se produit lorsqu'on enchaîne simplement des appels
+    `measure_fit_at_fs` par section (qui ne fait pas de split de paragraphes).
+
+    Le paramètre `order` est conservé pour compatibilité mais utilisé
+    uniquement pour ordonner les paires reconnues.
+    """
     remaining = list(paras)
-    used_by = {}
+    used_by = {n: [] for n in order}
     total = 0
-    for name in order:
-        k = measure_fit_at_fs(
-            c, S[name], remaining, font_name, font_size, leading_ratio, inner_pad,
-            section_name=name, spacing_policy=spacing_policy,
-            bullet_cfg=bullet_cfg, date_box=date_box, date_style=date_style
-        )
-        used_by[name] = remaining[:k]
-        total += k
-        remaining = remaining[k:]
+
+    # Identifier les paires attendues dans l'ordre.
+    # order est typiquement ["S5", "S6", "S3", "S4"] → paires (S5,S6) puis (S3,S4).
+    pairs = []
+    i = 0
+    while i + 1 < len(order):
+        a, b = order[i], order[i + 1]
+        if a in S and b in S:
+            pairs.append((a, b))
+            i += 2
+        else:
+            i += 1
+
+    for nameA, nameB in pairs:
+        # Utiliser plan_pair_with_split pour refléter la logique de rendu
+        try:
+            A_full, A_tail, B_prelude, B_full, rest = plan_pair_with_split(
+                c, S[nameA], S[nameB], nameA, nameB, remaining,
+                font_name, font_size, leading_ratio, inner_pad,
+                split_min_gain_ratio, spacing_policy, bullet_cfg, date_box, date_style,
+            )
+        except Exception:
+            # Fallback : mesure par section en cas d'échec de plan_pair_with_split
+            kA = measure_fit_at_fs(
+                c, S[nameA], remaining, font_name, font_size, leading_ratio, inner_pad,
+                section_name=nameA, spacing_policy=spacing_policy,
+                bullet_cfg=bullet_cfg, date_box=date_box, date_style=date_style,
+            )
+            used_by[nameA] = remaining[:kA]
+            total += kA
+            remaining = remaining[kA:]
+            kB = measure_fit_at_fs(
+                c, S[nameB], remaining, font_name, font_size, leading_ratio, inner_pad,
+                section_name=nameB, spacing_policy=spacing_policy,
+                bullet_cfg=bullet_cfg, date_box=date_box, date_style=date_style,
+            )
+            used_by[nameB] = remaining[:kB]
+            total += kB
+            remaining = remaining[kB:]
+            continue
+
+        # Nombre de paragraphes de la liste originale consommés par cette paire :
+        # tous les paragraphes de `remaining` qui ne sont pas dans `rest`.
+        consumed = len(remaining) - len(rest)
+        used_by[nameA] = remaining[:consumed]  # approximation agrégée
+        used_by[nameB] = []  # détail non nécessaire pour la recherche binaire
+        total += consumed
+        remaining = rest
+
     return used_by, total
 
 
@@ -460,12 +512,13 @@ def _read_date_line_config(cfg: Config) -> DateLineConfig:
 
 
 def _read_date_style_config(cfg: Config) -> DateStyleConfig:
-    """Lit les paramètres de style des dates (bold, italic, alignement, police)."""
+    """Lit les paramètres de style des dates (bold, italic, alignement, police, couleur)."""
     return DateStyleConfig(
         font_name=getattr(cfg, "date_font_name", None),
         bold=getattr(cfg, "date_bold", False),
         italic=getattr(cfg, "date_italic", False),
         alignment=getattr(cfg, "date_alignment", "left"),
+        color=getattr(cfg, "date_color", "#000000"),
     )
 
 
@@ -497,6 +550,14 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
         images_dir=getattr(cfg, 'inline_images_dir', ''),
         scale=getattr(cfg, 'inline_images_scale', 0.85),
         margin=getattr(cfg, 'inline_images_margin', 1.0),
+        auto_scale=getattr(cfg, 'inline_images_auto_scale', False),
+    )
+
+    # --- Configuration de l'étiquette "Bidul #xxx" ---
+    configure_bidul_label(
+        enabled=getattr(cfg, 'bidul_label_enabled', False),
+        color=getattr(cfg, 'bidul_label_color', '#000000'),
+        fmt=getattr(cfg, 'bidul_label_format', 'Bidul #{num}'),
     )
 
     # --- Polices de base (nécessaires pour les références hardcodées dans config.yml) ---
@@ -596,7 +657,8 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
             style_mid = paragraph_style(cfg.font_name, mid, cfg.leading_ratio)
             spacing_mid = SpacingPolicy(spacing_cfg, style_mid.leading)
             _, tot = _simulate_allocation_at_fs(c, S, order_fs, paras, cfg.font_name, mid, cfg.leading_ratio,
-                                                cfg.inner_padding, spacing_mid, bullet_cfg, date_box, date_style)
+                                                cfg.inner_padding, spacing_mid, bullet_cfg, date_box, date_style,
+                                                split_min_gain_ratio=cfg.split_min_gain_ratio)
             if tot >= len(paras):
                 best_fs, lo = mid, mid
             else:
@@ -841,10 +903,14 @@ def draw_document(c, project_root: str, cfg: Config, layout: Layout, config_path
         draw_poster_logos(c, S7["S7_Logos"], logos, cfg)
 
         # --- Calcul de la taille de police ---
-        # Filtrer les images inline du poster (pas de rendu image dans le poster)
-        poster_paras = [p for p in (s5_full + s6_full + s3_full + s4_full) if not _is_image(p)]
-        num_dates = sum(1 for p in poster_paras if not _is_event(p))
-        num_events = sum(1 for p in poster_paras if _is_event(p))
+        # Filtrer images inline (pas de rendu image dans le poster) et legacy SUBFEST.
+        # Les SUBEV (events de sous-groupe) sont conservés tels quels pour que le
+        # poster reproduise la même mise en page que les pages 1-2 (sous-en-tête
+        # festival + sub-events avec puce ▸).
+        poster_paras = [p for p in (s5_full + s6_full + s3_full + s4_full)
+                        if not _is_image(p) and not _is_subfestival(p)]
+        num_events = sum(1 for p in poster_paras if _is_event(p) or _is_subevent(p))
+        num_dates = len(poster_paras) - num_events
         log.info(f"Poster: {len(poster_paras)} paragraphes ({num_dates} dates, {num_events} événements)")
         log.info(f"Poster: {len(poster_frames)} colonnes, hauteurs = {[f.h for f in poster_frames]}")
 

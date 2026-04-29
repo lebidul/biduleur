@@ -18,7 +18,7 @@ from reportlab.pdfbase.pdfmetrics import stringWidth
 from .layout import Section
 from .drawing import paragraph_style
 from .html_utils import sanitize_inline_markup
-from .glyphs import apply_glyph_fallbacks
+from .glyphs import apply_glyph_fallbacks, FALLBACK_FONT
 from .spacing import SpacingPolicy
 
 from .config import BulletConfig, DateBoxConfig, DateLineConfig, DateStyleConfig, PosterConfig
@@ -39,6 +39,21 @@ FREE_PLACEHOLDER = "{{FREE}}"
 # Pattern pour détecter les placeholders image {{IMG:filename.jpg}}
 _IMG_PLACEHOLDER_RE = re.compile(r'^\{\{IMG:(.+?)\}\}$')
 
+# Pattern pour détecter le préfixe {{BIDUL:xxx}} en début de date
+_BIDUL_PREFIX_RE = re.compile(r'^\{\{BIDUL:([^\}]+)\}\}')
+
+# Pattern pour détecter le préfixe {{SUBFEST}} (legacy, sous-en-tête festival)
+_SUBFEST_PREFIX = "{{SUBFEST}}"
+_SUBFEST_PREFIX_RE = re.compile(r'^\{\{SUBFEST\}\}(.*)$', re.DOTALL)
+
+# Pattern pour détecter le préfixe {{SUBEV}} (event d'un sous-groupe festival)
+_SUBEV_PREFIX = "{{SUBEV}}"
+_SUBEV_PREFIX_RE = re.compile(r'^\{\{SUBEV\}\}(.*)$', re.DOTALL)
+
+# Caractère de puce pour les sous-events (alignée avec la 1re lettre du festival)
+# ▸ = U+25B8 (black right-pointing small triangle), rendu via DejaVuSans
+_SUBEVENT_BULLET = "▸"
+
 # Dossier par défaut pour les images inline (relatif au dossier package)
 _INLINE_IMAGES_DIR = os.path.join(_PACKAGE_DIR, "assets", "images")
 
@@ -51,13 +66,84 @@ _INLINE_IMAGES_ENABLED = True
 # Marge en points avant/après chaque image inline
 _INLINE_IMAGE_MARGIN = 1.0
 
+# Auto-scaling des images inline trop grandes pour leur section
+_INLINE_IMAGE_AUTO_SCALE = False
 
-def configure_inline_images(enabled: bool = True, images_dir: str = "", scale: float = 0.85, margin: float = 1.0):
+# Étiquette "Bidul #xxx" à gauche des dates right-aligned
+_BIDUL_LABEL_ENABLED = False
+_BIDUL_LABEL_COLOR = "#000000"
+_BIDUL_LABEL_FORMAT = "Bidul #{num}"
+
+
+def configure_bidul_label(enabled: bool = False, color: str = "#000000", fmt: str = "Bidul #{num}"):
+    """Configure le rendu de l'étiquette 'Bidul #xxx' côté gauche des dates."""
+    global _BIDUL_LABEL_ENABLED, _BIDUL_LABEL_COLOR, _BIDUL_LABEL_FORMAT
+    _BIDUL_LABEL_ENABLED = bool(enabled)
+    _BIDUL_LABEL_COLOR = color or "#000000"
+    _BIDUL_LABEL_FORMAT = fmt or "Bidul #{num}"
+
+
+def _draw_bidul_label(c, raw: str, x_left: float, y_top: float, font_size: float,
+                      date_style: "DateStyleConfig | None"):
+    """
+    Si `raw` commence par {{BIDUL:xxx}}, dessine l'étiquette 'Bidul #xxx'
+    à la coordonnée (x_left, y_top - font_size) en alignement gauche,
+    avec la couleur configurée.
+
+    À appeler UNIQUEMENT quand la date est alignée à droite, sinon
+    il y aurait chevauchement avec le texte de la date.
+    """
+    if not _BIDUL_LABEL_ENABLED or date_style is None:
+        return
+    if date_style.alignment != "right":
+        return
+    _stripped, num = _extract_bidul_prefix(raw)
+    if not num:
+        return
+    try:
+        label_text = _BIDUL_LABEL_FORMAT.format(num=num)
+    except Exception:
+        label_text = f"Bidul #{num}"
+    font_name = date_style.font_name or getattr(c, '_fontname', 'Helvetica')
+    c.saveState()
+    try:
+        c.setFont(font_name, font_size)
+    except Exception:
+        c.setFont("Helvetica", font_size)
+    c.setFillColor(HexColor(_BIDUL_LABEL_COLOR))
+    # y_top est le sommet du paragraphe date; on descend d'une ligne de hauteur ~font_size
+    # pour aligner la baseline avec celle de la première ligne de la date
+    baseline_y = y_top - font_size * 0.85
+    c.drawString(x_left, baseline_y, label_text)
+    c.restoreState()
+
+
+def _extract_bidul_prefix(raw: str) -> tuple[str, str | None]:
+    """
+    Extrait le préfixe {{BIDUL:xxx}} d'une chaîne de date.
+    Retourne (raw_sans_préfixe, num_bidul) ou (raw, None) si pas de préfixe.
+    """
+    if not raw:
+        return raw, None
+    m = _BIDUL_PREFIX_RE.match(raw)
+    if not m:
+        return raw, None
+    return raw[m.end():], m.group(1)
+
+
+def configure_inline_images(
+        enabled: bool = True,
+        images_dir: str = "",
+        scale: float = 0.85,
+        margin: float = 1.0,
+        auto_scale: bool = False,
+):
     """Configure les paramètres d'images inline depuis la Config.
 
     Appelé une fois au début du rendu PDF par draw_logic.py.
     """
-    global _INLINE_IMAGES_DIR, INLINE_IMAGE_SCALE, _INLINE_IMAGES_ENABLED, _INLINE_IMAGE_MARGIN
+    global _INLINE_IMAGES_DIR, INLINE_IMAGE_SCALE, _INLINE_IMAGES_ENABLED, \
+        _INLINE_IMAGE_MARGIN, _INLINE_IMAGE_AUTO_SCALE
     _INLINE_IMAGES_ENABLED = enabled
     if images_dir and os.path.isdir(images_dir):
         _INLINE_IMAGES_DIR = images_dir
@@ -66,6 +152,59 @@ def configure_inline_images(enabled: bool = True, images_dir: str = "", scale: f
     if 0.0 < scale <= 1.0:
         INLINE_IMAGE_SCALE = scale
     _INLINE_IMAGE_MARGIN = max(0.0, margin)
+    _INLINE_IMAGE_AUTO_SCALE = bool(auto_scale)
+
+
+def _compute_image_dimensions(
+        image_path: str,
+        section_width: float,
+        available_height: float,
+        margin: float,
+) -> tuple[float, float] | None:
+    """
+    Calcule les dimensions (img_w, img_h) auxquelles l'image sera rendue,
+    en tenant compte de l'échelle utilisateur et de l'auto-scaling éventuel.
+
+    Retourne None si l'image ne peut pas être placée du tout
+    (hauteur utile ≤ 0, ou auto_scale désactivé et image trop grande).
+
+    Flow :
+    - Taille "idéale" : largeur = section_width * INLINE_IMAGE_SCALE
+    - Hauteur calculée depuis le ratio d'aspect à cette largeur
+    - Si ça rentre dans available_height (moins 2*margin) : on retourne tel quel
+    - Sinon, si auto_scale est ON : on réduit la hauteur pour tenir et
+      on ajuste la largeur proportionnellement
+    - Sinon (auto_scale OFF) : None
+    """
+    img_w_natural = section_width * INLINE_IMAGE_SCALE
+    img_h_natural = _calc_image_height_for_width(image_path, img_w_natural)
+    needed = img_h_natural + 2 * margin
+
+    if needed <= available_height:
+        return (img_w_natural, img_h_natural)
+
+    if not _INLINE_IMAGE_AUTO_SCALE:
+        return None
+
+    # Auto-scaling : réduire la hauteur pour tenir dans available_height - 2*margin
+    max_h = available_height - 2 * margin
+    if max_h <= 0:
+        return None
+
+    size = _get_inline_image_size(image_path)
+    if not size or size[0] <= 0 or size[1] <= 0:
+        return None
+    orig_w, orig_h = size
+    # Garder le même ratio d'aspect : new_w / new_h = orig_w / orig_h
+    new_w = max_h * orig_w / orig_h
+    # Ne jamais dépasser la largeur idéale (pas d'agrandissement au-dessus de INLINE_IMAGE_SCALE)
+    if new_w > img_w_natural:
+        new_w = img_w_natural
+        new_h = _calc_image_height_for_width(image_path, new_w)
+        if new_h + 2 * margin > available_height:
+            return None
+        return (new_w, new_h)
+    return (new_w, max_h)
 
 # Cache pour les dimensions des images inline {path: (width, height)}
 _INLINE_IMAGE_SIZE_CACHE: dict[str, tuple[int, int] | None] = {}
@@ -376,6 +515,7 @@ def _mk_style_for_kind(base: ParagraphStyle, kind: str,
     if kind == "DATE":
         ds = date_style or DateStyleConfig()
         ta = _ALIGNMENT_MAP.get(ds.alignment, TA_LEFT)
+        ds_color = getattr(ds, "color", None) or "#000000"
         cache_key = (
             "DATE", base_font, font_size,
             date_box.enabled,
@@ -385,11 +525,12 @@ def _mk_style_for_kind(base: ParagraphStyle, kind: str,
             date_box.padding,
             ta,
             ds.font_name,
+            ds_color,
         )
         if cache_key in _STYLE_CACHE:
             return _STYLE_CACHE[cache_key]
 
-        kwargs = {"alignment": ta}
+        kwargs = {"alignment": ta, "textColor": HexColor(ds_color)}
         if ds.font_name:
             kwargs["fontName"] = ds.font_name
         if date_box.enabled:
@@ -407,6 +548,46 @@ def _mk_style_for_kind(base: ParagraphStyle, kind: str,
         _STYLE_CACHE[cache_key] = style
         return style
 
+    if kind == "SUBFEST":
+        # (Legacy) Sous-en-tête festival : italique + bold, sans puce, indent réduit, gauche
+        cache_key = ("SUBFEST", base_font, font_size,
+                     bullet_cfg.event_hanging_indent)
+        if cache_key in _STYLE_CACHE:
+            return _STYLE_CACHE[cache_key]
+        style = ParagraphStyle(
+            name=f"{base.name}_subfest", parent=base,
+            leftIndent=max(0.0, bullet_cfg.event_hanging_indent * 0.3),
+            alignment=TA_LEFT,
+        )
+        _STYLE_CACHE[cache_key] = style
+        return style
+
+    if kind == "SUBEVENT":
+        # Event de sous-groupe festival.
+        # La puce ▸ doit s'aligner avec la 1re lettre du nom du festival au-dessus.
+        # Si EVENT a leftIndent=event_hanging_indent (texte à x=10), alors
+        # SUBEVENT veut sa puce à x=10 → bulletIndent=10.
+        # Pour réduire l'espace puce-texte, leftIndent juste un peu plus loin
+        # (≈ 4pt après le bullet character).
+        ev_indent = bullet_cfg.event_hanging_indent
+        cache_key = (
+            "SUBEVENT", base_font, font_size,
+            ev_indent, bullet_cfg.bullet_size_ratio,
+        )
+        if cache_key in _STYLE_CACHE:
+            return _STYLE_CACHE[cache_key]
+        bullet_font_size = font_size * bullet_cfg.bullet_size_ratio
+        style = ParagraphStyle(
+            name=f"{base.name}_subevent", parent=base,
+            leftIndent=ev_indent + 4.0,         # texte ~4pt après bullet → tight
+            bulletFontSize=bullet_font_size,
+            bulletFontName=FALLBACK_FONT,        # DejaVuSans pour rendre ▸
+            bulletIndent=ev_indent,              # bullet aligné avec 1re lettre du festival
+            alignment=TA_JUSTIFY,
+        )
+        _STYLE_CACHE[cache_key] = style
+        return style
+
     return base
 
 
@@ -414,6 +595,20 @@ def _mk_text_for_kind(
         raw: str, kind: str, bullet_cfg: BulletConfig, font_size: float = 10.0,
         date_style: DateStyleConfig | None = None
 ) -> Tuple[str, Optional[str]]:
+    # Pour les dates, retirer le préfixe {{BIDUL:xxx}} s'il existe
+    # (il sera rendu séparément à gauche de la date)
+    if kind == "DATE":
+        raw, _bidul_num = _extract_bidul_prefix(raw)
+    if kind == "SUBFEST":
+        # Retirer le préfixe {{SUBFEST}}
+        m = _SUBFEST_PREFIX_RE.match(raw or "")
+        if m:
+            raw = m.group(1)
+    if kind == "SUBEVENT":
+        # Retirer le préfixe {{SUBEV}} (le bullet sera ajouté séparément)
+        m = _SUBEV_PREFIX_RE.match(raw or "")
+        if m:
+            raw = m.group(1)
     txt = _strip_head_tail_breaks(sanitize_inline_markup(raw))
     bullet_text = None
     if kind == "EVENT":
@@ -421,6 +616,9 @@ def _mk_text_for_kind(
             bullet_char = bullet_cfg.event_bullet_replacement or "❑"
             bullet_text = bullet_char
         txt = _strip_leading_bullet(txt)
+    elif kind == "SUBEVENT":
+        # Sous-event : puce différente, alignée avec la 1re lettre du festival
+        bullet_text = _SUBEVENT_BULLET
 
     # Remplacer tous les placeholders d'icônes par les images
     txt = _replace_all_placeholders(txt, font_size)
@@ -432,16 +630,82 @@ def _mk_text_for_kind(
         if date_style.bold:
             txt = f"<b>{txt}</b>"
 
+    # Sous-en-tête festival : style italique + bold (fixe)
+    if kind == "SUBFEST":
+        txt = f"<b><i>{txt}</i></b>"
+
     return apply_glyph_fallbacks(txt), bullet_text
 
 
+def _is_subfestival(raw: str) -> bool:
+    """(Legacy) Détecte un sous-en-tête festival via le préfixe {{SUBFEST}}."""
+    if not raw:
+        return False
+    s = raw.lstrip()
+    return s.startswith(_SUBFEST_PREFIX)
+
+
+def _is_subevent(raw: str) -> bool:
+    """Détecte un event de sous-groupe festival via le préfixe {{SUBEV}}."""
+    if not raw:
+        return False
+    s = raw.lstrip()
+    return s.startswith(_SUBEV_PREFIX)
+
+
 def _classify_paragraph(raw: str) -> str:
-    """Classifie un paragraphe: IMAGE, EVENT ou DATE."""
+    """Classifie un paragraphe: IMAGE, SUBEVENT, SUBFEST, EVENT ou DATE."""
     if _is_image(raw):
         return "IMAGE"
+    if _is_subevent(raw):
+        return "SUBEVENT"
+    if _is_subfestival(raw):
+        return "SUBFEST"
     if _is_event(raw):
         return "EVENT"
     return "DATE"
+
+
+def _compute_next_para_need(
+        raw_next: str,
+        w: float,
+        font_size: float,
+        base: "ParagraphStyle",
+        bullet_cfg: "BulletConfig",
+        date_box: "DateBoxConfig",
+        date_style: "DateStyleConfig | None",
+        spacing_policy: "SpacingPolicy",
+        section_name: str,
+        first_non_event_seen: bool,
+) -> float:
+    """
+    Calcule la place verticale nécessaire pour placer le paragraphe suivant
+    (event, date OU image) dans une section de largeur `w`.
+
+    Retourne 0 si le paragraphe est une image manquante (fichier introuvable)
+    — il sera silencieusement ignoré au rendu, donc ne provoque pas d'orphan.
+    """
+    next_kind = _classify_paragraph(raw_next)
+
+    if next_kind == "IMAGE":
+        image_path = _get_image_path(raw_next)
+        if image_path and os.path.exists(image_path):
+            img_margin = _INLINE_IMAGE_MARGIN
+            # Utilise l'échelle naturelle (sans auto-scale) pour la vérification d'orphelin :
+            # on veut savoir la taille IDÉALE de l'image, pas la taille réduite forcée.
+            img_w = w * INLINE_IMAGE_SCALE
+            img_h = _calc_image_height_for_width(image_path, img_w)
+            return img_h + 2 * img_margin
+        return 0.0
+
+    # EVENT ou DATE (la DATE comme "suivante" est rare mais possible)
+    next_st = _mk_style_for_kind(base, next_kind, bullet_cfg, date_box, font_size, date_style)
+    next_txt, next_bullet = _mk_text_for_kind(raw_next, next_kind, bullet_cfg, font_size, date_style)
+    next_p = Paragraph(next_txt, next_st, bulletText=next_bullet)
+    _w, next_ph = next_p.wrap(w, 1e6)
+    next_sb = spacing_policy.space_before(next_kind, section_name, first_non_event_seen)
+    next_sa = spacing_policy.space_after(next_kind, next_ph)
+    return next_sb + next_ph + next_sa
 
 
 def measure_fit_at_fs(
@@ -465,12 +729,12 @@ def measure_fit_at_fs(
         if kind == "IMAGE":
             image_path = _get_image_path(raw)
             if image_path and os.path.exists(image_path):
-                img_margin = _INLINE_IMAGE_MARGIN  # marge minimale avant/après image (en points)
-                img_w = w * INLINE_IMAGE_SCALE
-                ph = _calc_image_height_for_width(image_path, img_w)
-                need = ph + 2 * img_margin
-                if (y - need) < y0:
+                img_margin = _INLINE_IMAGE_MARGIN
+                dims = _compute_image_dimensions(image_path, w, y - y0, img_margin)
+                if dims is None:
                     break
+                _img_w, ph = dims
+                need = ph + 2 * img_margin
                 y -= need
                 used += 1
             continue
@@ -490,28 +754,16 @@ def measure_fit_at_fs(
             break
 
         # CONTRAINTE : Empêcher qu'une DATE se retrouve seule en bas
-        # Si c'est une DATE et qu'il reste des paragraphes après
+        # Si c'est une DATE et qu'il reste des paragraphes après (EVENT ou IMAGE)
         if kind == "DATE" and i < len(paras_text) - 1:
-            # Regarder le prochain paragraphe
             next_raw = paras_text[i + 1]
-            next_kind = _classify_paragraph(next_raw)
-
-            # Si le suivant est un EVENT, vérifier qu'on peut en placer au moins un
-            if next_kind == "EVENT":
-                # Calculer la valeur qu'aura first_non_event_seen_in_S5 APRÈS avoir placé la DATE actuelle
-                first_non_event_after_current = first_non_event_seen_in_S5
-
-                next_st = _mk_style_for_kind(base, next_kind, bullet_cfg, date_box, font_size, date_style)
-                next_txt, next_bullet = _mk_text_for_kind(next_raw, next_kind, bullet_cfg, font_size, date_style)
-                next_p = Paragraph(next_txt, next_st, bulletText=next_bullet)
-                _next_w, next_ph = next_p.wrap(w, 1e6)
-                next_sb = spacing_policy.space_before(next_kind, section_name, first_non_event_after_current)
-                next_sa = spacing_policy.space_after(next_kind, next_ph)
-                next_need = next_sb + next_ph + next_sa
-
-                # Si on n'a pas assez de place pour la DATE + au moins un EVENT, ne pas placer la DATE
-                if (y - need - next_need) < y0:
-                    break
+            next_need = _compute_next_para_need(
+                next_raw, w, font_size, base, bullet_cfg, date_box, date_style,
+                spacing_policy, section_name, first_non_event_seen_in_S5,
+            )
+            # Si on n'a pas assez de place pour la DATE + le paragraphe suivant, break
+            if next_need > 0 and (y - need - next_need) < y0:
+                break
 
         # Le paragraphe peut être placé
         y -= need
@@ -553,11 +805,10 @@ def draw_section_fixed_fs_with_prelude(
             image_path = _get_image_path(raw)
             if image_path and os.path.exists(image_path):
                 img_margin = _INLINE_IMAGE_MARGIN
-                img_w = w * INLINE_IMAGE_SCALE
-                ph = _calc_image_height_for_width(image_path, img_w)
-                need = ph + 2 * img_margin
-                if (y - need) < y0:
+                dims = _compute_image_dimensions(image_path, w, y - y0, img_margin)
+                if dims is None:
                     break
+                img_w, ph = dims
                 y -= img_margin
                 img_x = x0 + (w - img_w) / 2  # centrer horizontalement
                 c.drawImage(image_path, img_x, y - ph, width=img_w, height=ph,
@@ -582,22 +833,12 @@ def draw_section_fixed_fs_with_prelude(
         # CONTRAINTE : Empêcher qu'une DATE se retrouve seule en bas
         if kind == "DATE" and i < len(paras_text) - 1:
             next_raw = paras_text[i + 1]
-            next_kind = _classify_paragraph(next_raw)
-
-            if next_kind == "EVENT":
-                # Calculer la valeur qu'aura first_non_event_seen_in_S5 APRÈS avoir placé la DATE actuelle
-                first_non_event_after_current = first_non_event_seen_in_S5
-
-                next_st = _mk_style_for_kind(base, next_kind, bullet_cfg, date_box, font_size, date_style)
-                next_txt, next_bullet = _mk_text_for_kind(next_raw, next_kind, bullet_cfg, font_size, date_style)
-                next_p = Paragraph(next_txt, next_st, bulletText=next_bullet)
-                _next_w, next_ph = next_p.wrap(w, h)
-                next_sb = spacing_policy.space_before(next_kind, section_name, first_non_event_after_current)
-                next_sa = spacing_policy.space_after(next_kind, next_ph)
-                next_need = next_sb + next_ph + next_sa
-
-                if (y - need - next_need) < y0:
-                    break
+            next_need = _compute_next_para_need(
+                next_raw, w, font_size, base, bullet_cfg, date_box, date_style,
+                spacing_policy, section_name, first_non_event_seen_in_S5,
+            )
+            if next_need > 0 and (y - need - next_need) < y0:
+                break
 
         # Dessiner le paragraphe
         y -= sb
@@ -615,6 +856,8 @@ def draw_section_fixed_fs_with_prelude(
                 c.line(line_x_start, y_line, line_x_end, y_line)
                 c.restoreState()
         p.drawOn(c, x0, y - ph)
+        if kind == "DATE":
+            _draw_bidul_label(c, raw, x0, y, font_size, date_style)
         y -= ph + sa
 
     c.restoreState()
@@ -644,12 +887,11 @@ def draw_section_fixed_fs_with_tail(
             image_path = _get_image_path(raw)
             if image_path and os.path.exists(image_path):
                 img_margin = _INLINE_IMAGE_MARGIN
-                img_w = w * INLINE_IMAGE_SCALE
-                ph = _calc_image_height_for_width(image_path, img_w)
-                need = ph + 2 * img_margin
-                if (y - need) < y0:
+                dims = _compute_image_dimensions(image_path, w, y - y0, img_margin)
+                if dims is None:
                     c.restoreState()
                     return
+                img_w, ph = dims
                 y -= img_margin
                 img_x = x0 + (w - img_w) / 2  # centrer horizontalement
                 c.drawImage(image_path, img_x, y - ph, width=img_w, height=ph,
@@ -675,23 +917,13 @@ def draw_section_fixed_fs_with_tail(
         # CONTRAINTE : Empêcher qu'une DATE se retrouve seule en bas
         if kind == "DATE" and i < len(paras_text) - 1:
             next_raw = paras_text[i + 1]
-            next_kind = _classify_paragraph(next_raw)
-
-            if next_kind == "EVENT":
-                # Calculer la valeur qu'aura first_non_event_seen_in_S5 APRÈS avoir placé la DATE actuelle
-                first_non_event_after_current = first_non_event_seen_in_S5
-
-                next_st = _mk_style_for_kind(base, next_kind, bullet_cfg, date_box, font_size, date_style)
-                next_txt, next_bullet = _mk_text_for_kind(next_raw, next_kind, bullet_cfg, font_size, date_style)
-                next_p = Paragraph(next_txt, next_st, bulletText=next_bullet)
-                _next_w, next_ph = next_p.wrap(w, h)
-                next_sb = spacing_policy.space_before(next_kind, section_name, first_non_event_after_current)
-                next_sa = spacing_policy.space_after(next_kind, next_ph)
-                next_need = next_sb + next_ph + next_sa
-
-                if (y - need - next_need) < y0:
-                    c.restoreState()
-                    return
+            next_need = _compute_next_para_need(
+                next_raw, w, font_size, base, bullet_cfg, date_box, date_style,
+                spacing_policy, section_name, first_non_event_seen_in_S5,
+            )
+            if next_need > 0 and (y - need - next_need) < y0:
+                c.restoreState()
+                return
 
         # Dessiner le paragraphe
         y -= sb
@@ -709,6 +941,8 @@ def draw_section_fixed_fs_with_tail(
                 c.line(line_x_start, y_line, line_x_end, y_line)
                 c.restoreState()
         p.drawOn(c, x0, y - ph)
+        if kind == "DATE":
+            _draw_bidul_label(c, raw, x0, y, font_size, date_style)
         y -= ph + sa
 
     # Dessiner le tail
@@ -747,10 +981,10 @@ def plan_pair_with_split(
             image_path = _get_image_path(raw)
             if image_path and os.path.exists(image_path):
                 img_margin = _INLINE_IMAGE_MARGIN
-                img_w = wA * INLINE_IMAGE_SCALE
-                ph = _calc_image_height_for_width(image_path, img_w)
-                needA_full = ph + 2 * img_margin
-                if needA_full <= remA:
+                dims = _compute_image_dimensions(image_path, wA, remA, img_margin)
+                if dims is not None:
+                    _img_w, ph = dims
+                    needA_full = ph + 2 * img_margin
                     A_full.append(raw)
                     remA -= needA_full
                     i += 1
@@ -770,23 +1004,13 @@ def plan_pair_with_split(
             # CONTRAINTE : Empêcher qu'une DATE se retrouve seule en bas de A
             if kind == "DATE" and i < n - 1:
                 next_raw = paras_text[i + 1]
-                next_kind = _classify_paragraph(next_raw)
-
-                if next_kind == "EVENT":
-                    # Calculer si le prochain EVENT peut rentrer dans A
-                    first_non_event_after_current = first_non_event_seen_in_S5_A
-                    next_st = _mk_style_for_kind(base, next_kind, bullet_cfg, date_box, font_size, date_style)
-                    next_txt, next_bullet = _mk_text_for_kind(next_raw, next_kind, bullet_cfg, font_size, date_style)
-                    next_p = Paragraph(next_txt, next_st, bulletText=next_bullet)
-                    _next_w, next_ph = next_p.wrap(wA, 1e6)
-                    next_sb = spacing_policy.space_before(next_kind, nameA, first_non_event_after_current)
-                    next_sa = spacing_policy.space_after(next_kind, next_ph)
-                    next_need = next_sb + next_ph + next_sa
-
-                    # Si on n'a pas assez de place pour DATE + EVENT, ne pas placer la DATE dans A
-                    if next_need > remA - needA_full:
-                        # La DATE ne rentre pas dans A avec son EVENT, on arrête le remplissage de A
-                        break
+                next_need = _compute_next_para_need(
+                    next_raw, wA, font_size, base, bullet_cfg, date_box, date_style,
+                    spacing_policy, nameA, first_non_event_seen_in_S5_A,
+                )
+                # Si on n'a pas assez de place pour DATE + suivant, ne pas placer la DATE dans A
+                if next_need > 0 and next_need > remA - needA_full:
+                    break
 
             A_full.append(raw)
             remA -= needA_full
@@ -819,10 +1043,10 @@ def plan_pair_with_split(
             image_path = _get_image_path(raw)
             if image_path and os.path.exists(image_path):
                 img_margin = _INLINE_IMAGE_MARGIN
-                img_w = wB * INLINE_IMAGE_SCALE
-                ph = _calc_image_height_for_width(image_path, img_w)
-                needB = ph + 2 * img_margin
-                if needB <= remB:
+                dims = _compute_image_dimensions(image_path, wB, remB, img_margin)
+                if dims is not None:
+                    _img_w, ph = dims
+                    needB = ph + 2 * img_margin
                     B_full.append(raw)
                     remB -= needB
                     i += 1
@@ -842,23 +1066,13 @@ def plan_pair_with_split(
             # CONTRAINTE : Empêcher qu'une DATE se retrouve seule en bas de B
             if kind == "DATE" and i < n - 1:
                 next_raw = paras_text[i + 1]
-                next_kind = _classify_paragraph(next_raw)
-
-                if next_kind == "EVENT":
-                    # Calculer si le prochain EVENT peut rentrer dans B
-                    first_non_event_after_current = first_non_event_seen_in_S5_B
-                    next_st = _mk_style_for_kind(base, next_kind, bullet_cfg, date_box, font_size, date_style)
-                    next_txt, next_bullet = _mk_text_for_kind(next_raw, next_kind, bullet_cfg, font_size, date_style)
-                    next_p = Paragraph(next_txt, next_st, bulletText=next_bullet)
-                    _next_w, next_ph = next_p.wrap(wB, 1e6)
-                    next_sb = spacing_policy.space_before(next_kind, nameB, first_non_event_after_current)
-                    next_sa = spacing_policy.space_after(next_kind, next_ph)
-                    next_need = next_sb + next_ph + next_sa
-
-                    # Si on n'a pas assez de place pour DATE + EVENT, ne pas placer la DATE dans B
-                    if next_need > remB - needB:
-                        # La DATE ne rentre pas dans B avec son EVENT, on arrête le remplissage de B
-                        break
+                next_need = _compute_next_para_need(
+                    next_raw, wB, font_size, base, bullet_cfg, date_box, date_style,
+                    spacing_policy, nameB, first_non_event_seen_in_S5_B,
+                )
+                # Si on n'a pas assez de place pour DATE + suivant, ne pas placer la DATE dans B
+                if next_need > 0 and next_need > remB - needB:
+                    break
 
             B_full.append(raw)
             remB -= needB
@@ -888,7 +1102,10 @@ def _build_poster_story(
     _date_box = date_box or DateBoxConfig()
     story: list = []
     for raw in paras_text:
-        kind = "EVENT" if _is_event(raw) else "DATE"
+        kind = _classify_paragraph(raw)
+        # IMAGE et SUBFEST sont normalement filtrés en amont ; sécurité ici
+        if kind in ("IMAGE", "SUBFEST"):
+            continue
         st = _mk_style_for_kind(base_style, kind, bullet_cfg, _date_box, font_size, date_style=date_style)
         txt, bullet = _mk_text_for_kind(raw, kind, bullet_cfg, font_size, date_style=date_style)
 

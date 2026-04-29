@@ -62,6 +62,7 @@ def create_all(app):
     _create_cover_section(main_frame, app, ui_row)
     _create_page_layout_section(main_frame, app, ui_row)
     _create_inline_images_section(main_frame, app, ui_row)
+    _create_teriaki_experimental_section(main_frame, app, ui_row)
     _create_abbreviations_section(main_frame, app, ui_row)  # ✨ NOUVEAU v1.4.2
     _create_date_sep_section(main_frame, app, ui_row)
     _create_poster_section(main_frame, app, ui_row)
@@ -431,6 +432,24 @@ def _create_page_layout_section(parent, app, ui_row):
     free_check.grid(row=lr, column=0, columnspan=2, sticky="w", padx=5, pady=5)
     Tooltip(free_check,
             text='Remplace automatiquement ", 0€" par une icône "gratuit" dans le texte des événements.')
+    lr += 1
+
+    # --- Option : sous-groupement par festival ---
+    fest_subgroup_check = tk.Checkbutton(
+        page_layout_frame,
+        text="Regrouper les événements partageant la même valeur de \"FESTOCHE EVENEMENT\"",
+        variable=app.festival_subgroup_enabled_var,
+    )
+    fest_subgroup_check.grid(row=lr, column=0, columnspan=3, sticky="w", padx=5, pady=5)
+    Tooltip(fest_subgroup_check,
+            text="Quand plusieurs événements partagent la même date et la même valeur\n"
+                 "de la colonne FESTOCHE EVENEMENT, ils sont regroupés sous un\n"
+                 "sous-en-tête (italique + bold) portant le nom du festival.\n\n"
+                 "Le préfixe 'Festival // ' est alors omis dans chaque ligne événement,\n"
+                 "ce qui économise de la place horizontalement.\n\n"
+                 "Exemple : 9 événements \"Jazz Tangentes 2026\" sur le même jour\n"
+                 "afficheront un seul sous-en-tête \"Jazz Tangentes 2026\" suivi\n"
+                 "des 9 événements (sans répétition du nom du festival).")
 
     r += 1
     ui_row['r'] = r
@@ -496,6 +515,75 @@ def _create_inline_images_section(parent, app, ui_row):
                  "0.0 = aucune marge")
     Tooltip(app.inline_images_margin_entry,
             text="Marge en points (pt) avant et après chaque image.\nValeur par défaut : 1.0")
+    lr += 1
+
+    # Auto-scale des images trop grandes
+    app.inline_images_auto_scale_checkbox = tk.Checkbutton(
+        app.inline_images_frame,
+        text="Réduire automatiquement les images trop grandes pour une section",
+        variable=app.inline_images_auto_scale_var,
+    )
+    app.inline_images_auto_scale_checkbox.grid(row=lr, column=0, columnspan=3, sticky="w", padx=5, pady=5)
+    Tooltip(app.inline_images_auto_scale_checkbox,
+            text="Quand activé, une image trop grande pour la section courante\n"
+                 "(typiquement une image portrait qui ne rentre pas dans S3/S4)\n"
+                 "sera automatiquement réduite pour tenir, en préservant son ratio.\n\n"
+                 "Cela évite les coupures brutales et les espaces vides dans les sections,\n"
+                 "au prix d'une variation visuelle de la taille de l'image selon sa position.\n\n"
+                 "Désactivé par défaut : les images sont toujours rendues à l'échelle configurée,\n"
+                 "quitte à déborder ou être sautées.")
+
+    r += 1
+    ui_row['r'] = r
+
+
+def _create_teriaki_experimental_section(parent, app, ui_row):
+    """Crée la section des fonctions expérimentales pour le Bidul Teriaki (debug-only)."""
+    r = ui_row['r']
+
+    app.teriaki_frame = ttk.LabelFrame(parent, text="Fonctions expérimentales Teriaki", padding="10")
+    app.teriaki_frame.grid(row=r, column=0, columnspan=3, sticky="ew", pady=10)
+    app.teriaki_frame.columnconfigure(0, weight=1)
+
+    lr = 0
+
+    # Regroupement des dates consécutives
+    app.date_grouping_checkbox = tk.Checkbutton(
+        app.teriaki_frame,
+        text="Regrouper les dates consécutives",
+        variable=app.date_grouping_enabled_var,
+    )
+    app.date_grouping_checkbox.grid(row=lr, column=0, sticky="w", padx=5, pady=5)
+    Tooltip(app.date_grouping_checkbox,
+            text="Regroupe les événements qui se suivent d'un jour à l'autre\n"
+                 "sous un en-tête de date commun.\n\n"
+                 "Exemple :\n"
+                 "  Samedi 23 Août 2025\n"
+                 "  Dimanche 24 Août 2025\n"
+                 "devient :\n"
+                 "  Samedi 23 & Dimanche 24 Août 2025\n\n"
+                 "Les événements restent affichés dans l'ordre chronologique.")
+    lr += 1
+
+    # Festival dans l'en-tête de date (expérimental)
+    app.festival_in_header_checkbox = tk.Checkbutton(
+        app.teriaki_frame,
+        text="Déplacer le festival dans l'en-tête de date (expérimental)",
+        variable=app.festival_in_date_header_var,
+    )
+    app.festival_in_header_checkbox.grid(row=lr, column=0, sticky="w", padx=5, pady=5)
+    Tooltip(app.festival_in_header_checkbox,
+            text="Déplace le contenu de la colonne FESTOCHE/EVENEMENT\n"
+                 "dans l'en-tête de date.\n\n"
+                 "Exemple :\n"
+                 "  Dimanche 24 Août 2025\n"
+                 "  ❑ Les Siestes Teriaki // ...\n"
+                 "devient :\n"
+                 "  Dimanche 24 Août 2025 -- Les Siestes Teriaki\n"
+                 "  ❑ ...\n\n"
+                 "ATTENTION : fonctionnalité expérimentale. Si plusieurs événements\n"
+                 "à la même date ont des festivals différents, seul le premier\n"
+                 "apparaît dans l'en-tête.")
 
     r += 1
     ui_row['r'] = r
@@ -632,6 +720,43 @@ def _create_date_sep_section(parent, app, ui_row):
     style_frame.grid(row=lr, column=1, sticky="w", padx=5, pady=5)
     tk.Checkbutton(style_frame, text="Gras", variable=app.date_bold_var).pack(side=tk.LEFT)
     tk.Checkbutton(style_frame, text="Italique", variable=app.date_italic_var).pack(side=tk.LEFT, padx=10)
+    lr += 1
+
+    # Couleur du texte des dates
+    tk.Label(date_sep_frame, text="Couleur du texte :").grid(row=lr, column=0, sticky="w", padx=5, pady=5)
+    date_color_frame = ttk.Frame(date_sep_frame)
+    date_color_frame.grid(row=lr, column=1, sticky="w", padx=5, pady=5)
+    app.date_color_preview = tk.Label(date_color_frame, text="    ",
+                                      bg=app.date_color_var.get(), relief="sunken")
+    app.date_color_preview.pack(side=tk.LEFT, padx=(0, 5))
+    app.date_color_btn = tk.Button(date_color_frame, text="…", width=3)
+    app.date_color_btn.pack(side=tk.LEFT)
+    Tooltip(app.date_color_btn, text="Choisir la couleur du texte des dates")
+    lr += 1
+
+    # Étiquette "Bidul #xxx" à gauche de la date (si alignée à droite)
+    app.bidul_label_checkbox = tk.Checkbutton(
+        date_sep_frame,
+        text='Afficher "Bidul #xxx" à gauche de la date (si alignée à droite)',
+        variable=app.bidul_label_enabled_var,
+    )
+    app.bidul_label_checkbox.grid(row=lr, column=0, columnspan=2, sticky="w", padx=5, pady=5)
+    Tooltip(app.bidul_label_checkbox,
+            text='Affiche "Bidul #xxx" en alignement gauche, sur la même ligne\n'
+                 "que la date (qui doit être alignée à droite).\n\n"
+                 "xxx prend la valeur de la colonne BIDUL du fichier Excel.")
+    lr += 1
+
+    # Couleur du label Bidul
+    tk.Label(date_sep_frame, text="Couleur 'Bidul #xxx' :").grid(row=lr, column=0, sticky="w", padx=5, pady=5)
+    bidul_color_frame = ttk.Frame(date_sep_frame)
+    bidul_color_frame.grid(row=lr, column=1, sticky="w", padx=5, pady=5)
+    app.bidul_label_color_preview = tk.Label(bidul_color_frame, text="    ",
+                                             bg=app.bidul_label_color_var.get(), relief="sunken")
+    app.bidul_label_color_preview.pack(side=tk.LEFT, padx=(0, 5))
+    app.bidul_label_color_btn = tk.Button(bidul_color_frame, text="…", width=3)
+    app.bidul_label_color_btn.pack(side=tk.LEFT)
+    Tooltip(app.bidul_label_color_btn, text="Couleur du texte de l'étiquette 'Bidul #xxx'")
     lr += 1
 
     # Création du cadre de couleur (sera géré par un callback)

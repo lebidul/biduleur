@@ -79,6 +79,42 @@ Chemins relatifs au dossier contenant `config.yml` pour les fichiers d'entrée e
 -   `date_line`: Active et configure une ligne horizontale après les dates.
 -   `date_box`: Active et configure un cadre autour des dates.
 -   `date_spaceBefore`/`After`: Espace vertical (en points) ajouté avant et après chaque date sur les pages 1 et 2.
+-   `date_color`: Couleur de police des dates (hex, défaut `#000000`).
+-   `date_bold`/`date_italic`/`date_alignment`: Style et alignement (`left`/`center`/`right`) des dates.
+
+#### Étiquette "Bidul #xxx" (`bidul_label_*`)
+-   `bidul_label_enabled`: Affiche `"Bidul #xxx"` côté gauche, sur la même ligne qu'une date alignée à droite (`xxx` = valeur de la colonne `BIDUL` du fichier Excel).
+-   `bidul_label_color`: Couleur du texte de l'étiquette (indépendante de `date_color`).
+-   `bidul_label_format`: Template du label (défaut `"Bidul #{num}"`).
+
+#### Regroupement de dates (`date_grouping_enabled`, mode debug)
+-   Quand activé, les événements sur des **jours calendaires consécutifs** sont rassemblés sous une date composite : `"Samedi 23 & Dimanche 24 Août 2025"`.
+-   Concerne uniquement les dates complètes (YYYY-MM-DD).
+
+#### Plages `DATE FIN` (colonne Excel optionnelle)
+-   Si la colonne `DATE FIN` est renseignée pour une ligne, l'événement est affiché avec une plage `"Du <début> au <fin>"`.
+-   Format intelligent : minimise le mois/année selon le contexte (même mois → `"Du Samedi 27 au Dimanche 28 Août 2016"`).
+-   Rétrocompatible : aucun impact si la colonne n'existe pas.
+
+#### Sous-groupement par festival (`festival_subgroup_enabled`)
+-   Quand ≥ 2 événements partagent la **même date** ET la **même valeur de FESTOCHE EVENEMENT**, ils sont regroupés sous un sous-en-tête `"❑ Festival (style)"` suivi d'événements avec puce `▸` alignée sur la 1ère lettre du nom du festival.
+-   Singletons : comportement classique inchangé (`❑ Festival // artistes`).
+-   Le sous-en-tête se positionne à la position chronologique du 1er événement du groupe.
+-   Reproduit la même mise en page sur le poster (page 3).
+
+#### Festival dans l'en-tête de date (`festival_in_date_header`, mode debug)
+-   Mode expérimental : déplace la valeur du 1er événement de la colonne FESTOCHE EVENEMENT dans l'en-tête de date (`"Date -- Festival"`) au lieu de la préfixer dans chaque ligne événement.
+
+#### Images inline (`inline_images_*`)
+-   `inline_images_enabled`: active la prise en compte des lignes Excel avec `GENRE 1 = "img"` (le nom du fichier image est dans `NOM SPECTACLE 1`).
+-   `inline_images_dir`: dossier des images (défaut `misenpageur/assets/images/`).
+-   `inline_images_scale`: facteur d'échelle de la largeur de section (défaut `0.85`).
+-   `inline_images_margin`: espace en points avant/après chaque image (défaut `1.0`).
+-   `inline_images_auto_scale`: si activé, les images trop grandes pour leur section sont automatiquement réduites (préserve le ratio d'aspect) au lieu d'être droppées.
+
+#### Normalisation des noms propres (constantes biduleur)
+-   La fonction `format_style` du module `biduleur` normalise la colonne STYLE (FESTOCHE/EVENEMENT) avec un lowercase intelligent + dictionnaire `PROPER_NOUNS_MAP` (~580 villes/pays connus).
+-   Définition dans `biduleur/constants.py`. L'utilisateur peut étendre le dictionnaire pour ajouter des villes/régions spécifiques.
 
 #### Boîte "Cucaracha" (`cucaracha_box`)
 Configure la boîte spéciale en bas de la colonne des logos (page 1).

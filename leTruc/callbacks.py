@@ -62,6 +62,8 @@ def assign_all(app):
     app.run_button.config(command=app._on_run)
 
     app.back_color_btn.config(command=lambda: on_pick_color(app.date_box_back_color_var))
+    app.date_color_btn.config(command=lambda: on_pick_color(app.date_color_var))
+    app.bidul_label_color_btn.config(command=lambda: on_pick_color(app.bidul_label_color_var))
 
     app.stories_font_color_button.config(command=lambda: on_pick_color(app.stories_font_color_var))
     app.stories_bg_color_button.config(command=lambda: on_pick_color(app.stories_bg_color_var))
@@ -87,6 +89,16 @@ def assign_all(app):
     app.date_box_back_color_var.trace_add(
         "write",
         lambda *args: app.back_color_preview.config(bg=app.date_box_back_color_var.get())
+    )
+
+    app.date_color_var.trace_add(
+        "write",
+        lambda *args: app.date_color_preview.config(bg=app.date_color_var.get())
+    )
+
+    app.bidul_label_color_var.trace_add(
+        "write",
+        lambda *args: app.bidul_label_color_preview.config(bg=app.bidul_label_color_var.get())
     )
 
     # ✨ NOUVEAU : Toggle des boutons config quand debug mode change
@@ -383,14 +395,16 @@ def on_toggle_config_buttons(app):
     """
     is_debug = app.debug_mode_var.get()
 
-    # --- Boutons import/reset config ---
-    if is_debug:
-        app.config_buttons_frame.pack(pady=(5, 0))
-    else:
-        app.config_buttons_frame.pack_forget()
+    # --- Boutons config ---
+    # Importer/Exporter sont toujours visibles ; Reset (destructif) reste debug-only
+    if hasattr(app, 'reset_config_btn'):
+        if is_debug:
+            app.reset_config_btn.pack(side=tk.LEFT, padx=5)
+        else:
+            app.reset_config_btn.pack_forget()
 
     # --- Widgets debug-only ---
-    debug_only_frames = [app.ours_frame, app.logos_frame, app.inline_images_frame]
+    debug_only_frames = [app.ours_frame, app.logos_frame, app.inline_images_frame, app.teriaki_frame]
     debug_only_widgets = [
         app.cover_checkbox,
         app.margin_label, app.margin_entry,
