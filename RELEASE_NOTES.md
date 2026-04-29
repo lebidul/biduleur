@@ -1,3 +1,64 @@
+# Bidul v1.8.1 - Export de config en mode normal, fix import texte Cucaracha
+
+Petite version d'amélioration ergonomique de l'UI : bouton **Exporter config**
+disponible en mode normal (pas seulement debug), et correction d'un bug
+silencieux lors de l'import du texte Cucaracha.
+
+## ✨ Nouveautés
+
+### Bouton "💾 Exporter config" en mode normal
+*   Nouveau bouton accessible **en permanence** (mode normal ET mode debug),
+    à côté du bouton "📂 Importer config"
+*   Permet de **sauvegarder l'état courant de l'UI** sous forme de fichier
+    `config.json` à un emplacement choisi via une boîte de dialogue
+*   Le nom suggéré par défaut est dérivé du fichier d'entrée :
+    `<input_file>.config.json`
+*   Le fichier produit est **directement compatible** avec le bouton
+    "Importer config" pour un round-trip complet
+*   Inclut tous les paramètres récents : `festival_subgroup_enabled`,
+    `bidul_label_*`, `date_color`, `inline_images_auto_scale`,
+    `date_grouping_enabled`, `festival_in_date_header`, etc.
+*   Inclut aussi les méta-champs `_input_file`, `_abbreviations_enabled`,
+    `_split_pdf`, `_print_pdf`, `_generate_html`, etc., comme dans la
+    sauvegarde automatique du mode debug
+
+### Boutons config toujours visibles
+*   **Importer config** et **Exporter config** sont désormais visibles **en
+    permanence** (mode normal ET debug)
+*   **Reset config** reste réservé au mode debug (action destructive)
+
+## 🐛 Corrections
+
+### Texte Cucaracha non importé depuis le config
+*   Quand un fichier config avec `cucaracha_box.content_type = "text"` était
+    importé, le texte était écrit dans la `StringVar` mais **pas dans le
+    widget `tk.Text`** affiché à l'utilisateur — le texte était donc
+    silencieusement perdu et remplacé par une zone vide
+*   Corrigé : le contenu est maintenant restauré dans le widget Text quand
+    le type est "text", puis le `_on_run` lit bien la valeur attendue
+
+## 🔧 Détails techniques
+
+*   `leTruc/_helpers.py` : nouvelle fonction `save_current_config_from_app()`
+    qui collecte toutes les variables Tkinter de l'`Application` et les
+    sérialise en JSON via `asdict(cfg)` ; fix de la branche
+    `cucaracha_box.content_value` dans `load_and_apply_config()` pour
+    écrire dans le widget Text
+*   `leTruc/app.py` : nouvelle méthode `_on_export_config()` qui ouvre une
+    boîte de dialogue, suggère un nom, et appelle
+    `save_current_config_from_app()` ; bouton "Exporter config" ajouté au
+    `config_buttons_frame` ; frame désormais affiché par défaut
+*   `leTruc/callbacks.py` : `on_toggle_config_buttons()` ne pack/unpack plus
+    le frame entier (toujours visible) — seul le bouton Reset est
+    conditionné au mode debug
+
+## 📚 Bonus
+
+*   `biduleur/constants.py` : ajout de "Gascogne" au dictionnaire
+    `PROPER_NOUNS_MAP`
+
+---
+
 # Bidul v1.8.0 - Sous-groupement par festival, plages de dates, couleur, label Bidul, auto-scale images, normalisation des noms propres
 
 Cette version étend considérablement les options de mise en page de l'agenda et du poster : **regroupement chronologique des dates consécutives**, **plages "Du X au Y"** via une nouvelle colonne, **sous-groupement par festival** quand plusieurs événements partagent la même valeur de FESTOCHE EVENEMENT, **couleur de police personnalisable** pour les dates, **étiquette "Bidul #xxx"** côté gauche, **auto-scaling des images inline** trop grandes, et un **dictionnaire de ~580 villes/pays** pour normaliser automatiquement la casse des noms propres dans la colonne STYLE.

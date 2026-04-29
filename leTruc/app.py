@@ -220,16 +220,23 @@ class Application(TkinterDnD.Tk):
         self.debug_checkbox = tk.Checkbutton(button_frame, text="Mode Debug", variable=self.debug_mode_var)
         self.debug_checkbox.pack(side=tk.LEFT)
 
-        # ✨ NOUVEAU : Cadre pour les boutons de configuration (caché par défaut)
+        # Cadre pour les boutons de configuration — toujours visible (mode normal et debug)
         self.config_buttons_frame = ttk.Frame(action_frame)
 
         import_btn = tk.Button(self.config_buttons_frame, text="📂 Importer config",
                                command=self._on_import_config)
         import_btn.pack(side=tk.LEFT, padx=5)
 
-        reset_btn = tk.Button(self.config_buttons_frame, text="🔄 Reset config",
-                              command=self._on_reset_config)
-        reset_btn.pack(side=tk.LEFT, padx=5)
+        export_btn = tk.Button(self.config_buttons_frame, text="💾 Exporter config",
+                               command=self._on_export_config)
+        export_btn.pack(side=tk.LEFT, padx=5)
+
+        # Reset config : reste réservé au mode debug (action destructive)
+        self.reset_config_btn = tk.Button(self.config_buttons_frame, text="🔄 Reset config",
+                                          command=self._on_reset_config)
+        self.reset_config_btn.pack(side=tk.LEFT, padx=5)
+
+        self.config_buttons_frame.pack(pady=(5, 0))
 
     def _on_run(self):
         """Callback du bouton 'Créer le Bidul !'."""
@@ -456,6 +463,37 @@ class Application(TkinterDnD.Tk):
             messagebox.showinfo("Succès", "Configuration réinitialisée")
         except Exception as e:
             messagebox.showerror("Erreur", f"Impossible de reset :\n{e}")
+
+    def _on_export_config(self):
+        """Exporte la configuration actuelle de l'UI vers un fichier JSON."""
+        from tkinter import filedialog
+        from ._helpers import save_current_config_from_app
+
+        # Suggérer un nom basé sur le fichier d'entrée (ou "config.json")
+        initial_file = "config.json"
+        input_path = self.input_var.get().strip()
+        if input_path:
+            stem = os.path.splitext(os.path.basename(input_path))[0]
+            if stem:
+                initial_file = f"{stem}.config.json"
+
+        dest_path = filedialog.asksaveasfilename(
+            title="Exporter la configuration",
+            defaultextension=".json",
+            initialfile=initial_file,
+            filetypes=[("JSON", "*.json"), ("Tous", "*.*")],
+        )
+        if not dest_path:
+            return
+
+        try:
+            save_current_config_from_app(self, dest_path)
+            messagebox.showinfo(
+                "Succès",
+                f"Configuration exportée :\n{os.path.basename(dest_path)}",
+            )
+        except Exception as e:
+            messagebox.showerror("Erreur", f"Impossible d'exporter la config :\n{e}")
 
     # --- Méthodes pour la gestion du Canvas (Callbacks internes) ---
 

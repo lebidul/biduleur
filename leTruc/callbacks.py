@@ -395,11 +395,13 @@ def on_toggle_config_buttons(app):
     """
     is_debug = app.debug_mode_var.get()
 
-    # --- Boutons import/reset config ---
-    if is_debug:
-        app.config_buttons_frame.pack(pady=(5, 0))
-    else:
-        app.config_buttons_frame.pack_forget()
+    # --- Boutons config ---
+    # Importer/Exporter sont toujours visibles ; Reset (destructif) reste debug-only
+    if hasattr(app, 'reset_config_btn'):
+        if is_debug:
+            app.reset_config_btn.pack(side=tk.LEFT, padx=5)
+        else:
+            app.reset_config_btn.pack_forget()
 
     # --- Widgets debug-only ---
     debug_only_frames = [app.ours_frame, app.logos_frame, app.inline_images_frame, app.teriaki_frame]

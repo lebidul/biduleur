@@ -718,6 +718,162 @@ def _default_paths_from_input(input_file: str) -> dict:
     }
 
 
+def save_current_config_from_app(app_instance, dest_path: str) -> None:
+    """
+    Sauvegarde la configuration actuelle de l'UI au format JSON.
+
+    Construit un Config en partant des valeurs par défaut de config.yml puis
+    en surchargeant avec les valeurs courantes des widgets Tkinter (mode debug
+    OU mode normal). Le fichier produit est compatible avec
+    `load_and_apply_config()`.
+    """
+    from misenpageur.misenpageur.config import Config
+    from dataclasses import asdict
+    import json
+    import tkinter as tk
+
+    defaults = _project_defaults()
+    cfg = Config.from_yaml(defaults["config"])
+
+    # --- Helpers locaux pour parser sans crash en cas d'entrée invalide ---
+    def _f(var, default=0.0):
+        try:
+            return float(var.get().strip())
+        except (ValueError, AttributeError):
+            return default
+
+    def _i(var, default=0):
+        try:
+            return int(var.get().strip())
+        except (ValueError, AttributeError):
+            return default
+
+    # --- Récupération du texte cucaracha (Tk Text ou StringVar selon type) ---
+    cuca_value = ""
+    if app_instance.cucaracha_text_widget is not None:
+        cuca_value = app_instance.cucaracha_text_widget.get("1.0", tk.END).strip()
+    if app_instance.cucaracha_type_var.get() == "image":
+        cuca_value = app_instance.cucaracha_value_var.get().strip()
+
+    # --- Application des valeurs UI sur cfg (mirror de run_pipeline) ---
+    cfg.input_file = app_instance.input_var.get().strip()
+    cfg.cover_image = app_instance.cover_var.get().strip()
+    cfg.output_pdf = app_instance.pdf_var.get().strip()
+    cfg.output_svg_dir = app_instance.svg_output_var.get().strip()
+    cfg.stories_output_dir = app_instance.stories_output_var.get().strip()
+    cfg.skip_cover = not app_instance.generate_cover_var.get()
+    cfg.auteur_couv = app_instance.auteur_var.get().strip()
+    cfg.auteur_couv_url = app_instance.auteur_url_var.get().strip()
+    cfg.font_name = app_instance.body_font_name_var.get()
+    cfg.font_size_mode = app_instance.font_size_mode_var.get()
+    cfg.font_size_forced = _f(app_instance.font_size_forced_var, 10.0)
+    cfg.generate_svg = app_instance.generate_svg_var.get()
+    cfg.debug_mode = app_instance.debug_mode_var.get()
+
+    # Ours / Logos
+    cfg.ours_layout = app_instance.ours_layout_var.get()
+    cfg.ours_svg_file = app_instance.ours_svg_var.get().strip()
+    if app_instance.ours_png_var.get().strip():
+        cfg.section_1['ours_background_png'] = app_instance.ours_png_var.get().strip()
+    if app_instance.logos_var.get().strip():
+        cfg.logos_dir = app_instance.logos_var.get().strip()
+    cfg.logos_layout = app_instance.logos_layout_var.get()
+    cfg.logos_padding_mm = _f(app_instance.logos_padding_var, 1.0)
+    cfg.logos_svg_file = app_instance.logos_svg_var.get().strip()
+    cfg.logos_print_svg_file = app_instance.logos_print_svg_var.get().strip()
+
+    # Layout
+    cfg.pdf_layout['page_margin_mm'] = _f(app_instance.margin_var, 1.0)
+
+    # Dates
+    sep = app_instance.date_separator_var.get()
+    cfg.date_line['enabled'] = (sep == "ligne")
+    cfg.date_box['enabled'] = (sep == "box")
+    if cfg.date_box['enabled']:
+        cfg.date_box['back_color'] = app_instance.date_box_back_color_var.get()
+    cfg.date_spaceBefore = _f(app_instance.date_spacing_var, 4.0)
+    cfg.date_spaceAfter = _f(app_instance.date_spacing_var, 4.0)
+    dfn = app_instance.date_font_name_var.get()
+    cfg.date_font_name = dfn if dfn != "(Identique au corps)" else None
+    cfg.date_bold = app_instance.date_bold_var.get()
+    cfg.date_italic = app_instance.date_italic_var.get()
+    cfg.date_alignment = app_instance.date_align_var.get()
+    cfg.date_color = app_instance.date_color_var.get()
+
+    # Étiquette Bidul
+    cfg.bidul_label_enabled = app_instance.bidul_label_enabled_var.get()
+    cfg.bidul_label_color = app_instance.bidul_label_color_var.get()
+
+    # Sous-groupe festival
+    cfg.festival_subgroup_enabled = app_instance.festival_subgroup_enabled_var.get()
+
+    # Poster
+    cfg.poster['design'] = app_instance.poster_design_var.get()
+    cfg.poster['font_size_safety_factor'] = _f(app_instance.safety_factor_var, 1.0)
+    cfg.poster['background_image_alpha'] = app_instance.alpha_var.get()
+    cfg.poster['title'] = app_instance.poster_title_var.get().strip()
+
+    # Cucaracha
+    cfg.cucaracha_box['content_type'] = app_instance.cucaracha_type_var.get()
+    cfg.cucaracha_box['content_value'] = cuca_value
+    cfg.cucaracha_box['text_font_name'] = app_instance.cucaracha_font_var.get()
+    cfg.cucaracha_box['text_font_size'] = _i(app_instance.cucaracha_font_size_var, 8)
+
+    # Icônes
+    cfg.chapeau_icon_enabled = app_instance.chapeau_icon_var.get()
+    cfg.free_icon_enabled = app_instance.free_icon_var.get()
+
+    # Images inline
+    cfg.inline_images_enabled = app_instance.inline_images_enabled_var.get()
+    cfg.inline_images_dir = app_instance.inline_images_dir_var.get().strip()
+    cfg.inline_images_scale = _f(app_instance.inline_images_scale_var, 0.85)
+    cfg.inline_images_margin = _f(app_instance.inline_images_margin_var, 1.0)
+    cfg.inline_images_auto_scale = app_instance.inline_images_auto_scale_var.get()
+
+    # Fonctions expérimentales Teriaki
+    cfg.date_grouping_enabled = app_instance.date_grouping_enabled_var.get()
+    cfg.festival_in_date_header = app_instance.festival_in_date_header_var.get()
+
+    # Stories
+    cfg.stories['enabled'] = app_instance.generate_stories_var.get()
+    if app_instance.stories_output_var.get().strip():
+        cfg.stories['output_dir'] = app_instance.stories_output_var.get().strip()
+    cfg.stories['agenda_font_name'] = app_instance.stories_font_name_var.get()
+    cfg.stories['agenda_font_size'] = _i(app_instance.stories_font_size_var, 18)
+    cfg.stories['text_color'] = app_instance.stories_font_color_var.get()
+    cfg.stories['background_color'] = app_instance.stories_bg_color_var.get()
+    cfg.stories['background_image_alpha'] = app_instance.stories_alpha_var.get()
+    cfg.stories['background_type'] = app_instance.stories_bg_type_var.get()
+    cfg.stories['background_image'] = app_instance.stories_bg_image_var.get().strip()
+
+    # --- Sérialisation JSON avec champs '_' pour ré-import ---
+    abbreviations_enabled = {key: var.get() for key, var in app_instance.abbreviation_vars.items()}
+
+    def _json_converter(o):
+        if isinstance(o, Path):
+            return str(o)
+        raise TypeError(f"Object of type {o.__class__.__name__} is not JSON serializable")
+
+    config_data = asdict(cfg)
+    config_data["_input_file"] = cfg.input_file
+    config_data["_abbreviations_enabled"] = abbreviations_enabled
+    config_data["_split_pdf"] = app_instance.split_pdf_var.get()
+    config_data["_print_pdf"] = app_instance.print_pdf_var.get()
+    config_data["_generate_html"] = app_instance.generate_html_var.get()
+    config_data["_inline_images_enabled"] = cfg.inline_images_enabled
+    config_data["_inline_images_dir"] = cfg.inline_images_dir
+    config_data["_inline_images_scale"] = cfg.inline_images_scale
+    config_data["_inline_images_margin"] = cfg.inline_images_margin
+    config_data["_inline_images_auto_scale"] = cfg.inline_images_auto_scale
+    config_data["_date_grouping_enabled"] = cfg.date_grouping_enabled
+    config_data["_festival_in_date_header"] = cfg.festival_in_date_header
+
+    # Créer le dossier parent si besoin
+    Path(dest_path).parent.mkdir(parents=True, exist_ok=True)
+    with open(dest_path, 'w', encoding='utf-8') as f:
+        json.dump(config_data, f, indent=2, default=_json_converter, ensure_ascii=False)
+
+
 def load_and_apply_config(app_instance, config_path: str):
     """
     Charge un fichier de config (YAML ou JSON) et met à jour les variables du GUI.
@@ -911,8 +1067,14 @@ def load_and_apply_config(app_instance, config_path: str):
             app_instance.cucaracha_type_var.set(ctype)
 
         cvalue = cfg.cucaracha_box.get("content_value")
-        if cvalue:
+        if cvalue is not None:
+            # Mettre à jour la StringVar (utilisée par le mode 'image')
             app_instance.cucaracha_value_var.set(cvalue)
+            # Mode 'text' : restaurer le contenu dans le Text widget (source de vérité)
+            if ctype == "text" and hasattr(app_instance, 'cucaracha_text_widget') \
+                    and app_instance.cucaracha_text_widget is not None:
+                app_instance.cucaracha_text_widget.delete("1.0", "end")
+                app_instance.cucaracha_text_widget.insert("1.0", cvalue)
             # Mettre à jour la vignette si c'est une image
             if ctype == "image" and hasattr(app_instance, 'cucaracha_preview'):
                 cvalue_abs = make_abs(cvalue, config_dir) if cvalue else ""

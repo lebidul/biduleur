@@ -293,6 +293,8 @@ PROPER_NOUNS_MAP: Dict[str, str] = {
     "cannes": "Cannes",
     "monaco-ville": "Monaco-Ville",
 
+    "gascogne": "Gascogne",
+
     # ============ Capitales européennes (FR + EN/locale) ============
     "tirana": "Tirana",  # Albanie
     "andorre-la-vieille": "Andorre-la-Vieille",  # Andorre
