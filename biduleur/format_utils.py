@@ -171,25 +171,171 @@ def fmt_link(*links: str) -> str:
     return formatted_links
 
 
+# =====================================================================
+# Normalisation HEURE & PRIX (fuzzy / regex-based)
+# =====================================================================
+
+# Mots-clés PRIX exacts → output canonique. Comparaison case-insensitive
+# après strip de la chaîne d'entrée.
+_PRICE_KEYWORDS_EXACT = {
+    'gratuit': '0€',          # convention Bidul : on affiche "0€" plutôt que "gratuit"
+    'free': '0€',
+    'libre': 'prix libre',
+    'prix libre': 'prix libre',
+    'au chapeau': 'au chapeau',
+    'chapeau': 'au chapeau',
+    'complet': 'complet',
+    'tnc': 'tnc',
+    't.n.c': 'tnc',
+    'hnc': 'hnc',
+    'h.n.c': 'hnc',
+    'a confirmer': 'à confirmer',
+    'à confirmer': 'à confirmer',
+    'achat sur place': 'achat sur place',
+}
+
+
+def normalize_heure(s: str) -> str:
+    """
+    Normalise une chaîne HEURE en une forme canonique :
+        "20H30"           → "20h30"
+        "20H"             → "20h"
+        "10 h & 14h30"    → "10h & 14h30"
+        "10h et 14h30"    → "10h & 14h30"
+        "20h00"           → "20h"
+        "17h-4h"          → "17h-4h"
+        "Dès 19H"         → "Dès 19h"
+        "5h00"            → "5h"
+        ""                → ""
+
+    Règles :
+    - 'H' majuscule → 'h' minuscule (devant ou après chiffre)
+    - Espaces autour de 'h' supprimés (`10 h` → `10h`)
+    - `h00` → `h` (pas de minutes inutiles)
+    - 'et' (insensible à la casse) → '&'
+    - Espaces multiples → un seul espace
+    """
+    if not s or not s.strip():
+        return ""
+    s = s.strip()
+
+    # Normalisation 'H' / espace autour : convertit "20H30", "20 h", "10 H30"
+    # en "20h30", "20h", "10h30". Si les minutes sont "00", on les supprime.
+    # IMPORTANT : pas de \s* APRES [Hh] (pour ne pas avaler les espaces autour
+    # des séparateurs comme '&' ou 'et').
+    def _h_repl(m):
+        hh = m.group(1)
+        mm = m.group(2)
+        if mm and mm != '00':
+            return f"{hh}h{mm}"
+        return f"{hh}h"
+    s = re.sub(r'(\d+)\s*[Hh](\d*)', _h_repl, s)
+
+    # 'et' (séparateur d'horaires) → '&'
+    s = re.sub(r'\s+et\s+', ' & ', s, flags=re.IGNORECASE)
+
+    # Mots-clés HEURE
+    s = re.sub(r'\bt\.n\.c\b', 'tnc', s, flags=re.IGNORECASE)
+    s = re.sub(r'\bh\.n\.c\b', 'hnc', s, flags=re.IGNORECASE)
+    s = re.sub(r'\bTNC\b', 'tnc', s)
+    s = re.sub(r'\bHNC\b', 'hnc', s)
+
+    # Normalisation virgules/espaces
+    s = re.sub(r'\s*,\s*', ', ', s)
+    s = re.sub(r'\s+', ' ', s)
+    return s.strip()
+
+
+def normalize_prix(s: str) -> str:
+    """
+    Normalise une chaîne PRIX en une forme canonique :
+        "Gratuit"        → "gratuit"
+        "GRATUIT"        → "gratuit"
+        "Au Chapeau"     → "au chapeau"
+        "Prix Libre"     → "prix libre"
+        "Libre"          → "prix libre"
+        "0", "0 €", "0€" → "0€"
+        "5 €"            → "5€"
+        "5 euros"        → "5€"
+        "5 à 10 €"       → "5 à 10€"
+        "5-10€"          → "5 à 10€"
+        "5.50€"          → "5,50€" (style français pour les décimales)
+        "tnc", "T.N.C"   → "tnc"
+        "5€ et +"        → "5€ et +" (préservé)
+        "à partir de 1€" → "à partir de 1€" (préservé)
+        ""               → ""
+
+    Pour les descriptions complexes (tarif plein/réduit etc.), seules les
+    parties reconnues (devises, mots-clés, plages X-Y) sont normalisées ;
+    le reste du texte est préservé.
+    """
+    if not s or not s.strip():
+        return ""
+    s = s.strip()
+
+    # Cas mot-clé exact (case-insensitive)
+    low = s.lower()
+    if low in _PRICE_KEYWORDS_EXACT:
+        return _PRICE_KEYWORDS_EXACT[low]
+
+    # "0" / "0€" / "0 €" → "0€"
+    if re.fullmatch(r'0\s*€?', low):
+        return '0€'
+
+    # Nombre seul (entier ou décimal) sans devise → ajouter "€"
+    # Ex: "10" → "10€", "5,50" → "5,50€", "22" → "22€"
+    m = re.fullmatch(r'(\d+(?:[.,]\d+)?)', low)
+    if m:
+        val = m.group(1).replace('.', ',')
+        return f"{val}€"
+
+    # "euros" / "euro" → "€" (insensible à la casse)
+    s = re.sub(r'\s*euros?\b', '€', s, flags=re.IGNORECASE)
+    # Pas d'espace avant €
+    s = re.sub(r'\s+€', '€', s)
+    # Décimales style français : '5.50' → '5,50'
+    s = re.sub(r'(\d+)\.(\d+)', r'\1,\2', s)
+    # 'X-Y' (entre chiffres) → 'X à Y'
+    s = re.sub(r'(\d)\s*-\s*(\d)', r'\1 à \2', s)
+    # ' a ' (ASCII) → ' à ' (avec accent)
+    s = re.sub(r' a (?=\d)', ' à ', s)
+
+    # Mots-clés inline (case-insensitive)
+    s = re.sub(r'\bau\s+chapeau\b', 'au chapeau', s, flags=re.IGNORECASE)
+    # "gratuit" inline → "0€" (convention Bidul) — applique aussi pour "Gratuit"
+    s = re.sub(r'\bgratuit\b', '0€', s, flags=re.IGNORECASE)
+    s = re.sub(r'\bprix\s+libre\b', 'prix libre', s, flags=re.IGNORECASE)
+    s = re.sub(r'\bt\.n\.c\b', 'tnc', s, flags=re.IGNORECASE)
+    s = re.sub(r'\bh\.n\.c\b', 'hnc', s, flags=re.IGNORECASE)
+    s = re.sub(r'\bTNC\b', 'tnc', s)
+    s = re.sub(r'\bHNC\b', 'hnc', s)
+    s = re.sub(r'\bComplet\b', 'complet', s)
+
+    # Espaces multiples
+    s = re.sub(r'\s+', ' ', s)
+    return s.strip()
+
+
 def fmt_heure(heure) -> str:
     """
-    Formate l'heure. Gère datetime.time depuis Excel.
+    Formate l'heure pour le rendu Bidul.
+    Applique normalize_heure puis ajoute le séparateur ", " final.
     """
-    replacements = {"h00": "h", " h": "h", " a ": " à ", "h.n.c": "hnc"}
-
-    # Conversion robuste en string
     heure_str = _to_str(heure)
-
     if not heure_str or heure_str.lower().strip() in ("", "nan"):
         return ""
-
-    return f"{format_string(heure_str, replacements, lower=True)}, "
+    return f"{normalize_heure(heure_str)}, "
 
 
 def fmt_prix(prix) -> str:
-    replacements = {" a ": " à ", " €": "€", "gratuit": "0€", "t.n.c": "tnc", "h.n.c": "hnc"}
+    """
+    Formate le prix pour le rendu Bidul.
+    Applique normalize_prix.
+    """
     prix_str = _to_str(prix)
-    return format_string(prix_str, replacements, lower=True)
+    if not prix_str or prix_str.lower().strip() in ("", "nan"):
+        return ""
+    return normalize_prix(prix_str)
 
 
 def format_style(style) -> str:
