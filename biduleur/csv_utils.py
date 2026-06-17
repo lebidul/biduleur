@@ -601,6 +601,16 @@ def read_and_sort_file(filename: str, date_grouping_enabled: bool = False, festi
         first_genre_col = spectacle_col_sets[0]['genre']
         df['info_last'] = df[DATE].apply(lambda x: 0 if x == COLONNE_INFO else 1)
 
+        # Excel peut renvoyer un mélange de types pour HEURE (str, datetime.time,
+        # None) et GENRE 1 (str, None) selon la mise en forme des cellules. Pandas
+        # refuse de trier un mélange (TypeError: '<' not supported between str
+        # and datetime.time → "'values' is not ordered, ..."). On normalise les
+        # colonnes utilisées pour le tri en strings via _to_str avant sort_values.
+        from biduleur.format_utils import _to_str as _to_str_helper
+        for sort_col in [first_genre_col, HORAIRE]:
+            if sort_col in df.columns:
+                df[sort_col] = df[sort_col].apply(_to_str_helper)
+
         # Tri chronologique standard. Le réordonnancement par sous-groupe festival
         # (pour que les events d'un même festival soient contigus à la position du
         # 1er d'entre eux dans l'ordre chronologique) est fait dans parse_bidul.
