@@ -105,6 +105,21 @@ Chemins relatifs au dossier contenant `config.yml` pour les fichiers d'entrée e
 #### Festival dans l'en-tête de date (`festival_in_date_header`, mode debug)
 -   Mode expérimental : déplace la valeur du 1er événement de la colonne FESTOCHE EVENEMENT dans l'en-tête de date (`"Date -- Festival"`) au lieu de la préfixer dans chaque ligne événement.
 
+#### Mode Bidul d'été (`summer_mode`, `input_file_2`, `summer_separator_style`)
+Mode spécial pour l'édition combinée juillet+août (ou tout couple de mois).
+-   `summer_mode`: active la fusion de 2 fichiers d'entrée et l'insertion de séparateurs de mois entre les événements des 2 fichiers d'origine.
+-   `input_file_2`: chemin du 2ᵉ fichier xlsx/csv (mois suivant). Les 2 DataFrames sont concaténés, et chaque ligne porte une étiquette `_source_index` (0 ou 1) qui sert de clé de tri secondaire — les événements du fichier 1 viennent avant ceux du fichier 2, indépendamment des dates.
+-   Les sections **FESTIVALS** et **"Coups de coeur et en bref"** restent globales aux 2 fichiers (cumul en début d'agenda).
+-   `summer_separator_style`: choisit le rendu de la séparation entre les 2 mois :
+    -   `"banner"` (défaut) : placeholder `{{MONTH:NOM}}` injecté avant le 1er event de chaque fichier, rendu en gros, centré, bold (kind `MONTH_HEADER` dans `textflow.py`).
+    -   `"inline"` : aucun placeholder ; le nom du mois est suffixé à chaque en-tête de date (`"Dimanche 12 Avril"`). Si l'affichage de la date contient déjà le mois (cas des dates ISO), il n'est pas dupliqué.
+-   Le **nom du mois** est dérivé du nom de fichier : recherche d'abord un nom de mois français (Avril, Mars, Août, ...), puis un préfixe `YYYYMM_` ou `YYYY-MM`. Fallback générique `MOIS 1` / `MOIS 2` si rien n'est trouvé.
+
+#### Section FESTIVALS (marqueur DATE = "Festivals")
+-   Toute ligne dont la colonne `DATE` vaut exactement `"Festivals"` est routée en début d'agenda dans une section **FESTIVALS**, avec le même rendu que `"Coups de coeur et en bref"` (pas de puce ❑, pas de label Bidul#, formatage via `format_info(FESTIVAL, STYLE_FESTIVAL, NOM SPECTACLE 1)`).
+-   Activable indépendamment du mode été — mais c'est en mode été qu'on l'utilise typiquement (l'édition combinée met les gros festivals d'été en avant).
+-   Ordre des sections : `FESTIVALS` → `Coups de coeur et en bref` → événements datés du fichier 1 → (séparateur) → événements datés du fichier 2.
+
 #### Images inline (`inline_images_*`)
 -   `inline_images_enabled`: active la prise en compte des lignes Excel avec `GENRE 1 = "img"` (le nom du fichier image est dans `NOM SPECTACLE 1`).
 -   `inline_images_dir`: dossier des images (défaut `misenpageur/assets/images/`).
