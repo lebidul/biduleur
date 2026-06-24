@@ -75,6 +75,11 @@ class Application(TkinterDnD.Tk):
         """
         # --- Variables pour les chemins de fichiers et dossiers ---
         self.input_var = tk.StringVar()
+        self.input2_var = tk.StringVar()  # 2ᵉ fichier xlsx (mode Bidul d'été)
+        self.summer_mode_var = tk.BooleanVar(value=self.cfg_defaults.get("summer_mode", False))
+        self.summer_separator_style_var = tk.StringVar(
+            value=self.cfg_defaults.get("summer_separator_style", "banner")
+        )
         self.ours_png_var = tk.StringVar(value=self.cfg_defaults.get("ours_background_png", ""))
         self.ours_layout_var = tk.StringVar(value="svg")
         self.ours_svg_var = tk.StringVar(value="misenpageur/assets/ours/ours.svg")
@@ -372,6 +377,9 @@ class Application(TkinterDnD.Tk):
             inline_images_auto_scale=self.inline_images_auto_scale_var.get(),
             date_grouping_enabled=self.date_grouping_enabled_var.get(),
             festival_in_date_header=self.festival_in_date_header_var.get(),
+            summer_mode=self.summer_mode_var.get(),
+            input_file_2=self.input2_var.get().strip(),
+            summer_separator_style=self.summer_separator_style_var.get(),
         )
 
     def _check_thread_for_results(self):

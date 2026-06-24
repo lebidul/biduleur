@@ -1,6 +1,6 @@
 import math
 from biduleur.format_utils import format_evenement, format_info, format_lieu, fmt_prix, fmt_heure, format_artists_styles, fmt_link, capfirst, fmt_virgule, format_style, _to_str
-from biduleur.constants import DATE, COLONNE_INFO, FESTIVAL, STYLE_FESTIVAL, VILLE, LIEU, PRIX, HORAIRE, GENRE_EVT_IMAGE, BIDUL_COL, SUBFEST_PREFIX, P_MD_OPEN_DATE, P_MD_CLOSE_DATE, P_MD_OPEN_DATE_AGENDA, P_MD_CLOSE, P_MD_OPEN, P_MD_POST_OPEN
+from biduleur.constants import DATE, COLONNE_INFO, COLONNE_FESTIVALS, FESTIVAL, STYLE_FESTIVAL, VILLE, LIEU, PRIX, HORAIRE, GENRE_EVT_IMAGE, BIDUL_COL, SUBFEST_PREFIX, P_MD_OPEN_DATE, P_MD_CLOSE_DATE, P_MD_OPEN_DATE_AGENDA, P_MD_CLOSE, P_MD_OPEN, P_MD_POST_OPEN
 from typing import Dict, Tuple, Optional
 
 
@@ -82,11 +82,11 @@ def parse_bidul_event(
         # Mode expérimental Teriaki : déplacer le festival dans l'en-tête de date
         if festival_in_date_header and not festival_subgroup_enabled:
             fest_raw = _to_str(event.get(FESTIVAL, '')).strip()
-            if fest_raw and fest_raw.lower() != 'nan' and date_display != COLONNE_INFO:
+            if fest_raw and fest_raw.lower() != 'nan' and date_display not in (COLONNE_INFO, COLONNE_FESTIVALS):
                 date_display = f"{date_display} -- {fest_raw}"
 
         # Placeholder "Bidul #xxx" pour rendu côté misenpageur (à gauche de la date)
-        if bidul_label_enabled and date_display != COLONNE_INFO:
+        if bidul_label_enabled and date_display not in (COLONNE_INFO, COLONNE_FESTIVALS):
             bidul_num = _format_bidul_num(event.get(BIDUL_COL))
             if bidul_num:
                 date_display = f"{{{{BIDUL:{bidul_num}}}}}{date_display}"
@@ -101,7 +101,7 @@ def parse_bidul_event(
     # (puce ❑ + texte = nom du festival + style en italique entre parenthèses).
     # Les events de ce groupe seront ensuite émis avec un marker {{SUBEV}}
     # qui leur donne une puce différente alignée avec la 1re lettre du festival.
-    if festival_subgroup_enabled and event[DATE] != COLONNE_INFO:
+    if festival_subgroup_enabled and event[DATE] not in (COLONNE_INFO, COLONNE_FESTIVALS):
         evt_festival = _normalized_festival(event)
         if evt_festival and evt_festival != current_subfest:
             # Style en italique+parens : utiliser le style "représentatif" du
@@ -134,7 +134,7 @@ def parse_bidul_event(
             line_post += img_tag
         return line_bidul, line_agenda, line_post, current_date, current_subfest
 
-    if event[DATE] == COLONNE_INFO:
+    if event[DATE] in (COLONNE_INFO, COLONNE_FESTIVALS):
         spectacle_val = event.get(first_spectacle_col, '') if first_spectacle_col else ''
         evenement = format_info(event[FESTIVAL], event[STYLE_FESTIVAL], spectacle_val)
         line_bidul += f"{P_MD_OPEN}{capfirst(evenement)}{P_MD_CLOSE}"

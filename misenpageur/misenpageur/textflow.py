@@ -50,6 +50,9 @@ _SUBFEST_PREFIX_RE = re.compile(r'^\{\{SUBFEST\}\}(.*)$', re.DOTALL)
 _SUBEV_PREFIX = "{{SUBEV}}"
 _SUBEV_PREFIX_RE = re.compile(r'^\{\{SUBEV\}\}(.*)$', re.DOTALL)
 
+# Pattern pour détecter un séparateur de mois {{MONTH:NOM}} (mode Bidul d'été)
+_MONTH_HEADER_RE = re.compile(r'^\{\{MONTH:(.+?)\}\}$')
+
 # Caractère de puce pour les sous-events (alignée avec la 1re lettre du festival)
 # ▸ = U+25B8 (black right-pointing small triangle), rendu via DejaVuSans
 _SUBEVENT_BULLET = "▸"
@@ -562,6 +565,24 @@ def _mk_style_for_kind(base: ParagraphStyle, kind: str,
         _STYLE_CACHE[cache_key] = style
         return style
 
+    if kind == "MONTH_HEADER":
+        # Séparateur de mois (mode Bidul d'été) : centré, bold, taille majorée.
+        mh_size = font_size * 1.5
+        cache_key = ("MONTH_HEADER", base_font, font_size)
+        if cache_key in _STYLE_CACHE:
+            return _STYLE_CACHE[cache_key]
+        style = ParagraphStyle(
+            name=f"{base.name}_month_header", parent=base,
+            fontSize=mh_size,
+            leading=mh_size * 1.1,
+            alignment=TA_CENTER,
+            leftIndent=0.0,
+            spaceBefore=mh_size * 0.4,
+            spaceAfter=mh_size * 0.2,
+        )
+        _STYLE_CACHE[cache_key] = style
+        return style
+
     if kind == "SUBEVENT":
         # Event de sous-groupe festival.
         # La puce ▸ doit s'aligner avec la 1re lettre du nom du festival au-dessus.
@@ -609,6 +630,11 @@ def _mk_text_for_kind(
         m = _SUBEV_PREFIX_RE.match(raw or "")
         if m:
             raw = m.group(1)
+    if kind == "MONTH_HEADER":
+        # Extraire le nom du mois depuis {{MONTH:NOM}}
+        m = _MONTH_HEADER_RE.match((raw or "").strip())
+        if m:
+            raw = m.group(1)
     txt = _strip_head_tail_breaks(sanitize_inline_markup(raw))
     bullet_text = None
     if kind == "EVENT":
@@ -634,6 +660,10 @@ def _mk_text_for_kind(
     if kind == "SUBFEST":
         txt = f"<b><i>{txt}</i></b>"
 
+    # Séparateur de mois : bold
+    if kind == "MONTH_HEADER":
+        txt = f"<b>{txt}</b>"
+
     return apply_glyph_fallbacks(txt), bullet_text
 
 
@@ -653,10 +683,19 @@ def _is_subevent(raw: str) -> bool:
     return s.startswith(_SUBEV_PREFIX)
 
 
+def _is_month_header(raw: str) -> bool:
+    """Détecte un séparateur de mois {{MONTH:NOM}} (mode Bidul d'été)."""
+    if not raw:
+        return False
+    return bool(_MONTH_HEADER_RE.match(raw.strip()))
+
+
 def _classify_paragraph(raw: str) -> str:
-    """Classifie un paragraphe: IMAGE, SUBEVENT, SUBFEST, EVENT ou DATE."""
+    """Classifie un paragraphe: IMAGE, MONTH_HEADER, SUBEVENT, SUBFEST, EVENT ou DATE."""
     if _is_image(raw):
         return "IMAGE"
+    if _is_month_header(raw):
+        return "MONTH_HEADER"
     if _is_subevent(raw):
         return "SUBEVENT"
     if _is_subfestival(raw):

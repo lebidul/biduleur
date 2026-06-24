@@ -1,14 +1,14 @@
 import os
 import re
 from datetime import datetime, timedelta
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any, Tuple
 
 import pandas as pd
 import openpyxl
 
 from biduleur.constants import (
     DATE, DATE_FIN, HORAIRE, FESTIVAL, STYLE_FESTIVAL, VILLE, LIEU, PRIX,
-    COLONNE_INFO, detect_spectacle_columns,
+    COLONNE_INFO, COLONNE_FESTIVALS, detect_spectacle_columns,
 )
 from biduleur.event_utils import parse_bidul_event
 
@@ -45,6 +45,42 @@ JOURS_SEMAINE = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'D
 REQUIRED_BASE_COLUMNS = [
     DATE, HORAIRE, FESTIVAL, STYLE_FESTIVAL, VILLE, LIEU, PRIX,
 ]
+
+
+def _month_label_from_filename(path: Optional[str]) -> Optional[str]:
+    """
+    Extrait un nom de mois (en MAJUSCULES) depuis le nom de fichier.
+    Cherche d'abord un nom de mois français (Avril, Mars, ...), puis un
+    préfixe YYYYMM_ ou YYYY-MM. Retourne None si rien n'est trouvé.
+
+    Exemples:
+        '202604_tapage_biduleur_Avril_2026.xlsx' -> 'AVRIL'
+        '2025-07 Bidul-304.xlsx'                 -> 'JUILLET'
+    """
+    if not path:
+        return None
+    base = os.path.basename(path)
+    name = os.path.splitext(base)[0].lower()
+    # 1) Cherche un nom de mois français en clair
+    for num, mois in MOIS_FR.items():
+        # Tolère accents en cherchant la forme telle qu'elle est dans MOIS_FR
+        if mois in name:
+            return mois.upper()
+        # Variante sans accent (ex. "fevrier", "aout")
+        no_accent = (mois.replace('é', 'e').replace('è', 'e')
+                          .replace('û', 'u').replace('ç', 'c'))
+        if no_accent != mois and no_accent in name:
+            return mois.upper()
+    # 2) Cherche YYYYMM_ ou YYYY-MM en début de nom
+    m = re.match(r'^(\d{4})[-_]?(\d{2})', name)
+    if m:
+        try:
+            month_num = int(m.group(2))
+            if 1 <= month_num <= 12:
+                return MOIS_FR[month_num].upper()
+        except ValueError:
+            pass
+    return None
 
 
 def _canonical_currency_symbol(raw: Any) -> str:
@@ -506,87 +542,121 @@ def _apply_date_range_display(df: pd.DataFrame) -> None:
         log.info(f"[DATES] {nb_ranges} plage(s) DATE→DATE FIN formatée(s)")
 
 
-def read_and_sort_file(filename: str, date_grouping_enabled: bool = False, festival_subgroup_enabled: bool = False) -> Optional[List[Dict]]:
+def _read_and_prepare_one_file(filename: str) -> Tuple[pd.DataFrame, List[Dict]]:
+    """
+    Lit UN fichier (CSV/XLS/XLSX), valide ses colonnes, extrait les hyperliens,
+    filtre les lignes inactives, et applique les conversions de base.
+
+    Retourne le DataFrame préparé + la liste des sets de colonnes spectacle.
+    Lève ValueError sur erreur de format/contenu.
+    """
+    file_extension = os.path.splitext(filename)[1].lower()
+
+    # Lecture du fichier avec gestion d'erreur spécifique
+    try:
+        if file_extension in ['.csv']:
+            df = pd.read_csv(filename, encoding='utf8', keep_default_na=False, na_values=[''])
+        elif file_extension in ['.xls', '.xlsx']:
+            df = pd.read_excel(filename, keep_default_na=False, na_values=[''])
+        else:
+            raise ValueError(
+                f"Format de fichier non supporté : {file_extension}\n\nFormats acceptés : .csv, .xls, .xlsx")
+    except Exception as read_error:
+        error_msg = str(read_error).lower()
+        if "format cannot be determined" in error_msg or "corrupt" in error_msg:
+            raise ValueError(
+                f"Le fichier Excel est corrompu ou illisible.\n\n"
+                f"Solutions :\n"
+                f"• Ouvrir le fichier dans Excel et l'enregistrer à nouveau\n"
+                f"• Exporter en CSV depuis Excel\n"
+                f"• Vérifier que le fichier n'est pas vide"
+            )
+        elif "permission" in error_msg or "access" in error_msg:
+            raise ValueError(
+                f"Impossible d'accéder au fichier.\n\n"
+                f"Assurez-vous que :\n"
+                f"• Le fichier n'est pas ouvert dans Excel\n"
+                f"• Vous avez les droits de lecture"
+            )
+        else:
+            raise ValueError(f"Erreur lors de la lecture du fichier :\n\n{read_error}")
+
+    # Validation des colonnes de base obligatoires
+    missing_cols = [col for col in REQUIRED_BASE_COLUMNS if col not in df.columns]
+    if missing_cols:
+        raise ValueError(
+            f"Colonnes manquantes dans le fichier :\n\n" +
+            "\n".join(f"• {col}" for col in missing_cols)
+        )
+
+    # Détection dynamique des colonnes spectacle (GENRE N, NOM SPECTACLE N, etc.)
+    spectacle_col_sets = detect_spectacle_columns(df.columns)
+    if not spectacle_col_sets:
+        raise ValueError(
+            "Aucune colonne spectacle détectée (GENRE N, NOM SPECTACLE N, etc.).\n\n"
+            "Le fichier doit contenir au moins un set de colonnes spectacle."
+        )
+    log.info(f"[COLONNES] {len(spectacle_col_sets)} set(s) de colonnes spectacle détecté(s) dans "
+             f"{os.path.basename(filename)} : {[s['num'] for s in spectacle_col_sets]}")
+
+    # --- Extraction des hyperlinks depuis Excel ---
+    hyperlinks = {}
+    if file_extension in ['.xls', '.xlsx']:
+        hyperlinks = _extract_hyperlinks(filename, df)
+
+    # --- Injecter les hyperlinks dans le DataFrame ---
+    if hyperlinks:
+        for (row_idx, col_name), target_url in hyperlinks.items():
+            if row_idx < len(df) and col_name in df.columns:
+                cell_value = df.at[df.index[row_idx], col_name]
+                display_text = str(cell_value).strip() if pd.notna(cell_value) and cell_value else target_url
+                df.at[df.index[row_idx], col_name] = f"{target_url}|{display_text}"
+
+    # --- Filtrage des lignes inactives ---
+    df = _filter_inactive_rows(df)
+
+    # --- Conversion PRIX -> texte avec devise ---
+    df = _convert_price_column_to_text(df)
+
+    # Remplace NaN par None pour la suite
+    df = df.where(pd.notnull(df), None)
+
+    return df, spectacle_col_sets
+
+
+def read_and_sort_file(
+        filename: str,
+        date_grouping_enabled: bool = False,
+        festival_subgroup_enabled: bool = False,
+        filename_2: Optional[str] = None,
+) -> Optional[List[Dict]]:
     """
     Lit et trie un fichier (CSV, XLS, ou XLSX).
+
     Args:
-        filename (str): Chemin du fichier d'entrée.
+        filename: Chemin du fichier d'entrée principal.
+        date_grouping_enabled: Active le regroupement des dates consécutives.
+        festival_subgroup_enabled: (transmis par parse_bidul, pas utilisé ici).
+        filename_2: Chemin du 2ᵉ fichier optionnel (mode Bidul d'été).
+            Quand fourni, les 2 DataFrames sont concaténés avant le tri global.
+            Les colonnes spectacle doivent être compatibles entre les 2 fichiers.
+
     Returns:
-        Optional[List[Dict]]: Liste des enregistrements triés ou None en cas d'erreur.
+        Liste des enregistrements triés ou None en cas d'erreur.
     """
     try:
-        file_extension = os.path.splitext(filename)[1].lower()
+        df, spectacle_col_sets = _read_and_prepare_one_file(filename)
+        df['_source_index'] = 0  # mode Bidul d'été : groupe d'origine
 
-        # Lecture du fichier avec gestion d'erreur spécifique
-        try:
-            if file_extension in ['.csv']:
-                df = pd.read_csv(filename, encoding='utf8', keep_default_na=False, na_values=[''])
-            elif file_extension in ['.xls', '.xlsx']:
-                df = pd.read_excel(filename, keep_default_na=False, na_values=[''])
-            else:
-                raise ValueError(
-                    f"Format de fichier non supporté : {file_extension}\n\nFormats acceptés : .csv, .xls, .xlsx")
-        except Exception as read_error:
-            # Transformer les erreurs de lecture en messages clairs
-            error_msg = str(read_error).lower()
-            if "format cannot be determined" in error_msg or "corrupt" in error_msg:
-                raise ValueError(
-                    f"Le fichier Excel est corrompu ou illisible.\n\n"
-                    f"Solutions :\n"
-                    f"• Ouvrir le fichier dans Excel et l'enregistrer à nouveau\n"
-                    f"• Exporter en CSV depuis Excel\n"
-                    f"• Vérifier que le fichier n'est pas vide"
-                )
-            elif "permission" in error_msg or "access" in error_msg:
-                raise ValueError(
-                    f"Impossible d'accéder au fichier.\n\n"
-                    f"Assurez-vous que :\n"
-                    f"• Le fichier n'est pas ouvert dans Excel\n"
-                    f"• Vous avez les droits de lecture"
-                )
-            else:
-                raise ValueError(f"Erreur lors de la lecture du fichier :\n\n{read_error}")
-
-        # Validation des colonnes de base obligatoires
-        missing_cols = [col for col in REQUIRED_BASE_COLUMNS if col not in df.columns]
-        if missing_cols:
-            raise ValueError(
-                f"Colonnes manquantes dans le fichier :\n\n" +
-                "\n".join(f"• {col}" for col in missing_cols)
-            )
-
-        # Détection dynamique des colonnes spectacle (GENRE N, NOM SPECTACLE N, etc.)
-        spectacle_col_sets = detect_spectacle_columns(df.columns)
-        if not spectacle_col_sets:
-            raise ValueError(
-                "Aucune colonne spectacle détectée (GENRE N, NOM SPECTACLE N, etc.).\n\n"
-                "Le fichier doit contenir au moins un set de colonnes spectacle."
-            )
-        log.info(f"[COLONNES] {len(spectacle_col_sets)} set(s) de colonnes spectacle détecté(s) : "
-                 f"{[s['num'] for s in spectacle_col_sets]}")
-
-        # --- Extraction des hyperlinks depuis Excel ---
-        hyperlinks = {}
-        if file_extension in ['.xls', '.xlsx']:
-            hyperlinks = _extract_hyperlinks(filename, df)
-
-        # --- Injecter les hyperlinks dans le DataFrame ---
-        # Pour les cellules avec un hyperlink, formater en "url|display_text"
-        if hyperlinks:
-            for (row_idx, col_name), target_url in hyperlinks.items():
-                if row_idx < len(df) and col_name in df.columns:
-                    cell_value = df.at[df.index[row_idx], col_name]
-                    display_text = str(cell_value).strip() if pd.notna(cell_value) and cell_value else target_url
-                    df.at[df.index[row_idx], col_name] = f"{target_url}|{display_text}"
-
-        # --- Filtrage des lignes inactives ---
-        df = _filter_inactive_rows(df)
-
-        # --- Conversion PRIX -> texte avec devise ---
-        df = _convert_price_column_to_text(df)
-
-        # Remplace NaN par None pour la suite
-        df = df.where(pd.notnull(df), None)
+        # --- Mode Bidul d'été : fusion avec un 2ᵉ fichier ---
+        if filename_2:
+            df2, spectacle_col_sets_2 = _read_and_prepare_one_file(filename_2)
+            df2['_source_index'] = 1
+            log.info(f"[ETE] Fusion de 2 fichiers : {len(df)} + {len(df2)} lignes")
+            df = pd.concat([df, df2], ignore_index=True)
+            # On garde le set le plus complet (union par numéro)
+            if len(spectacle_col_sets_2) > len(spectacle_col_sets):
+                spectacle_col_sets = spectacle_col_sets_2
 
         # Parser les dates: extraire clé de tri + normaliser pour affichage
         parsed = df[DATE].apply(_parse_date)
@@ -597,9 +667,20 @@ def read_and_sort_file(filename: str, date_grouping_enabled: bool = False, festi
         # pour les lignes où elle est renseignée
         _apply_date_range_display(df)
 
-        # Tri personnalisé : 'En Bref' (COLONNE_INFO) passe à la fin
+        # Tri personnalisé : 3 sections au début de l'agenda
+        #   0 = FESTIVALS (mode Bidul d'été)
+        #   1 = "Coups de coeur et en bref" (COLONNE_INFO)
+        #   2 = événements datés normaux
         first_genre_col = spectacle_col_sets[0]['genre']
-        df['info_last'] = df[DATE].apply(lambda x: 0 if x == COLONNE_INFO else 1)
+
+        def _section_order(date_val):
+            if date_val == COLONNE_FESTIVALS:
+                return 0
+            if date_val == COLONNE_INFO:
+                return 1
+            return 2
+
+        df['info_last'] = df[DATE].apply(_section_order)
 
         # Excel peut renvoyer un mélange de types pour HEURE (str, datetime.time,
         # None) et GENRE 1 (str, None) selon la mise en forme des cellules. Pandas
@@ -611,10 +692,11 @@ def read_and_sort_file(filename: str, date_grouping_enabled: bool = False, festi
             if sort_col in df.columns:
                 df[sort_col] = df[sort_col].apply(_to_str_helper)
 
-        # Tri chronologique standard. Le réordonnancement par sous-groupe festival
-        # (pour que les events d'un même festival soient contigus à la position du
-        # 1er d'entre eux dans l'ordre chronologique) est fait dans parse_bidul.
-        df_sorted = df.sort_values(by=['info_last', 'Day', first_genre_col, HORAIRE])
+        # Tri chronologique standard. En mode Bidul d'été, les événements datés
+        # normaux du fichier 1 viennent avant ceux du fichier 2 (via _source_index)
+        # — les sections FESTIVALS et "Coups de coeur" restent globales aux 2 fichiers.
+        # Le réordonnancement par sous-groupe festival est fait dans parse_bidul.
+        df_sorted = df.sort_values(by=['info_last', '_source_index', 'Day', first_genre_col, HORAIRE])
         df_sorted = df_sorted.drop(columns=['info_last'])
 
         # Regroupement optionnel des dates consécutives (feature Teriaki)
@@ -644,6 +726,9 @@ def parse_bidul(
         festival_in_date_header: bool = False,
         bidul_label_enabled: bool = False,
         festival_subgroup_enabled: bool = False,
+        filename_2: Optional[str] = None,
+        summer_mode: bool = False,
+        summer_separator_style: str = "banner",
 ) -> tuple:
     """
     Traite le fichier d'entrée (CSV, XLS, ou XLSX) et génère les données nécessaires.
@@ -653,12 +738,18 @@ def parse_bidul(
             calendaires consécutifs sous une même date composite (feature Teriaki).
         festival_in_date_header (bool): Si True, déplace le contenu de la colonne
             FESTOCHE/EVENEMENT dans l'en-tête de date (feature expérimentale Teriaki).
+        filename_2 (Optional[str]): 2ᵉ fichier xlsx (mode Bidul d'été). Quand
+            fourni, les événements des 2 fichiers sont fusionnés et triés ensemble.
     Returns:
         tuple: (html_body_bidul, html_body_agenda, number_of_lines)
     """
     body_content = ''
     body_content_agenda = ''
-    sorted_events = read_and_sort_file(filename, date_grouping_enabled=date_grouping_enabled)
+    sorted_events = read_and_sort_file(
+        filename,
+        date_grouping_enabled=date_grouping_enabled,
+        filename_2=filename_2,
+    )
     if sorted_events is None:
         return body_content, body_content_agenda, 0
 
@@ -721,6 +812,12 @@ def parse_bidul(
     current_date = None
     current_subfest = None
     number_of_lines = 0
+    # Mode Bidul d'été : libellés de mois dérivés des noms de fichier
+    month_labels = {
+        0: _month_label_from_filename(filename) or "MOIS 1",
+        1: _month_label_from_filename(filename_2) or "MOIS 2",
+    } if summer_mode else {}
+    current_source_index = None  # index du fichier d'origine (0 ou 1)
 
     for row in sorted_events:
         # strip des chaînes
@@ -744,6 +841,32 @@ def parse_bidul(
                     # Injecte dans la row pour que parse_bidul_event puisse le
                     # récupérer lors de la 1re émission du sous-en-tête.
                     row['_subhead_style'] = subhead_style_for_event
+
+        # --- Marquage du mois (mode Bidul d'été) ---
+        # Ignore les lignes FESTIVALS et "Coups de coeur" qui sont des sections globales.
+        if summer_mode and row.get(DATE) not in (COLONNE_INFO, COLONNE_FESTIVALS):
+            row_source = row.get('_source_index')
+            if row_source is not None:
+                label = month_labels.get(row_source) or f"MOIS {row_source + 1}"
+
+                # Style "banner" : émet <p>{{MONTH:NOM}}</p> au changement de fichier
+                if summer_separator_style == "banner" and row_source != current_source_index:
+                    month_header = f"<p>{{{{MONTH:{label}}}}}</p>"
+                    body_content += month_header + "\n\n"
+                    body_content_agenda += month_header + "\n\n"
+                    if current_source_index is not None:
+                        current_date = None  # forcer ré-émission de la date
+
+                # Style "inline" : ajoute le nom du mois à l'affichage de la date
+                # si ce n'est pas déjà présent (ex. dates ISO "Dimanche 12 Avril 2025")
+                if summer_separator_style == "inline":
+                    date_disp = row.get(DATE, '') or ''
+                    if date_disp and label.lower() not in date_disp.lower():
+                        # Capitaliser le nom du mois (Avril, pas AVRIL)
+                        row[DATE] = f"{date_disp} {label.capitalize()}"
+
+                if row_source != current_source_index:
+                    current_source_index = row_source
 
         formatted_line_bidul, formatted_line_agenda, formatted_line_post, current_date, current_subfest = parse_bidul_event(
             row, current_date,

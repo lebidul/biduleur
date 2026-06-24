@@ -107,6 +107,14 @@ def assign_all(app):
     # v1.5.2 : Toggle des widgets HTML quand la checkbox change
     app.generate_html_var.trace_add("write", lambda *args: on_toggle_html_widgets(app))
 
+    # Mode Bidul d'été : toggle visibilité 2ᵉ zone de drop + binding drop + bouton
+    if hasattr(app, 'drop_zone_2') and app.drop_zone_2 is not None:
+        app.drop_zone_2.dnd_bind('<<Drop>>', lambda event: on_drop_input_file_2(app, event))
+        app.drop_zone_2_label.dnd_bind('<<Drop>>', lambda event: on_drop_input_file_2(app, event))
+    if hasattr(app, 'input2_button'):
+        app.input2_button.config(command=lambda: on_pick_input_2(app))
+    app.summer_mode_var.trace_add("write", lambda *args: on_toggle_summer_mode(app))
+
     # ✨ NOUVEAU v1.4.2 : Callbacks pour les boutons d'abréviations
     if hasattr(app, 'abbrev_select_all_btn'):
         app.abbrev_select_all_btn.config(command=lambda: on_abbrev_select_all(app))
@@ -125,6 +133,7 @@ def assign_all(app):
     on_update_alpha_label(app)
     on_toggle_config_buttons(app)  # ✨ NOUVEAU : Initialiser l'état des boutons config
     on_toggle_html_widgets(app)  # v1.5.2 : Initialiser l'état des widgets HTML
+    on_toggle_summer_mode(app)  # Mode Bidul d'été : initialiser visibilité 2ᵉ drop zone
     _update_drop_zone_text(app, app.input_var.get())
     _update_cover_drop_zone(app, app.cover_var.get())
 
@@ -136,6 +145,19 @@ def assign_all(app):
 
 
 # --- Fonctions de sélection de fichiers/dossiers ---
+
+def on_pick_input_2(app):
+    """Callback pour le bouton de sélection du 2ᵉ fichier (mode été)."""
+    file_path = filedialog.askopenfilename(
+        title="Sélectionner le 2ᵉ fichier (mois suivant)",
+        filetypes=[("Excel", "*.xls;*.xlsx"), ("CSV", "*.csv"), ("Tous", "*.*")]
+    )
+    if not file_path:
+        return
+    app.input2_var.set(file_path)
+    if hasattr(app, 'drop_zone_2_label') and app.drop_zone_2_label is not None:
+        app.drop_zone_2_label.config(text=f"📅 2ᵉ fichier : {os.path.basename(file_path)}")
+
 
 def on_pick_input(app):
     """Callback pour le bouton de sélection du fichier d'entrée."""
@@ -482,6 +504,39 @@ def on_drop_input_file(app, event):
     app.pdf_var.set(d["pdf"])
     app.svg_output_var.set(d["svg_output_dir"])
     app.stories_output_var.set(d["stories_output"])
+
+
+def on_drop_input_file_2(app, event):
+    """Callback exécuté lorsqu'un 2ᵉ fichier est déposé (mode Bidul d'été)."""
+    file_path = event.data.strip()
+    if file_path.startswith('{') and file_path.endswith('}'):
+        file_path = file_path[1:-1]
+
+    if not os.path.exists(file_path):
+        messagebox.showerror("Erreur", f"Le fichier déposé n'a pas pu être trouvé :\n{file_path}")
+        return
+
+    app.input2_var.set(file_path)
+    # Mise à jour visuelle de la 2ᵉ drop zone
+    if hasattr(app, 'drop_zone_2_label') and app.drop_zone_2_label is not None:
+        app.drop_zone_2_label.config(text=f"📅 2ᵉ fichier : {os.path.basename(file_path)}")
+
+
+def on_toggle_summer_mode(app):
+    """Affiche/cache la 2ᵉ zone de drop et le choix de style selon le checkbox 'Mode été'."""
+    enabled = app.summer_mode_var.get() if hasattr(app, 'summer_mode_var') else False
+    if hasattr(app, 'drop_zone_2') and app.drop_zone_2 is not None:
+        if enabled:
+            app.drop_zone_2.grid(row=app.drop_zone_2_row, column=0, columnspan=3,
+                                 sticky="ew", padx=10, pady=(0, 10))
+        else:
+            app.drop_zone_2.grid_remove()
+    if hasattr(app, 'summer_sep_frame') and app.summer_sep_frame is not None:
+        if enabled:
+            app.summer_sep_frame.grid(row=app.summer_sep_frame_row, column=0, columnspan=3,
+                                      sticky="w", pady=(0, 5))
+        else:
+            app.summer_sep_frame.grid_remove()
 
 
 def on_drop_cover_file(app, event):

@@ -136,6 +136,11 @@ class Config:
     date_grouping_enabled: bool = False
     festival_in_date_header: bool = False
 
+    # --- Mode Bidul d'été (double mois, séparateurs JUILLET/AOÛT, section FESTIVALS) ---
+    summer_mode: bool = False
+    input_file_2: Optional[str] = None  # 2ᵉ fichier xlsx (optionnel) — fusionné avec le 1er
+    summer_separator_style: str = "banner"  # "banner" = gros bandeau MOIS / "inline" = mois ajouté à chaque date
+
     # --- Debug ---
     debug_mode: bool = False
 

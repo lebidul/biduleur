@@ -24,10 +24,14 @@ class SpacingPolicy:
             if section_name == "S5" and not first_non_event_seen_in_S5:
                 return self.cfg.first_non_event_spaceBefore_in_S5
             return self.cfg.date_spaceBefore
+        if kind == "MONTH_HEADER":
+            return self.cfg.date_spaceBefore * 1.5
         return self.cfg.event_spaceBefore
 
     def space_after(self, kind: str, para_height: float) -> float:
         if kind == "DATE":
+            return self.cfg.date_spaceAfter
+        if kind == "MONTH_HEADER":
             return self.cfg.date_spaceAfter
         # dynamique pour événements, à la ligne
         lines = max(1, int(round(para_height / self.leading)))

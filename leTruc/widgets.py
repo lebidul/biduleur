@@ -109,6 +109,63 @@ def _create_input_section(parent, app, ui_row):
     app.drop_zone_label.dnd_bind('<<Drop>>', lambda event: on_drop_input_file(app, event))
     r += 1
 
+    # --- Mode Bidul d'été (juillet + août) ---
+    app.summer_mode_check = tk.Checkbutton(
+        parent,
+        text="🌞 Mode Bidul d'été (fusion de 2 fichiers, séparateurs JUILLET/AOÛT, section FESTIVALS)",
+        variable=app.summer_mode_var,
+    )
+    app.summer_mode_check.grid(row=r, column=0, columnspan=3, sticky="w", padx=10, pady=(5, 0))
+    Tooltip(app.summer_mode_check,
+            text="Active le mode 'Bidul d'été' :\n"
+                 " • Permet d'ajouter un 2ᵉ fichier d'entrée (août typiquement)\n"
+                 " • Insère un séparateur centré au changement de mois (JUILLET / AOÛT)\n"
+                 " • Toute ligne avec DATE = 'Festivals' est routée vers la section\n"
+                 "   FESTIVALS en début d'agenda (idem 'Coups de coeur et en bref').")
+    r += 1
+
+    # 2ᵉ zone de drop (visible uniquement en mode été)
+    app.drop_zone_2 = ttk.Frame(parent, relief="sunken", borderwidth=2, padding=15)
+    app.drop_zone_2.columnconfigure(0, weight=1)
+    app.drop_zone_2_label = ttk.Label(
+        app.drop_zone_2,
+        text="📅 Glissez-déposez le 2ᵉ fichier (mois suivant) ici — optionnel",
+        font=("Arial", 10),
+        anchor="center",
+    )
+    app.drop_zone_2_label.grid(row=0, column=0, pady=(0, 5))
+    app.input2_button = tk.Button(app.drop_zone_2, text="Sélectionner un 2ᵉ fichier…")
+    app.input2_button.grid(row=1, column=0)
+
+    app.drop_zone_2.drop_target_register(DND_FILES)
+    app.drop_zone_2_label.drop_target_register(DND_FILES)
+    # Le binding sera défini dans callbacks.py (on_drop_input_file_2)
+    app.drop_zone_2_row = r  # stocker la ligne pour le toggle
+    # Pas de .grid() ici : la visibilité est gérée par le callback on_toggle_summer_mode
+    r += 1
+
+    # --- Choix du style de séparation entre les 2 mois ---
+    app.summer_sep_frame = ttk.Frame(parent)
+    ttk.Label(app.summer_sep_frame, text="Style de séparation entre les 2 mois :").grid(
+        row=0, column=0, sticky="w", padx=(10, 5)
+    )
+    app.summer_sep_banner_rb = ttk.Radiobutton(
+        app.summer_sep_frame,
+        text="Bandeau de mois (gros AVRIL / MAI)",
+        variable=app.summer_separator_style_var,
+        value="banner",
+    )
+    app.summer_sep_banner_rb.grid(row=0, column=1, sticky="w", padx=5)
+    app.summer_sep_inline_rb = ttk.Radiobutton(
+        app.summer_sep_frame,
+        text="Mois inline (Dimanche 12 Avril)",
+        variable=app.summer_separator_style_var,
+        value="inline",
+    )
+    app.summer_sep_inline_rb.grid(row=0, column=2, sticky="w", padx=5)
+    app.summer_sep_frame_row = r  # mémorise la ligne pour le toggle de visibilité
+    r += 1
+
     models_frame = ttk.Frame(parent)
     models_frame.grid(row=r, column=1, columnspan=2, sticky="w", padx=5, pady=(0, 10))
     tk.Label(models_frame, text="Télécharger un modèle :").pack(side=tk.LEFT, anchor=tk.W)

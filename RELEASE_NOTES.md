@@ -1,3 +1,126 @@
+# Bidul v1.9.0 - Mode Bidul d'été : édition combinée 2 mois, section FESTIVALS, séparateurs de mois
+
+Nouvelle version dédiée à l'édition spéciale **juillet + août** (ou tout couple
+de mois) du Bidul : un seul agenda regroupant 2 mois en entrée, avec une
+section **FESTIVALS** en tête et un séparateur visuel entre les 2 mois.
+
+## ✨ Nouveautés
+
+### Mode "Bidul d'été" (`summer_mode`, `input_file_2`)
+*   Nouvelle case à cocher **🌞 Mode Bidul d'été** dans la section d'import :
+    active la **fusion de 2 fichiers xlsx/csv** d'entrée en un seul agenda
+*   Quand la case est cochée, une **2ᵉ zone de drop** apparaît pour glisser
+    le fichier du 2ᵉ mois (août typiquement, mais ça marche avec n'importe
+    quel couple de mois — testé sur mars/avril, avril/mai, juillet/août)
+*   Les événements des 2 fichiers sont **concaténés** au niveau du DataFrame
+    puis triés ensemble. Les événements du **1ᵉʳ fichier sont placés avant**
+    ceux du 2ᵉ (indépendamment des dates), ce qui garantit que l'agenda
+    reste chronologique même quand les dates sont en texte (« Mercredi 1 »
+    sans année/mois explicite)
+
+### Section FESTIVALS en début d'agenda
+*   Nouveau **marqueur de date** : toute ligne avec `DATE = "Festivals"`
+    est routée dans une section **FESTIVALS** placée en tête de l'agenda,
+    juste avant la section "Coups de coeur et en bref"
+*   Même **logique de mise en page** que la section "Coups de coeur" :
+    formatage via `format_info(FESTIVAL, STYLE_FESTIVAL, NOM SPECTACLE 1)`,
+    pas de puce ❑, pas d'étiquette `Bidul #xxx`, pas de séparateur de date
+*   Les festivals des 2 fichiers sont **cumulés** dans la section globale
+    (pas séparés par mois)
+*   Idem pour la section "Coups de coeur et en bref"
+
+### Séparateurs de mois — 2 styles au choix
+Nouveau radio-button **"Style de séparation entre les 2 mois"** (visible
+uniquement quand le mode été est activé), avec 2 options mutuellement
+exclusives :
+
+*   **Bandeau de mois (défaut)** : un gros `JUILLET` / `AOÛT` centré, en
+    gras, taille majorée (×1.5), est inséré avant le 1er événement de
+    chaque fichier. Implémenté via un placeholder `{{MONTH:NOM}}` dans le
+    HTML et un nouveau kind `MONTH_HEADER` dans `textflow.py`
+*   **Mois inline (Dimanche 12 Avril)** : aucun gros bandeau, mais le nom
+    du mois est suffixé à chaque en-tête de date. Pratique quand les dates
+    d'entrée sont en texte sans année (« Mercredi 1 » devient « Mercredi
+    1 Avril »). Si l'affichage de la date contient déjà le mois (cas des
+    dates ISO `2025-04-12` → `Dimanche 12 Avril 2025`), il n'est pas dupliqué
+
+### Détection automatique du nom de mois
+*   Le nom du mois affiché dans les séparateurs est **dérivé du nom de
+    fichier** :
+    1.  Recherche d'un nom de mois français en clair (avec ou sans accents :
+        Avril, Mars, Août, Décembre, Fevrier, Aout, ...)
+    2.  Fallback : préfixe `YYYYMM_` ou `YYYY-MM` (ex. `202604_…xlsx` →
+        `Avril`, `2025-07 Bidul-304.xlsx` → `Juillet`)
+    3.  Fallback ultime : `MOIS 1` / `MOIS 2`
+
+### Intégration complète dans Import/Export config
+*   Les 3 nouveaux champs (`summer_mode`, `input_file_2`,
+    `summer_separator_style`) sont sauvegardés dans **les 3 chemins de
+    sérialisation** : `save_current_config_from_app()`, dump debug au
+    démarrage du pipeline, et chargement des defaults
+*   Round-trip complet : exporter une config en mode été → la réimporter
+    restaure la case 🌞, le chemin du 2ᵉ fichier, et le style de séparation
+*   Variantes `_*` (`_summer_mode`, `_input_file_2`,
+    `_summer_separator_style`) en plus des champs principaux, comme pour
+    les autres options (`_date_grouping_enabled`, etc.)
+
+## 🔧 Détails techniques
+
+*   `biduleur/constants.py` : ajout de la constante `COLONNE_FESTIVALS =
+    "Festivals"` (marqueur de date, analogue à `COLONNE_INFO = "Coups de
+    coeur et en bref"`)
+*   `biduleur/csv_utils.py` :
+    *   Extraction d'un helper `_read_and_prepare_one_file()` pour la
+        lecture per-file (validation colonnes, hyperlinks, filter inactif,
+        conversion prix)
+    *   `read_and_sort_file()` accepte un `filename_2: Optional[str]`,
+        concatène les 2 DataFrames, et tag chaque ligne avec
+        `_source_index` (0 ou 1)
+    *   Tri étendu : `['info_last', '_source_index', 'Day',
+        first_genre_col, HORAIRE]` (3 sections : FESTIVALS=0, INFO=1,
+        events=2, puis par source pour préserver l'origine)
+    *   Nouveau helper `_month_label_from_filename()` qui dérive le nom du
+        mois d'un chemin de fichier
+    *   `parse_bidul()` accepte `filename_2`, `summer_mode`,
+        `summer_separator_style` et émet soit le placeholder
+        `{{MONTH:NOM}}`, soit le suffixe inline sur la date
+*   `biduleur/event_utils.py` : `if event[DATE] in (COLONNE_INFO,
+    COLONNE_FESTIVALS)` au lieu du seul `COLONNE_INFO` — partage la même
+    branche de rendu
+*   `misenpageur/misenpageur/config.py` : 3 nouveaux champs dans la
+    dataclass `Config` (`summer_mode: bool = False`, `input_file_2:
+    Optional[str] = None`, `summer_separator_style: str = "banner"`)
+*   `misenpageur/misenpageur/textflow.py` : nouveau kind `MONTH_HEADER`
+    avec son style dédié (centré, bold, taille ×1.5) et regex
+    `_MONTH_HEADER_RE` pour extraire le nom du mois du placeholder
+*   `misenpageur/misenpageur/spacing.py` : politique d'espacement pour
+    `MONTH_HEADER` (spaceBefore = `date_spaceBefore × 1.5`)
+*   `leTruc/app.py` : 2 nouvelles `tk.StringVar`/`BooleanVar`
+    (`input2_var`, `summer_mode_var`, `summer_separator_style_var`)
+*   `leTruc/widgets.py` : checkbox 🌞, 2ᵉ drop zone (avec
+    `drop_target_register`), et frame radio bandeau/inline
+*   `leTruc/callbacks.py` : nouveaux callbacks `on_drop_input_file_2`,
+    `on_pick_input_2`, `on_toggle_summer_mode` (gère la visibilité de la
+    2ᵉ drop zone ET du frame radio)
+*   `leTruc/_helpers.py` : `run_pipeline()` accepte les 3 nouveaux
+    paramètres et les propage à `parse_bidul()` ; save/load wiring sur
+    les 3 chemins de sérialisation
+
+## 📚 Notes d'utilisation
+
+*   Le mode été marche aussi bien avec des **dates ISO** qu'avec des
+    **dates en texte** (style « Mercredi 1 » sans année/mois). Le tri par
+    `_source_index` garantit que les événements d'avril ne se mélangent
+    jamais avec ceux de mai, même quand les dates ont l'air ambiguës
+*   Pour utiliser la **section FESTIVALS** sans le mode été, il suffit de
+    mettre `DATE = "Festivals"` dans une ligne de xlsx — ça marche en mode
+    normal
+*   En mode été, **les 2 fichiers doivent avoir des colonnes spectacle
+    compatibles** (GENRE N, NOM SPECTACLE N, etc.). Le set de colonnes le
+    plus complet est conservé
+
+---
+
 # Bidul v1.8.1 - Export de config en mode normal, fix import texte Cucaracha
 
 Petite version d'amélioration ergonomique de l'UI : bouton **Exporter config**

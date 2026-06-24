@@ -184,6 +184,9 @@ def _load_cfg_defaults() -> dict:
         out["inline_images_auto_scale"] = getattr(cfg, "inline_images_auto_scale", False)
         out["date_grouping_enabled"] = getattr(cfg, "date_grouping_enabled", False)
         out["festival_in_date_header"] = getattr(cfg, "festival_in_date_header", False)
+        out["summer_mode"] = getattr(cfg, "summer_mode", False)
+        out["input_file_2"] = getattr(cfg, "input_file_2", None)
+        out["summer_separator_style"] = getattr(cfg, "summer_separator_style", "banner")
 
         if isinstance(cfg.stories, dict):
             out["stories_enabled"] = cfg.stories.get("enabled", True)
@@ -259,6 +262,9 @@ def run_pipeline(
         inline_images_auto_scale: bool = False,
         date_grouping_enabled: bool = False,
         festival_in_date_header: bool = False,
+        summer_mode: bool = False,
+        input_file_2: str = "",
+        summer_separator_style: str = "banner",
 ) -> tuple[bool, str]:
     debug_dir = None
     if debug_mode:
@@ -328,6 +334,9 @@ def run_pipeline(
                 festival_in_date_header=festival_in_date_header,
                 bidul_label_enabled=bidul_label_enabled,
                 festival_subgroup_enabled=festival_subgroup_enabled,
+                filename_2=(input_file_2 if (summer_mode and input_file_2) else None),
+                summer_mode=summer_mode,
+                summer_separator_style=summer_separator_style,
             )
         except ValueError as e:
             # Erreur de validation (colonnes manquantes ou fichier corrompu)
@@ -474,6 +483,9 @@ def run_pipeline(
         cfg.inline_images_auto_scale = inline_images_auto_scale
         cfg.date_grouping_enabled = date_grouping_enabled
         cfg.festival_in_date_header = festival_in_date_header
+        cfg.summer_mode = summer_mode
+        cfg.input_file_2 = input_file_2 or None
+        cfg.summer_separator_style = summer_separator_style
         cfg.stories['enabled'] = generate_stories
         if stories_output_dir:
             cfg.stories['output_dir'] = stories_output_dir
@@ -617,6 +629,9 @@ def run_pipeline(
                 config_data["_inline_images_auto_scale"] = inline_images_auto_scale
                 config_data["_date_grouping_enabled"] = date_grouping_enabled
                 config_data["_festival_in_date_header"] = festival_in_date_header
+                config_data["_summer_mode"] = summer_mode
+                config_data["_input_file_2"] = input_file_2 or None
+                config_data["_summer_separator_style"] = summer_separator_style
                 with open(config_path, 'w', encoding='utf-8') as f:
                     json.dump(config_data, f, indent=2, default=json_converter, ensure_ascii=False)
             except Exception as e:
@@ -834,6 +849,11 @@ def save_current_config_from_app(app_instance, dest_path: str) -> None:
     cfg.date_grouping_enabled = app_instance.date_grouping_enabled_var.get()
     cfg.festival_in_date_header = app_instance.festival_in_date_header_var.get()
 
+    # Mode Bidul d'été
+    cfg.summer_mode = app_instance.summer_mode_var.get()
+    cfg.input_file_2 = app_instance.input2_var.get().strip() or None
+    cfg.summer_separator_style = app_instance.summer_separator_style_var.get()
+
     # Stories
     cfg.stories['enabled'] = app_instance.generate_stories_var.get()
     if app_instance.stories_output_var.get().strip():
@@ -867,6 +887,9 @@ def save_current_config_from_app(app_instance, dest_path: str) -> None:
     config_data["_inline_images_auto_scale"] = cfg.inline_images_auto_scale
     config_data["_date_grouping_enabled"] = cfg.date_grouping_enabled
     config_data["_festival_in_date_header"] = cfg.festival_in_date_header
+    config_data["_summer_mode"] = cfg.summer_mode
+    config_data["_input_file_2"] = cfg.input_file_2
+    config_data["_summer_separator_style"] = cfg.summer_separator_style
 
     # Créer le dossier parent si besoin
     Path(dest_path).parent.mkdir(parents=True, exist_ok=True)
@@ -1195,6 +1218,41 @@ def load_and_apply_config(app_instance, config_path: str):
         festival_in_header = getattr(cfg, 'festival_in_date_header', False)
     if hasattr(app_instance, 'festival_in_date_header_var'):
         app_instance.festival_in_date_header_var.set(bool(festival_in_header))
+
+    # Mode Bidul d'été
+    summer_mode = raw_data.get('_summer_mode', None)
+    if summer_mode is None:
+        summer_mode = getattr(cfg, 'summer_mode', False)
+    if hasattr(app_instance, 'summer_mode_var'):
+        app_instance.summer_mode_var.set(bool(summer_mode))
+
+    input_file_2 = raw_data.get('_input_file_2', None)
+    if input_file_2 is None:
+        input_file_2 = getattr(cfg, 'input_file_2', None)
+    if hasattr(app_instance, 'input2_var'):
+        # Restaurer le chemin (résolu en absolu via make_abs si présent)
+        if input_file_2:
+            try:
+                abs_path = make_abs(input_file_2, config_dir)
+            except Exception:
+                abs_path = input_file_2
+            app_instance.input2_var.set(str(abs_path))
+        else:
+            app_instance.input2_var.set("")
+
+    separator_style = raw_data.get('_summer_separator_style', None)
+    if separator_style is None:
+        separator_style = getattr(cfg, 'summer_separator_style', 'banner')
+    if hasattr(app_instance, 'summer_separator_style_var'):
+        app_instance.summer_separator_style_var.set(separator_style)
+
+    # Re-appliquer la visibilité de la 2e zone après mise à jour de summer_mode_var
+    if hasattr(app_instance, 'summer_mode_var'):
+        try:
+            from .callbacks import on_toggle_summer_mode
+            on_toggle_summer_mode(app_instance)
+        except Exception:
+            pass
 
     # Forcer le rafraîchissement du GUI
     app_instance.update_idletasks()
