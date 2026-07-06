@@ -261,19 +261,95 @@ def capfirst(s):
         return ''
 
 
+def _prettify_agenda_html(body: str) -> str:
+    """
+    Transforme le body brut de l'agenda en HTML prêt-à-coller dans WordPress :
+    - remplace les placeholders internes ({{SUBEV}}, {{MONTH:NOM}})
+    - grossit et colore les en-têtes de date
+    - transforme les séparateurs de mois en gros bandeaux
+    Les styles sont INLINE pour survivre à un copier-coller ou à un éditeur
+    WordPress qui filtre les <style>.
+    """
+    import re as _re
+
+    # 1) Séparateur de mois (mode Bidul d'été) : <p>{{MONTH:NOM}}</p> → gros bandeau
+    body = _re.sub(
+        r'<p[^>]*>\s*\{\{MONTH:([^}]+)\}\}\s*</p>',
+        r'<h2 style="text-align:center;font-family:Arial,sans-serif;font-size:2em;'
+        r'color:#b8860b;letter-spacing:0.2em;margin:1.5em 0 0.8em;padding:0.3em 0;'
+        r'border-top:3px double #b8860b;border-bottom:3px double #b8860b;">\1</h2>',
+        body,
+    )
+
+    # 2) En-têtes de date agenda : identifiés par color:blue dans le style inline.
+    #    Le format brut ferme via </spanp></p> — on normalise en </p>.
+    body = _re.sub(
+        r'<p[^>]*color:blue[^>]*>([^<]+?)</spanp></p>',
+        r'<p style="font-family:Arial,sans-serif;font-size:1.15em;font-weight:bold;'
+        r'text-align:center;color:#ffffff;background:#b8860b;padding:0.35em 0.5em;'
+        r'margin:1.2em 0 0.5em;border-radius:3px;line-height:1.3;">\1</p>',
+        body,
+    )
+    # Certains en-têtes de date en agenda n'ont pas le </spanp> foireux : idem sans.
+    body = _re.sub(
+        r'<p[^>]*color:blue[^>]*>([^<]+?)</p>',
+        r'<p style="font-family:Arial,sans-serif;font-size:1.15em;font-weight:bold;'
+        r'text-align:center;color:#ffffff;background:#b8860b;padding:0.35em 0.5em;'
+        r'margin:1.2em 0 0.5em;border-radius:3px;line-height:1.3;">\1</p>',
+        body,
+    )
+
+    # 3) Sous-events festival : {{SUBEV}} → indentation + puce ▸
+    body = body.replace(
+        '{{SUBEV}}',
+        '<span style="display:inline-block;width:2.2em">&nbsp;</span>'
+        '<span style="color:#b8860b;font-weight:bold">▸</span>&nbsp;'
+    )
+
+    # 4) Sous-en-tête de festival (rare mais possible)
+    body = body.replace('{{SUBFEST}}', '')
+
+    # 5) Placeholder image (au cas où) : on laisse pour l'instant en clair
+    #    (l'agenda WordPress n'utilise pas les images inline)
+
+    # 6) Line-height 0.25 illisible en HTML web → on rehausse.
+    body = body.replace('line-height:0.25', 'line-height:1.4')
+
+    return body
+
+
 def output_html_file(html_body: str, original_file_name: str = None, output_filename: str = None,
-                     output_folder_name: str = OUTPUT_FOLDER_NAME):
+                     output_folder_name: str = OUTPUT_FOLDER_NAME, pretty: bool = False):
     pre, ext = os.path.splitext(os.path.basename(original_file_name))
     if not output_filename:
         output_filename = os.path.join(output_folder_name, pre + ".html")
     else:
         output_filename = os.path.join(output_folder_name, output_filename)
-    html_string = f"""<!DOCTYPE html>
+
+    body = _prettify_agenda_html(html_body) if pretty else html_body
+
+    # En mode pretty : wrapper responsive + charset explicite pour un rendu propre
+    # une fois collé dans une page WordPress.
+    if pretty:
+        html_string = f"""<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<title>Agenda</title>
+</head>
+<body style="max-width:820px;margin:1.5em auto;padding:0 1em;color:#222;
+font-family:'Arial Narrow',Arial,sans-serif;line-height:1.4;">
+{body}
+</body>
+</html>
+"""
+    else:
+        html_string = f"""<!DOCTYPE html>
 <html  xmlns="http://www.w3.org/1999/xhtml" xml:lang="fr">
 <head>
 <meta charset="UTF-8"/>
 <body>
-{html_body}
+{body}
 </body>
 </head>
 </html>

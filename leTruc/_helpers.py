@@ -350,7 +350,8 @@ def run_pipeline(
         else:
             status_queue.put(('status', f"Étape {current_step}/{total_steps} : Préparation des données...", current_step, None))
         output_html_file(html_body_bidul, original_file_name=input_file, output_filename=out_html)
-        output_html_file(html_body_agenda, original_file_name=input_file, output_filename=out_agenda_html)
+        # agenda.html : sortie destinée à alimenter une page WordPress → prettify
+        output_html_file(html_body_agenda, original_file_name=input_file, output_filename=out_agenda_html, pretty=True)
 
         html_text = read_text(out_html)
         paras = extract_paragraphs_from_html(html_text)
