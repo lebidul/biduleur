@@ -350,7 +350,17 @@ def run_pipeline(
         else:
             status_queue.put(('status', f"Étape {current_step}/{total_steps} : Préparation des données...", current_step, None))
         output_html_file(html_body_bidul, original_file_name=input_file, output_filename=out_html)
-        output_html_file(html_body_agenda, original_file_name=input_file, output_filename=out_agenda_html)
+        # agenda.html : sortie destinée à alimenter une page WordPress via
+        # le renderer 'Le Bidul de nuit' (2 colonnes, 4 lignes par event).
+        from biduleur.format_utils import render_wordpress_agenda
+        wp_html = render_wordpress_agenda(
+            input_file,
+            filename_2=(input_file_2 if (summer_mode and input_file_2) else None),
+            summer_mode=summer_mode,
+            summer_separator_style=summer_separator_style,
+        )
+        with open(out_agenda_html, 'w', encoding='utf-8') as f:
+            f.write(wp_html)
 
         html_text = read_text(out_html)
         paras = extract_paragraphs_from_html(html_text)
@@ -1237,8 +1247,17 @@ def load_and_apply_config(app_instance, config_path: str):
             except Exception:
                 abs_path = input_file_2
             app_instance.input2_var.set(str(abs_path))
+            # Rafraîchir aussi le label de la 2ᵉ drop zone (comme pour input_file #1)
+            if hasattr(app_instance, 'drop_zone_2_label') and app_instance.drop_zone_2_label is not None:
+                app_instance.drop_zone_2_label.config(
+                    text=f"📅 2ᵉ fichier : {os.path.basename(abs_path)}"
+                )
         else:
             app_instance.input2_var.set("")
+            if hasattr(app_instance, 'drop_zone_2_label') and app_instance.drop_zone_2_label is not None:
+                app_instance.drop_zone_2_label.config(
+                    text="📅 Glissez-déposez le 2ᵉ fichier (mois suivant) ici — optionnel"
+                )
 
     separator_style = raw_data.get('_summer_separator_style', None)
     if separator_style is None:

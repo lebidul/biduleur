@@ -1,3 +1,84 @@
+# Bidul v1.9.1 - Nouveau renderer WordPress "Le Bidul de nuit" pour agenda.html
+
+Version orientée intégration web : la sortie `agenda.html` (activée via la
+case **Générer les fichiers HTML**) est maintenant un **document autonome
+prêt-à-coller** dans l'éditeur de code de WordPress, avec un design
+2-colonnes "Le Bidul de nuit" (fond nuit + sidebar crème) et une structure
+d'événement standardisée en 4 lignes.
+
+## ✨ Nouveautés
+
+### Renderer WordPress dédié pour `agenda.html`
+*   Nouvelle fonction `render_wordpress_agenda()` dans `biduleur/format_utils.py`
+    qui construit l'HTML depuis les records structurés (pas de regex sur le
+    HTML sortant du renderer PDF)
+*   Sortie 2-colonnes en flexbox :
+    *   **Colonne gauche** (fond nuit `#17172E`, ~62%) : les événements datés,
+        groupés par jour avec un marker chartreuse "MER. 01" à gauche
+    *   **Colonne droite** (fond crème `#EDE8D3`, ~38%) : les sections
+        **Festivals** et **Coups de cœur** avec bullets `◆` brique
+*   Chaque événement rendu sur **4 lignes** :
+    1.  Festival + style (optionnel, italic)
+    2.  Artistes/spectacles en **BOLD** avec style en `[crochets italic]`,
+        séparés par un **+** chartreuse
+    3.  Lieu, Ville (italic)
+    4.  Heure — Tarif (avec tarif en chartreuse)
+*   **Convention Bidul respectée** : les artistes de `GENRE = concert` sont
+    en MAJUSCULES ; les événements `GENRE = sv` (spectacle vivant) gardent
+    leur casse d'origine
+
+### Adaptations mobile (media query ≤720px)
+*   Les 2 colonnes s'**empilent verticalement** grâce à `flex-wrap` +
+    `flex-basis` en pixels (380px + 240px = 620px min avant wrap)
+*   Sur mobile, l'agenda prend une allure de **"card"** : bords arrondis 6px,
+    paddings internes réduits (24×16px), fonts et day-marker calibrés pour
+    la largeur réduite (JUILLET 32px, day num 36px)
+*   Styles inline redondants sur les éléments critiques (day, month-sep,
+    root container) pour survivre au filtrage éventuel du `<style>` par
+    l'éditeur Gutenberg
+
+### Séparateurs de mois dans l'agenda WordPress (mode Bidul d'été)
+*   Quand `summer_mode` est actif, un séparateur `JUILLET` / `AOÛT` en
+    Impact 44px chartreuse est inséré au changement de fichier d'origine —
+    même logique que le renderer PDF
+
+## 🐛 Corrections
+
+### Label visuel de la 2ᵉ drop zone à l'import config
+*   Lors de l'import d'une config avec `summer_mode = true` et un
+    `input_file_2` renseigné, la variable Tkinter était bien restaurée mais
+    le label de la 2ᵉ drop zone gardait le texte "📅 Glissez-déposez le 2ᵉ
+    fichier…" — visuellement rien ne semblait avoir été chargé
+*   Corrigé : le label est maintenant rafraîchi avec le nom du fichier
+    (identique au comportement de la 1ʳᵉ drop zone)
+
+## 🔧 Détails techniques
+
+*   `biduleur/format_utils.py` : ajout de `render_wordpress_agenda()` +
+    helpers `_wp_esc`, `_wp_link_or_text`, `_wp_split_date`,
+    `_wp_extract_spectacles`, `_wp_render_event`, `_wp_render_sidebar_item`,
+    `_wp_render_month_title` + constante CSS `_WP_NUIT_CSS`
+*   `leTruc/_helpers.py` : `run_pipeline()` appelle maintenant
+    `render_wordpress_agenda(...)` pour la sortie `agenda.html` (remplace
+    l'appel `output_html_file(pretty=True)` du prettify précédent) ;
+    `load_and_apply_config()` rafraîchit le label de la 2ᵉ drop zone après
+    avoir restauré `input2_var`
+*   Le `bidul.html` (utilisé par le renderer PDF) reste inchangé — pas
+    d'impact sur la sortie PDF
+
+## 📚 Notes d'utilisation
+
+*   L'`agenda.html` généré est un document HTML complet avec `<!DOCTYPE>`,
+    `<style>` scoped à `.bdul-agenda-nuit`, et styles inline redondants
+*   Pour l'intégrer dans WordPress : ouvrir le fichier dans un éditeur
+    texte, tout copier, puis coller dans un bloc **HTML personnalisé** dans
+    l'éditeur de code de la page WP
+*   Sur les thèmes WP qui ne déclarent pas `align-wide`, l'agenda restera
+    contraint à la largeur de contenu du thème (comportement attendu) — le
+    design "card" mobile est optimisé pour ce cas
+
+---
+
 # Bidul v1.9.0 - Mode Bidul d'été : édition combinée 2 mois, section FESTIVALS, séparateurs de mois
 
 Nouvelle version dédiée à l'édition spéciale **juillet + août** (ou tout couple
