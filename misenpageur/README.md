@@ -120,6 +120,14 @@ Mode spécial pour l'édition combinée juillet+août (ou tout couple de mois).
 -   Activable indépendamment du mode été — mais c'est en mode été qu'on l'utilise typiquement (l'édition combinée met les gros festivals d'été en avant).
 -   Ordre des sections : `FESTIVALS` → `Coups de coeur et en bref` → événements datés du fichier 1 → (séparateur) → événements datés du fichier 2.
 
+#### Renderer WordPress "Le Bidul de nuit" (`biduleur/format_utils.py` → `render_wordpress_agenda`)
+-   Génère un HTML autonome pour la sortie `*.agenda.html` (activée via **Générer les fichiers HTML**), destiné à alimenter une page WordPress en copier-coller dans l'éditeur de code.
+-   Layout 2-colonnes flexbox : gauche fond nuit (`#17172E`, événements datés groupés par jour avec marker chartreuse "MER. 01"), droite fond crème (`#EDE8D3`, sections **Festivals** + **Coups de cœur**).
+-   Chaque événement rendu sur 4 lignes : (1) Festival + `(style italic)` optionnel, (2) **ARTISTES** en bold + `[style italic]` séparés par `+` chartreuse, (3) *Lieu, Ville* italic, (4) `Heure — Tarif`.
+-   Convention de casse : `GENRE = concert` → artiste en MAJUSCULES ; `GENRE = sv` → capfirst.
+-   Media query mobile (≤720px) : colonnes empilées, rendu "card" (bords arrondis, paddings réduits, fonts calibrés). Styles inline redondants sur les éléments critiques pour survivre au filtrage Gutenberg.
+-   En mode Bidul d'été, un séparateur `JUILLET` / `AOÛT` en Impact chartreuse est inséré au changement de fichier d'origine.
+
 #### Images inline (`inline_images_*`)
 -   `inline_images_enabled`: active la prise en compte des lignes Excel avec `GENRE 1 = "img"` (le nom du fichier image est dans `NOM SPECTACLE 1`).
 -   `inline_images_dir`: dossier des images (défaut `misenpageur/assets/images/`).
