@@ -265,6 +265,8 @@ def run_pipeline(
         summer_mode: bool = False,
         input_file_2: str = "",
         summer_separator_style: str = "banner",
+        cucaracha_font_size_mode: str = "fixed",
+        cucaracha_font_size_min: float = 5.0,
 ) -> tuple[bool, str]:
     debug_dir = None
     if debug_mode:
@@ -484,6 +486,8 @@ def run_pipeline(
         cfg.cucaracha_box['content_value'] = cucaracha_value
         cfg.cucaracha_box['text_font_name'] = cucaracha_text_font
         cfg.cucaracha_box['text_font_size'] = cucaracha_font_size
+        cfg.cucaracha_box['text_font_size_mode'] = cucaracha_font_size_mode
+        cfg.cucaracha_box['text_font_size_min'] = cucaracha_font_size_min
         cfg.chapeau_icon_enabled = chapeau_icon_enabled
         cfg.free_icon_enabled = free_icon_enabled
         cfg.inline_images_enabled = inline_images_enabled
@@ -843,6 +847,10 @@ def save_current_config_from_app(app_instance, dest_path: str) -> None:
     cfg.cucaracha_box['content_value'] = cuca_value
     cfg.cucaracha_box['text_font_name'] = app_instance.cucaracha_font_var.get()
     cfg.cucaracha_box['text_font_size'] = _i(app_instance.cucaracha_font_size_var, 8)
+    if hasattr(app_instance, "cucaracha_font_size_mode_var"):
+        cfg.cucaracha_box['text_font_size_mode'] = app_instance.cucaracha_font_size_mode_var.get()
+    if hasattr(app_instance, "cucaracha_font_size_min_var"):
+        cfg.cucaracha_box['text_font_size_min'] = _f(app_instance.cucaracha_font_size_min_var, 5.0)
 
     # Icônes
     cfg.chapeau_icon_enabled = app_instance.chapeau_icon_var.get()
@@ -1122,6 +1130,14 @@ def load_and_apply_config(app_instance, config_path: str):
         cfsize = cfg.cucaracha_box.get("text_font_size")
         if cfsize is not None:
             app_instance.cucaracha_font_size_var.set(str(cfsize))
+
+        cfmode = cfg.cucaracha_box.get("text_font_size_mode")
+        if cfmode and hasattr(app_instance, "cucaracha_font_size_mode_var"):
+            app_instance.cucaracha_font_size_mode_var.set(str(cfmode))
+
+        cfmin = cfg.cucaracha_box.get("text_font_size_min")
+        if cfmin is not None and hasattr(app_instance, "cucaracha_font_size_min_var"):
+            app_instance.cucaracha_font_size_min_var.set(str(cfmin))
 
     # Stories
     if isinstance(cfg.stories, dict):
