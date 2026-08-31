@@ -400,17 +400,90 @@ def register_courier() -> bool:
 
 # -------------------- Enregistrement dynamique --------------------
 
+# Suffixes de graisse/style à stripper pour trouver le "nom de base" d'une
+# famille de polices. Utilisé pour retrouver des familles sœurs quand la
+# variante demandée (bold/italic) est absente de la famille primaire.
+_FONT_WEIGHT_SUFFIXES = {
+    "thin", "hairline", "extralight", "ultralight", "light", "semilight",
+    "regular", "book", "normal", "roman", "text",
+    "medium",
+    "semibold", "demibold", "bold", "extrabold", "ultrabold",
+    "heavy", "black", "extrablack",
+    "italic", "oblique",
+    # Modificateurs qui peuvent précéder un poids en 2 mots
+    # ('Ultra Light', 'Extra Bold', 'Semi Bold', 'Demi Bold')
+    "ultra", "extra", "semi", "demi",
+}
+
+
+def _strip_font_weight_suffixes(name: str) -> str:
+    """
+    Retire les suffixes de poids/style en fin de nom de famille.
+    Exemples :
+        'Malgun Gothic Semilight'  -> 'Malgun Gothic'
+        'Helvetica Neue Ultra Light' -> 'Helvetica Neue'
+        'Arial'                    -> 'Arial' (inchangé)
+    """
+    tokens = name.split()
+    while len(tokens) > 1 and tokens[-1].lower() in _FONT_WEIGHT_SUFFIXES:
+        tokens.pop()
+    return " ".join(tokens)
+
+
+def _find_sibling_variant_path(
+        families: dict,
+        base_name: str,
+        need_bold: bool,
+        need_italic: bool,
+) -> Optional[str]:
+    """
+    Cherche une famille sœur (même base_name après stripping) dont le nom
+    encode les traits voulus (bold/italic). Retourne le chemin de sa variante
+    regular, ou None si aucune correspondance.
+
+    Ex. pour base_name='Malgun Gothic', need_bold=True, need_italic=False :
+    cherche une famille 'Malgun Gothic Bold' et retourne sa variante regular.
+    """
+    for fam_name, fam in families.items():
+        if fam_name == base_name:
+            # La famille de base elle-même — peut avoir des variantes internes
+            key = ("bolditalic" if (need_bold and need_italic)
+                   else "bold" if need_bold
+                   else "italic" if need_italic
+                   else "regular")
+            v = fam.variants.get(key)
+            if v:
+                return v.path
+            continue
+        if _strip_font_weight_suffixes(fam_name) != base_name:
+            continue
+        low = fam_name.lower()
+        has_bold = "bold" in low or "heavy" in low or "black" in low
+        has_italic = "italic" in low or "oblique" in low
+        if has_bold == need_bold and has_italic == need_italic:
+            reg = fam.variants.get("regular")
+            if reg:
+                return reg.path
+    return None
+
+
 def register_font_family_by_name(name: str) -> bool:
     """
     Enregistre une famille de polices par son nom, en utilisant la découverte
     dynamique (font_discovery) pour trouver les fichiers TTF.
+
+    Si la famille primaire ne fournit pas de variante bold/italic/bolditalic
+    (cas typique des polices Windows exposées comme familles séparées par
+    graisse : 'Malgun Gothic Semilight' n'a pas de bold intrinsèque), on
+    cherche les variantes manquantes dans les familles sœurs partageant le
+    même nom de base après stripping des suffixes de graisse.
 
     Retourne True si la police est enregistrée avec succès (ou déjà enregistrée).
     """
     if name in _REGISTERED_FONTS:
         return True
 
-    from .font_discovery import get_font_family
+    from .font_discovery import get_font_family, scan_font_directories
 
     family = get_font_family(name)
     if family is None:
@@ -426,11 +499,35 @@ def register_font_family_by_name(name: str) -> bool:
         log.warning(f"Police '{name}' : pas de variante regular trouvée")
         return False
 
+    bold_path = bold.path if bold else None
+    italic_path = italic.path if italic else None
+    bolditalic_path = bolditalic.path if bolditalic else None
+
+    # Fallback : chercher les variantes manquantes dans les familles sœurs.
+    # Utile pour les polices Windows dont chaque graisse est exposée comme une
+    # famille séparée (Malgun Gothic Semilight, Helvetica Neue Light, ...).
+    if not (bold_path and italic_path and bolditalic_path):
+        base = _strip_font_weight_suffixes(name)
+        if base:  # Peut être == name si aucun suffixe, on essaie quand même
+            all_families = scan_font_directories()
+            if not bold_path:
+                bold_path = _find_sibling_variant_path(all_families, base, need_bold=True, need_italic=False)
+                if bold_path:
+                    log.info(f"[fonts] Bold pour '{name}' emprunté à une famille sœur ({base}) : {bold_path}")
+            if not italic_path:
+                italic_path = _find_sibling_variant_path(all_families, base, need_bold=False, need_italic=True)
+                if italic_path:
+                    log.info(f"[fonts] Italic pour '{name}' emprunté à une famille sœur ({base}) : {italic_path}")
+            if not bolditalic_path:
+                bolditalic_path = _find_sibling_variant_path(all_families, base, need_bold=True, need_italic=True)
+                if bolditalic_path:
+                    log.info(f"[fonts] BoldItalic pour '{name}' emprunté à une famille sœur ({base}) : {bolditalic_path}")
+
     return _register_family_partial(
         name,
         reg.path,
-        bold.path if bold else None,
-        italic.path if italic else None,
-        bolditalic.path if bolditalic else None,
+        bold_path,
+        italic_path,
+        bolditalic_path,
         subset=True,
     )
