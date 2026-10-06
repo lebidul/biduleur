@@ -144,6 +144,13 @@ class Application(TkinterDnD.Tk):
         self.cucaracha_value_var = tk.StringVar(value=self.cfg_defaults.get("cucaracha_value", ""))
         self.cucaracha_font_var = tk.StringVar(value=self.cfg_defaults.get("cucaracha_text_font", "Arial"))
         self.cucaracha_font_size_var = tk.StringVar(value=str(self.cfg_defaults.get("cucaracha_text_font_size", "8")))
+        # Taille de police dynamique (auto-shrink si le texte ne rentre pas)
+        self.cucaracha_font_size_mode_var = tk.StringVar(
+            value=self.cfg_defaults.get("cucaracha_text_font_size_mode", "fixed")
+        )
+        self.cucaracha_font_size_min_var = tk.StringVar(
+            value=str(self.cfg_defaults.get("cucaracha_text_font_size_min", "5"))
+        )
         self.cucaracha_text_widget = None
         self.cucaracha_frame = None
         self.drop_zone_label = None
@@ -272,6 +279,7 @@ class Application(TkinterDnD.Tk):
                 'font_size_forced_val': float(self.font_size_forced_var.get().strip()),
                 'stories_font_size_val': int(self.stories_font_size_var.get().strip()),
                 'cuca_font_size_val': int(self.cucaracha_font_size_var.get().strip()),
+                'cuca_font_size_min_val': float(self.cucaracha_font_size_min_var.get().strip() or 5.0),
                 'inline_images_scale_val': float(self.inline_images_scale_var.get().strip()),
                 'inline_images_margin_val': float(self.inline_images_margin_var.get().strip()),
             })
@@ -354,6 +362,8 @@ class Application(TkinterDnD.Tk):
             cucaracha_value=validated_args['cuca_value_val'],
             cucaracha_text_font=self.cucaracha_font_var.get(),
             cucaracha_font_size=validated_args['cuca_font_size_val'],
+            cucaracha_font_size_mode=self.cucaracha_font_size_mode_var.get(),
+            cucaracha_font_size_min=validated_args['cuca_font_size_min_val'],
             chapeau_icon_enabled=self.chapeau_icon_var.get(),
             free_icon_enabled=self.free_icon_var.get(),
             date_box_back_color=self.date_box_back_color_var.get(),

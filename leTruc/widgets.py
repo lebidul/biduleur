@@ -327,6 +327,26 @@ def _create_cucaracha_section(parent, app, ui_row):
     app.cucaracha_font_size_label.pack(side=tk.LEFT)
     app.cucaracha_font_size_entry.pack(side=tk.LEFT)
 
+    # --- Taille dynamique (auto-shrink si le texte ne rentre pas) ---
+    app.cucaracha_dyn_frame = ttk.Frame(app.cucaracha_frame)
+    tk.Label(app.cucaracha_dyn_frame, text="Mode taille :").pack(side=tk.LEFT)
+    rb_fixed = tk.Radiobutton(
+        app.cucaracha_dyn_frame, text="Fixe",
+        variable=app.cucaracha_font_size_mode_var, value="fixed"
+    )
+    rb_fixed.pack(side=tk.LEFT)
+    rb_auto = tk.Radiobutton(
+        app.cucaracha_dyn_frame, text="Auto (réduit pour tenir)",
+        variable=app.cucaracha_font_size_mode_var, value="auto"
+    )
+    rb_auto.pack(side=tk.LEFT, padx=(0, 10))
+    tk.Label(app.cucaracha_dyn_frame, text="Min (pt) :").pack(side=tk.LEFT)
+    tk.Entry(app.cucaracha_dyn_frame, textvariable=app.cucaracha_font_size_min_var, width=4).pack(side=tk.LEFT)
+    Tooltip(rb_fixed, text="La taille reste celle définie ci-dessus. Si le texte ne rentre pas, il est tronqué.")
+    Tooltip(rb_auto,
+            text="La taille est réduite automatiquement (pas de 0.5pt) jusqu'à ce que le texte tienne dans la boîte,\n"
+                 "avec la valeur \"Min\" comme plancher.")
+
     # --- Widgets pour le type "Image" ---
     app.cucaracha_image_entry = tk.Entry(app.cucaracha_frame, textvariable=app.cucaracha_value_var)
     app.cucaracha_image_button = tk.Button(app.cucaracha_frame, text="Parcourir…")

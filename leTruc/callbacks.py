@@ -350,6 +350,8 @@ def on_toggle_cucaracha_widgets(app):
         app.cucaracha_image_button,
         app.cucaracha_preview
     ]
+    if hasattr(app, "cucaracha_dyn_frame") and app.cucaracha_dyn_frame is not None:
+        widgets_to_hide.append(app.cucaracha_dyn_frame)
     for widget in widgets_to_hide:
         widget.grid_remove()
 
@@ -357,6 +359,8 @@ def on_toggle_cucaracha_widgets(app):
     if ctype == "text":
         app.cucaracha_text_widget.grid(row=1, column=0, columnspan=3, sticky="ew", pady=(5, 0))
         app.cucaracha_font_frame.grid(row=2, column=0, columnspan=3, sticky="w", padx=5, pady=5)
+        if hasattr(app, "cucaracha_dyn_frame") and app.cucaracha_dyn_frame is not None:
+            app.cucaracha_dyn_frame.grid(row=3, column=0, columnspan=3, sticky="w", padx=5, pady=(0, 5))
 
     elif ctype == "image":
         app.cucaracha_image_entry.grid(row=1, column=0, columnspan=2, sticky="ew", pady=5)

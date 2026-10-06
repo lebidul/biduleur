@@ -1365,7 +1365,9 @@ def _draw_cucaracha_box(c: canvas.Canvas, box_coords: tuple, cfg: Config):
 
     # --- TEXTE (si content_type == "text") ---
     if content_type == "text":
-        padding = 2 * mm
+        # Padding configurable (défaut 1mm, réduit vs 2mm historique pour
+        # laisser plus de place au contenu).
+        padding = float(c_cfg.get("padding_mm", 1.0)) * mm
         title_h = c_cfg.get("title_font_size", 8) * 1.2 + 4  # Approximation hauteur titre
         content_x, content_y = x + padding, y + padding
         content_w, content_h = w - (2 * padding), h - title_h - (2 * padding)
@@ -1383,11 +1385,46 @@ def _draw_cucaracha_box(c: canvas.Canvas, box_coords: tuple, cfg: Config):
         align_map = {"left": TA_LEFT, "center": TA_CENTER, "right": TA_RIGHT}
         alignment = align_map.get(c_cfg.get("text_align", "center"), TA_CENTER)
 
+        # Mode "auto" : réduit la font_size par pas de 0.5pt jusqu'à ce que
+        # le paragraphe rentre dans (content_w, content_h). Plancher configurable
+        # via `text_font_size_min` (défaut 5pt).
+        size_mode = c_cfg.get("text_font_size_mode", "fixed")
+        if size_mode == "auto":
+            try:
+                min_size = float(c_cfg.get("text_font_size_min", 5.0))
+            except (ValueError, TypeError):
+                min_size = 5.0
+            current = font_size
+            while current >= min_size:
+                trial_style = ParagraphStyle(
+                    'CucarachaTextTrial',
+                    fontName=font_name,
+                    fontSize=current,
+                    leading=current * 1.2,  # leading plus serré pour maximiser
+                    alignment=alignment,
+                )
+                try:
+                    trial_p = Paragraph(text_content, trial_style)
+                    _, needed_h = trial_p.wrap(content_w, content_h + 10_000)
+                    if needed_h <= content_h:
+                        font_size = current
+                        break
+                except Exception:
+                    pass
+                current -= 0.5
+            else:
+                # Aucune taille ne rentre : on garde le plancher (peut déborder mais
+                # au moins on rend quelque chose).
+                font_size = min_size
+            leading_ratio = 1.2
+        else:
+            leading_ratio = 1.3
+
         text_style = ParagraphStyle(
             'CucarachaText',
             fontName=font_name,
             fontSize=font_size,
-            leading=font_size * 1.3,
+            leading=font_size * leading_ratio,
             alignment=alignment
         )
         story = [Paragraph(text_content, text_style)]

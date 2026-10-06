@@ -1,3 +1,35 @@
+# Bidul v1.9.2 - Cucaracha : taille de police dynamique + fix gras des dates
+
+## ✨ Nouveautés
+
+### Cucaracha : taille de police dynamique (auto-shrink)
+*   Nouveau sélecteur **Mode taille** dans la section Cucaracha (type texte) :
+    *   **Fixe** : la taille reste celle définie, le texte est tronqué s'il ne rentre pas
+    *   **Auto (réduit pour tenir)** : la taille diminue par pas de 0.5pt jusqu'à ce que le texte tienne dans la boîte
+*   Nouveau champ **Min (pt)** : plancher de la réduction (défaut 5pt)
+*   Mode auto : interligne resserré (1.2 au lieu de 1.3)
+*   Padding interne de la boîte réduit (1mm au lieu de 2mm), configurable via `cucaracha_box.padding_mm`
+*   Mode et minimum sauvegardés/restaurés dans l'export/import de config
+    (`text_font_size_mode`, `text_font_size_min`)
+
+## 🐛 Corrections
+
+### `date_bold` sans effet sur certaines polices Windows
+*   Certaines polices Windows exposent chaque graisse comme une famille séparée
+    (ex. « Malgun Gothic Semilight »), sans variante bold intrinsèque : le gras
+    des dates n'était alors pas appliqué
+*   Corrigé : les variantes bold/italic/bold-italic manquantes sont désormais
+    recherchées dans les familles sœurs (même nom de base)
+
+## 🔧 Détails techniques
+
+*   `misenpageur/misenpageur/drawing.py` : boucle d'auto-shrink dans `_draw_cucaracha_box`
+*   `misenpageur/misenpageur/fonts.py` : `_strip_font_weight_suffixes`, `_find_sibling_variant_path`,
+    fallback dans `register_font_family_by_name`
+*   `leTruc/` : variables, widgets (`cucaracha_dyn_frame`), callbacks et sauvegarde/chargement de config
+
+---
+
 # Bidul v1.9.1 - Nouveau renderer WordPress "Le Bidul de nuit" pour agenda.html
 
 Version orientée intégration web : la sortie `agenda.html` (activée via la

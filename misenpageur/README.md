@@ -144,6 +144,9 @@ Configure la boîte spéciale en bas de la colonne des logos (page 1).
 -   `content_type`: "none", "text", ou "image".
 -   `content_value`: Le texte ou le chemin de l'image.
 -   `height_mm`: Hauteur de la boîte si elle est active.
+-   `text_font_size_mode`: `"fixed"` (défaut) ou `"auto"` (réduit la police par pas de 0.5pt jusqu'à ce que le texte tienne).
+-   `text_font_size_min`: Taille plancher en mode auto (défaut `5`).
+-   `padding_mm`: Marge interne du texte (défaut `1.0`).
 -   ... et d'autres options de style.
 
 #### Poster (Page 3) (`poster`)
