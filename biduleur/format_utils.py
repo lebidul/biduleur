@@ -316,9 +316,13 @@ def _wp_extract_spectacles(record: Dict, spectacle_col_sets) -> list:
         artist = _to_str(record.get(cs['artiste'], '')).strip()
         style = _to_str(record.get(cs['style'], '')).strip()
 
-        if not (spectacle or artist):
-            continue
         if genre.lower() == GENRE_EVT_IMAGE:
+            continue
+        # Style seul (ni spectacle ni artiste) : comme dans le PDF
+        # (format_sv / format_concert), le style devient le libellé en gras.
+        if not (spectacle or artist):
+            if style:
+                items.append((capfirst(style), ''))
             continue
 
         # Convention Bidul : les artistes de "concert" sont TOUJOURS en majuscules,

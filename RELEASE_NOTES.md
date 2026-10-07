@@ -1,3 +1,16 @@
+# Bidul v1.9.3 - Fix agenda.html : événement avec style seul
+
+## 🐛 Corrections
+
+### Événement sans spectacle ni artiste, avec uniquement un STYLE
+*   Dans `agenda.html` (renderer WordPress), un événement dont seule la colonne
+    `STYLE` est renseignée (ex. « Jam session Bazar en Ordre ») perdait sa ligne
+    d'artistes, alors que le PDF l'affichait correctement
+*   Corrigé : comme dans le PDF, le style devient le libellé en gras
+*   Code : `_wp_extract_spectacles` dans `biduleur/format_utils.py`
+
+---
+
 # Bidul v1.9.2 - Cucaracha : taille de police dynamique + fix gras des dates
 
 ## ✨ Nouveautés
