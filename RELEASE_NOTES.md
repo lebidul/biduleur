@@ -1,3 +1,20 @@
+# Bidul v1.9.5 - agenda.html : reconnaissance des lieux par alias
+
+## ✨ Nouveautés
+
+### Les lieux saisis sous une variante sont retrouvés
+*   Nouveau fichier `biduleur/data/lieu_alias.csv` (copie de
+    `bidul.indexer/corpus/lieu_alias.csv`, colonnes `variante,lieu_nom`) : « Esp. Salvador »,
+    « PCV », « Th. Chaoué »… renvoient vers le nom officiel du lieu
+*   Recherche dans `lieu.csv` : nom + ville, puis nom officiel via alias + ville, puis nom seul
+    s'il est unique et que la ville est compatible (St-Cosme = Saint-Cosme, Fresnay =
+    Fresnay-sur-Sarthe, « Le Mans » par défaut). Les noms génériques (« Médiathèque »…) ne sont
+    jamais devinés sans la bonne ville
+*   Sur Février et Mars 2026, les lieux enrichis passent d'environ 60 % à plus de 85 %
+*   Code : `LieuIndex` dans `biduleur/agenda_table.py`
+
+---
+
 # Bidul v1.9.4 - agenda.html : tableau filtrable avec infos des lieux
 
 ## ✨ Nouveautés
