@@ -225,7 +225,7 @@ Beaux-Arts,Le Mans,beauxarts,,Place des Thermes,72000,48.0063067,0.1961357,nomin
 Bibliothèque,Le Mans,bibliotheque,,,,48.0247785,0.3324378,nominatim,exact,Bibliothèque,1,,,
 Bibliothèque universitaire,Le Mans,bibliothequeuniversitaire,,Boulevard Paul d'Estournelles de Constant,72000,48.0160219,0.1605519,nominatim,exact,Bibliothèque universitaire,,,,
 Bibovino,Le Mans,,10,Rue du Dr Leroy,72000,48.003076714346,0.19584725758179,manuel,exact,,,,,
-Bistro Broc Café,Le Mans,bistrobroccafe,,Boulevard des Ravalières,72560,47.9773437,0.2716957,nominatim,exact,Bistro Broc Café,,https://bistrobroccafe.e-monsite.com,https://www.facebook.com/bistrobroccafe,
+Bistro Broc Café,Changé,bistrobroccafe,,Boulevard des Ravalières,72560,47.9773437,0.2716957,nominatim,exact,Bistro Broc Café,,https://bistrobroccafe.e-monsite.com,https://www.facebook.com/bistrobroccafe,
 Bières et Chopes,Le Mans,bieresetchopes,,Ligne droite des Hunaudières,72100,47.9529814,0.2291927,nominatim,exact,Bières et Chopes,,,,
 Bld Winston Churchill,Le Mans,bldwinstonchurchill,,Boulevard Winston Churchill,72000,48.0073849,0.1967849,manuel,exact,,,,,
 Blue Zinc,Le Mans,bluezinc,45,Avenue de la Libération,72000,48.0058613,0.1890035,nominatim,exact,Blue Zinc,,,https://www.facebook.com/bluezincbar,https://www.instagram.com/blue__zinc/
@@ -296,7 +296,7 @@ Eglise St Nicolas,Le Mans,eglisestnicolas,,Rue du Général de Gaulle,72190,48.0
 Elastique à Musique,Le Mans,,14,Rue du Père Mersenne,72200,47.9983803695309,0.194036753045626,manuel,exact,,,https://asso.elastique.org,https://www.facebook.com/L.elastique.a.musique,https://www.instagram.com/elastique_a_musique/
 Entre la place des Jacobins et la place de la République,Le Mans,entreplacejacobinsetplacerepublique,,,72000,48.0073849,0.1967849,nominatim,city,Le Mans,,,,
 Espace Ephémère Centre Jacobins,Le Mans,,13,Rue Claude Blondeau,72000,48.0069312661394,0.199314678456944,manuel,exact,,,,,
-Espace Henri Salvador,Le Mans,espacehenrisalvador,2,Place Jean-Claude Boulard,72190,48.0250891,0.2056839,nominatim,exact,Espace culturel Henri Salvador,,,,
+Espace Henri Salvador,Coulaines,espacehenrisalvador,2,Place Jean-Claude Boulard,72190,48.0250891,0.2056839,nominatim,exact,Espace culturel Henri Salvador,,,,
 Espace Ronsard,Le Mans,espaceronsard,,Escalier des Ponts Neufs,72000,48.0070847,0.1970721,nominatim,approximate,Jardin Pierre de Ronsard,,,,
 Espace bis 18 rue St Martin,Le Mans,espacebis18ruestmartin,18,Rue Saint-Martin,72000,48.005421,0.1970424,nominatim,exact,L'espace Bis de la librairie Bulle,,,,
 Espace culturel L'Orée du Bois,Le Mans,espacecultureloreebois,,Chemin de Beauchene,72650,48.039266,0.1519688,nominatim,exact,Centre Saint-Christophe,,,,
@@ -346,7 +346,7 @@ L'Étoile des Saveurs,Le Mans,,,Quai Amiral Lalande,72000,48.0018468201041,0.188
 L'Étoile du Nord,Le Mans,etoilenord,10,Rue du Nord,72000,48.005816713509,0.211466275309596,manuel,exact,,,,,
 L'île aux Planches,Le Mans,ileplanches,,,,47.9987015,0.1877337,nominatim,approximate,Île aux Planches,,,,
 L.n.c,Le Mans,nc,,,,48.0073849,0.1967849,nominatim,city,Le Mans,,,,
-La Brass'vie,Le Mans,brassvie,3,Pl. André Ricordeau,72000,47.7905903412156,0.413523640180809,manuel,exact,,,https://vlap.fr/labrassviedejupilles,https://www.facebook.com/brassvie.jupilles.7,
+La Brass'vie,Jupilles,brassvie,3,Pl. André Ricordeau,72000,47.7905903412156,0.413523640180809,manuel,exact,,,https://vlap.fr/labrassviedejupilles,https://www.facebook.com/brassvie.jupilles.7,
 La Bulle,Le Mans,bulle,,Rue de l'Hôtel de Ville,72230,47.9265284,0.189545,nominatim,exact,Salle des fêtes La Bulle,,,,
 La Capitainerie,Le Mans,capitainerie,101,Quai Amiral Lalande,72000,48.001718973353,0.189310243282101,nominatim,exact,La Capitainerie,,,,
 La Capsule,Le Mans,capsule,137,Av. de la Libération,72000,48.0036287701513,0.186657054251506,manuel,exact,,,,,
