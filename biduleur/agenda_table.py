@@ -1,7 +1,7 @@
 """Agenda HTML « tableau filtrable » pour la page WordPress d'un numéro du Bidul.
 
 Pipeline : fichier tapage (xlsx/csv) -> read_and_sort_file -> événements
-normalisés -> enrichissement des lieux via data/lieu.csv -> fragment HTML
+normalisés -> enrichissement des lieux via data/lieu.csv (+ lieu_alias.csv) -> fragment HTML
 autonome (CSS + JS inline, tout préfixé ``bdl-``) à coller dans un bloc
 « HTML personnalisé » de WordPress.
 """
@@ -25,6 +25,7 @@ from biduleur.format_utils import _to_str, fmt_prix
 log = logging.getLogger(__name__)
 
 LIEUX_CSV = Path(__file__).parent / "data" / "lieu.csv"
+ALIAS_CSV = Path(__file__).parent / "data" / "lieu_alias.csv"
 TYPES = {"c": "Concert", "sv": "Spectacle"}
 
 
@@ -34,16 +35,65 @@ def _norm(s: str) -> str:
 
 
 # ---------------------------------------------------------------- lieux
-def load_lieux(path: Path = LIEUX_CSV) -> dict[tuple[str, str], dict]:
-    """Index (nom normalisé, ville normalisée) -> ligne du CSV."""
-    index: dict[tuple[str, str], dict] = {}
-    with open(path, encoding="utf-8", newline="") as f:
-        for row in csv.DictReader(f):
+def _norm_ville(v: str) -> str:
+    """Normalise une ville en dépliant St / Ste (St-Cosme -> Saint-Cosme)."""
+    expand = lambda m: "sainte" if m.group(0).lower().startswith("ste") else "saint"
+    return _norm(re.sub(r"(?<![a-zA-Z])ste?(?![a-zA-Z])", expand, v or "", flags=re.I))
+
+
+def _ville_compatible(row_ville: str, ville: str) -> bool:
+    """Même ville à l'abréviation / au suffixe près (St-Cosme, Fresnay-sur-Sarthe)."""
+    a, b = _norm_ville(row_ville), _norm_ville(ville)
+    # lieu.csv porte parfois « Le Mans » par défaut ; sans ville saisie = Le Mans
+    return a == b or a.startswith(b) or b.startswith(a) or "lemans" in (a, b)
+
+
+class LieuIndex:
+    """Retrouve une ligne de lieu.csv à partir du lieu/ville saisis dans le tapage.
+
+    Ordre : (nom, ville) exact -> via alias (variante -> nom canonique) avec la
+    ville -> nom seul quand il est unique dans lieu.csv (ville saisie absente
+    ou différente).
+    """
+
+    def __init__(self, rows: list[dict], aliases: dict[str, str]):
+        self.by_key: dict[tuple[str, str], dict] = {}
+        self.by_name: dict[str, list[dict]] = {}
+        for row in rows:
             ville = _norm(row["ville"])
-            for nom in (row["nom"], row.get("nom_normalise", "")):
-                if nom:
-                    index.setdefault((_norm(nom), ville), row)
-    return index
+            for nom in {_norm(row["nom"]), _norm(row.get("nom_normalise", ""))} - {""}:
+                self.by_key.setdefault((nom, ville), row)
+                self.by_name.setdefault(nom, []).append(row)
+        self.aliases = aliases
+
+    def find(self, nom: str, ville: str) -> dict | None:
+        n, v = _norm(nom), _norm(ville)
+        candidates = [n]
+        canon = self.aliases.get(n)
+        if canon:
+            candidates.append(canon)
+        for c in candidates:
+            if (c, v) in self.by_key:
+                return self.by_key[(c, v)]
+        for c in candidates:
+            rows = self.by_name.get(c, [])
+            # noms génériques (« Médiathèque »…) : jamais sans la bonne ville
+            if (len({_norm(r["ville"]) for r in rows}) == 1 and not rows[0].get("is_generic")
+                    and _ville_compatible(rows[0]["ville"], ville)):
+                return rows[0]
+        return None
+
+
+def load_lieux(path: Path = LIEUX_CSV, alias_path: Path | None = ALIAS_CSV) -> LieuIndex:
+    with open(path, encoding="utf-8", newline="") as f:
+        rows = list(csv.DictReader(f))
+    aliases: dict[str, str] = {}
+    if alias_path and Path(alias_path).exists():
+        with open(alias_path, encoding="utf-8", newline="") as f:
+            for r in csv.DictReader(f):
+                if r.get("variante") and r.get("lieu_nom"):
+                    aliases.setdefault(_norm(r["variante"]), _norm(r["lieu_nom"]))
+    return LieuIndex(rows, aliases)
 
 
 def _lieu_info(row: dict | None) -> dict:
@@ -77,7 +127,7 @@ def _clean_url(v: str) -> str:
     return v.split("|", 1)[0] if "|" in v else v
 
 
-def build_events(records: list[dict], periods: list[tuple[int, int]], lieux: dict) -> tuple[list[dict], list[dict]]:
+def build_events(records: list[dict], periods: list[tuple[int, int]], lieux: LieuIndex) -> tuple[list[dict], list[dict]]:
     """Retourne (événements datés, « coups de coeur / en bref »)."""
     events, brefs = [], []
     for rec in records:
@@ -115,7 +165,7 @@ def build_events(records: list[dict], periods: list[tuple[int, int]], lieux: dic
         d = date(year, month, int(day))
         item["date"] = d.isoformat()
         item["jour"] = f"{JOURS_SEMAINE[d.weekday()]} {d.day}"
-        item["lieu_info"] = _lieu_info(lieux.get((_norm(item["lieu"]), _norm(item["ville"]))))
+        item["lieu_info"] = _lieu_info(lieux.find(item["lieu"], item["ville"]))
         events.append(item)
     return events, brefs
 
