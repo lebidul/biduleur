@@ -1,4 +1,4 @@
-# Bidul (à venir) - agenda.html : tableau filtrable avec infos des lieux
+# Bidul v1.9.4 - agenda.html : tableau filtrable avec infos des lieux
 
 ## ✨ Nouveautés
 
