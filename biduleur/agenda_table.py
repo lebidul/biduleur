@@ -19,7 +19,7 @@ from biduleur.constants import (
     COLONNE_FESTIVALS, COLONNE_INFO, DATE, FESTIVAL, HORAIRE, LIEU, PRIX,
     STYLE_FESTIVAL, VILLE,
 )
-from biduleur.csv_utils import JOURS_SEMAINE, MOIS_FR, read_and_sort_file
+from biduleur.csv_utils import JOURS_SEMAINE, MOIS_FR, _month_label_from_filename, read_and_sort_file
 from biduleur.format_utils import _to_str, fmt_prix
 
 log = logging.getLogger(__name__)
@@ -59,17 +59,25 @@ def _lieu_info(row: dict | None) -> dict:
 
 # ------------------------------------------------------------ événements
 def _year_month(path: str) -> tuple[int, int]:
-    m = re.match(r"(\d{4})(\d{2})", Path(path).name)
-    if not m:
-        raise ValueError("Le nom du fichier doit commencer par AAAAMM (ex. 202601_...)")
-    return int(m.group(1)), int(m.group(2))
+    """Mois/année depuis le nom du fichier : AAAAMM_... ou nom de mois + année."""
+    name = Path(path).name
+    m = re.match(r"(\d{4})(\d{2})", name)
+    if m and 1 <= int(m.group(2)) <= 12:
+        return int(m.group(1)), int(m.group(2))
+    label = _month_label_from_filename(path)
+    y = re.search(r"(20\d{2})", name)
+    if label and y:
+        num = next(n for n, mois in MOIS_FR.items() if mois.upper() == label)
+        return int(y.group(1)), num
+    raise ValueError("Impossible de déterminer le mois du fichier : son nom doit commencer par AAAAMM "
+                     "(ex. 202601_tapage_biduleur_Janvier_2026.xlsx).")
 
 
 def _clean_url(v: str) -> str:
     return v.split("|", 1)[0] if "|" in v else v
 
 
-def build_events(records: list[dict], year: int, month: int, lieux: dict) -> tuple[list[dict], list[dict]]:
+def build_events(records: list[dict], periods: list[tuple[int, int]], lieux: dict) -> tuple[list[dict], list[dict]]:
     """Retourne (événements datés, « coups de coeur / en bref »)."""
     events, brefs = [], []
     for rec in records:
@@ -103,6 +111,7 @@ def build_events(records: list[dict], year: int, month: int, lieux: dict) -> tup
             item["label"] = label
             brefs.append(item)
             continue
+        year, month = periods[min(int(rec.get("_source_index") or 0), len(periods) - 1)]
         d = date(year, month, int(day))
         item["date"] = d.isoformat()
         item["jour"] = f"{JOURS_SEMAINE[d.weekday()]} {d.day}"
@@ -184,19 +193,32 @@ def render_html(events: list[dict], brefs: list[dict], title: str) -> str:
                .replace("{{COUNT}}", str(len(events))))
 
 
-def generate(input_file: str, output_file: str, lieux_csv: Path = LIEUX_CSV) -> dict:
-    year, month = _year_month(input_file)
-    records = read_and_sort_file(input_file)
+def render_agenda_table(input_file: str, filename_2: str | None = None,
+                        lieux_csv: Path = LIEUX_CSV) -> tuple[str, dict]:
+    """Fragment HTML prêt à coller dans un bloc « HTML personnalisé » + statistiques.
+
+    filename_2 : 2ᵉ fichier optionnel (Bidul d'été, 2 mois sur une même page).
+    """
+    files = [input_file] + ([filename_2] if filename_2 else [])
+    periods = [_year_month(f) for f in files]
+    records = read_and_sort_file(input_file, filename_2=filename_2)
     if records is None:
         raise ValueError("Lecture du fichier impossible")
-    lieux = load_lieux(lieux_csv)
-    events, brefs = build_events(records, year, month, lieux)
-    title = f"Agenda {MOIS_FR[month].capitalize()} {year}"
-    Path(output_file).write_text(render_html(events, brefs, title), encoding="utf-8")
-    matched = sum(1 for e in events if e["lieu_info"])
-    stats = {"evenements": len(events), "brefs": len(brefs), "lieux_reconnus": matched,
+    events, brefs = build_events(records, periods, load_lieux(lieux_csv))
+    mois = " – ".join(MOIS_FR[m].capitalize() for _, m in periods)
+    title = f"Agenda {mois} {periods[-1][0]}"
+    # Pas de ligne vide : l'éditeur WordPress y insérerait des <p>/<br> (wpautop).
+    fragment = "\n".join(l for l in render_html(events, brefs, title).splitlines() if l.strip())
+    stats = {"evenements": len(events), "brefs": len(brefs),
+             "lieux_enrichis": sum(1 for e in events if e["lieu_info"]),
              "lieux_sans_correspondance": sorted({f'{e["lieu"]} ({e["ville"]})' for e in events if not e["lieu_info"]})}
     log.info("Agenda tableau : %s", json.dumps({k: v for k, v in stats.items() if k != "lieux_sans_correspondance"}))
+    return fragment, stats
+
+
+def generate(input_file: str, output_file: str, filename_2: str | None = None) -> dict:
+    fragment, stats = render_agenda_table(input_file, filename_2)
+    Path(output_file).write_text(fragment, encoding="utf-8")
     return stats
 
 
@@ -207,5 +229,5 @@ if __name__ == "__main__":
     a = ap.parse_args()
     logging.basicConfig(level=logging.INFO)
     s = generate(a.input_file, a.out)
-    print(f"{s['evenements']} événements, {s['lieux_reconnus']} avec lieu enrichi, {s['brefs']} en bref")
+    print(f"{s['evenements']} événements, {s['lieux_enrichis']} avec lieu enrichi, {s['brefs']} en bref")
     print("Sans correspondance :", *s["lieux_sans_correspondance"], sep="\n  ")

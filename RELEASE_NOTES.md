@@ -1,3 +1,22 @@
+# Bidul (à venir) - agenda.html : tableau filtrable avec infos des lieux
+
+## ✨ Nouveautés
+
+### agenda.html devient un tableau filtrable pour WordPress
+*   La sortie « HTML Agenda » de Le Truc (et de la CLI) est désormais un tableau
+    Date / Événement / Lieu / Type / Prix : tri par colonne, recherche, filtres
+    ville / type / date / gratuit, affichage en cartes sur mobile
+*   Fragment autonome (CSS + JS inline, classes préfixées `bdl-`) à coller dans un
+    bloc « HTML personnalisé » de WordPress
+*   La colonne Lieu affiche adresse, site, Facebook et Instagram quand ils sont
+    connus, d'après `biduleur/data/lieu.csv` (copie de `bidul.indexer/corpus/lieu.csv`,
+    à compléter au fil des numéros ; lieu sans correspondance = nom + ville)
+*   Le nom du fichier d'entrée doit commencer par `AAAAMM` (ou contenir mois + année)
+*   Code : `biduleur/agenda_table.py`, `biduleur/templates/agenda_table.html`
+*   Fix : `python -m biduleur.main` plantait (unpack de `run_biduleur`)
+
+---
+
 # Bidul v1.9.3 - Fix agenda.html : événement avec style seul
 
 ## 🐛 Corrections
