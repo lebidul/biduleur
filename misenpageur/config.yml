@@ -131,7 +131,7 @@ section_1:
   auteur_font_name: "Arial-Bold"
   auteur_font_size: 9
   auteur_align: "center"
-  qr_code_value: "https://www.lebidul.com"
+  qr_code_value: "https://www.lebidul.com/agenda-culturel-le-bidul-du-mois/"
   qr_code_height_mm: 32
   qr_code_style: "gapped"
   qr_code_color: "#000000"

@@ -45,7 +45,9 @@ def run_biduleur(input_file: str, bidul_output_file: str, agenda_output_file: st
         output_html_file(html_body_bidul, original_file_name=input_file, output_filename=bidul_output_file)
 
         log.info(f"Génération du fichier Agenda HTML : {agenda_output_file}")
-        output_html_file(html_body_agenda, original_file_name=input_file, output_filename=agenda_output_file)
+        from biduleur.agenda_table import render_agenda_table
+        agenda_fragment, _stats = render_agenda_table(input_file)
+        Path(agenda_output_file).write_text(agenda_fragment, encoding="utf-8")
 
         log.info("-" * 40)
         log.info("Traitement terminé avec succès !")
@@ -126,7 +128,7 @@ def main() -> int:
     agenda_output = args.out_agenda or str(input_path.with_suffix(".agenda.html"))
 
     # Exécuter la logique métier et récupérer le résultat
-    success, num_lines = run_biduleur(args.input_file, bidul_output, agenda_output)
+    success, num_lines, _err = run_biduleur(args.input_file, bidul_output, agenda_output)
 
     if args.debug and debug_dir:
         # 1. Sauvegarder la "configuration" (les arguments passés)

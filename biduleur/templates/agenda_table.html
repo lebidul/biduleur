@@ -1,0 +1,106 @@
+<!-- Agenda Le Bidul — fragment autonome pour bloc « HTML personnalisé » WordPress -->
+<style>
+.bdl{--bdl-ink:#1d1d1f;--bdl-mute:#6b6b70;--bdl-line:#e3e3e6;--bdl-accent:#d6336c;--bdl-bg:#fff;--bdl-head:#2b2f4a;--bdl-head2:#3a3f63;--bdl-soft:#f6f6f8;
+  font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--bdl-ink);max-width:1100px;margin:0 auto}
+.bdl *{box-sizing:border-box}
+.bdl h2{margin:0 0 .75rem;font-size:1.6rem}
+.bdl-filtres{display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;padding:.8rem;background:var(--bdl-soft);border-radius:10px;margin-bottom:.8rem}
+.bdl-filtres input[type=search],.bdl-filtres select{padding:.5rem .7rem;border:1px solid var(--bdl-line);border-radius:8px;font:inherit;background:#fff;min-width:0}
+.bdl-filtres input[type=search]{flex:1 1 220px}
+.bdl-filtres label{display:flex;gap:.35rem;align-items:center;cursor:pointer;white-space:nowrap}
+.bdl-reset{border:0;background:none;color:var(--bdl-accent);cursor:pointer;font:inherit;text-decoration:underline}
+.bdl-count{color:var(--bdl-mute);margin:.2rem 0 .6rem;font-size:.9rem}
+.bdl table{width:100%;border-collapse:collapse;background:var(--bdl-bg)}
+.bdl table{border-radius:10px;overflow:hidden;border:1px solid var(--bdl-line)}
+.bdl th{text-align:left;padding:.75rem .8rem;background:var(--bdl-head);color:#fff;font-size:.82rem;text-transform:uppercase;letter-spacing:.06em;white-space:nowrap}
+.bdl th:nth-child(odd){background:var(--bdl-head2)}
+.bdl th button{all:unset;cursor:pointer;color:inherit}
+.bdl th button::after{content:" \2195";color:#ffffff99}
+.bdl th[aria-sort=ascending] button::after{content:" \2191";color:var(--bdl-accent)}
+.bdl th[aria-sort=descending] button::after{content:" \2193";color:var(--bdl-accent)}
+.bdl td{padding:.75rem .7rem;border-bottom:1px solid var(--bdl-line);vertical-align:top}
+.bdl td:nth-child(odd){background:#fafafc}
+.bdl td:nth-child(even){background:#fff}
+.bdl td:first-child{border-left:3px solid var(--bdl-accent)}
+.bdl tbody tr:hover td{background:#f1f1f7}
+.bdl-jour{display:block;font-weight:700}
+.bdl-heure{color:var(--bdl-mute);font-size:.9rem}
+.bdl-festival{font-size:.8rem;text-transform:uppercase;letter-spacing:.04em;color:var(--bdl-accent);font-weight:600}
+.bdl-titre{font-weight:600}
+.bdl-style{font-weight:400;color:var(--bdl-mute);font-size:.9rem}
+.bdl-lieu-nom{font-weight:600}
+.bdl-ville,.bdl-adresse{color:var(--bdl-mute);font-size:.88rem}
+.bdl-liens{list-style:none;display:flex;flex-wrap:wrap;gap:.25rem .6rem;margin:.25rem 0 0;padding:0;font-size:.85rem}
+.bdl-liens a{color:var(--bdl-accent);text-decoration:none;border-bottom:1px solid currentColor}
+.bdl-badge{display:inline-block;padding:.1rem .5rem;border-radius:99px;font-size:.78rem;font-weight:600;margin:0 .25rem .25rem 0}
+.bdl-badge-c{background:#e7f0ff;color:#1c4fb3}.bdl-badge-sv{background:#fff0e0;color:#a2540a}
+.bdl-prix{white-space:nowrap}
+.bdl tr[hidden]{display:none!important}
+.bdl-vide{display:none;padding:2rem;text-align:center;color:var(--bdl-mute)}
+.bdl-brefs{margin-top:2rem;padding:1rem 1.2rem;background:var(--bdl-soft);border-radius:10px}
+.bdl-brefs h3{margin-top:0}.bdl-brefs ul{margin:0;padding-left:1.1rem}.bdl-brefs li{margin:.35rem 0}
+@media(max-width:720px){
+  .bdl thead{display:none}
+  .bdl tr{display:block;padding:.8rem 0;border-bottom:1px solid var(--bdl-line)}
+  .bdl td,.bdl td:nth-child(odd){display:block;border:0;padding:.15rem .6rem;background:transparent}
+  .bdl td:first-child{border-left:3px solid var(--bdl-accent)}
+  .bdl td[data-label=Type]:empty,.bdl td[data-label=Prix]:empty{display:none}
+  .bdl td[data-label=Date]{display:flex;gap:.6rem;align-items:baseline}
+}
+</style>
+<div class="bdl" id="bdl">
+  <h2>{{TITLE}}</h2>
+  <div class="bdl-filtres">
+    <input type="search" id="bdl-q" placeholder="Rechercher un artiste, un lieu, une ville…" aria-label="Rechercher">
+    <select id="bdl-ville" aria-label="Ville"><option value="">Toutes les villes</option>{{VILLES}}</select>
+    <select id="bdl-type" aria-label="Type"><option value="">Tous les types</option><option>Concert</option><option>Spectacle</option></select>
+    <select id="bdl-date" aria-label="Jour"><option value="">Tous les jours</option>{{JOURS}}</select>
+    <label><input type="checkbox" id="bdl-gratuit"> Gratuit</label>
+    <button type="button" class="bdl-reset" id="bdl-reset">Réinitialiser</button>
+  </div>
+  <div class="bdl-count" id="bdl-count" aria-live="polite"></div>
+  <table>
+    <thead><tr>
+      <th aria-sort="ascending"><button type="button" data-k="date">Date</button></th>
+      <th><button type="button" data-k="titre">Événement</button></th>
+      <th><button type="button" data-k="lieu">Lieu</button></th>
+      <th>Type</th><th>Prix</th>
+    </tr></thead>
+    <tbody>
+{{ROWS}}
+    </tbody>
+  </table>
+  <div class="bdl-vide" id="bdl-vide">Aucun événement ne correspond à ces filtres.</div>
+  {{BREFS}}
+</div>
+<script>
+(function(){
+  var root=document.getElementById('bdl'), $=function(i){return document.getElementById(i)};
+  var tbody=root.querySelector('tbody'), rows=[].slice.call(tbody.rows);
+  function norm(s){return s.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9]/g,'')}
+  function apply(){
+    var q=norm($('bdl-q').value), v=$('bdl-ville').value, t=$('bdl-type').value, d=$('bdl-date').value, g=$('bdl-gratuit').checked, n=0;
+    rows.forEach(function(r){
+      var ds=r.dataset, ok=(!q||ds.search.indexOf(q)>-1)&&(!v||ds.ville===v)&&(!t||ds.types.split(',').indexOf(t)>-1)&&(!d||ds.date===d)&&(!g||ds.gratuit==='1');
+      r.hidden=!ok; if(ok)n++;
+    });
+    $('bdl-count').textContent=n+' événement'+(n>1?'s':'')+' sur {{COUNT}}';
+    $('bdl-vide').style.display=n?'none':'block';
+  }
+  ['bdl-q','bdl-ville','bdl-type','bdl-date','bdl-gratuit'].forEach(function(i){$(i).addEventListener('input',apply)});
+  $('bdl-reset').addEventListener('click',function(){
+    $('bdl-q').value=$('bdl-ville').value=$('bdl-type').value=$('bdl-date').value='';$('bdl-gratuit').checked=false;apply()});
+  var key={date:function(r){return r.dataset.date+(r.cells[0].querySelector('.bdl-heure')||{textContent:''}).textContent},
+    titre:function(r){return norm(r.cells[1].textContent)}, lieu:function(r){return norm(r.cells[2].textContent)}};
+  [].forEach.call(root.querySelectorAll('th button'),function(b){
+    b.addEventListener('click',function(){
+      var th=b.parentNode, dir=th.getAttribute('aria-sort')==='ascending'?-1:1;
+      [].forEach.call(root.querySelectorAll('th'),function(h){h.removeAttribute('aria-sort')});
+      th.setAttribute('aria-sort',dir===1?'ascending':'descending');
+      var f=key[b.dataset.k];
+      rows.sort(function(a,c){var x=f(a),y=f(c);return x<y?-dir:x>y?dir:0}).forEach(function(r){tbody.appendChild(r)});
+    });
+  });
+  apply();
+})();
+</script>
