@@ -101,7 +101,7 @@ def _lieu_info(row: dict | None) -> dict:
     if not row:
         return {}
     voie = " ".join(p for p in (row["adresse_numero"], row["adresse_voie"]) if p)
-    adresse = ", ".join(p for p in (voie, " ".join(p for p in (row["code_postal"], row["ville"]) if p)) if p)
+    adresse = ", ".join(p for p in (voie, row["code_postal"]) if p)  # la ville est déjà affichée au-dessus
     info = {"adresse": adresse if voie else "",
             "site": row["site"], "facebook": row["facebook"], "instagram": row["instagram"]}
     return {k: v for k, v in info.items() if v}
