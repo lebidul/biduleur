@@ -53,7 +53,7 @@
     <input type="search" id="bdl-q" placeholder="Rechercher un artiste, un lieu, une ville…" aria-label="Rechercher">
     <select id="bdl-ville" aria-label="Ville"><option value="">Toutes les villes</option>{{VILLES}}</select>
     <select id="bdl-type" aria-label="Type"><option value="">Tous les types</option><option>Concert</option><option>Spectacle</option></select>
-    <input type="date" id="bdl-date" aria-label="À partir du" style="padding:.45rem;border:1px solid var(--bdl-line);border-radius:8px;font:inherit">
+    <select id="bdl-date" aria-label="Jour"><option value="">Tous les jours</option>{{JOURS}}</select>
     <label><input type="checkbox" id="bdl-gratuit"> Gratuit</label>
     <button type="button" class="bdl-reset" id="bdl-reset">Réinitialiser</button>
   </div>
@@ -80,7 +80,7 @@
   function apply(){
     var q=norm($('bdl-q').value), v=$('bdl-ville').value, t=$('bdl-type').value, d=$('bdl-date').value, g=$('bdl-gratuit').checked, n=0;
     rows.forEach(function(r){
-      var ds=r.dataset, ok=(!q||ds.search.indexOf(q)>-1)&&(!v||ds.ville===v)&&(!t||ds.types.split(',').indexOf(t)>-1)&&(!d||ds.date>=d)&&(!g||ds.gratuit==='1');
+      var ds=r.dataset, ok=(!q||ds.search.indexOf(q)>-1)&&(!v||ds.ville===v)&&(!t||ds.types.split(',').indexOf(t)>-1)&&(!d||ds.date===d)&&(!g||ds.gratuit==='1');
       r.hidden=!ok; if(ok)n++;
     });
     $('bdl-count').textContent=n+' événement'+(n>1?'s':'')+' sur {{COUNT}}';

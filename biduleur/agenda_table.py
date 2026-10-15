@@ -182,13 +182,17 @@ def render_html(events: list[dict], brefs: list[dict], title: str) -> str:
     villes = sorted({e["ville"] for e in events if e["ville"]}, key=_norm)
     n_ville = lambda v: sum(1 for e in events if e["ville"] == v)
     opts = "".join(f'<option value="{_e(v)}">{_e(v)} ({n_ville(v)})</option>' for v in villes)
+    jours: dict[str, list] = {}
+    for e in events:
+        jours.setdefault(e["date"], [e["jour"], 0])[1] += 1
+    jours_opts = "".join(f'<option value="{d}">{_e(j)} ({n})</option>' for d, (j, n) in sorted(jours.items()))
     rows = "\n".join(_row(e) for e in events)
     bref_html = ""
     if brefs:
         bref_html = ('<section class="bdl-brefs"><h3>Coups de cœur et en bref</h3><ul>'
                      + "".join(_bref(b) for b in brefs) + "</ul></section>")
     tpl = (Path(__file__).parent / "templates" / "agenda_table.html").read_text(encoding="utf-8")
-    return (tpl.replace("{{TITLE}}", _e(title)).replace("{{VILLES}}", opts)
+    return (tpl.replace("{{TITLE}}", _e(title)).replace("{{VILLES}}", opts).replace("{{JOURS}}", jours_opts)
                .replace("{{ROWS}}", rows).replace("{{BREFS}}", bref_html)
                .replace("{{COUNT}}", str(len(events))))
 
