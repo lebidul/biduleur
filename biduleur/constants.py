@@ -738,5 +738,9 @@ PROPER_NOUNS_MAP: Dict[str, str] = {
     "uk": "UK",
     "rdc": "RDC",
     "uae": "UAE",
+    # Noms propres divers
+    "wajdi": "Wajdi",
+    "mowawad": "Mowawad",
+    "cuba": "Cuba",
 }
 

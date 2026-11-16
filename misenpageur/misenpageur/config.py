@@ -239,5 +239,8 @@ class StoryConfig:
     background_type: str = "color"
     background_image: Optional[str] = None
     background_image_alpha: float = 0.5
-    margin: int = 60
-    line_spacing_ratio: float = 1.2
+    margin: int = 70
+    line_spacing_ratio: float = 1.25
+    # Zone sûre Instagram : espace réservé en haut (profil) et en bas (réponse)
+    safe_top: int = 160
+    safe_bottom: int = 200

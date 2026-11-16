@@ -109,6 +109,15 @@ def parse_bidul_event(
             subhead_style_val = event.get('_subhead_style', '') or event.get(STYLE_FESTIVAL, '')
             style_suffix = format_style(subhead_style_val)
             subhead_text = f"{evt_festival}{style_suffix}"
+            # Champs communs à tout le groupe (lieu, ville, heure, prix) remontés ici
+            extra = event.get('_subhead_extra') or {}
+            if extra:
+                extra_str = (
+                    f"{format_lieu(extra.get(LIEU, ''))}{format_lieu(extra.get(VILLE, ''))}"
+                    f"{fmt_heure(extra.get(HORAIRE, ''))}{fmt_prix(extra.get(PRIX, ''))}"
+                ).rstrip(", ")
+                if extra_str:
+                    subhead_text += f", {extra_str}"
             subfest_para = f"{P_MD_OPEN}{subhead_text}{P_MD_CLOSE}"
             line_bidul += subfest_para
             line_agenda += subfest_para
@@ -178,6 +187,9 @@ def parse_bidul_event(
 
     # Créez d'abord le bloc heure/prix
     heure_prix_block = f"{heure}{prix}"
+    if festival_subgroup_enabled:
+        # Heure/prix peuvent avoir été remontés dans le sous-en-tête : pas de virgule orpheline
+        heure_prix_block = heure_prix_block.rstrip(", ")
     heure_prix_insecable = heure_prix_block.replace(" ", "\u00A0")
 
     # Construction des lignes de sortie
