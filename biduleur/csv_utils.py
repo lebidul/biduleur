@@ -785,6 +785,25 @@ def parse_bidul(
                         group_styles[key] = st
         datefest_counts = cnt
 
+        # Champs (lieu, ville, heure, prix) communs à TOUS les événements d'un
+        # sous-groupe → remontés dans le sous-en-tête et retirés des événements.
+        _common_fields = (LIEU, VILLE, HORAIRE, PRIX)
+        group_rows = {}
+        for r in sorted_events:
+            f = _fest_key_for_count(r)
+            if f and cnt[(r.get(DATE, '') or '', f)] >= 2:
+                group_rows.setdefault((r.get(DATE, '') or '', f), []).append(r)
+        group_common = {}  # (date, festival) -> {champ: valeur commune}
+        for key, rows in group_rows.items():
+            common = {}
+            for col in _common_fields:
+                vals = {_to_str_helper(r.get(col, '')).strip() for r in rows}
+                vals_l = {v.lower() for v in vals}
+                if len(vals_l) == 1 and next(iter(vals_l)) not in ('', 'nan'):
+                    common[col] = next(iter(vals))
+            if common:
+                group_common[key] = common
+
         # Calcul de la "position effective" pour chaque event :
         # - Si dans un groupe (count ≥ 2) : position du 1er event du groupe
         # - Sinon : sa propre position
@@ -841,6 +860,11 @@ def parse_bidul(
                     # Injecte dans la row pour que parse_bidul_event puisse le
                     # récupérer lors de la 1re émission du sous-en-tête.
                     row['_subhead_style'] = subhead_style_for_event
+                    common = group_common.get((d_val, f_key))
+                    if common:
+                        row['_subhead_extra'] = common
+                        for col in common:
+                            row[col] = ''
 
         # --- Marquage du mois (mode Bidul d'été) ---
         # Ignore les lignes FESTIVALS et "Coups de coeur" qui sont des sections globales.
