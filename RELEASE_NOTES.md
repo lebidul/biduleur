@@ -13,6 +13,17 @@
 *   Sur Février et Mars 2026, les lieux enrichis passent d'environ 60 % à plus de 85 %
 *   Code : `LieuIndex` dans `biduleur/agenda_table.py`
 
+### Sous-groupes de festival : champs communs remontés
+*   Lieu, ville, heure et prix identiques pour tous les événements d'un sous-groupe sont
+    affichés une seule fois dans le sous-en-tête, et retirés des événements
+
+### Stories Instagram de l'agenda
+*   Un jour n'est plus coupé entre deux images s'il tient sur une page ; sinon il continue
+    avec « (suite) »
+*   Contenu contenu dans la zone sûre Instagram (`safe_top` / `safe_bottom`), retour à la
+    ligne mesuré sur la police réelle, police par défaut plus grande
+*   Le symbole « € » est conservé : repli sur la police système si la copie embarquée n'a pas le glyphe
+
 ---
 
 # Bidul v1.9.4 - agenda.html : tableau filtrable avec infos des lieux

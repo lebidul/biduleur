@@ -222,11 +222,13 @@ stories:
   width: 1080
   height: 1920
   agenda_font_name: "Arial Narrow"
-  agenda_font_size: 18
+  agenda_font_size: 38
   text_color: "#62d92f"
   background_color: "#000000"
-  margin: 25
-  line_spacing_ratio: 2.0
+  margin: 70
+  line_spacing_ratio: 1.25
+  safe_top: 160
+  safe_bottom: 200
 
 # ======================================================================
 # NOTES D'UTILISATION
