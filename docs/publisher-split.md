@@ -61,8 +61,8 @@ bidul.publisher/
 ```
 
 - `events.py` : lecture/validation de `events.json` (dataclass, vérif de `schema_version`).
-- Suppression de `gsheet_client` : la source devient `events.json`. À arbitrer : récupérer le
-  fichier depuis une release GitHub du biduleur, un Drive, ou un commit dans un dépôt de données.
+- Suppression de `gsheet_client` : la source devient `events.json`. Le fichier est récupéré depuis
+  une release GitHub du biduleur.
 - `daily_post.py`, `agenda.py`, `main.v0.py`, `templates.py` (templates inline obsolètes) :
   réécrits ou abandonnés au profit de templates fichiers.
 
