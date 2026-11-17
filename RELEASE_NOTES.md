@@ -1,4 +1,4 @@
-# Bidul v1.9.5 - agenda.html : reconnaissance des lieux par alias
+# Bidul v1.9.5 - agenda.html : lieux par alias, sous-groupes de festival, stories Instagram
 
 ## ✨ Nouveautés
 
@@ -12,6 +12,8 @@
     jamais devinés sans la bonne ville
 *   Sur Février et Mars 2026, les lieux enrichis passent d'environ 60 % à plus de 85 %
 *   Code : `LieuIndex` dans `biduleur/agenda_table.py`
+*   La ville n'est plus répétée dans l'adresse affichée du lieu
+*   Correction de la ville de Bistro Broc Café, Espace Henri Salvador et La Brass'vie (`lieu.csv`)
 
 ### Sous-groupes de festival : champs communs remontés
 *   Lieu, ville, heure et prix identiques pour tous les événements d'un sous-groupe sont
@@ -23,6 +25,9 @@
 *   Contenu contenu dans la zone sûre Instagram (`safe_top` / `safe_bottom`), retour à la
     ligne mesuré sur la police réelle, police par défaut plus grande
 *   Le symbole « € » est conservé : repli sur la police système si la copie embarquée n'a pas le glyphe
+
+### Style
+*   « wajdi », « mowawad » et « cuba » gardent leur majuscule initiale
 
 ---
 
