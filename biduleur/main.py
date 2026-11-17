@@ -86,6 +86,10 @@ def make_parser() -> argparse.ArgumentParser:
         help="Chemin du fichier de sortie pour l'Agenda HTML. (Défaut: <input>.agenda.html)"
     )
     p.add_argument(
+        "--out-events-json",
+        help="Chemin de sortie pour events.json (événements normalisés, consommés par bidul.publisher)."
+    )
+    p.add_argument(
         "-v", "--verbose",
         action="store_true",
         help="Activer l'affichage des logs détaillés dans la console."
@@ -129,6 +133,14 @@ def main() -> int:
 
     # Exécuter la logique métier et récupérer le résultat
     success, num_lines, _err = run_biduleur(args.input_file, bidul_output, agenda_output)
+
+    if success and args.out_events_json:
+        from biduleur.export_events import export_events_json
+        try:
+            export_events_json(args.input_file, args.out_events_json)
+        except Exception as e:
+            log.error(f"Export events.json impossible : {e}")
+            success = False
 
     if args.debug and debug_dir:
         # 1. Sauvegarder la "configuration" (les arguments passés)
